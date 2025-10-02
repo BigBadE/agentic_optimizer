@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
+use std::fs::read_to_string;
 use std::path::PathBuf;
+use crate::core::{Error, Result};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Query {
@@ -9,7 +11,7 @@ pub struct Query {
 }
 
 impl Query {
-    pub fn new(text: impl Into<String>) -> Self {
+    pub fn new<T: Into<String>>(text: T) -> Self {
         Self {
             text: text.into(),
             conversation_id: None,
@@ -17,6 +19,7 @@ impl Query {
         }
     }
 
+    #[must_use]
     pub fn with_files(mut self, files: Vec<PathBuf>) -> Self {
         self.files_context = files;
         self
@@ -41,7 +44,7 @@ pub struct TokenUsage {
 }
 
 impl TokenUsage {
-    pub fn total(&self) -> u64 {
+    pub const fn total(&self) -> u64 {
         self.input + self.output + self.cache_read + self.cache_write
     }
 }
@@ -53,13 +56,14 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(system_prompt: impl Into<String>) -> Self {
+    pub fn new<T: Into<String>>(system_prompt: T) -> Self {
         Self {
             files: Vec::new(),
             system_prompt: system_prompt.into(),
         }
     }
 
+    #[must_use]
     pub fn with_files(mut self, files: Vec<FileContext>) -> Self {
         self.files = files;
         self
@@ -68,13 +72,18 @@ impl Context {
     pub fn files_to_string(&self) -> String {
         self.files
             .iter()
-            .map(|f| format!("// File: {}\n{}\n", f.path.display(), f.content))
+            .map(|file_ctx| format!("// File: {}\n{}\n", file_ctx.path.display(), file_ctx.content))
             .collect::<Vec<_>>()
             .join("\n")
     }
 
+    #[allow(
+        clippy::integer_division,
+        clippy::integer_division_remainder_used,
+        reason = "approximate token count; division by 4 is intentional"
+    )]
     pub fn token_estimate(&self) -> usize {
-        let files_len: usize = self.files.iter().map(|f| f.content.len()).sum();
+        let files_len: usize = self.files.iter().map(|file_ctx| file_ctx.content.len()).sum();
         (self.system_prompt.len() + files_len) / 4
     }
 }
@@ -86,9 +95,11 @@ pub struct FileContext {
 }
 
 impl FileContext {
-    pub fn from_path(path: &PathBuf) -> crate::core::Result<Self> {
-        let content = std::fs::read_to_string(path)
-            .map_err(|_| crate::core::Error::FileNotFound(path.display().to_string()))?;
+    /// # Errors
+    /// Returns an error if the file cannot be read from the filesystem.
+    pub fn from_path(path: &PathBuf) -> Result<Self> {
+        let content = read_to_string(path)
+            .map_err(|_| Error::FileNotFound(path.display().to_string()))?;
 
         Ok(Self {
             path: path.clone(),
@@ -96,7 +107,7 @@ impl FileContext {
         })
     }
 
-    pub fn new(path: PathBuf, content: String) -> Self {
+    pub const fn new(path: PathBuf, content: String) -> Self {
         Self { path, content }
     }
 }

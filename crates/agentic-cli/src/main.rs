@@ -1,16 +1,17 @@
 use anyhow::Result;
-use tracing_subscriber::{layer::SubscriberExt, util::SubscriberInitExt};
+use tracing_subscriber::{fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _};
 
 use agentic_context::ContextBuilder;
-use agentic_core::{ModelProvider, Query, TokenUsage};
+use agentic_core::{ModelProvider as _, Query, TokenUsage};
 use agentic_providers::AnthropicProvider;
 
 mod cli;
 mod config;
 
-use clap::Parser;
+use clap::Parser as _;
 use cli::{Cli, Commands};
 use config::Config;
+use std::path::PathBuf;
 
 #[tokio::main]
 async fn main() -> Result<()> {
@@ -37,7 +38,7 @@ async fn main() -> Result<()> {
             handle_config(full)?;
         }
         Commands::Metrics { daily } => {
-            handle_metrics(daily)?;
+            handle_metrics(daily);
         }
     }
 
@@ -46,8 +47,8 @@ async fn main() -> Result<()> {
 
 async fn handle_query(
     query_text: String,
-    project: std::path::PathBuf,
-    files: Vec<std::path::PathBuf>,
+    project: PathBuf,
+    files: Vec<PathBuf>,
     max_files: Option<usize>,
 ) -> Result<()> {
     tracing::info!("Processing query: {}", query_text);
@@ -77,63 +78,65 @@ async fn handle_query(
     tracing::info!("Sending request to {}...", provider.name());
     let response = provider.generate(&query, &context).await?;
 
-    println!("\n{}\n", "=".repeat(80));
-    println!("{}", response.text);
-    println!("{}", "=".repeat(80));
+    tracing::info!("\n{sep}\n", sep = "=".repeat(80));
+    tracing::info!("{text}", text = response.text);
+    tracing::info!("{sep}", sep = "=".repeat(80));
 
-    println!("\nMetrics:");
-    println!("  Provider: {}", response.provider);
-    println!("  Confidence: {:.2}", response.confidence);
-    println!("  Latency: {}ms", response.latency_ms);
-    println!("  Tokens:");
-    println!("    Input: {}", response.tokens_used.input);
-    println!("    Output: {}", response.tokens_used.output);
-    println!("    Cache Read: {}", response.tokens_used.cache_read);
-    println!("    Cache Write: {}", response.tokens_used.cache_write);
-    println!("    Total: {}", response.tokens_used.total());
+    tracing::info!("\nMetrics:");
+    tracing::info!("  Provider: {provider}", provider = response.provider);
+    tracing::info!("  Confidence: {confidence:.2}", confidence = response.confidence);
+    tracing::info!("  Latency: {latency}ms", latency = response.latency_ms);
+    tracing::info!("  Tokens:");
+    tracing::info!("    Input: {input}", input = response.tokens_used.input);
+    tracing::info!("    Output: {output}", output = response.tokens_used.output);
+    tracing::info!("    Cache Read: {cache_read}", cache_read = response.tokens_used.cache_read);
+    tracing::info!("    Cache Write: {cache_write}", cache_write = response.tokens_used.cache_write);
+    tracing::info!("    Total: {total}", total = response.tokens_used.total());
 
     let actual_cost = calculate_cost(&response.tokens_used);
-    println!("  Cost: ${:.4}", actual_cost);
+    tracing::info!("  Cost: ${actual_cost:.4}");
 
     Ok(())
 }
 
+/// Output current configuration. If `full` is true, prints full TOML.
 fn handle_config(full: bool) -> Result<()> {
     let config = Config::from_env();
 
     if full {
         let toml = toml::to_string_pretty(&config)?;
-        println!("{}", toml);
+        tracing::info!("{toml}");
     } else {
-        println!("Configuration:");
-        println!("  Anthropic API Key: {}", 
-            if config.providers.anthropic_api_key.is_some() {
-                "Set"
-            } else {
-                "Not set"
-            }
+        tracing::info!("Configuration:");
+        tracing::info!(
+            "  Anthropic API Key: {status}",
+            status = if config.providers.anthropic_api_key.is_some() { "Set" } else { "Not set" }
         );
-        println!("  Max Files: {}", config.context.max_files);
-        println!("  Max File Size: {} bytes", config.context.max_file_size);
+        tracing::info!("  Max Files: {max}", max = config.context.max_files);
+        tracing::info!("  Max File Size: {size} bytes", size = config.context.max_file_size);
     }
 
     Ok(())
 }
 
-fn handle_metrics(_daily: bool) -> Result<()> {
-    println!("Metrics tracking not yet implemented in MVP.");
-    println!("This will be added in Phase 5 (Advanced Optimizations).");
-    Ok(())
+/// Placeholder for future metrics handler.
+fn handle_metrics(_daily: bool) {
+    tracing::info!("Metrics tracking not yet implemented in MVP.");
+    tracing::info!("This will be added in Phase 5 (Advanced Optimizations).");
 }
 
+/// Calculate estimated cost based on token usage.
 fn calculate_cost(usage: &TokenUsage) -> f64 {
     const INPUT_COST: f64 = 3.0 / 1_000_000.0;
     const OUTPUT_COST: f64 = 15.0 / 1_000_000.0;
     const CACHE_READ_COST: f64 = 0.3 / 1_000_000.0;
     const CACHE_WRITE_COST: f64 = 3.75 / 1_000_000.0;
 
-    (usage.input as f64 * INPUT_COST)
-        + (usage.output as f64 * OUTPUT_COST)
-        + (usage.cache_read as f64 * CACHE_READ_COST)
-        + (usage.cache_write as f64 * CACHE_WRITE_COST)
+    // Chain mul_add for better numerical behavior and to satisfy clippy.
+    (usage.cache_write as f64)
+        .mul_add(
+            CACHE_WRITE_COST,
+            (usage.cache_read as f64)
+                .mul_add(CACHE_READ_COST, (usage.output as f64).mul_add(OUTPUT_COST, usage.input as f64 * INPUT_COST)),
+        )
 }

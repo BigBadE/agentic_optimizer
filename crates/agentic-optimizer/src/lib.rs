@@ -1,3 +1,6 @@
+//! Agentic Optimizer application crate.
+//! Provides CLI, configuration, context building, and core types/providers.
+
 pub mod cli;
 pub mod config;
 pub mod context;

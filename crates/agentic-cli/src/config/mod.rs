@@ -1,26 +1,21 @@
 use serde::{Deserialize, Serialize};
+use std::env;
+use std::fs::read_to_string;
 use std::path::PathBuf;
 
 use agentic_core::Result;
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     pub providers: ProvidersConfig,
     pub context: ContextConfig,
 }
 
 impl Config {
-    pub fn default() -> Self {
-        Self {
-            providers: ProvidersConfig::default(),
-            context: ContextConfig::default(),
-        }
-    }
-
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "file loading not yet exposed in CLI")]
     pub fn from_file(path: &PathBuf) -> Result<Self> {
-        let content = std::fs::read_to_string(path)?;
-        let config: Config = toml::from_str(&content)?;
+        let content = read_to_string(path)?;
+        let config: Self = toml::from_str(&content)?;
         Ok(config)
     }
 
@@ -37,7 +32,7 @@ pub struct ProvidersConfig {
 impl Default for ProvidersConfig {
     fn default() -> Self {
         Self {
-            anthropic_api_key: std::env::var("ANTHROPIC_API_KEY").ok(),
+            anthropic_api_key: env::var("ANTHROPIC_API_KEY").ok(),
         }
     }
 }

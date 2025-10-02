@@ -4,8 +4,10 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-agentic-core = { path = "../agentic-core" }
-walkdir = "2"
+agentic-core.workspace = true
+agentic-languages.workspace = true
+walkdir.workspace = true
+tracing.workspace = true
 
 [lints]
 workspace = true

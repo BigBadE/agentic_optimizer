@@ -26,6 +26,21 @@ pub enum Commands {
         max_files: Option<usize>,
     },
 
+    #[command(about = "Show relevant files for a prompt without sending to LLM")]
+    Prompt {
+        #[arg(help = "The prompt/query to analyze")]
+        query: String,
+
+        #[arg(short, long, default_value = ".", help = "Project root directory")]
+        project: PathBuf,
+
+        #[arg(short, long, help = "Specific files to include in context")]
+        files: Vec<PathBuf>,
+
+        #[arg(long, help = "Maximum number of files to include")]
+        max_files: Option<usize>,
+    },
+
     #[command(about = "Show configuration")]
     Config {
         #[arg(long, help = "Show full configuration including defaults")]

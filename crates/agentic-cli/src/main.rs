@@ -1,5 +1,6 @@
 use anyhow::Result;
 use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _};
+use console::{style, Term};
 
 use agentic_context::ContextBuilder;
 use agentic_core::{ModelProvider as _, Query, TokenUsage};
@@ -8,6 +9,7 @@ use agentic_languages::{Language, create_backend};
 
 mod cli;
 mod config;
+mod ollama;
 
 use clap::Parser as _;
 use cli::{Cli, Commands};
@@ -41,7 +43,7 @@ async fn main() -> Result<()> {
             files,
             max_files,
         } => {
-            handle_prompt(query, project, files, max_files)?;
+            handle_prompt(query, project, files, max_files).await?;
         }
         Commands::Config { full } => {
             handle_config(full)?;
@@ -74,7 +76,7 @@ async fn handle_query(
     let query = Query::new(query_text).with_files(files);
 
     tracing::info!("Building context...");
-    let context = builder.build_context(&query)?;
+    let context = builder.build_context(&query).await?;
     tracing::info!(
         "Context built: {} files, ~{} tokens",
         context.files.len(),
@@ -109,13 +111,18 @@ async fn handle_query(
 }
 
 /// Handle the prompt command - show relevant files without sending to LLM.
-fn handle_prompt(
+async fn handle_prompt(
     query_text: String,
     project: PathBuf,
     files: Vec<PathBuf>,
     max_files: Option<usize>,
 ) -> Result<()> {
-    tracing::info!("Analyzing prompt: {}", query_text);
+    let term = Term::stdout();
+    
+    term.write_line(&format!("{} {}", 
+        style("Analyzing prompt:").cyan().bold(), 
+        style(&query_text).yellow()
+    ))?;
 
     let mut builder = ContextBuilder::new(project);
     if let Some(max) = max_files {
@@ -123,27 +130,55 @@ fn handle_prompt(
     }
 
     // Always enable Rust semantic analysis
-    tracing::info!("Enabling Rust semantic analysis...");
+    term.write_line(&format!("{}", style("Enabling Rust semantic analysis...").cyan()))?;
     let backend = create_backend(Language::Rust)?;
     builder = builder.with_language_backend(backend);
 
+    // Ensure Ollama is available for intelligent context fetching (required)
+    term.write_line(&format!("{}", style("Checking Ollama availability...").cyan()))?;
+    ollama::ensure_available().await?;
+
     let query = Query::new(query_text).with_files(files);
 
-    tracing::info!("Building context...");
-    let context = builder.build_context(&query)?;
+    term.write_line(&format!("{}", style("Building context...").cyan()))?;
     
-    tracing::info!("\n{sep}\n", sep = "=".repeat(80));
-    tracing::info!("RELEVANT FILES FOR PROMPT");
-    tracing::info!("{sep}\n", sep = "=".repeat(80));
+    // Build context and capture any errors/warnings
+    let context = match builder.build_context(&query).await {
+        Ok(ctx) => ctx,
+        Err(e) => {
+            term.write_line(&format!("{} {}", 
+                style("Error:").red().bold(),
+                style(e.to_string()).red()
+            ))?;
+            return Err(e.into());
+        }
+    };
+    
+    term.write_line("")?;
+    term.write_line(&style("=".repeat(80)).dim().to_string())?;
+    term.write_line(&format!("{}", style("RELEVANT FILES FOR PROMPT").green().bold()))?;
+    term.write_line(&style("=".repeat(80)).dim().to_string())?;
+    term.write_line("")?;
     
     for (index, file) in context.files.iter().enumerate() {
-        tracing::info!("{}. {}", index + 1, file.path.display());
+        term.write_line(&format!("{}. {}", 
+            style(format!("{:3}", index + 1)).cyan(),
+            style(file.path.display()).white()
+        ))?;
     }
     
-    tracing::info!("\n{sep}", sep = "=".repeat(80));
-    tracing::info!("Total files: {}", context.files.len());
-    tracing::info!("Estimated tokens: ~{}", context.token_estimate());
-    tracing::info!("{sep}\n", sep = "=".repeat(80));
+    term.write_line("")?;
+    term.write_line(&style("=".repeat(80)).dim().to_string())?;
+    term.write_line(&format!("{} {}", 
+        style("Total files:").bold(),
+        style(context.files.len()).yellow()
+    ))?;
+    term.write_line(&format!("{} {}", 
+        style("Estimated tokens:").bold(),
+        style(format!("~{}", context.token_estimate())).yellow()
+    ))?;
+    term.write_line(&style("=".repeat(80)).dim().to_string())?;
+    term.write_line("")?;
 
     Ok(())
 }

@@ -6,7 +6,6 @@ use toml::de::Error as TomlError;
 
 pub type Result<T> = CoreResult<T, Error>;
 
-#[allow(clippy::error_impl_error, reason = "thiserror::Error is the idiomatic way to define error types")]
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("IO error: {0}")]

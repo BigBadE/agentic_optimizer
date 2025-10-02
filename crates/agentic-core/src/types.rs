@@ -68,7 +68,6 @@ impl Context {
         self
     }
 
-    #[allow(clippy::min_ident_chars, reason = "standard iterator variable name")]
     pub fn files_to_string(&self) -> String {
         self.files
             .iter()
@@ -77,7 +76,6 @@ impl Context {
             .join("\n")
     }
 
-    #[allow(clippy::integer_division, clippy::integer_division_remainder_used, clippy::min_ident_chars, reason = "approximate token count calculation, division by 4 is intentional")]
     pub fn token_estimate(&self) -> usize {
         let files_len: usize = self.files.iter().map(|file| file.content.len()).sum();
         (self.system_prompt.len() + files_len) / 4

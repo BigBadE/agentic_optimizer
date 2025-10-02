@@ -1,0 +1,11 @@
+[package]
+name = "agentic-context"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+agentic-core = { path = "../agentic-core" }
+walkdir = "2"
+
+[lints]
+workspace = true

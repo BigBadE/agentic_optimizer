@@ -1,0 +1,82 @@
+cargo-features = ["codegen-backend"]
+
+[workspace]
+resolver = "3"
+members = [
+    "crates/*"
+]
+
+[workspace.package]
+version = "0.1.0"
+edition = "2024"
+
+[workspace.dependencies]
+
+
+[profile.dev]
+opt-level = 1
+lto = false
+
+[profile.dev.package."*"]
+opt-level = 3
+codegen-backend = "cranelift"
+
+[workspace.lints.rust]
+unsafe_code = "forbid"
+warnings = "deny"
+future-incompatible = "deny"
+let-underscore = "deny"
+nonstandard-style = "deny"
+refining-impl-trait = "deny"
+unused = { level = "deny", priority = -1 }
+
+# Strict lints, should not be changed.
+[workspace.lints.clippy]
+all = "deny"
+cargo = "deny"
+complexity = "deny"
+correctness = "deny"
+nursery = "deny"
+pedantic = "deny"
+perf = "deny"
+restriction = "deny"
+style = "deny"
+suspicious = "deny"
+as_conversions = { level = "allow", priority = 1 }
+allow_attributes = { level = "allow", priority = 1 }
+arbitrary_source_item_ordering = { level = "allow", priority = 1 }
+cast_precision_loss = { level = "allow", priority = 1 }
+else_if_without_else = { level = "allow", priority = 1 }
+multiple_crate_versions = { level = "allow", priority = 1 }
+module_name_repetitions = { level = "allow", priority = 1 }
+mod_module_files = { level = "allow", priority = 1 }
+blanket_clippy_restriction_lints = { level = "allow", priority = 1 }
+iter_over_hash_type = { level = "allow", priority = 1 }
+cargo_common_metadata = { level = "allow", priority = 1 }
+cast_possible_truncation = { level = "allow", priority = 1 }
+cast_sign_loss = { level = "allow", priority = 1 }
+pub_with_shorthand = { level = "allow", priority = 1 }
+exhaustive_structs = { level = "allow", priority = 1 }
+unseparated_literal_suffix = { level = "allow", priority = 1 }
+pattern_type_mismatch = { level = "allow", priority = 1 }
+std_instead_of_alloc = { level = "allow", priority = 1 }
+shadow_reuse = { level = "allow", priority = 1 }
+map_err_ignore = { level = "allow", priority = 1 }
+indexing_slicing = { level = "allow", priority = 1 }
+missing_inline_in_public_items = { level = "allow", priority = 1 }
+future_not_send = { level = "allow", priority = 1 }
+self_named_module_files = { level = "allow", priority = 1 }
+significant_drop_tightening = { level = "allow", priority = 1 }
+arithmetic_side_effects = { level = "allow", priority = 1 }
+missing-trait-methods = { level = "allow", priority = 1 }
+float_arithmetic = { level = "allow", priority = 1 }
+pub_use = { level = "allow", priority = 1 }
+must_use_candidate = { level = "allow", priority = 1 }
+exhaustive_enums = { level = "allow", priority = 1 }
+too-long-first-doc-paragraph = { level = "allow", priority = 1 }
+implicit_return = { level = "allow", priority = 1 }
+single_call_fn = { level = "allow", priority = 1 }
+question_mark_used = { level = "allow", priority = 1 }
+wildcard_imports = { level = "allow", priority = 1 }
+wildcard_enum_match_arm = { level = "allow", priority = 1 }
+implicit_hasher = { level = "allow", priority = 1 }

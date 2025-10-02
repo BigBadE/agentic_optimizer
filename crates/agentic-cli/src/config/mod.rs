@@ -12,7 +12,7 @@ pub struct Config {
 }
 
 impl Config {
-    #[allow(dead_code, reason = "file loading not yet exposed in CLI")]
+    #[allow(dead_code, reason = "Unimplemented")]
     pub fn from_file(path: &PathBuf) -> Result<Self> {
         let content = read_to_string(path)?;
         let config: Self = toml::from_str(&content)?;

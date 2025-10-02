@@ -5,6 +5,10 @@ use agentic_core::{Context, FileContext, Query, Result};
 use agentic_languages::LanguageProvider;
 use core::result::Result as CoreResult;
 
+use crate::query::{QueryAnalyzer, QueryIntent};
+use crate::subagent::LocalContextAgent;
+use crate::expander::ContextExpander;
+
 /// Default system prompt used when constructing the base context.
 const DEFAULT_SYSTEM_PROMPT: &str = "You are a helpful coding assistant. You help users understand and modify their codebase.\n\nWhen making changes:\n1. Be precise and accurate\n2. Explain your reasoning\n3. Provide complete, working code\n4. Follow the existing code style\n\nYou have access to the user's codebase context below.";
 
@@ -28,8 +32,7 @@ pub struct ContextBuilder {
 impl ContextBuilder {
     /// Create a new builder with defaults.
     #[must_use]
-    #[allow(clippy::missing_const_for_fn, reason = "PathBuf construction in const fn is not desired here")]
-    pub fn new(project_root: PathBuf) -> Self {
+    pub const fn new(project_root: PathBuf) -> Self {
         Self {
             project_root,
             max_files: 50,
@@ -41,8 +44,7 @@ impl ContextBuilder {
 
     /// Override the maximum number of files included in context.
     #[must_use]
-    #[allow(clippy::missing_const_for_fn, reason = "builder-style API; const not necessary")]
-    pub fn with_max_files(mut self, max_files: usize) -> Self {
+    pub const fn with_max_files(mut self, max_files: usize) -> Self {
         self.max_files = max_files;
         self
     }
@@ -61,12 +63,49 @@ impl ContextBuilder {
     ///
     /// # Errors
     /// Returns an error if file scanning or reading fails.
-    pub fn build_context(&mut self, query: &Query) -> Result<Context> {
+    pub async fn build_context(&mut self, query: &Query) -> Result<Context> {
+        // Step 1: Analyze the query to extract intent
+        let analyzer = QueryAnalyzer::new();
+        let intent = analyzer.analyze(&query.text);
+        
+        tracing::info!("Query intent: action={:?}, scope={:?}, complexity={:?}", 
+            intent.action, intent.scope, intent.complexity);
+        tracing::debug!("Keywords: {:?}, Entities: {:?}", intent.keywords, intent.entities);
+
         let mut files = if query.files_context.is_empty() {
-            let collected = self.collect_all_files();
-            tracing::info!("Collected {} files from project scan", collected.len());
-            collected
+            // Step 2: Initialize backend if available
+            if self.language_backend.is_some() && !self.language_backend_initialized {
+                if let Some(backend) = &mut self.language_backend {
+                    eprintln!("⚙️  Initializing rust-analyzer (this may take a moment)...");
+                    tracing::info!("Initializing language backend...");
+                    match backend.initialize(&self.project_root) {
+                        Ok(()) => {
+                            self.language_backend_initialized = true;
+                            eprintln!("✓ Rust-analyzer initialized successfully");
+                            tracing::info!("Language backend initialized successfully");
+                        }
+                        Err(e) => {
+                            eprintln!("⚠️  Warning: Failed to initialize rust-analyzer: {}", e);
+                            eprintln!("   Falling back to basic file scanning");
+                            tracing::warn!("Failed to initialize language backend: {}", e);
+                        }
+                    }
+                }
+            }
+
+            // Step 3: Use subagent to generate context plan (backend is required)
+            if self.language_backend.is_some() && self.language_backend_initialized {
+                let agent_files = self.use_subagent_for_context(&intent, &query.text).await?;
+                eprintln!("✓ Intelligent context fetching found {} files", agent_files.len());
+                tracing::info!("Subagent found {} files", agent_files.len());
+                agent_files
+            } else {
+                return Err(agentic_core::Error::Other(
+                    "Language backend not initialized. This should not happen.".into()
+                ));
+            }
         } else {
+            // User provided specific files
             let mut collected = Vec::new();
             for file_path in &query.files_context {
                 if let Ok(file_context) = FileContext::from_path(file_path) {
@@ -82,45 +121,47 @@ impl ContextBuilder {
             }
         };
 
-        // If language backend is available, enhance context with semantic analysis
-        if self.language_backend.is_some() {
-            tracing::info!("Enhancing {} files with semantic analysis", files.len());
-            files = self.enhance_with_semantic_context(files, query)?;
-            tracing::info!("After semantic enhancement: {} files", files.len());
-        }
-
         files.truncate(self.max_files);
         tracing::info!("Final context: {} files (max: {})", files.len(), self.max_files);
 
         Ok(Context::new(DEFAULT_SYSTEM_PROMPT).with_files(files))
     }
 
-    /// Enhance file context with semantic analysis from language backend.
-    fn enhance_with_semantic_context(
-        &mut self,
-        files: Vec<FileContext>,
-        _query: &Query,
-    ) -> Result<Vec<FileContext>> {
-        // Initialize backend lazily if not already initialized
+    /// Use the subagent to intelligently gather context
+    async fn use_subagent_for_context(&self, intent: &QueryIntent, query_text: &str) -> Result<Vec<FileContext>> {
+        // Initialize the language backend if needed
         if !self.language_backend_initialized {
-            if let Some(backend) = &mut self.language_backend {
-                tracing::info!("Initializing language backend for semantic analysis (this may take a moment)...");
-                
-                if let Err(error) = backend.initialize(&self.project_root) {
-                    tracing::warn!("Failed to initialize language backend: {}. Continuing with basic file scanning.", error);
-                    return Ok(files);
-                }
-                self.language_backend_initialized = true;
-                tracing::info!("Language backend initialized successfully");
-            }
+            return Err(agentic_core::Error::Other("Language backend not initialized".into()));
         }
 
-        // TODO: Implement semantic symbol search and related file discovery
-        // Currently disabled to prevent hanging - will be implemented in next iteration
+        // Create and check subagent availability
+        let agent = LocalContextAgent::new();
         
-        tracing::info!("Semantic analysis complete, returning {} files", files.len());
-        Ok(files)
+        if !agent.is_available().await? {
+            return Err(agentic_core::Error::Other(
+                "Ollama not available. Please ensure Ollama is running with: ollama serve".into()
+            ));
+        }
+
+        tracing::info!("Using LocalContextAgent (Ollama) to generate context plan");
+
+        // Generate context plan
+        let plan = agent.generate_plan(intent, query_text).await?;
+        
+        tracing::info!("Context plan generated: {}", plan.reasoning);
+        tracing::debug!("Plan details: keywords={:?}, symbols={:?}, patterns={:?}, depth={}", 
+            plan.keywords, plan.symbols_to_find, plan.file_patterns, plan.max_depth);
+
+        // Use expander to execute the plan
+        let expander = ContextExpander::new(
+            self.language_backend.as_ref(),
+            &self.project_root,
+            self.max_file_size,
+        );
+
+        expander.expand(&plan)
     }
+
 
     /// Collect a list of readable code files under the project root.
     fn collect_all_files(&self) -> Vec<FileContext> {

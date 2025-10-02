@@ -8,16 +8,17 @@ name = "agentic"
 path = "src/main.rs"
 
 [dependencies]
-agentic-core = { path = "../agentic-core" }
-agentic-providers = { path = "../agentic-providers" }
-agentic-context = { path = "../agentic-context" }
-anyhow = "1"
-clap = { version = "4", features = ["derive"] }
-serde = { version = "1", features = ["derive"] }
-tokio = { version = "1", features = ["full"] }
-toml = "0.8"
-tracing = "0.1"
-tracing-subscriber = { version = "0.3", features = ["env-filter"] }
+agentic-core.workspace = true
+agentic-providers.workspace = true
+agentic-context.workspace = true
+agentic-languages.workspace = true
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
 
 [lints]
 workspace = true

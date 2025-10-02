@@ -1,9 +1,10 @@
 use anyhow::Result;
-use tracing_subscriber::{fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _};
+use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _};
 
 use agentic_context::ContextBuilder;
 use agentic_core::{ModelProvider as _, Query, TokenUsage};
 use agentic_providers::AnthropicProvider;
+use agentic_languages::{Language, create_backend};
 
 mod cli;
 mod config;
@@ -33,6 +34,14 @@ async fn main() -> Result<()> {
             max_files,
         } => {
             handle_query(query, project, files, max_files).await?;
+        }
+        Commands::Prompt {
+            query,
+            project,
+            files,
+            max_files,
+        } => {
+            handle_prompt(query, project, files, max_files)?;
         }
         Commands::Config { full } => {
             handle_config(full)?;
@@ -95,6 +104,46 @@ async fn handle_query(
 
     let actual_cost = calculate_cost(&response.tokens_used);
     tracing::info!("  Cost: ${actual_cost:.4}");
+
+    Ok(())
+}
+
+/// Handle the prompt command - show relevant files without sending to LLM.
+fn handle_prompt(
+    query_text: String,
+    project: PathBuf,
+    files: Vec<PathBuf>,
+    max_files: Option<usize>,
+) -> Result<()> {
+    tracing::info!("Analyzing prompt: {}", query_text);
+
+    let mut builder = ContextBuilder::new(project);
+    if let Some(max) = max_files {
+        builder = builder.with_max_files(max);
+    }
+
+    // Always enable Rust semantic analysis
+    tracing::info!("Enabling Rust semantic analysis...");
+    let backend = create_backend(Language::Rust)?;
+    builder = builder.with_language_backend(backend);
+
+    let query = Query::new(query_text).with_files(files);
+
+    tracing::info!("Building context...");
+    let context = builder.build_context(&query)?;
+    
+    tracing::info!("\n{sep}\n", sep = "=".repeat(80));
+    tracing::info!("RELEVANT FILES FOR PROMPT");
+    tracing::info!("{sep}\n", sep = "=".repeat(80));
+    
+    for (index, file) in context.files.iter().enumerate() {
+        tracing::info!("{}. {}", index + 1, file.path.display());
+    }
+    
+    tracing::info!("\n{sep}", sep = "=".repeat(80));
+    tracing::info!("Total files: {}", context.files.len());
+    tracing::info!("Estimated tokens: ~{}", context.token_estimate());
+    tracing::info!("{sep}\n", sep = "=".repeat(80));
 
     Ok(())
 }

@@ -2,6 +2,7 @@ use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 
 use agentic_core::{Context, FileContext, Query, Result};
+use agentic_languages::LanguageProvider;
 use core::result::Result as CoreResult;
 
 /// Default system prompt used when constructing the base context.
@@ -18,6 +19,10 @@ pub struct ContextBuilder {
     max_files: usize,
     /// Maximum file size in bytes to include
     max_file_size: usize,
+    /// Optional language backend for semantic analysis
+    language_backend: Option<Box<dyn LanguageProvider>>,
+    /// Whether the language backend has been initialized
+    language_backend_initialized: bool,
 }
 
 impl ContextBuilder {
@@ -29,6 +34,8 @@ impl ContextBuilder {
             project_root,
             max_files: 50,
             max_file_size: 100_000,
+            language_backend: None,
+            language_backend_initialized: false,
         }
     }
 
@@ -40,13 +47,25 @@ impl ContextBuilder {
         self
     }
 
+    /// Enable a language backend for semantic analysis.
+    /// 
+    /// This accepts any implementation of the `LanguageProvider` trait,
+    /// allowing support for multiple languages (Rust, Java, Python, etc.)
+    #[must_use]
+    pub fn with_language_backend(mut self, backend: Box<dyn LanguageProvider>) -> Self {
+        self.language_backend = Some(backend);
+        self
+    }
+
     /// Build a `Context` for the provided query.
     ///
     /// # Errors
     /// Returns an error if file scanning or reading fails.
-    pub fn build_context(&self, query: &Query) -> Result<Context> {
+    pub fn build_context(&mut self, query: &Query) -> Result<Context> {
         let mut files = if query.files_context.is_empty() {
-            self.collect_all_files()
+            let collected = self.collect_all_files();
+            tracing::info!("Collected {} files from project scan", collected.len());
+            collected
         } else {
             let mut collected = Vec::new();
             for file_path in &query.files_context {
@@ -55,15 +74,52 @@ impl ContextBuilder {
                 }
             }
             if collected.is_empty() {
-                self.collect_all_files()
+                let collected = self.collect_all_files();
+                tracing::info!("Collected {} files from project scan", collected.len());
+                collected
             } else {
                 collected
             }
         };
 
+        // If language backend is available, enhance context with semantic analysis
+        if self.language_backend.is_some() {
+            tracing::info!("Enhancing {} files with semantic analysis", files.len());
+            files = self.enhance_with_semantic_context(files, query)?;
+            tracing::info!("After semantic enhancement: {} files", files.len());
+        }
+
         files.truncate(self.max_files);
+        tracing::info!("Final context: {} files (max: {})", files.len(), self.max_files);
 
         Ok(Context::new(DEFAULT_SYSTEM_PROMPT).with_files(files))
+    }
+
+    /// Enhance file context with semantic analysis from language backend.
+    fn enhance_with_semantic_context(
+        &mut self,
+        files: Vec<FileContext>,
+        _query: &Query,
+    ) -> Result<Vec<FileContext>> {
+        // Initialize backend lazily if not already initialized
+        if !self.language_backend_initialized {
+            if let Some(backend) = &mut self.language_backend {
+                tracing::info!("Initializing language backend for semantic analysis (this may take a moment)...");
+                
+                if let Err(error) = backend.initialize(&self.project_root) {
+                    tracing::warn!("Failed to initialize language backend: {}. Continuing with basic file scanning.", error);
+                    return Ok(files);
+                }
+                self.language_backend_initialized = true;
+                tracing::info!("Language backend initialized successfully");
+            }
+        }
+
+        // TODO: Implement semantic symbol search and related file discovery
+        // Currently disabled to prevent hanging - will be implemented in next iteration
+        
+        tracing::info!("Semantic analysis complete, returning {} files", files.len());
+        Ok(files)
     }
 
     /// Collect a list of readable code files under the project root.

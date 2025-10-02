@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::fs::read_to_string;
 use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -9,7 +10,7 @@ pub struct Query {
 }
 
 impl Query {
-    pub fn new(text: impl Into<String>) -> Self {
+    pub fn new<T: Into<String>>(text: T) -> Self {
         Self {
             text: text.into(),
             conversation_id: None,
@@ -17,6 +18,7 @@ impl Query {
         }
     }
 
+    #[must_use]
     pub fn with_files(mut self, files: Vec<PathBuf>) -> Self {
         self.files_context = files;
         self
@@ -41,7 +43,7 @@ pub struct TokenUsage {
 }
 
 impl TokenUsage {
-    pub fn total(&self) -> u64 {
+    pub const fn total(&self) -> u64 {
         self.input + self.output + self.cache_read + self.cache_write
     }
 }
@@ -53,28 +55,31 @@ pub struct Context {
 }
 
 impl Context {
-    pub fn new(system_prompt: impl Into<String>) -> Self {
+    pub fn new<T: Into<String>>(system_prompt: T) -> Self {
         Self {
             files: Vec::new(),
             system_prompt: system_prompt.into(),
         }
     }
 
+    #[must_use]
     pub fn with_files(mut self, files: Vec<FileContext>) -> Self {
         self.files = files;
         self
     }
 
+    #[allow(clippy::min_ident_chars, reason = "standard iterator variable name")]
     pub fn files_to_string(&self) -> String {
         self.files
             .iter()
-            .map(|f| format!("// File: {}\n{}\n", f.path.display(), f.content))
+            .map(|file| format!("// File: {}\n{}\n", file.path.display(), file.content))
             .collect::<Vec<_>>()
             .join("\n")
     }
 
+    #[allow(clippy::integer_division, clippy::integer_division_remainder_used, clippy::min_ident_chars, reason = "approximate token count calculation, division by 4 is intentional")]
     pub fn token_estimate(&self) -> usize {
-        let files_len: usize = self.files.iter().map(|f| f.content.len()).sum();
+        let files_len: usize = self.files.iter().map(|file| file.content.len()).sum();
         (self.system_prompt.len() + files_len) / 4
     }
 }
@@ -86,8 +91,10 @@ pub struct FileContext {
 }
 
 impl FileContext {
+    /// # Errors
+    /// Returns an error if the file cannot be read
     pub fn from_path(path: &PathBuf) -> crate::Result<Self> {
-        let content = std::fs::read_to_string(path)
+        let content = read_to_string(path)
             .map_err(|_| crate::Error::FileNotFound(path.display().to_string()))?;
 
         Ok(Self {
@@ -96,7 +103,7 @@ impl FileContext {
         })
     }
 
-    pub fn new(path: PathBuf, content: String) -> Self {
+    pub const fn new(path: PathBuf, content: String) -> Self {
         Self { path, content }
     }
 }

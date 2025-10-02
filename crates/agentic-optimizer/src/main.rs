@@ -50,7 +50,7 @@ async fn handle_query(
 ) -> Result<()> {
     tracing::info!("Processing query: {}", query_text);
 
-    let config = Config::from_env();
+    let _config = Config::from_env();
 
     let provider = AnthropicProvider::from_env()?;
 

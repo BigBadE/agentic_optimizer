@@ -1,11 +1,16 @@
+use core::result::Result as CoreResult;
+use std::io::Error as IoError;
+
 use thiserror::Error;
+use toml::de::Error as TomlError;
 
-pub type Result<T> = std::result::Result<T, Error>;
+pub type Result<T> = CoreResult<T, Error>;
 
+#[allow(clippy::error_impl_error, reason = "thiserror::Error is the idiomatic way to define error types")]
 #[derive(Debug, Error)]
 pub enum Error {
     #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(#[from] IoError),
 
     #[error("HTTP request failed: {0}")]
     Request(#[from] reqwest::Error),
@@ -14,7 +19,7 @@ pub enum Error {
     Json(#[from] serde_json::Error),
 
     #[error("TOML deserialization error: {0}")]
-    Toml(#[from] toml::de::Error),
+    Toml(#[from] TomlError),
 
     #[error("Configuration error: {0}")]
     Config(String),
@@ -33,13 +38,16 @@ pub enum Error {
 
     #[error("File not found: {0}")]
     FileNotFound(String),
+
+    #[error("{0}")]
+    Other(String),
 }
 
 impl Error {
-    pub fn is_retryable(&self) -> bool {
+    pub const fn is_retryable(&self) -> bool {
         matches!(
             self,
-            Error::Request(_) | Error::Provider(_)
+            Self::Request(_) | Self::Provider(_)
         )
     }
 }

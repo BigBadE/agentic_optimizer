@@ -4,7 +4,7 @@ use crate::{Context, Query, Response, Result};
 
 #[async_trait]
 pub trait ModelProvider: Send + Sync {
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
 
     async fn is_available(&self) -> bool;
 

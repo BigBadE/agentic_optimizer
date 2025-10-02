@@ -1,0 +1,26 @@
+[package]
+name = "agentic-languages"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+agentic-core = { path = "../agentic-core" }
+
+# Rust analyzer integration
+ra_ap_ide = "0.0.231"
+ra_ap_ide_db = "0.0.231"
+ra_ap_hir = "0.0.231"
+ra_ap_syntax = "0.0.231"
+ra_ap_vfs = "0.0.231"
+ra_ap_paths = "0.0.231"
+ra_ap_project_model = "0.0.231"
+ra_ap_load-cargo = "0.0.231"
+
+# Utilities
+anyhow = "1.0"
+thiserror = "2.0"
+tracing = "0.1"
+walkdir = "2.5"

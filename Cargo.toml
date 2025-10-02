@@ -55,6 +55,7 @@ iter_over_hash_type = { level = "allow", priority = 1 }
 cargo_common_metadata = { level = "allow", priority = 1 }
 cast_possible_truncation = { level = "allow", priority = 1 }
 cast_sign_loss = { level = "allow", priority = 1 }
+missing_docs_in_private_items = { level = "allow", priority = 1 }
 pub_with_shorthand = { level = "allow", priority = 1 }
 exhaustive_structs = { level = "allow", priority = 1 }
 unseparated_literal_suffix = { level = "allow", priority = 1 }

@@ -1,0 +1,19 @@
+/target
+Cargo.lock
+
+# Config files with secrets
+config.toml
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Metrics and logs
+metrics.json
+*.log

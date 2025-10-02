@@ -1,0 +1,13 @@
+# Agentic Optimizer Configuration Example
+# Copy this to config.toml and fill in your API keys
+
+[providers]
+# Get your API key from: https://console.anthropic.com/
+anthropic_api_key = "sk-ant-..."
+
+[context]
+# Maximum number of files to include in context
+max_files = 50
+
+# Maximum file size in bytes (files larger than this are skipped)
+max_file_size = 100000

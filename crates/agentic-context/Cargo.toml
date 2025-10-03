@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 agentic-core.workspace = true
 agentic-languages.workspace = true
+rust-backend = { path = "../agentic-languages/languages/rust-backend" }
 walkdir.workspace = true
 tracing.workspace = true
 serde.workspace = true

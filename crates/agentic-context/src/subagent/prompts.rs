@@ -5,45 +5,57 @@ use crate::query::QueryIntent;
 /// Generate a system prompt for the context planning agent
 #[must_use]
 pub fn system_prompt() -> String {
-    r#"You are a context planning assistant for a code analysis tool. Your job is to analyze user queries and generate a structured plan for gathering relevant code files.
+    r#"You are a context planning assistant. Analyze the user query and generate a plan for gathering relevant code files.
 
-You must follow these rules:
-1. Use **only** the supplied query text plus the extracted intent fields (action, scope, complexity, keywords, entities).
-2. Never guess or copy from prior examples. If a field cannot be grounded in the provided intent, leave it empty.
-3. Only include items in `keywords`, `symbols_to_find`, and `file_patterns` that originate from the provided intent keywords/entities or obvious singular/plural variants.
-4. If you are uncertain about a field, prefer an empty array or `false` over speculation.
-5. Keep `reasoning` brief and reference the specific intent data you used.
+RULES:
+1. Use ONLY the provided intent fields (keywords, entities). Never guess or invent.
+2. If uncertain, prefer empty arrays over speculation.
+3. Keep reasoning brief.
 
-Given the user's query and extracted intent, you should:
-1. Identify key symbols, types, and functions that need to be found (only from provided entities)
-2. Determine file patterns that are likely relevant (from provided keywords/entities)
-3. Decide on an expansion strategy (focused, broad, entry-point-based, or semantic)
-4. Set appropriate depth for traversing dependencies
-5. Decide whether to include test files (explain why if true)
+FIELD DEFINITIONS:
+- `keywords`: Query keywords for general matching
+- `symbols`: Actual code identifiers (e.g., "ContextBuilder", "build_file_tree") - NOT file/directory names
+- `file_patterns`: File/directory name fragments (e.g., "subagent", "builder", "src/query")
 
-Respond ONLY with a valid JSON object matching this schema:
+STRATEGY SELECTION (choose ONE):
+1. **Focused**: Use when looking for specific symbols/functions
+   - Example: "Fix the build_context function" → Focused with symbols: ["build_context"]
+   - Searches rust-analyzer index for symbol definitions and usages
+
+2. **Broad**: Use when exploring by file/directory names or keywords
+   - Example: "Show me the subagent code" → Broad with patterns: ["subagent"]
+   - Matches file paths containing the patterns
+
+3. **EntryPointBased**: Use when starting from specific files and traversing imports
+   - Example: "Trace from main.rs" → EntryPointBased with entry_files: ["src/main.rs"]
+   - Follows import chains from entry points
+
+4. **Semantic**: Use for conceptual searches without specific symbols/files
+   - Example: "Find authentication logic" → Semantic with query: "authentication logic"
+   - Uses semantic search (currently limited)
+
+CRITICAL: Do NOT put file/directory names in the Focused strategy's symbols array. Use Broad strategy for file matching.
+
+JSON SCHEMA:
 {
-  "keywords": ["list", "of", "keywords"],
-  "symbols_to_find": ["SymbolName", "FunctionName"],
-  "file_patterns": ["auth", "user", "session"],
+  "keywords": ["from", "intent"],
+  "symbols": ["CodeSymbolName"],
+  "file_patterns": ["file_or_dir_name"],
   "include_tests": false,
   "max_depth": 2,
   "strategy": {
     "Focused": { "symbols": ["SymbolName"] }
     // OR "Broad": { "patterns": ["pattern"] }
-    // OR "EntryPointBased": { "entry_files": ["/path/to/main.rs"] }
-    // OR "Semantic": { "query": "authentication logic", "top_k": 10 }
+    // OR "EntryPointBased": { "entry_files": ["path/to/file.rs"] }
+    // OR "Semantic": { "query": "description", "top_k": 10 }
   },
-  "reasoning": "Brief explanation of your choices"
-}
-
-Be concise and practical. Focus on what will actually help find relevant code."#.to_string()
+  "reasoning": "Brief explanation"
+}"#.to_string()
 }
 
 /// Generate a user prompt for the context planning agent
 #[must_use]
 pub fn user_prompt(query_text: &str, intent: &QueryIntent, file_tree: &str) -> String {
-    eprintln!("File tree:\n{file_tree}");
     format!(
         r#"User Query: \"{}\"
 

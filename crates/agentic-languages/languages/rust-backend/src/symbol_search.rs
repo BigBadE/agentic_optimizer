@@ -108,16 +108,58 @@ impl<'analysis> SymbolSearcher<'analysis> {
         Ok(None)
     }
 
-    /// Find references to a symbol by name using a structural scan.
+    /// Find references to a symbol by name using rust-analyzer's reference index.
     pub fn find_references(&self, symbol_name: &str) -> Result<Vec<SymbolInfo>> {
         let mut results = Vec::new();
 
-        for (_path, file_id) in self.backend.file_id_map.iter() {
-            let symbols = self.list_symbols_in_file_by_id(*file_id)?;
-            
-            for symbol in symbols {
-                if symbol.name.contains(symbol_name) {
-                    results.push(symbol);
+        // First, find the symbol definition using the global index
+        let definitions = self.find_symbol_by_name(symbol_name)?;
+        
+        // For each definition, use rust-analyzer's find_all_refs to get usages
+        for def in definitions {
+            let Some(file_id) = self.backend.get_file_id(&def.file_path) else {
+                continue;
+            };
+
+            // Get line index to convert line number to offset
+            let Ok(line_index) = self.analysis.file_line_index(file_id) else {
+                continue;
+            };
+
+            // Convert line to offset (approximate - use start of line)
+            let Some(offset) = line_index.offset(ra_ap_ide::LineCol { 
+                line: def.line, 
+                col: 0 
+            }) else {
+                continue;
+            };
+
+            let position = ra_ap_ide::FilePosition { file_id, offset };
+
+            // Use rust-analyzer's optimized reference search
+            if let Ok(Some(refs)) = self.analysis.find_all_refs(position, None) {
+                // refs is a Vec<ReferenceSearchResult>
+                for ref_result in refs {
+                    // Each ReferenceSearchResult has references: FileReferenceNode
+                    for (file_id, ranges) in &ref_result.references {
+                        if let Some(path) = self.backend.path_from_file_id(*file_id) {
+                            let Ok(ref_line_index) = self.analysis.file_line_index(*file_id) else {
+                                continue;
+                            };
+                            
+                            for (text_range, _category) in ranges {
+                                let line = ref_line_index.line_col(text_range.start()).line;
+                                
+                                results.push(SymbolInfo {
+                                    name: symbol_name.to_string(),
+                                    kind: def.kind,
+                                    file_path: path.clone(),
+                                    line,
+                                    documentation: None,
+                                });
+                            }
+                        }
+                    }
                 }
             }
 

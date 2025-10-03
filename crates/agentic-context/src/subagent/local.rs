@@ -4,6 +4,7 @@ use std::time::Instant;
 use ollama_rs::{Ollama, generation::chat::ChatMessage};
 use agentic_core::Result;
 use crate::query::{QueryIntent, ContextPlan};
+use crate::models::{ModelConfig, TaskComplexity};
 use super::agent::ContextAgent;
 use super::prompts;
 use serde_json::Value;
@@ -35,7 +36,7 @@ impl LocalContextAgent {
     }
 
     /// Call Ollama API using the ollama-rs crate (static version for use with Handle)
-    async fn call_ollama_static(ollama: &Ollama, system: &str, user: &str) -> Result<String> {
+    async fn call_ollama_static(ollama: &Ollama, system: &str, user: &str, model: &str) -> Result<String> {
         use ollama_rs::generation::chat::request::ChatMessageRequest;
         
         let messages = vec![
@@ -43,11 +44,7 @@ impl LocalContextAgent {
             ChatMessage::user(user.to_string()),
         ];
 
-        // Get model from environment or use default
-        let model = std::env::var("OLLAMA_MODEL")
-            .unwrap_or_else(|_| "qwen2.5-coder:7b".to_string());
-
-        let request = ChatMessageRequest::new(model, messages);
+        let request = ChatMessageRequest::new(model.to_string(), messages);
 
         let response = ollama
             .send_chat_messages(request)
@@ -123,11 +120,12 @@ impl LocalContextAgent {
         let system = prompts::system_prompt();
         let user = prompts::user_prompt(query_text, intent, file_tree);
 
-        let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "qwen2.5-coder:7b".to_string());
+        let config = ModelConfig::from_env();
+        let model = config.select_for_task(TaskComplexity::Medium);
         eprintln!("  Calling Ollama API (model: {})...", model);
         
         let start = Instant::now();
-        let response = Self::call_ollama_static(&self.ollama, &system, &user).await?;
+        let response = Self::call_ollama_static(&self.ollama, &system, &user, model).await?;
         let elapsed = start.elapsed();
         
         let response_chars = response.len();

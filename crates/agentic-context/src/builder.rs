@@ -1,5 +1,5 @@
-use std::path::{Path, PathBuf};
 use std::collections::HashMap;
+use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use indicatif::{ProgressBar, ProgressStyle};
 use ignore::WalkBuilder;
@@ -8,9 +8,12 @@ use agentic_core::{Context, FileContext, Query, Result};
 use agentic_languages::LanguageProvider;
 use core::result::Result as CoreResult;
 
+use crate::fs_utils::is_source_file;
 use crate::query::{QueryAnalyzer, QueryIntent};
 use crate::subagent::LocalContextAgent;
 use crate::expander::ContextExpander;
+use crate::embedding::VectorSearchManager;
+use crate::context_inclusion::{ContextManager, PrioritizedFile, FilePriority, MAX_CONTEXT_TOKENS};
 
 /// Default system prompt used when constructing the base context.
 const DEFAULT_SYSTEM_PROMPT: &str = "You are a helpful coding assistant. You help users understand and modify their codebase.\n\nWhen making changes:\n1. Be precise and accurate\n2. Explain your reasoning\n3. Provide complete, working code\n4. Follow the existing code style\n\nYou have access to the user's codebase context below.";
@@ -30,6 +33,8 @@ pub struct ContextBuilder {
     language_backend: Option<Box<dyn LanguageProvider>>,
     /// Whether the language backend has been initialized
     language_backend_initialized: bool,
+    /// Vector search manager for semantic search
+    vector_manager: Option<VectorSearchManager>,
 }
 
 impl ContextBuilder {
@@ -42,6 +47,7 @@ impl ContextBuilder {
             max_file_size: 100_000,
             language_backend: None,
             language_backend_initialized: false,
+            vector_manager: None,
         }
     }
 
@@ -76,24 +82,128 @@ impl ContextBuilder {
         tracing::debug!("Keywords: {:?}, Entities: {:?}", intent.keywords, intent.entities);
 
         let mut files = if query.files_context.is_empty() {
-            // Step 2: Initialize backend if available
-            if self.language_backend.is_some() && !self.language_backend_initialized {
-                if let Some(backend) = &mut self.language_backend {
-                    eprintln!("⚙️  Initializing rust-analyzer (this may take a moment)...");
-                    tracing::info!("Initializing language backend...");
-                    match backend.initialize(&self.project_root) {
-                        Ok(()) => {
-                            self.language_backend_initialized = true;
-                            eprintln!("✓ Rust-analyzer initialized successfully");
-                            tracing::info!("Language backend initialized successfully");
+            // Step 2: Initialize backend and vector search IN PARALLEL
+            let needs_backend_init = self.language_backend.is_some() && !self.language_backend_initialized;
+            let needs_vector_init = self.vector_manager.is_none();
+
+            if needs_backend_init || needs_vector_init {
+                eprintln!("⚙️  Initializing systems in parallel...");
+                
+                // Rust-analyzer initialization (CPU-bound, blocking)
+                // Take ownership temporarily to run in parallel
+                let backend_handle = if needs_backend_init {
+                    let mut backend = self.language_backend.take();
+                    let project_root = self.project_root.clone();
+                    
+                    Some(tokio::task::spawn_blocking(move || {
+                        eprintln!("  → Initializing rust-analyzer...");
+                        if let Some(ref mut b) = backend {
+                            tracing::info!("Initializing language backend...");
+                            let result = b.initialize(&project_root);
+                            (backend, result)
+                        } else {
+                            (backend, Ok(()))
                         }
-                        Err(e) => {
-                            eprintln!("⚠️  Warning: Failed to initialize rust-analyzer: {}", e);
-                            eprintln!("   Falling back to basic file scanning");
-                            tracing::warn!("Failed to initialize language backend: {}", e);
+                    }))
+                } else {
+                    None
+                };
+
+                // Vector search initialization (I/O-bound, async)
+                let vector_handle = if needs_vector_init {
+                    eprintln!("  → Building embedding index...");
+                    let mut manager = VectorSearchManager::new(self.project_root.clone());
+                    
+                    Some(tokio::spawn(async move {
+                        let result = manager.initialize().await;
+                        (manager, result)
+                    }))
+                } else {
+                    None
+                };
+
+                // Wait for BOTH tasks to complete simultaneously
+                match (backend_handle, vector_handle) {
+                    (Some(bh), Some(vh)) => {
+                        // Both tasks running - wait for both
+                        let (backend_result, vector_result) = tokio::join!(bh, vh);
+                        
+                        // Handle rust-analyzer result
+                        match backend_result {
+                            Ok((backend, Ok(()))) => {
+                                self.language_backend = backend;
+                                self.language_backend_initialized = true;
+                                eprintln!("  ✓ Rust-analyzer initialized");
+                                tracing::info!("Language backend initialized successfully");
+                            }
+                            Ok((backend, Err(e))) => {
+                                self.language_backend = backend;
+                                eprintln!("  ⚠️  Warning: Failed to initialize rust-analyzer: {}", e);
+                                eprintln!("     Falling back to basic file scanning");
+                                tracing::warn!("Failed to initialize language backend: {}", e);
+                            }
+                            Err(e) => {
+                                eprintln!("  ⚠️  Task join error: {}", e);
+                            }
+                        }
+                        
+                        // Handle vector search result
+                        match vector_result {
+                            Ok((manager, Ok(()))) => {
+                                self.vector_manager = Some(manager);
+                                eprintln!("  ✓ Embedding index ready");
+                            }
+                            Ok((_, Err(e))) => {
+                                eprintln!("  ⚠️  Warning: Failed to initialize vector search: {}", e);
+                                tracing::warn!("Failed to initialize vector search: {}", e);
+                            }
+                            Err(e) => {
+                                eprintln!("  ⚠️  Task join error: {}", e);
+                            }
                         }
                     }
+                    (Some(bh), None) => {
+                        // Only backend
+                        match bh.await {
+                            Ok((backend, Ok(()))) => {
+                                self.language_backend = backend;
+                                self.language_backend_initialized = true;
+                                eprintln!("  ✓ Rust-analyzer initialized");
+                                tracing::info!("Language backend initialized successfully");
+                            }
+                            Ok((backend, Err(e))) => {
+                                self.language_backend = backend;
+                                eprintln!("  ⚠️  Warning: Failed to initialize rust-analyzer: {}", e);
+                                eprintln!("     Falling back to basic file scanning");
+                                tracing::warn!("Failed to initialize language backend: {}", e);
+                            }
+                            Err(e) => {
+                                eprintln!("  ⚠️  Task join error: {}", e);
+                            }
+                        }
+                    }
+                    (None, Some(vh)) => {
+                        // Only vector search
+                        match vh.await {
+                            Ok((manager, Ok(()))) => {
+                                self.vector_manager = Some(manager);
+                                eprintln!("  ✓ Embedding index ready");
+                            }
+                            Ok((_, Err(e))) => {
+                                eprintln!("  ⚠️  Warning: Failed to initialize vector search: {}", e);
+                                tracing::warn!("Failed to initialize vector search: {}", e);
+                            }
+                            Err(e) => {
+                                eprintln!("  ⚠️  Task join error: {}", e);
+                            }
+                        }
+                    }
+                    (None, None) => {
+                        // Nothing to initialize
+                    }
                 }
+                
+                eprintln!("✓ All systems initialized");
             }
 
             // Step 3: Use subagent to generate context plan (backend is required)
@@ -156,23 +266,52 @@ impl ContextBuilder {
             ));
         }
 
-        spinner.set_message("Generating context plan with AI agent...");
+        spinner.set_message("Generating context plan and searching embeddings...");
         tracing::info!("Using LocalContextAgent (Ollama) to generate context plan");
 
         // Build lightweight file tree for context
-        let file_tree = self.build_file_tree();
+        let file_tree = self.build_file_tree(intent);
 
-        // Generate context plan
-        let plan = agent.generate_plan(intent, query_text, &file_tree).await?;
-        
+        // Run plan generation and vector search IN PARALLEL
+        let plan_future = agent.generate_plan(intent, query_text, &file_tree);
+        let vector_search_future = async {
+            // Use vector manager if available
+            if let Some(manager) = &self.vector_manager {
+                // Request more results to fill context up to token limit
+                match manager.search(query_text, 50).await {
+                    Ok(results) => Ok::<Vec<crate::embedding::SearchResult>, agentic_core::Error>(results),
+                    Err(e) => {
+                        eprintln!("Warning: Vector search failed: {}", e);
+                        Ok(Vec::new())
+                    }
+                }
+            } else {
+                Ok(Vec::new())
+            }
+        };
+
+        // Run both in parallel using tokio::join
+        let (plan_result, vector_results) = tokio::join!(plan_future, vector_search_future);
+        let plan = plan_result?;
+        let semantic_matches = vector_results?;
+
+        if !semantic_matches.is_empty() {
+            eprintln!("--- Semantic search found {} matches", semantic_matches.len());
+            for (i, result) in semantic_matches.iter().enumerate() {
+                eprintln!("  {}. {} (score: {:.3})", i + 1, result.file_path.display(), result.score);
+            }
+        } else {
+            eprintln!("--- Semantic search: no results (store may be empty)");
+        }
+
         spinner.finish_with_message(format!("✓ Context plan: {}", plan.reasoning));
         eprintln!("  Keywords: {:?}", plan.keywords);
-        eprintln!("  Symbols: {:?}", plan.symbols_to_find);
+        eprintln!("  Symbols: {:?}", plan.symbols);
         eprintln!("  Patterns: {:?}", plan.file_patterns);
         
         tracing::info!("Context plan generated: {}", plan.reasoning);
         tracing::debug!("Plan details: keywords={:?}, symbols={:?}, patterns={:?}, depth={}", 
-            plan.keywords, plan.symbols_to_find, plan.file_patterns, plan.max_depth);
+            plan.keywords, plan.symbols, plan.file_patterns, plan.max_depth);
 
         // Use expander to execute the plan
         let expander = ContextExpander::new(
@@ -181,7 +320,43 @@ impl ContextBuilder {
             self.max_file_size,
         );
 
-        expander.expand(&plan)
+        let plan_files = expander.expand(&plan)?;
+        
+        // Use context manager to intelligently add files based on priority and token limits
+        let mut context_mgr = ContextManager::new(MAX_CONTEXT_TOKENS);
+        
+        // First, add plan files with high priority
+        let mut plan_prioritized = Vec::new();
+        for file in plan_files {
+            plan_prioritized.push(PrioritizedFile::new(file, FilePriority::High));
+        }
+        
+        let plan_added = crate::context_inclusion::add_prioritized_files(&mut context_mgr, plan_prioritized);
+        eprintln!("  Added {} plan files ({} tokens used)", plan_added, context_mgr.token_count());
+        
+        // Then, fill remaining context with semantic search results
+        if !context_mgr.is_full() && !semantic_matches.is_empty() {
+            let mut semantic_prioritized = Vec::new();
+            
+            for result in semantic_matches {
+                if let Ok(file_context) = FileContext::from_path(&result.file_path) {
+                    // Only add if not already in context
+                    if !context_mgr.files().iter().any(|f| f.path == file_context.path) {
+                        semantic_prioritized.push(PrioritizedFile::with_score(
+                            file_context,
+                            FilePriority::Medium,
+                            result.score,
+                        ));
+                    }
+                }
+            }
+            
+            let semantic_added = crate::context_inclusion::add_prioritized_files(&mut context_mgr, semantic_prioritized);
+            eprintln!("  Added {} semantic matches ({} tokens total / {} max)", 
+                semantic_added, context_mgr.token_count(), MAX_CONTEXT_TOKENS);
+        }
+        
+        Ok(context_mgr.into_files())
     }
 
 
@@ -198,7 +373,7 @@ impl ContextBuilder {
                 continue;
             }
 
-            if !Self::is_code_file(entry.path()) {
+            if !is_source_file(entry.path()) {
                 continue;
             }
 
@@ -240,33 +415,35 @@ impl ContextBuilder {
         false
     }
 
-    /// Determine whether a path looks like a code/documentation file worth indexing.
-    fn is_code_file(path: &Path) -> bool {
-        path.extension().is_some_and(|extension| {
-            let ext = extension.to_string_lossy();
-            matches!(ext.as_ref(), "rs" | "toml" | "md" | "txt" | "json" | "yaml" | "yml")
-        })
+    /// Build a lightweight file tree for context planning
+    fn build_file_tree(&self, intent: &QueryIntent) -> String {
+        const MAX_ENTRIES: usize = 1000;
+        const MAX_PER_DIR: usize = 10;
+        
+        let (entries, filtered_count) = self.collect_file_tree_entries(MAX_ENTRIES, MAX_PER_DIR);
+        let filtered_entries = self.filter_empty_directories(entries);
+        
+        let dir_count = filtered_entries.iter().filter(|(_, is_dir)| *is_dir).count();
+        let file_count = filtered_entries.len() - dir_count;
+        
+        eprintln!("File tree stats: {} dirs, {} files, {} total entries, {} filtered", 
+            dir_count, file_count, filtered_entries.len(), filtered_count);
+
+        self.categorize_and_format_tree(intent, &filtered_entries, filtered_count, MAX_ENTRIES)
     }
 
-    /// Build a lightweight file tree for context planning
-    fn build_file_tree(&self) -> String {
+    fn collect_file_tree_entries(&self, max_entries: usize, max_per_dir: usize) -> (Vec<(String, bool)>, usize) {
         let mut entries: Vec<(String, bool)> = Vec::new();
         let mut filtered_count = 0;
         let mut dir_entry_counts: HashMap<String, usize> = HashMap::new();
-        const MAX_ENTRIES: usize = 1000;
-        const MAX_PER_DIR: usize = 10;
 
-        eprintln!("Building file tree from: {}", self.project_root.display());
-        
-        // Use ignore crate's WalkBuilder which properly handles .gitignore
         let walker = WalkBuilder::new(&self.project_root)
-            .max_depth(Some(4))
-            .hidden(true)  // Skip hidden files/dirs automatically
-            .git_ignore(true)  // Respect .gitignore
-            .git_global(false)  // Don't use global gitignore
-            .git_exclude(false)  // Don't use .git/info/exclude
+            .max_depth(None)
+            .hidden(true)
+            .git_ignore(true)
+            .git_global(false)
+            .git_exclude(false)
             .filter_entry(|entry| {
-                // Filter out hardcoded ignored directories
                 if let Some(file_name) = entry.path().file_name() {
                     let name = file_name.to_string_lossy();
                     if entry.file_type().map_or(false, |ft| ft.is_dir()) 
@@ -281,7 +458,7 @@ impl ContextBuilder {
         for entry_result in walker {
             match entry_result {
                 Ok(entry) => {
-                    if entries.len() >= MAX_ENTRIES {
+                    if entries.len() >= max_entries {
                         break;
                     }
 
@@ -290,29 +467,25 @@ impl ContextBuilder {
                     if let Ok(rel_path) = path.strip_prefix(&self.project_root) {
                         let path_str = rel_path.to_string_lossy().replace('\\', "/");
                         
-                        // Skip empty path (root directory itself)
                         if path_str.is_empty() {
                             continue;
                         }
                         
                         let is_dir = entry.file_type().map_or(false, |ft| ft.is_dir());
-                        
-                        // Only include source files, not all files
-                        if !is_dir && !Self::is_code_file(path) {
+
+                        if !is_dir && !is_source_file(path) {
                             filtered_count += 1;
                             continue;
                         }
                         
-                        // Get parent directory for per-directory limiting
                         let parent_dir = if let Some(parent) = Path::new(&path_str).parent() {
                             parent.to_string_lossy().to_string()
                         } else {
                             String::from(".")
                         };
                         
-                        // Check per-directory limit
                         let dir_count = dir_entry_counts.entry(parent_dir.clone()).or_insert(0);
-                        if *dir_count >= MAX_PER_DIR {
+                        if *dir_count >= max_per_dir {
                             filtered_count += 1;
                             continue;
                         }
@@ -327,13 +500,15 @@ impl ContextBuilder {
             }
         }
 
-        // Filter out empty directories (directories with no files under them)
+        (entries, filtered_count)
+    }
+
+    fn filter_empty_directories(&self, entries: Vec<(String, bool)>) -> Vec<(String, bool)> {
+
         let mut non_empty_dirs = std::collections::HashSet::new();
         
-        // Mark all parent directories of files as non-empty
         for (path, is_dir) in &entries {
             if !is_dir {
-                // Mark all parent directories as non-empty
                 let mut current = Path::new(path);
                 while let Some(parent) = current.parent() {
                     let parent_str = parent.to_string_lossy().replace('\\', "/");
@@ -345,8 +520,7 @@ impl ContextBuilder {
             }
         }
         
-        // Filter entries to only include files and non-empty directories
-        let filtered_entries: Vec<_> = entries.into_iter()
+        entries.into_iter()
             .filter(|(path, is_dir)| {
                 if *is_dir {
                     non_empty_dirs.contains(path)
@@ -354,33 +528,108 @@ impl ContextBuilder {
                     true
                 }
             })
-            .collect();
-        
-        let dir_count = filtered_entries.iter().filter(|(_, is_dir)| *is_dir).count();
-        let file_count = filtered_entries.len() - dir_count;
-        
-        eprintln!("File tree stats: {} dirs, {} files, {} total entries, {} filtered", 
-            dir_count, file_count, filtered_entries.len(), filtered_count);
+            .collect()
+    }
 
-        // Build hierarchical tree structure
-        let mut tree = String::from("Project Structure:\n");
+    fn categorize_and_format_tree(&self, intent: &QueryIntent, filtered_entries: &[(String, bool)], _filtered_count: usize, max_entries: usize) -> String {
+
+        // Categorize entries by match type
+        let mut keyword_matches: Vec<String> = Vec::new();
+        let mut symbol_matches: Vec<String> = Vec::new();
+        let mut folder_matches: Vec<String> = Vec::new();
+        let mut file_matches: Vec<String> = Vec::new();
         
-        for (path, is_dir) in &filtered_entries {
-            let depth = path.matches('/').count();
-            let indent = "    ".repeat(depth);
+        for (path, is_dir) in filtered_entries {
+            let path_lower = path.to_lowercase();
             let name = Path::new(path).file_name()
                 .and_then(|n| n.to_str())
                 .unwrap_or(path);
+            let name_lower = name.to_lowercase();
             
+            let mut matched = false;
+            
+            // Check for keyword matches (from intent.keywords)
+            for keyword in &intent.keywords {
+                let kw_lower = keyword.to_lowercase();
+                if name_lower.contains(&kw_lower) || path_lower.contains(&kw_lower) {
+                    if *is_dir {
+                        keyword_matches.push(format!("{}/", path));
+                    } else {
+                        keyword_matches.push(path.clone());
+                    }
+                    matched = true;
+                    break;
+                }
+            }
+            
+            if matched {
+                continue;
+            }
+            
+            // Check for entity/symbol matches (from intent.entities)
+            for entity in &intent.entities {
+                let entity_lower = entity.to_lowercase();
+                if name_lower.contains(&entity_lower) || path_lower.contains(&entity_lower) {
+                    if *is_dir {
+                        symbol_matches.push(format!("{}/", path));
+                    } else {
+                        symbol_matches.push(path.clone());
+                    }
+                    matched = true;
+                    break;
+                }
+            }
+            
+            if matched {
+                continue;
+            }
+            
+            // Categorize remaining by type
             if *is_dir {
-                tree.push_str(&format!("{}{}/\n", indent, name));
+                folder_matches.push(format!("{}/", path));
             } else {
-                tree.push_str(&format!("{}{}\n", indent, name));
+                file_matches.push(path.clone());
             }
         }
 
-        if filtered_entries.len() >= MAX_ENTRIES {
-            tree.push_str(&format!("\n(Truncated at {} entries)\n", MAX_ENTRIES));
+        // Build categorized output
+        let mut tree = String::new();
+        
+        if !keyword_matches.is_empty() {
+            tree.push_str("Keyword Matches:\n");
+            for item in &keyword_matches {
+                tree.push_str(&format!("  {}\n", item));
+            }
+            tree.push('\n');
+        }
+        
+        if !symbol_matches.is_empty() {
+            tree.push_str("Symbol/Entity Matches:\n");
+            for item in &symbol_matches {
+                tree.push_str(&format!("  {}\n", item));
+            }
+            tree.push('\n');
+        }
+        
+        
+        tree.push_str("All Folders:\n");
+        for item in &folder_matches {
+            tree.push_str(&format!("  {}\n", item));
+        }
+        tree.push('\n');
+        
+        tree.push_str("All Files:\n");
+        let display_count = file_matches.len().min(100);
+        for item in file_matches.iter().take(display_count) {
+            tree.push_str(&format!("  {}\n", item));
+        }
+        
+        if file_matches.len() > display_count {
+            tree.push_str(&format!("  ... and {} more files\n", file_matches.len() - display_count));
+        }
+
+        if filtered_entries.len() >= max_entries {
+            tree.push_str(&format!("\n(Truncated at {} entries)\n", max_entries));
         }
 
         tree

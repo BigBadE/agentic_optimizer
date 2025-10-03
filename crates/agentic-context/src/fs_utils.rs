@@ -1,0 +1,18 @@
+use std::path::Path;
+
+const SOURCE_EXTENSIONS: &[&str] = &[
+    "rs", "toml", "md", "txt", "json", "yaml", "yml", "js", "ts", "jsx",
+    "tsx", "py", "java", "go", "c", "cpp", "h", "hpp",
+];
+
+#[must_use]
+pub fn is_source_file(path: &Path) -> bool {
+    path.extension()
+        .and_then(|ext| ext.to_str())
+        .map(|ext| {
+            SOURCE_EXTENSIONS
+                .iter()
+                .any(|allowed| ext.eq_ignore_ascii_case(allowed))
+        })
+        .unwrap_or(false)
+}

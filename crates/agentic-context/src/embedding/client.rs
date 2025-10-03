@@ -18,6 +18,10 @@ pub struct SearchResult {
     pub score: f32,
     /// Preview of file content
     pub preview: String,
+    /// BM25 keyword score (if available)
+    pub bm25_score: Option<f32>,
+    /// Vector semantic score (if available)
+    pub vector_score: Option<f32>,
 }
 
 /// In-memory vector database for code files
@@ -76,6 +80,8 @@ impl VectorStore {
                     file_path: path,
                     score,
                     preview: preview.clone(),
+                    bm25_score: None,
+                    vector_score: None,
                 })
             })
             .collect()

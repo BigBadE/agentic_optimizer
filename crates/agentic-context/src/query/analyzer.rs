@@ -144,9 +144,16 @@ impl QueryAnalyzer {
             .split_whitespace()
             .filter(|word| {
                 // Check if word starts with uppercase or contains :: (Rust path)
-                word.chars().next().map_or(false, |c| c.is_uppercase()) || word.contains("::")
+                let has_uppercase = word.chars().next().map_or(false, |c| c.is_uppercase());
+                let has_path = word.contains("::");
+                (has_uppercase || has_path) && word.len() > 1  // Skip single chars like "I"
             })
-            .map(String::from)
+            .map(|word| {
+                // Clean up punctuation from end
+                word.trim_end_matches(|c: char| !c.is_alphanumeric() && c != ':' && c != '_')
+                    .to_string()
+            })
+            .filter(|word| !word.is_empty() && word.len() > 1)
             .collect()
     }
 }

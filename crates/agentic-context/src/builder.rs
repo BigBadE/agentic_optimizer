@@ -1,8 +1,6 @@
-use std::collections::HashMap;
-use std::path::{Path, PathBuf};
+use std::path::PathBuf;
 use walkdir::WalkDir;
 use indicatif::{ProgressBar, ProgressStyle};
-use ignore::WalkBuilder;
 
 use agentic_core::{Context, FileContext, Query, Result};
 use agentic_languages::LanguageProvider;
@@ -10,8 +8,6 @@ use core::result::Result as CoreResult;
 
 use crate::fs_utils::is_source_file;
 use crate::query::{QueryAnalyzer, QueryIntent};
-use crate::subagent::LocalContextAgent;
-use crate::expander::ContextExpander;
 use crate::embedding::VectorSearchManager;
 use crate::context_inclusion::{ContextManager, PrioritizedFile, FilePriority, MAX_CONTEXT_TOKENS};
 
@@ -240,14 +236,13 @@ impl ContextBuilder {
         Ok(Context::new(DEFAULT_SYSTEM_PROMPT).with_files(files))
     }
 
-    /// Use the subagent to intelligently gather context
-    async fn use_subagent_for_context(&self, intent: &QueryIntent, query_text: &str) -> Result<Vec<FileContext>> {
+    /// Use hybrid search to intelligently gather context
+    async fn use_subagent_for_context(&self, _intent: &QueryIntent, query_text: &str) -> Result<Vec<FileContext>> {
         // Initialize the language backend if needed
         if !self.language_backend_initialized {
             return Err(agentic_core::Error::Other("Language backend not initialized".into()));
         }
 
-        // Create and check subagent availability
         let spinner = ProgressBar::new_spinner();
         spinner.set_style(
             ProgressStyle::default_spinner()
@@ -256,105 +251,131 @@ impl ContextBuilder {
         );
         spinner.enable_steady_tick(std::time::Duration::from_millis(100));
         
-        spinner.set_message("Checking Ollama availability...");
-        let agent = LocalContextAgent::new();
-        
-        if !agent.is_available().await? {
-            spinner.finish_and_clear();
-            return Err(agentic_core::Error::Other(
-                "Ollama not available. Please ensure Ollama is running with: ollama serve".into()
-            ));
-        }
+        spinner.set_message("Running hybrid search (BM25 + Vector)...");
+        tracing::info!("Using hybrid BM25 + Vector search for context");
 
-        spinner.set_message("Generating context plan and searching embeddings...");
-        tracing::info!("Using LocalContextAgent (Ollama) to generate context plan");
-
-        // Build lightweight file tree for context
-        let file_tree = self.build_file_tree(intent);
-
-        // Run plan generation and vector search IN PARALLEL
-        let plan_future = agent.generate_plan(intent, query_text, &file_tree);
-        let vector_search_future = async {
-            // Use vector manager if available
-            if let Some(manager) = &self.vector_manager {
-                // Request more results to fill context up to token limit
-                match manager.search(query_text, 50).await {
-                    Ok(results) => Ok::<Vec<crate::embedding::SearchResult>, agentic_core::Error>(results),
-                    Err(e) => {
-                        eprintln!("Warning: Vector search failed: {}", e);
-                        Ok(Vec::new())
-                    }
+        // Use hybrid search (BM25 + vector embeddings)
+        let semantic_matches = if let Some(manager) = &self.vector_manager {
+            match manager.search(query_text, 50).await {
+                Ok(results) => results,
+                Err(e) => {
+                    eprintln!("Warning: Hybrid search failed: {}", e);
+                    Vec::new()
                 }
-            } else {
-                Ok(Vec::new())
-            }
-        };
-
-        // Run both in parallel using tokio::join
-        let (plan_result, vector_results) = tokio::join!(plan_future, vector_search_future);
-        let plan = plan_result?;
-        let semantic_matches = vector_results?;
-
-        if !semantic_matches.is_empty() {
-            eprintln!("--- Semantic search found {} matches", semantic_matches.len());
-            for (i, result) in semantic_matches.iter().enumerate() {
-                eprintln!("  {}. {} (score: {:.3})", i + 1, result.file_path.display(), result.score);
             }
         } else {
-            eprintln!("--- Semantic search: no results (store may be empty)");
+            Vec::new()
+        };
+
+        if !semantic_matches.is_empty() {
+            eprintln!("--- Hybrid search found {} matches", semantic_matches.len());
+            for (i, result) in semantic_matches.iter().enumerate().take(10) {
+                eprintln!("  {}. {} (score: {:.3})", i + 1, result.file_path.display(), result.score);
+            }
+            if semantic_matches.len() > 10 {
+                eprintln!("  ... and {} more", semantic_matches.len() - 10);
+            }
+        } else {
+            eprintln!("--- Hybrid search: no results (store may be empty)");
         }
 
-        spinner.finish_with_message(format!("✓ Context plan: {}", plan.reasoning));
-        eprintln!("  Keywords: {:?}", plan.keywords);
-        eprintln!("  Symbols: {:?}", plan.symbols);
-        eprintln!("  Patterns: {:?}", plan.file_patterns);
+        spinner.finish_with_message("✓ Hybrid search complete");
         
-        tracing::info!("Context plan generated: {}", plan.reasoning);
-        tracing::debug!("Plan details: keywords={:?}, symbols={:?}, patterns={:?}, depth={}", 
-            plan.keywords, plan.symbols, plan.file_patterns, plan.max_depth);
-
-        // Use expander to execute the plan
-        let expander = ContextExpander::new(
-            self.language_backend.as_ref(),
-            &self.project_root,
-            self.max_file_size,
-        );
-
-        let plan_files = expander.expand(&plan)?;
-        
-        // Use context manager to intelligently add files based on priority and token limits
+        // Use context manager to add hybrid search results
         let mut context_mgr = ContextManager::new(MAX_CONTEXT_TOKENS);
         
-        // First, add plan files with high priority
-        let mut plan_prioritized = Vec::new();
-        for file in plan_files {
-            plan_prioritized.push(PrioritizedFile::new(file, FilePriority::High));
-        }
+        // Add hybrid search results with priority based on file type
+        // Merge overlapping chunks from the same file
+        use std::collections::HashMap;
         
-        let plan_added = crate::context_inclusion::add_prioritized_files(&mut context_mgr, plan_prioritized);
-        eprintln!("  Added {} plan files ({} tokens used)", plan_added, context_mgr.token_count());
+        // Group chunks by file
+        let mut file_chunks: HashMap<PathBuf, Vec<(usize, usize, f32)>> = HashMap::new();
         
-        // Then, fill remaining context with semantic search results
-        if !context_mgr.is_full() && !semantic_matches.is_empty() {
-            let mut semantic_prioritized = Vec::new();
-            
-            for result in semantic_matches {
-                if let Ok(file_context) = FileContext::from_path(&result.file_path) {
-                    // Only add if not already in context
-                    if !context_mgr.files().iter().any(|f| f.path == file_context.path) {
-                        semantic_prioritized.push(PrioritizedFile::with_score(
-                            file_context,
-                            FilePriority::Medium,
-                            result.score,
-                        ));
+        for result in &semantic_matches {
+            // Parse chunk path: "file.rs:start-end"
+            if let Some(path_str) = result.file_path.to_str() {
+                if let Some((file_part, range_part)) = path_str.rsplit_once(':') {
+                    let path = PathBuf::from(file_part);
+                    if let Some((start_str, end_str)) = range_part.split_once('-') {
+                        if let (Ok(start), Ok(end)) = (start_str.parse::<usize>(), end_str.parse::<usize>()) {
+                            file_chunks.entry(path).or_insert_with(Vec::new).push((start, end, result.score));
+                        }
                     }
                 }
             }
-            
-            let semantic_added = crate::context_inclusion::add_prioritized_files(&mut context_mgr, semantic_prioritized);
-            eprintln!("  Added {} semantic matches ({} tokens total / {} max)", 
-                semantic_added, context_mgr.token_count(), MAX_CONTEXT_TOKENS);
         }
+        
+        // Merge overlapping chunks for each file
+        let mut search_prioritized = Vec::new();
+        
+        for (file_path, mut chunks) in file_chunks {
+            // Sort chunks by start line
+            chunks.sort_by_key(|(start, _, _)| *start);
+            
+            // Merge overlapping chunks
+            let merged = self.merge_overlapping_chunks(chunks);
+            
+            // Extract merged chunks
+            let is_code = Self::is_code_file(&file_path);
+            for (start, end, score) in merged {
+                match self.extract_chunk_with_context(&file_path, start, end, is_code) {
+                    Ok(chunk_ctx) => {
+                        let priority = if is_code {
+                            FilePriority::High
+                        } else {
+                            FilePriority::Medium
+                        };
+                        
+                        search_prioritized.push(PrioritizedFile::with_score(
+                            chunk_ctx,
+                            priority,
+                            score,
+                        ));
+                    }
+                    Err(e) => {
+                        eprintln!("Warning: Failed to extract chunk from {}: {}", file_path.display(), e);
+                    }
+                }
+            }
+        }
+        
+        let added = crate::context_inclusion::add_prioritized_files(&mut context_mgr, search_prioritized);
+        eprintln!("  Added {} chunks from hybrid search ({} tokens used)", added, context_mgr.token_count());
+        
+        // Show relevant sections for prompt
+        eprintln!("\n=== RELEVANT SECTIONS FOR PROMPT ===");
+        eprintln!("Total: {} chunks ({} tokens)\n", context_mgr.file_count(), context_mgr.token_count());
+        
+        // List all chunks with their sections
+        for (i, file) in context_mgr.files().iter().enumerate() {
+            let tokens = crate::context_inclusion::ContextManager::estimate_tokens(&file.content);
+            
+            // Extract section info from content
+            let section_info = if let Some(first_line) = file.content.lines().next() {
+                if first_line.starts_with("--- Context: lines") {
+                    // Code file with context
+                    first_line.trim_start_matches("--- Context: lines ").trim_end_matches(" ---").to_string()
+                } else if first_line.starts_with("--- Lines") {
+                    // Text file without context
+                    first_line.trim_start_matches("--- Lines ").trim_end_matches(" ---").to_string()
+                } else if file.content.lines().count() < 100 {
+                    // Small content without markers is likely a chunk
+                    format!("chunk (~{} lines)", file.content.lines().count())
+                } else {
+                    "full file".to_string()
+                }
+            } else {
+                "chunk".to_string()
+            };
+            
+            eprintln!("{}. {} [{}] ({} tokens)", 
+                i + 1, 
+                file.path.display(), 
+                section_info,
+                tokens
+            );
+        }
+        eprintln!("=====================================\n");
         
         Ok(context_mgr.into_files())
     }
@@ -395,7 +416,111 @@ impl ContextBuilder {
         files
     }
 
-    /// Determine whether a directory entry should be ignored.
+    /// Merge overlapping chunks considering context expansion
+    fn merge_overlapping_chunks(&self, chunks: Vec<(usize, usize, f32)>) -> Vec<(usize, usize, f32)> {
+        if chunks.is_empty() {
+            return Vec::new();
+        }
+        
+        let mut merged = Vec::new();
+        let mut current_start = chunks[0].0;
+        let mut current_end = chunks[0].1;
+        let mut max_score = chunks[0].2;
+        
+        const CONTEXT_LINES: usize = 50;
+        
+        for (start, end, score) in chunks.into_iter().skip(1) {
+            // Check if chunks overlap when considering context expansion
+            // Two chunks overlap if: start - CONTEXT <= current_end + CONTEXT
+            let expanded_current_end = current_end + CONTEXT_LINES;
+            let expanded_start = start.saturating_sub(CONTEXT_LINES);
+            
+            if expanded_start <= expanded_current_end {
+                // Merge: extend current chunk
+                current_end = current_end.max(end);
+                max_score = max_score.max(score);
+            } else {
+                // No overlap: save current and start new
+                merged.push((current_start, current_end, max_score));
+                current_start = start;
+                current_end = end;
+                max_score = score;
+            }
+        }
+        
+        // Add the last chunk
+        merged.push((current_start, current_end, max_score));
+        
+        merged
+    }
+
+    /// Extract a chunk with surrounding context (only for code files)
+    fn extract_chunk_with_context(&self, file_path: &PathBuf, start_line: usize, end_line: usize, include_context: bool) -> Result<FileContext> {
+        use std::fs;
+        
+        let content = fs::read_to_string(file_path)
+            .map_err(|e| agentic_core::Error::Other(format!("Failed to read file: {}", e)))?;
+        
+        let lines: Vec<&str> = content.lines().collect();
+        
+        // Calculate context window (±50 lines for code, exact chunk for text)
+        let (context_start, context_end) = if include_context {
+            const CONTEXT_LINES: usize = 50;
+            (
+                start_line.saturating_sub(CONTEXT_LINES).max(1),
+                (end_line + CONTEXT_LINES).min(lines.len())
+            )
+        } else {
+            // Text files: exact chunk only
+            (start_line, end_line)
+        };
+        
+        // Extract lines with context
+        let chunk_lines: Vec<&str> = lines
+            .iter()
+            .enumerate()
+            .filter(|(i, _)| *i + 1 >= context_start && *i + 1 <= context_end)
+            .map(|(_, line)| *line)
+            .collect();
+        
+        let chunk_content = chunk_lines.join("\n");
+        
+        // Create a marker to show the actual matched chunk (only if we added context)
+        let marker = if include_context && (context_start < start_line || context_end > end_line) {
+            format!("\n\n--- Matched chunk: lines {}-{} ---\n", start_line, end_line)
+        } else {
+            String::new()
+        };
+        
+        let final_content = if !marker.is_empty() {
+            format!("--- Context: lines {}-{} ---\n{}{}", context_start, context_end, chunk_content, marker)
+        } else if include_context {
+            format!("--- Context: lines {}-{} ---\n{}", context_start, context_end, chunk_content)
+        } else {
+            // Text files without context - still show line range
+            format!("--- Lines {}-{} ---\n{}", context_start, context_end, chunk_content)
+        };
+        
+        Ok(FileContext {
+            path: file_path.clone(),
+            content: final_content,
+        })
+    }
+
+    /// Check if a file is a code file (not documentation/text)
+    fn is_code_file(path: &PathBuf) -> bool {
+        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+            matches!(ext, 
+                "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "java" | "c" | "cpp" | 
+                "h" | "hpp" | "go" | "rb" | "php" | "cs" | "swift" | "kt" | "scala" |
+                "toml" | "yaml" | "yml" | "json" | "xml"
+            )
+        } else {
+            false
+        }
+    }
+
+    /// Check if a directory entry should be ignored
     fn is_ignored(entry: &walkdir::DirEntry) -> bool {
         let file_name = entry.file_name().to_string_lossy();
 
@@ -415,223 +540,4 @@ impl ContextBuilder {
         false
     }
 
-    /// Build a lightweight file tree for context planning
-    fn build_file_tree(&self, intent: &QueryIntent) -> String {
-        const MAX_ENTRIES: usize = 1000;
-        const MAX_PER_DIR: usize = 10;
-        
-        let (entries, filtered_count) = self.collect_file_tree_entries(MAX_ENTRIES, MAX_PER_DIR);
-        let filtered_entries = self.filter_empty_directories(entries);
-        
-        let dir_count = filtered_entries.iter().filter(|(_, is_dir)| *is_dir).count();
-        let file_count = filtered_entries.len() - dir_count;
-        
-        eprintln!("File tree stats: {} dirs, {} files, {} total entries, {} filtered", 
-            dir_count, file_count, filtered_entries.len(), filtered_count);
-
-        self.categorize_and_format_tree(intent, &filtered_entries, filtered_count, MAX_ENTRIES)
-    }
-
-    fn collect_file_tree_entries(&self, max_entries: usize, max_per_dir: usize) -> (Vec<(String, bool)>, usize) {
-        let mut entries: Vec<(String, bool)> = Vec::new();
-        let mut filtered_count = 0;
-        let mut dir_entry_counts: HashMap<String, usize> = HashMap::new();
-
-        let walker = WalkBuilder::new(&self.project_root)
-            .max_depth(None)
-            .hidden(true)
-            .git_ignore(true)
-            .git_global(false)
-            .git_exclude(false)
-            .filter_entry(|entry| {
-                if let Some(file_name) = entry.path().file_name() {
-                    let name = file_name.to_string_lossy();
-                    if entry.file_type().map_or(false, |ft| ft.is_dir()) 
-                        && IGNORED_DIRS.contains(&name.as_ref()) {
-                        return false;
-                    }
-                }
-                true
-            })
-            .build();
-
-        for entry_result in walker {
-            match entry_result {
-                Ok(entry) => {
-                    if entries.len() >= max_entries {
-                        break;
-                    }
-
-                    let path = entry.path();
-
-                    if let Ok(rel_path) = path.strip_prefix(&self.project_root) {
-                        let path_str = rel_path.to_string_lossy().replace('\\', "/");
-                        
-                        if path_str.is_empty() {
-                            continue;
-                        }
-                        
-                        let is_dir = entry.file_type().map_or(false, |ft| ft.is_dir());
-
-                        if !is_dir && !is_source_file(path) {
-                            filtered_count += 1;
-                            continue;
-                        }
-                        
-                        let parent_dir = if let Some(parent) = Path::new(&path_str).parent() {
-                            parent.to_string_lossy().to_string()
-                        } else {
-                            String::from(".")
-                        };
-                        
-                        let dir_count = dir_entry_counts.entry(parent_dir.clone()).or_insert(0);
-                        if *dir_count >= max_per_dir {
-                            filtered_count += 1;
-                            continue;
-                        }
-                        *dir_count += 1;
-                        
-                        entries.push((path_str, is_dir));
-                    }
-                }
-                Err(e) => {
-                    eprintln!("Warning: Error walking directory: {}", e);
-                }
-            }
-        }
-
-        (entries, filtered_count)
-    }
-
-    fn filter_empty_directories(&self, entries: Vec<(String, bool)>) -> Vec<(String, bool)> {
-
-        let mut non_empty_dirs = std::collections::HashSet::new();
-        
-        for (path, is_dir) in &entries {
-            if !is_dir {
-                let mut current = Path::new(path);
-                while let Some(parent) = current.parent() {
-                    let parent_str = parent.to_string_lossy().replace('\\', "/");
-                    if !parent_str.is_empty() {
-                        non_empty_dirs.insert(parent_str);
-                    }
-                    current = parent;
-                }
-            }
-        }
-        
-        entries.into_iter()
-            .filter(|(path, is_dir)| {
-                if *is_dir {
-                    non_empty_dirs.contains(path)
-                } else {
-                    true
-                }
-            })
-            .collect()
-    }
-
-    fn categorize_and_format_tree(&self, intent: &QueryIntent, filtered_entries: &[(String, bool)], _filtered_count: usize, max_entries: usize) -> String {
-
-        // Categorize entries by match type
-        let mut keyword_matches: Vec<String> = Vec::new();
-        let mut symbol_matches: Vec<String> = Vec::new();
-        let mut folder_matches: Vec<String> = Vec::new();
-        let mut file_matches: Vec<String> = Vec::new();
-        
-        for (path, is_dir) in filtered_entries {
-            let path_lower = path.to_lowercase();
-            let name = Path::new(path).file_name()
-                .and_then(|n| n.to_str())
-                .unwrap_or(path);
-            let name_lower = name.to_lowercase();
-            
-            let mut matched = false;
-            
-            // Check for keyword matches (from intent.keywords)
-            for keyword in &intent.keywords {
-                let kw_lower = keyword.to_lowercase();
-                if name_lower.contains(&kw_lower) || path_lower.contains(&kw_lower) {
-                    if *is_dir {
-                        keyword_matches.push(format!("{}/", path));
-                    } else {
-                        keyword_matches.push(path.clone());
-                    }
-                    matched = true;
-                    break;
-                }
-            }
-            
-            if matched {
-                continue;
-            }
-            
-            // Check for entity/symbol matches (from intent.entities)
-            for entity in &intent.entities {
-                let entity_lower = entity.to_lowercase();
-                if name_lower.contains(&entity_lower) || path_lower.contains(&entity_lower) {
-                    if *is_dir {
-                        symbol_matches.push(format!("{}/", path));
-                    } else {
-                        symbol_matches.push(path.clone());
-                    }
-                    matched = true;
-                    break;
-                }
-            }
-            
-            if matched {
-                continue;
-            }
-            
-            // Categorize remaining by type
-            if *is_dir {
-                folder_matches.push(format!("{}/", path));
-            } else {
-                file_matches.push(path.clone());
-            }
-        }
-
-        // Build categorized output
-        let mut tree = String::new();
-        
-        if !keyword_matches.is_empty() {
-            tree.push_str("Keyword Matches:\n");
-            for item in &keyword_matches {
-                tree.push_str(&format!("  {}\n", item));
-            }
-            tree.push('\n');
-        }
-        
-        if !symbol_matches.is_empty() {
-            tree.push_str("Symbol/Entity Matches:\n");
-            for item in &symbol_matches {
-                tree.push_str(&format!("  {}\n", item));
-            }
-            tree.push('\n');
-        }
-        
-        
-        tree.push_str("All Folders:\n");
-        for item in &folder_matches {
-            tree.push_str(&format!("  {}\n", item));
-        }
-        tree.push('\n');
-        
-        tree.push_str("All Files:\n");
-        let display_count = file_matches.len().min(100);
-        for item in file_matches.iter().take(display_count) {
-            tree.push_str(&format!("  {}\n", item));
-        }
-        
-        if file_matches.len() > display_count {
-            tree.push_str(&format!("  ... and {} more files\n", file_matches.len() - display_count));
-        }
-
-        if filtered_entries.len() >= max_entries {
-            tree.push_str(&format!("\n(Truncated at {} entries)\n", max_entries));
-        }
-
-        tree
-    }
 }

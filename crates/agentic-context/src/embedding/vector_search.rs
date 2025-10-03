@@ -9,7 +9,7 @@ use indicatif::{ProgressBar, ProgressStyle};
 use tokio::task::JoinSet;
 
 use agentic_core::Result;
-use crate::embedding::{EmbeddingClient, VectorStore, SearchResult, generate_preview};
+use crate::embedding::{EmbeddingClient, VectorStore, SearchResult, generate_preview, BM25Index};
 use crate::embedding::chunking::chunk_file;
 use crate::fs_utils::is_source_file;
 use crate::context_inclusion::MIN_SIMILARITY_SCORE;
@@ -57,10 +57,12 @@ impl VectorCache {
     }
 }
 
-/// Vector search manager with caching
+/// Vector search manager with caching and BM25 keyword search
 pub struct VectorSearchManager {
     /// In-memory vector store
     store: VectorStore,
+    /// BM25 keyword search index
+    bm25: BM25Index,
     /// File modification times for cache invalidation
     file_times: HashMap<PathBuf, SystemTime>,
     /// Embedding client
@@ -78,6 +80,7 @@ impl VectorSearchManager {
         
         Self {
             store: VectorStore::new(),
+            bm25: BM25Index::new(),
             file_times: HashMap::new(),
             client: EmbeddingClient::new(),
             project_root,
@@ -117,13 +120,20 @@ impl VectorSearchManager {
                 
                 let (valid, invalid) = self.validate_cache_entries(&cache.embeddings)?;
                 
-                // Add valid entries to store
+                // Add valid entries to store and BM25 index
                 for entry in &valid {
                     let chunk_path = format!("{}:{}-{}", entry.path.display(), entry.start_line, entry.end_line);
                     eprintln!("  Loaded: {} [{}] (dim: {})", chunk_path, entry.chunk_id, entry.embedding.len());
                     self.file_times.insert(entry.path.clone(), entry.modified);
-                    self.store.add(PathBuf::from(chunk_path), entry.embedding.clone(), entry.preview.clone());
+                    self.store.add(PathBuf::from(&chunk_path), entry.embedding.clone(), entry.preview.clone());
+                    
+                    // Rebuild BM25 index from preview (approximation)
+                    self.bm25.add_document(PathBuf::from(chunk_path), &entry.preview);
                 }
+                
+                // Finalize BM25 index
+                self.bm25.finalize();
+                eprintln!("  BM25 index built with {} documents", self.bm25.len());
                 
                 eprintln!("  Total embeddings in store: {}", self.store.len());
 
@@ -184,33 +194,93 @@ impl VectorSearchManager {
         Ok(())
     }
 
-    /// Search for similar files with minimum score threshold
+    /// Hybrid search combining BM25 keyword search and vector semantic search
     pub async fn search(&self, query: &str, top_k: usize) -> Result<Vec<SearchResult>> {
-        eprintln!("  Vector search: store has {} embeddings", self.store.len());
+        eprintln!("  Hybrid search: {} embeddings, {} BM25 docs", self.store.len(), self.bm25.len());
         
         if self.store.is_empty() {
             eprintln!("  ⚠️  Vector store is empty - no results");
             return Ok(Vec::new());
         }
         
+        // Run BM25 keyword search
+        let bm25_results = self.bm25.search(query, top_k * 2);  // Get more for ranking
+        eprintln!("  BM25 found {} keyword matches", bm25_results.len());
+        
+        // Run vector semantic search
         let query_embedding = self.client.embed(query).await?;
-        eprintln!("  Query embedded (dim: {})", query_embedding.len());
+        let vector_results = self.store.search(&query_embedding, top_k * 2);
+        eprintln!("  Vector found {} semantic matches", vector_results.len());
         
-        let results = self.store.search(&query_embedding, top_k);
-        eprintln!("  Found {} results before filtering", results.len());
+        // Combine results using Reciprocal Rank Fusion (RRF)
+        let combined = self.reciprocal_rank_fusion(&bm25_results, &vector_results, top_k);
         
-        if !results.is_empty() {
-            eprintln!("  Top scores: {:?}", results.iter().take(5).map(|r| r.score).collect::<Vec<_>>());
+        eprintln!("  Combined {} results using RRF", combined.len());
+        if !combined.is_empty() {
+            eprintln!("  Top scores: {:?}", combined.iter().take(5).map(|r| r.score).collect::<Vec<_>>());
         }
         
         // Filter by minimum similarity score
-        let filtered: Vec<_> = results.into_iter()
+        let filtered: Vec<_> = combined.into_iter()
             .filter(|r| r.score >= MIN_SIMILARITY_SCORE)
             .collect();
         
         eprintln!("  After filtering (score >= {}): {} results", MIN_SIMILARITY_SCORE, filtered.len());
         
         Ok(filtered)
+    }
+
+    /// Reciprocal Rank Fusion: combines rankings from multiple sources
+    /// RRF score = sum(1 / (k + rank)) where k=60 is a constant
+    /// Normalizes final scores to 0-1 range for compatibility with filtering
+    fn reciprocal_rank_fusion(
+        &self,
+        bm25_results: &[(PathBuf, f32)],
+        vector_results: &[SearchResult],
+        top_k: usize,
+    ) -> Vec<SearchResult> {
+        const K: f32 = 60.0;  // RRF constant
+        
+        let mut scores: HashMap<PathBuf, f32> = HashMap::new();
+        let mut previews: HashMap<PathBuf, String> = HashMap::new();
+        
+        // Add BM25 scores (weight: 0.4)
+        for (rank, (path, _score)) in bm25_results.iter().enumerate() {
+            let rrf_score = 0.4 / (K + rank as f32 + 1.0);
+            *scores.entry(path.clone()).or_insert(0.0) += rrf_score;
+        }
+        
+        // Add vector scores (weight: 0.6 - semantic is more important)
+        for (rank, result) in vector_results.iter().enumerate() {
+            let rrf_score = 0.6 / (K + rank as f32 + 1.0);
+            *scores.entry(result.file_path.clone()).or_insert(0.0) += rrf_score;
+            previews.insert(result.file_path.clone(), result.preview.clone());
+        }
+        
+        // Convert to SearchResult
+        let mut combined: Vec<SearchResult> = scores
+            .into_iter()
+            .map(|(path, score)| SearchResult {
+                file_path: path.clone(),
+                score,
+                preview: previews.get(&path).cloned().unwrap_or_default(),
+            })
+            .collect();
+        
+        combined.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        
+        // Normalize scores to 0-1 range
+        if let Some(max_score) = combined.first().map(|r| r.score) {
+            if max_score > 0.0 {
+                for result in &mut combined {
+                    result.score = result.score / max_score;
+                }
+            }
+        }
+        
+        combined.truncate(top_k);
+        
+        combined
     }
 
     /// Collect all source files in the project
@@ -304,7 +374,13 @@ impl VectorSearchManager {
                             for (path, chunk, embedding, preview) in chunk_results {
                                 let chunk_path = format!("{}:{}-{}", path.display(), chunk.start_line, chunk.end_line);
                                 eprintln!("    Embedded: {} [{}] (dim: {})", chunk_path, chunk.identifier, embedding.len());
-                                self.store.add(PathBuf::from(chunk_path), embedding, preview);
+                                
+                                // Add to vector store
+                                self.store.add(PathBuf::from(&chunk_path), embedding, preview);
+                                
+                                // Add to BM25 index
+                                self.bm25.add_document(PathBuf::from(chunk_path), &chunk.content);
+                                
                                 total_chunks += 1;
                             }
                             
@@ -318,6 +394,10 @@ impl VectorSearchManager {
                 }
             }
         }
+
+        // Finalize BM25 index (compute IDF scores)
+        self.bm25.finalize();
+        eprintln!("  BM25 index finalized with {} documents", self.bm25.len());
 
         Ok(())
     }

@@ -155,29 +155,10 @@ async fn handle_prompt(
     };
     
     term.write_line("")?;
-    term.write_line(&style("=".repeat(80)).dim().to_string())?;
-    term.write_line(&format!("{}", style("RELEVANT FILES FOR PROMPT").green().bold()))?;
-    term.write_line(&style("=".repeat(80)).dim().to_string())?;
-    term.write_line("")?;
-    
-    for (index, file) in context.files.iter().enumerate() {
-        term.write_line(&format!("{}. {}", 
-            style(format!("{:3}", index + 1)).cyan(),
-            style(file.path.display()).white()
-        ))?;
-    }
-    
-    term.write_line("")?;
-    term.write_line(&style("=".repeat(80)).dim().to_string())?;
     term.write_line(&format!("{} {}", 
-        style("Total files:").bold(),
-        style(context.files.len()).yellow()
+        style("✓ Context ready:").green().bold(),
+        style(format!("{} sections, ~{} tokens", context.files.len(), context.token_estimate())).yellow()
     ))?;
-    term.write_line(&format!("{} {}", 
-        style("Estimated tokens:").bold(),
-        style(format!("~{}", context.token_estimate())).yellow()
-    ))?;
-    term.write_line(&style("=".repeat(80)).dim().to_string())?;
     term.write_line("")?;
 
     Ok(())

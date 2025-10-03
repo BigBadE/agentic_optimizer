@@ -1,16 +1,18 @@
-//! Context expansion using ContextPlan and language backends.
+//! Context expansion logic for following code relationships.
 
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
-use indicatif::{ProgressBar, ProgressStyle};
 use ignore::WalkBuilder;
+use indicatif::{ProgressBar, ProgressStyle};
 
 use agentic_core::{FileContext, Result};
 use agentic_languages::LanguageProvider;
+
 use crate::{fs_utils::is_source_file, query::{ContextPlan, ExpansionStrategy}};
 
-/// Expands context based on a ContextPlan
+/// Expands context by following code relationships
+#[allow(dead_code)]
 pub struct ContextExpander<'a> {
     /// Optional language backend for semantic analysis
     backend: Option<&'a Box<dyn LanguageProvider>>,
@@ -20,6 +22,7 @@ pub struct ContextExpander<'a> {
     max_file_size: usize,
 }
 
+#[allow(dead_code)]
 impl<'a> ContextExpander<'a> {
     /// Create a new context expander
     #[must_use]

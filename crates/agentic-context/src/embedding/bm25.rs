@@ -124,21 +124,36 @@ impl BM25Index {
         for word in &words {
             let lower = word.to_lowercase();
             
-            // Preserve special tokens with punctuation
-            if lower.contains("::") || lower.starts_with("--") || lower.starts_with('-') {
-                if lower.len() > 2 {
-                    terms.push(lower.clone());
+            // Check for special tokens that should be preserved
+            let has_double_colon = lower.contains("::");
+            let has_double_dash = lower.starts_with("--");
+            let has_special = has_double_colon || has_double_dash;
+            
+            if has_special && lower.len() > 2 {
+                // Add the special token as-is (full path/flag)
+                terms.push(lower.clone());
+                
+                // For :: paths, also add individual components for partial matching
+                if has_double_colon {
+                    for component in lower.split("::") {
+                        if component.len() > 2 {
+                            terms.push(component.to_string());
+                        }
+                    }
                 }
             }
             
-            // Also add cleaned version
+            // Always add cleaned version (for fallback matching)
             let clean: String = lower
                 .chars()
                 .filter(|c| c.is_alphanumeric() || *c == '_')
                 .collect();
             
             if !clean.is_empty() && clean.len() > 2 {
-                terms.push(clean);
+                // Only add if different from special token (avoid duplicates)
+                if !has_special || clean != lower {
+                    terms.push(clean);
+                }
             }
         }
         

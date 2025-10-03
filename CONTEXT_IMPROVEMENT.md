@@ -2,12 +2,12 @@
 
 ## Implementation Checklist
 
-- [ ] **Enhanced BM25 Tokenization** - Preserve special tokens and add n-grams
-- [ ] **File Type Boosting** - Weight code files higher than docs/config
-- [ ] **Path-Based Boosting** - Boost files in relevant directories
-- [ ] **Minimum Relevance Filtering** - Remove low-quality small chunks
-- [ ] **Import-Based Boosting** - Boost files importing relevant crates
-- [ ] **Query Intent Detection** - Detect implementation vs explanation queries
+- [x] **Enhanced BM25 Tokenization** - Preserve special tokens and add n-grams
+- [x] **File Type Boosting** - Weight code files higher than docs/config
+- [x] **Path-Based Boosting** - Boost files in relevant directories
+- [x] **Minimum Relevance Filtering** - Remove low-quality small chunks
+- [x] **Import-Based Boosting** - Boost files importing relevant crates
+- [x] **Query Intent Detection** - Detect implementation vs explanation queries
 - [ ] **Adaptive BM25/Vector Weighting** - Adjust based on query characteristics
 - [ ] **Code Pattern Detection** - Boost files with relevant syntax patterns
 
@@ -18,6 +18,13 @@
 **Problem**: Current tokenization loses semantic information from compound terms.
 
 **Solution**: Preserve special patterns and generate n-grams.
+
+**Status**: ✅ **IMPLEMENTED** (with improvements)
+- Preserves `::` (Rust paths) and `--` (CLI flags) as special tokens
+- Splits `::` paths into components for partial matching (e.g., `user::input::data` → `user`, `input`, `data`)
+- Generates bigrams for phrase matching
+- Avoids duplicate tokens between special and cleaned versions
+- Comprehensive test coverage in `tests/bm25_tokenization.rs`
 
 ```rust
 fn tokenize(text: &str) -> Vec<String> {

@@ -237,6 +237,24 @@ impl RustBackend {
         
         searcher.list_symbols_in_file(file)
     }
+
+    /// Build import graph for a set of files
+    ///
+    /// Returns a map from file path to list of files it imports
+    ///
+    /// # Errors
+    /// Returns an error if the workspace is not initialized
+    pub fn build_import_graph(&self, files: &[PathBuf]) -> Result<HashMap<PathBuf, Vec<PathBuf>>> {
+        let mut graph = HashMap::new();
+        
+        for file in files {
+            if let Ok(imports) = self.extract_imports(file) {
+                graph.insert(file.clone(), imports);
+            }
+        }
+        
+        Ok(graph)
+    }
 }
 
 impl Default for RustBackend {

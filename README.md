@@ -107,14 +107,16 @@ agentic_optimizer/
 
 ## Context Fetching Performance
 
-**Current Metrics** (Phase 4 - Pattern Boost):
-- **Precision@3**: 25.0% (Target: 40%)
-- **Recall@10**: 50.4% (Target: 60%)
-- **MRR**: 0.469 (Target: 0.650)
-- **NDCG@10**: 0.432 (Target: 0.600)
-- **Critical in Top-3**: 20.0% (Target: 50%)
+**Current Metrics** (Phase 5 - Graph Ranking):
+- **Precision@3**: 30.0% (Target: 60%)
+- **Recall@10**: 49.4% (Target: 70%)
+- **MRR**: 0.440 (Target: 0.700)
+- **NDCG@10**: 0.437 (Target: 0.750)
+- **Critical in Top-3**: 25.0% (Target: 65%)
 
-See `benchmarks/README.md` for detailed benchmark information.
+*Targets set to industry tool levels (Cursor/GitHub Copilot estimated performance). Achieving these requires solving documentation dominance fundamentally.*
+
+See `benchmarks/README.md` for improvement roadmap.
 
 ## Roadmap
 

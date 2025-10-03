@@ -214,13 +214,20 @@ impl VectorSearchManager {
         // Combine results using adaptive weighted fusion
         let mut combined = self.reciprocal_rank_fusion(query, &bm25_results, &vector_results, top_k);
         
+        // Build import graph for graph-based ranking
+        let all_files: Vec<PathBuf> = combined.iter().map(|r| r.file_path.clone()).collect();
+        let import_graph = self.build_import_graph(&all_files);
+        
+        // Apply graph-based boost
+        self.apply_graph_boost(&mut combined, &import_graph);
+        
         // Apply import-based boosting using preview content
         for result in &mut combined {
             let import_boost = Self::boost_by_imports(&result.preview, query);
             result.score *= import_boost;
         }
         
-        // Re-sort after import boosting
+        // Re-sort after boosting
         combined.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         
         // Re-normalize after boosting
@@ -412,6 +419,67 @@ impl VectorSearchManager {
         }
         
         boost
+    }
+
+    /// Build import graph from Rust source files using rust-analyzer
+    fn build_import_graph(&self, files: &[PathBuf]) -> HashMap<PathBuf, Vec<PathBuf>> {
+        // Try to use rust-analyzer backend for accurate import resolution
+        if let Ok(backend) = self.try_get_rust_backend() {
+            if let Ok(graph) = backend.build_import_graph(files) {
+                return graph;
+            }
+        }
+        
+        // Fallback: return empty graph if rust-analyzer not available
+        // This is acceptable since graph ranking is a bonus feature
+        HashMap::new()
+    }
+    
+    /// Try to get or create a Rust backend for the project
+    fn try_get_rust_backend(&self) -> Result<rust_backend::RustBackend> {
+        use rust_backend::RustBackend;
+        
+        let mut backend = RustBackend::new();
+        backend.initialize(&self.project_root)?;
+        Ok(backend)
+    }
+    
+    /// Apply graph-based boost to results
+    fn apply_graph_boost(&self, results: &mut [SearchResult], graph: &HashMap<PathBuf, Vec<PathBuf>>) {
+        // Build reverse graph (who imports this file)
+        let mut reverse_graph: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
+        for (file, imports) in graph {
+            for imported in imports {
+                reverse_graph.entry(imported.clone())
+                    .or_default()
+                    .push(file.clone());
+            }
+        }
+        
+        // Boost files based on graph relationships
+        for result in results.iter_mut() {
+            let mut graph_boost = 1.0;
+            
+            // Boost if many files import this (central/important)
+            if let Some(importers) = reverse_graph.get(&result.file_path) {
+                let import_count = importers.len();
+                if import_count > 5 {
+                    graph_boost *= 1.3;  // Heavily imported = important
+                } else if import_count > 2 {
+                    graph_boost *= 1.15;  // Moderately imported
+                }
+            }
+            
+            // Boost if this file imports many others (coordinator/orchestrator)
+            if let Some(imports) = graph.get(&result.file_path) {
+                let import_count = imports.len();
+                if import_count > 10 {
+                    graph_boost *= 1.2;  // Orchestrator file
+                }
+            }
+            
+            result.score *= graph_boost;
+        }
     }
 
     /// Calculate chunk quality boost based on content

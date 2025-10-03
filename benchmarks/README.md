@@ -2,18 +2,20 @@
 
 Benchmarks for evaluating context retrieval quality using hybrid BM25 + vector search.
 
-## Current Performance (Phase 4 - Pattern Boost)
+## Current Performance (Phase 5 - Graph Ranking)
 
-| Metric | Current | Target | Gap |
-|--------|---------|--------|-----|
-| **Precision@3** | 25.0% | 40% | +15% |
-| **Precision@10** | 20.5% | 50% | +29.5% |
-| **Recall@10** | 50.4% | 60% | +9.6% |
-| **MRR** | 0.469 | 0.650 | +0.181 |
-| **NDCG@10** | 0.432 | 0.600 | +0.168 |
-| **Critical in Top-3** | 20.0% | 50% | +30% |
+| Metric | Current | Target (Industry) | Gap | Status |
+|--------|---------|------------------|-----|--------|
+| **Precision@3** | 30.0% | 60% | +30% | 🔴 50% of target |
+| **Precision@10** | 20.0% | 55% | +35% | 🔴 36% of target |
+| **Recall@10** | 49.4% | 70% | +20.6% | 🟡 71% of target |
+| **MRR** | 0.440 | 0.700 | +0.260 | 🔴 63% of target |
+| **NDCG@10** | 0.437 | 0.750 | +0.313 | 🔴 58% of target |
+| **Critical in Top-3** | 25.0% | 65% | +40% | 🔴 38% of target |
 
 **Test Suite**: 20 diverse test cases covering real-world coding agent scenarios
+
+*Targets set to estimated Cursor/GitHub Copilot performance levels. See `SOLVING_DOC_DOMINANCE.md` for fundamental solutions.*
 
 ## Quick Start
 
@@ -96,13 +98,38 @@ See `SETUP.md` for detailed format documentation.
   - Public API-rich: 1.2x
   - Module docs: 1.15x
 
-### 🔄 Next Steps to Hit Targets
-1. **Result Diversity** - Penalize multiple files from same directory
-2. **File Importance Signals** - Use depth, size, modification time
-3. **Two-Stage Ranking** - Re-rank top-50 with expensive features
-4. **Repository Structure Learning** - Adapt to project patterns
+### ✅ Phase 5: Graph Ranking (25% → 30% P@3, 20% → 25% Critical@3)
+- Import graph analysis using rust-analyzer:
+  - Boost heavily-imported files (1.3x if >5 importers)
+  - Boost orchestrator files (1.2x if >10 imports)
+  - Uses rust-analyzer backend for accurate import resolution
+  - Graceful fallback if rust-analyzer unavailable
 
-See `CONTEXT_IMPROVEMENT.md` in project root for detailed roadmap.
+### 🔄 To Hit Industry Targets (60% P@3, 70% R@10)
+
+**The Core Problem**: Generic text embeddings favor documentation over code.
+
+**Fundamental Solutions** (see `SOLVING_DOC_DOMINANCE.md` for details):
+
+1. **LLM Re-ranking** 🥇 RECOMMENDED
+   - Use Gemini Flash to re-rank top 50 candidates
+   - **Impact**: 30% → 50-60% P@3 (+20-30%)
+   - **Cost**: ~$0.004/query
+   - **Effort**: 1 week
+
+2. **Code-Aware Embeddings** 🥈
+   - Replace generic embeddings with CodeBERT/GraphCodeBERT
+   - **Impact**: +15-20% P@3
+   - **Cost**: One-time re-embedding
+   - **Effort**: 2-3 weeks
+
+3. **Custom Fine-Tuned Model** 🥉
+   - Train on "code > docs" preference
+   - **Impact**: 60%+ P@3 (industry level)
+   - **Cost**: $50-200 training
+   - **Effort**: 1-2 months
+
+**Recommended Path**: Implement LLM re-ranking (Phase 6) → Add CodeBERT (Phase 7) → Hit all targets
 
 ## Example Output
 

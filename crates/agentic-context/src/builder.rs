@@ -281,6 +281,32 @@ impl ContextBuilder {
 
         spinner.finish_with_message("✓ Hybrid search complete");
         
+        // Filter out low-quality small chunks before processing
+        let filtered_matches: Vec<_> = semantic_matches.iter()
+            .filter(|result| {
+                // Estimate chunk size from line range in path
+                if let Some(path_str) = result.file_path.to_str() {
+                    if let Some((_, range_part)) = path_str.rsplit_once(':') {
+                        if let Some((start_str, end_str)) = range_part.split_once('-') {
+                            if let (Ok(start), Ok(end)) = (start_str.parse::<usize>(), end_str.parse::<usize>()) {
+                                let line_count = end.saturating_sub(start);
+                                // Estimate ~10 tokens per line
+                                let estimated_tokens = line_count * 10;
+                                return Self::should_include_chunk(estimated_tokens, result.score);
+                            }
+                        }
+                    }
+                }
+                // If we can't parse, include it
+                true
+            })
+            .cloned()
+            .collect();
+        
+        eprintln!("  After quality filtering: {} chunks (removed {} low-quality)", 
+            filtered_matches.len(), 
+            semantic_matches.len() - filtered_matches.len());
+        
         // Use context manager to add hybrid search results
         let mut context_mgr = ContextManager::new(MAX_CONTEXT_TOKENS);
         
@@ -288,10 +314,10 @@ impl ContextBuilder {
         // Merge overlapping chunks from the same file
         use std::collections::HashMap;
         
-        // Group chunks by file
+        // Group chunks by file (using filtered matches)
         let mut file_chunks: HashMap<PathBuf, Vec<(usize, usize, f32)>> = HashMap::new();
         
-        for result in &semantic_matches {
+        for result in &filtered_matches {
             // Parse chunk path: "file.rs:start-end"
             if let Some(path_str) = result.file_path.to_str() {
                 if let Some((file_part, range_part)) = path_str.rsplit_once(':') {
@@ -339,6 +365,26 @@ impl ContextBuilder {
             }
         }
         
+        // Keep track of scores for display (total, bm25, vector)
+        let file_scores: Vec<(PathBuf, f32, Option<f32>, Option<f32>)> = filtered_matches.iter()
+            .filter_map(|result| {
+                if let Some(path_str) = result.file_path.to_str() {
+                    if let Some((file_part, _)) = path_str.rsplit_once(':') {
+                        Some((
+                            PathBuf::from(file_part),
+                            result.score,
+                            result.bm25_score,
+                            result.vector_score,
+                        ))
+                    } else {
+                        None
+                    }
+                } else {
+                    None
+                }
+            })
+            .collect();
+        
         let added = crate::context_inclusion::add_prioritized_files(&mut context_mgr, search_prioritized);
         eprintln!("  Added {} chunks from hybrid search ({} tokens used)", added, context_mgr.token_count());
         
@@ -346,9 +392,15 @@ impl ContextBuilder {
         eprintln!("\n=== RELEVANT SECTIONS FOR PROMPT ===");
         eprintln!("Total: {} chunks ({} tokens)\n", context_mgr.file_count(), context_mgr.token_count());
         
-        // List all chunks with their sections
+        // List all chunks with their sections and scores
         for (i, file) in context_mgr.files().iter().enumerate() {
             let tokens = crate::context_inclusion::ContextManager::estimate_tokens(&file.content);
+            
+            // Find the scores for this file
+            let (total_score, bm25, vector) = file_scores.iter()
+                .find(|(path, _, _, _)| path == &file.path)
+                .map(|(_, total, bm25, vector)| (*total, *bm25, *vector))
+                .unwrap_or((0.0, None, None));
             
             // Extract section info from content
             let section_info = if let Some(first_line) = file.content.lines().next() {
@@ -368,10 +420,23 @@ impl ContextBuilder {
                 "chunk".to_string()
             };
             
-            eprintln!("{}. {} [{}] ({} tokens)", 
+            // Format score display
+            // Note: component scores are raw RRF contributions, total is normalized to 0-1
+            let score_display = match (bm25, vector) {
+                (Some(b), Some(v)) => {
+                    let sum = b + v;
+                    format!("score: {:.3} (bm25: {:.3} + vec: {:.3} = {:.3})", total_score, b, v, sum)
+                },
+                (Some(b), None) => format!("score: {:.3} (bm25: {:.3})", total_score, b),
+                (None, Some(v)) => format!("score: {:.3} (vec: {:.3})", total_score, v),
+                (None, None) => format!("score: {:.3}", total_score),
+            };
+            
+            eprintln!("{}. {} [{}] ({}, {} tokens)", 
                 i + 1, 
                 file.path.display(), 
                 section_info,
+                score_display,
                 tokens
             );
         }
@@ -505,6 +570,17 @@ impl ContextBuilder {
             path: file_path.clone(),
             content: final_content,
         })
+    }
+
+    /// Check if a chunk should be included based on size and score
+    fn should_include_chunk(tokens: usize, score: f32) -> bool {
+        if tokens < 50 {
+            return false;  // Always filter tiny chunks
+        }
+        if tokens < 100 && score < 0.7 {
+            return false;  // Filter small low-score chunks
+        }
+        true
     }
 
     /// Check if a file is a code file (not documentation/text)

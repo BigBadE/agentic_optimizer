@@ -116,13 +116,46 @@ impl BM25Index {
         score
     }
 
-    /// Tokenize text into terms (lowercase, alphanumeric + underscore)
+    /// Tokenize text into terms with special token preservation and bigrams
     fn tokenize(text: &str) -> Vec<String> {
-        text.to_lowercase()
-            .split(|c: char| !c.is_alphanumeric() && c != '_')
-            .filter(|s| !s.is_empty() && s.len() > 2)  // Filter short terms
-            .map(String::from)
-            .collect()
+        let mut terms = Vec::new();
+        let words: Vec<&str> = text.split_whitespace().collect();
+        
+        for word in &words {
+            let lower = word.to_lowercase();
+            
+            // Preserve special tokens with punctuation
+            if lower.contains("::") || lower.starts_with("--") || lower.starts_with('-') {
+                if lower.len() > 2 {
+                    terms.push(lower.clone());
+                }
+            }
+            
+            // Also add cleaned version
+            let clean: String = lower
+                .chars()
+                .filter(|c| c.is_alphanumeric() || *c == '_')
+                .collect();
+            
+            if !clean.is_empty() && clean.len() > 2 {
+                terms.push(clean);
+            }
+        }
+        
+        // Add bigrams for common phrases
+        for window in words.windows(2) {
+            let w0 = window[0].to_lowercase();
+            let w1 = window[1].to_lowercase();
+            
+            let clean0: String = w0.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
+            let clean1: String = w1.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
+            
+            if clean0.len() > 2 && clean1.len() > 2 {
+                terms.push(format!("{}_{}", clean0, clean1));
+            }
+        }
+        
+        terms
     }
 
     /// Count term frequencies

@@ -2,7 +2,7 @@
 
 use std::collections::HashMap;
 use std::fs;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use serde::{Deserialize, Serialize};
 use indicatif::{ProgressBar, ProgressStyle};
@@ -123,7 +123,6 @@ impl VectorSearchManager {
                 // Add valid entries to store and BM25 index
                 for entry in &valid {
                     let chunk_path = format!("{}:{}-{}", entry.path.display(), entry.start_line, entry.end_line);
-                    eprintln!("  Loaded: {} [{}] (dim: {})", chunk_path, entry.chunk_id, entry.embedding.len());
                     self.file_times.insert(entry.path.clone(), entry.modified);
                     self.store.add(PathBuf::from(&chunk_path), entry.embedding.clone(), entry.preview.clone());
                     
@@ -213,9 +212,27 @@ impl VectorSearchManager {
         eprintln!("  Vector found {} semantic matches", vector_results.len());
         
         // Combine results using Reciprocal Rank Fusion (RRF)
-        let combined = self.reciprocal_rank_fusion(&bm25_results, &vector_results, top_k);
+        let mut combined = self.reciprocal_rank_fusion(&bm25_results, &vector_results, top_k);
         
-        eprintln!("  Combined {} results using RRF", combined.len());
+        // Apply import-based boosting using preview content
+        for result in &mut combined {
+            let import_boost = Self::boost_by_imports(&result.preview, query);
+            result.score *= import_boost;
+        }
+        
+        // Re-sort after import boosting
+        combined.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        
+        // Re-normalize after boosting
+        if let Some(max_score) = combined.first().map(|r| r.score) {
+            if max_score > 0.0 {
+                for result in &mut combined {
+                    result.score = result.score / max_score;
+                }
+            }
+        }
+        
+        eprintln!("  Combined {} results using RRF + import boost", combined.len());
         if !combined.is_empty() {
             eprintln!("  Top scores: {:?}", combined.iter().take(5).map(|r| r.score).collect::<Vec<_>>());
         }
@@ -230,6 +247,65 @@ impl VectorSearchManager {
         Ok(filtered)
     }
 
+    /// Check if file content has imports matching query terms
+    fn boost_by_imports(content: &str, query: &str) -> f32 {
+        let mut boost = 1.0;
+        let query_terms: Vec<&str> = query.split_whitespace()
+            .filter(|t| t.len() > 3)
+            .collect();
+        
+        if query_terms.is_empty() {
+            return boost;
+        }
+        
+        // Extract import lines
+        let imports: Vec<&str> = content
+            .lines()
+            .filter(|l| {
+                let trimmed = l.trim();
+                trimmed.starts_with("use ") || 
+                trimmed.starts_with("import ") ||
+                trimmed.starts_with("from ") ||
+                trimmed.starts_with("require(")
+            })
+            .collect();
+        
+        // Check if imports match query terms
+        for term in &query_terms {
+            let term_lower = term.to_lowercase();
+            if imports.iter().any(|i| i.to_lowercase().contains(&term_lower)) {
+                boost += 0.2;
+            }
+        }
+        
+        boost.min(2.0)
+    }
+
+    /// Calculate file type and location boost
+    fn calculate_file_boost(path: &Path) -> f32 {
+        let path_str = path.to_str().unwrap_or("");
+        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        
+        let type_boost = match ext {
+            "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "java" | "c" | "cpp" | 
+            "h" | "hpp" | "go" | "rb" | "php" | "cs" | "swift" | "kt" | "scala" => 1.5,
+            "toml" | "yaml" | "yml" | "json" | "xml" => 0.6,
+            "md" | "txt" => 0.5,
+            _ => 1.0,
+        };
+        
+        let location_boost = if path_str.contains("/src/") || path_str.contains("\\src\\") {
+            1.2
+        } else if path_str.contains("/docs/") || path_str.contains("\\docs\\") || 
+                  path_str.contains("/examples/") || path_str.contains("\\examples\\") {
+            0.7
+        } else {
+            1.0
+        };
+        
+        type_boost * location_boost
+    }
+
     /// Reciprocal Rank Fusion: combines rankings from multiple sources
     /// RRF score = sum(1 / (k + rank)) where k=60 is a constant
     /// Normalizes final scores to 0-1 range for compatibility with filtering
@@ -242,38 +318,48 @@ impl VectorSearchManager {
         const K: f32 = 60.0;  // RRF constant
         
         let mut scores: HashMap<PathBuf, f32> = HashMap::new();
+        let mut bm25_scores: HashMap<PathBuf, f32> = HashMap::new();
+        let mut vector_scores: HashMap<PathBuf, f32> = HashMap::new();
         let mut previews: HashMap<PathBuf, String> = HashMap::new();
         
         // Add BM25 scores (weight: 0.4)
         for (rank, (path, _score)) in bm25_results.iter().enumerate() {
             let rrf_score = 0.4 / (K + rank as f32 + 1.0);
             *scores.entry(path.clone()).or_insert(0.0) += rrf_score;
+            bm25_scores.insert(path.clone(), rrf_score);
         }
         
         // Add vector scores (weight: 0.6 - semantic is more important)
         for (rank, result) in vector_results.iter().enumerate() {
             let rrf_score = 0.6 / (K + rank as f32 + 1.0);
             *scores.entry(result.file_path.clone()).or_insert(0.0) += rrf_score;
+            vector_scores.insert(result.file_path.clone(), rrf_score);
             previews.insert(result.file_path.clone(), result.preview.clone());
         }
         
-        // Convert to SearchResult
+        // Convert to SearchResult and apply file type boosting
         let mut combined: Vec<SearchResult> = scores
             .into_iter()
-            .map(|(path, score)| SearchResult {
-                file_path: path.clone(),
-                score,
-                preview: previews.get(&path).cloned().unwrap_or_default(),
+            .map(|(path, score)| {
+                let boost = Self::calculate_file_boost(&path);
+                SearchResult {
+                    file_path: path.clone(),
+                    score: score * boost,
+                    preview: previews.get(&path).cloned().unwrap_or_default(),
+                    bm25_score: bm25_scores.get(&path).copied(),
+                    vector_score: vector_scores.get(&path).copied(),
+                }
             })
             .collect();
         
         combined.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         
-        // Normalize scores to 0-1 range
+        // Normalize total scores to 0-1 range (but keep component scores as raw contributions)
         if let Some(max_score) = combined.first().map(|r| r.score) {
             if max_score > 0.0 {
                 for result in &mut combined {
                     result.score = result.score / max_score;
+                    // Component scores stay as raw RRF values for debugging
                 }
             }
         }
@@ -373,8 +459,7 @@ impl VectorSearchManager {
                             
                             for (path, chunk, embedding, preview) in chunk_results {
                                 let chunk_path = format!("{}:{}-{}", path.display(), chunk.start_line, chunk.end_line);
-                                eprintln!("    Embedded: {} [{}] (dim: {})", chunk_path, chunk.identifier, embedding.len());
-                                
+
                                 // Add to vector store
                                 self.store.add(PathBuf::from(&chunk_path), embedding, preview);
                                 

@@ -4,10 +4,11 @@ use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
 use indicatif::{ProgressBar, ProgressStyle};
+use ignore::WalkBuilder;
 
 use agentic_core::{FileContext, Result};
 use agentic_languages::LanguageProvider;
-use crate::query::{ContextPlan, ExpansionStrategy};
+use crate::{fs_utils::is_source_file, query::{ContextPlan, ExpansionStrategy}};
 
 /// Expands context based on a ContextPlan
 pub struct ContextExpander<'a> {
@@ -49,7 +50,7 @@ impl<'a> ContextExpander<'a> {
         
         tracing::info!("Expanding context with strategy: {:?}", plan.strategy);
         tracing::debug!("Context plan: keywords={:?}, symbols={:?}, patterns={:?}", 
-            plan.keywords, plan.symbols_to_find, plan.file_patterns);
+            plan.keywords, plan.symbols, plan.file_patterns);
 
         let mut files = HashSet::new();
 
@@ -139,27 +140,47 @@ impl<'a> ContextExpander<'a> {
     fn find_files_by_patterns(&self, patterns: &[String]) -> Result<Vec<PathBuf>> {
         let mut files = Vec::new();
 
-        for entry in WalkDir::new(self.project_root)
-            .into_iter()
-            .filter_entry(|e| !Self::is_ignored(e))
-            .filter_map(std::result::Result::ok)
-        {
-            if !entry.file_type().is_file() {
-                continue;
-            }
+        // Use the same WalkBuilder as build_file_tree for consistency
+        let walker = WalkBuilder::new(self.project_root)
+            .max_depth(None)
+            .hidden(true)
+            .git_ignore(true)
+            .git_global(false)
+            .git_exclude(false)
+            .build();
 
-            let path = entry.path();
-            if !Self::is_code_file(path) {
-                continue;
-            }
-
-            // Check if path matches any pattern
-            let path_str = path.to_string_lossy().to_lowercase();
-            if patterns.iter().any(|pattern| path_str.contains(&pattern.to_lowercase())) {
-                if let Ok(metadata) = entry.metadata() {
-                    if metadata.len() <= self.max_file_size as u64 {
-                        files.push(path.to_path_buf());
+        for entry_result in walker {
+            match entry_result {
+                Ok(entry) => {
+                    let path = entry.path();
+                    
+                    // Only process files
+                    if !entry.file_type().map_or(false, |ft| ft.is_file()) {
+                        continue;
                     }
+
+                    // Only process source files
+                    if !is_source_file(path) {
+                        continue;
+                    }
+
+                    // Check if path matches any pattern (use relative path with forward slashes)
+                    let rel_path = path.strip_prefix(self.project_root)
+                        .unwrap_or(path)
+                        .to_string_lossy()
+                        .replace('\\', "/")
+                        .to_lowercase();
+                    
+                    if patterns.iter().any(|pattern| rel_path.contains(&pattern.to_lowercase())) {
+                        if let Ok(metadata) = entry.metadata() {
+                            if metadata.len() <= self.max_file_size as u64 {
+                                files.push(path.to_path_buf());
+                            }
+                        }
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Warning: Error walking directory: {}", e);
                 }
             }
         }
@@ -173,19 +194,34 @@ impl<'a> ContextExpander<'a> {
 
         if let Some(backend) = self.backend {
             for symbol in symbols {
+                // Skip if this looks like a file path or keyword, not a symbol
+                if symbol.contains('/') || symbol.contains('\\') || symbol.contains('.') {
+                    eprintln!("  Skipping '{}' - looks like a path, not a symbol", symbol);
+                    continue;
+                }
+                
+                // Skip very generic terms that would match too much
+                if symbol.len() < 3 {
+                    eprintln!("  Skipping '{}' - too short for symbol search", symbol);
+                    continue;
+                }
+                
                 spinner.set_message(format!("Searching for symbol: {}...", symbol));
+                
                 // Search for the symbol
                 let search_query = agentic_languages::SearchQuery {
                     symbol_name: Some(symbol.clone()),
                     include_references: true,
-                    include_implementations: false,
-                    max_results: 50,
+                    include_implementations: true,
+                    max_results: 20,
                 };
 
                 if let Ok(result) = backend.search_symbols(&search_query) {
                     eprintln!("    Symbol '{}': {} locations", symbol, result.symbols.len());
                     for symbol_info in result.symbols {
-                        files.push(symbol_info.file_path);
+                        if is_source_file(&symbol_info.file_path) {
+                            files.push(symbol_info.file_path);
+                        }
                     }
                 }
             }
@@ -254,7 +290,7 @@ impl<'a> ContextExpander<'a> {
 
             // Check if it's a test file
             if path_str.contains("test") || path_str.contains("spec") {
-                if Self::is_code_file(path) {
+                if is_source_file(path) {
                     // Check if it's related to any of our files
                     let file_name = path.file_stem()
                         .and_then(|s| s.to_str())
@@ -287,15 +323,4 @@ impl<'a> ContextExpander<'a> {
         IGNORED_DIRS.iter().any(|dir| file_name == *dir)
     }
 
-    /// Check if a file is a code file
-    fn is_code_file(path: &Path) -> bool {
-        const CODE_EXTENSIONS: &[&str] = &[
-            "rs", "toml", "md", "txt", "json", "yaml", "yml",
-            "js", "ts", "jsx", "tsx", "py", "java", "go", "c", "cpp", "h", "hpp"
-        ];
-
-        path.extension()
-            .and_then(|ext| ext.to_str())
-            .map_or(false, |ext| CODE_EXTENSIONS.contains(&ext))
-    }
 }

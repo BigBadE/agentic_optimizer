@@ -152,8 +152,11 @@ pub async fn ensure_available() -> Result<()> {
 
 /// Ensure the required model is downloaded
 async fn ensure_model_available() -> Result<()> {
+    use agentic_context::models::ModelConfig;
+    
     let term = Term::stdout();
-    let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "qwen2.5-coder:7b".to_string());
+    let config = ModelConfig::from_env();
+    let model = config.medium;
     
     term.write_line(&format!("{}", style(format!("Checking for model: {}", model)).dim()))?;
     

@@ -62,8 +62,8 @@ pub enum Complexity {
 pub struct ContextPlan {
     /// Keywords extracted from query
     pub keywords: Vec<String>,
-    /// Specific symbols to search for
-    pub symbols_to_find: Vec<String>,
+    /// Specific code symbols to search for (function/struct/trait names)
+    pub symbols: Vec<String>,
     /// File patterns to include (e.g., "auth", "user", "session")
     pub file_patterns: Vec<String>,
     /// Whether to include tests
@@ -80,7 +80,7 @@ impl Default for ContextPlan {
     fn default() -> Self {
         Self {
             keywords: Vec::new(),
-            symbols_to_find: Vec::new(),
+            symbols: Vec::new(),
             file_patterns: Vec::new(),
             include_tests: false,
             max_depth: 2,
@@ -137,7 +137,7 @@ impl ContextPlan {
     /// Add symbols to find
     #[must_use]
     pub fn with_symbols(mut self, symbols: Vec<String>) -> Self {
-        self.symbols_to_find = symbols;
+        self.symbols = symbols;
         self
     }
 

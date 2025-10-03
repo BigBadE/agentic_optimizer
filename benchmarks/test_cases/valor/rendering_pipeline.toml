@@ -1,0 +1,44 @@
+# Test Case: Rendering Pipeline
+name = "Rendering Pipeline"
+description = "Query about the rendering pipeline and WGPU integration"
+query = "fix the rendering pipeline to handle text layout"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/renderer/wgpu_backend/src/lib.rs"
+priority = "critical"
+reason = "Main WGPU rendering backend implementation"
+
+[[expected]]
+path = "crates/renderer/wgpu_backend/src/state.rs"
+priority = "critical"
+reason = "WGPU state management and rendering pipeline"
+
+[[expected]]
+path = "crates/renderer/wgpu_backend/src/text.rs"
+priority = "high"
+reason = "Text rendering logic"
+
+[[expected]]
+path = "crates/renderer/src/renderer.rs"
+priority = "high"
+reason = "Main renderer implementation"
+
+[[expected]]
+path = "crates/renderer/src/lib.rs"
+priority = "medium"
+reason = "Renderer module exports"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/css/src/parser.rs"
+reason = "CSS parsing, not rendering"
+
+[[excluded]]
+path = "crates/html"
+reason = "HTML parsing, not rendering"
+
+[[excluded]]
+path = "crates/js"
+reason = "JavaScript engine, not rendering"

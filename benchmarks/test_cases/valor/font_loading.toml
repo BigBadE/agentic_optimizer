@@ -1,0 +1,35 @@
+# Test Case: Font Loading
+name = "Web Font Loading"
+description = "Implement web font loading and fallbacks"
+query = "add support for @font-face and web font loading"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/css/modules/fonts"
+priority = "critical"
+reason = "Font CSS module"
+
+[[expected]]
+path = "crates/renderer/wgpu_backend/src/state/text.rs"
+priority = "critical"
+reason = "Text rendering with fonts"
+
+[[expected]]
+path = "crates/css/modules/text/src/lib.rs"
+priority = "high"
+reason = "Text properties including font-family"
+
+[[expected]]
+path = "crates/css/orchestrator/src/lib.rs"
+priority = "medium"
+reason = "CSS property resolution"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/html/src/parser"
+reason = "HTML parsing, not font loading"
+
+[[excluded]]
+path = "crates/js"
+reason = "JavaScript, not font CSS"

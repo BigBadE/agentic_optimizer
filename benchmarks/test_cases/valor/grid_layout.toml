@@ -1,0 +1,35 @@
+# Test Case: CSS Grid Layout
+name = "CSS Grid Layout"
+description = "Add CSS Grid support"
+query = "implement CSS Grid layout algorithm"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/css/modules/display/src/lib.rs"
+priority = "critical"
+reason = "Display property handling including grid"
+
+[[expected]]
+path = "crates/css/modules/flexbox/src/lib.rs"
+priority = "high"
+reason = "Similar layout algorithm to grid"
+
+[[expected]]
+path = "crates/css/modules/core/src/lib.rs"
+priority = "high"
+reason = "Core layout algorithms"
+
+[[expected]]
+path = "crates/css/orchestrator/src/lib.rs"
+priority = "medium"
+reason = "Layout orchestration"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/html/src/parser"
+reason = "HTML parsing, not grid layout"
+
+[[excluded]]
+path = "crates/js"
+reason = "JavaScript, not CSS grid"

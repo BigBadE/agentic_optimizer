@@ -1,0 +1,34 @@
+# Test Case: JavaScript Module System
+name = "JavaScript Module System"
+description = "ES modules implementation"
+query = "how are ES6 modules loaded and executed"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/js/src/modules.rs"
+priority = "critical"
+reason = "Module system implementation"
+
+[[expected]]
+path = "crates/js/src/runtime.rs"
+priority = "critical"
+reason = "Runtime module execution"
+
+[[expected]]
+path = "crates/js/src/lib.rs"
+priority = "high"
+reason = "JS module entry point"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/css"
+reason = "CSS styling, not JS modules"
+
+[[excluded]]
+path = "crates/html/src/parser"
+reason = "HTML parsing, not modules"
+
+[[excluded]]
+path = "crates/renderer"
+reason = "Rendering, not module loading"

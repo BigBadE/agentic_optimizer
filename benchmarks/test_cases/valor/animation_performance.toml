@@ -1,0 +1,35 @@
+# Test Case: CSS Animation Performance
+name = "CSS Animation Performance"
+description = "Debug janky CSS animations"
+query = "why are CSS animations dropping frames on transforms"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/css/modules/transforms/src/lib.rs"
+priority = "critical"
+reason = "Transform properties for animations"
+
+[[expected]]
+path = "crates/css/modules/core/src/lib.rs"
+priority = "critical"
+reason = "Core CSS property handling"
+
+[[expected]]
+path = "crates/renderer/src/lib.rs"
+priority = "high"
+reason = "Rendering pipeline for animations"
+
+[[expected]]
+path = "crates/page_handler/src/lib.rs"
+priority = "medium"
+reason = "Animation frame coordination"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/html/src/parser"
+reason = "HTML parsing, not animations"
+
+[[excluded]]
+path = "crates/js/src/console"
+reason = "Console logging, not animations"

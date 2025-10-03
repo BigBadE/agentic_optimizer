@@ -1,0 +1,35 @@
+# Test Case: CSS Selector Performance
+name = "CSS Selector Performance"
+description = "Performance optimization query"
+query = "optimize CSS selector matching for large DOMs"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/css/modules/selectors/src/lib.rs"
+priority = "critical"
+reason = "Selector matching implementation"
+
+[[expected]]
+path = "crates/css/modules/selectors/src/matching.rs"
+priority = "critical"
+reason = "Selector matching algorithm"
+
+[[expected]]
+path = "crates/css/modules/cascade/src/lib.rs"
+priority = "high"
+reason = "Cascade algorithm with selector matching"
+
+[[expected]]
+path = "crates/html/src/dom/mod.rs"
+priority = "medium"
+reason = "DOM structure being queried"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/renderer"
+reason = "Rendering, not selector matching"
+
+[[excluded]]
+path = "crates/js"
+reason = "JavaScript, not CSS selectors"

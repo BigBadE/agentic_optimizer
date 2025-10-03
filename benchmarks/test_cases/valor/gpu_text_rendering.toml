@@ -1,0 +1,35 @@
+# Test Case: GPU Text Rendering
+name = "GPU Text Rendering"
+description = "Bug fix for text rendering artifacts"
+query = "debug text rendering artifacts on GPU backend"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/renderer/wgpu_backend/src/state/text.rs"
+priority = "critical"
+reason = "GPU text rendering implementation"
+
+[[expected]]
+path = "crates/renderer/wgpu_backend/src/state.rs"
+priority = "critical"
+reason = "GPU state management"
+
+[[expected]]
+path = "crates/renderer/wgpu_backend/src/lib.rs"
+priority = "high"
+reason = "WGPU backend entry point"
+
+[[expected]]
+path = "crates/css/modules/text/src/lib.rs"
+priority = "medium"
+reason = "Text CSS properties"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/html/src/parser"
+reason = "HTML parsing, not rendering"
+
+[[excluded]]
+path = "crates/js"
+reason = "JavaScript, not GPU rendering"

@@ -1,0 +1,35 @@
+# Test Case: Z-Index Stacking Context
+name = "Z-Index Stacking Context"
+description = "Debug z-index stacking context issues"
+query = "fix z-index not working with positioned elements"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/css/modules/position/src/lib.rs"
+priority = "critical"
+reason = "Positioning and z-index properties"
+
+[[expected]]
+path = "crates/css/modules/core/src/9_visual_formatting"
+priority = "critical"
+reason = "Visual formatting model and stacking"
+
+[[expected]]
+path = "crates/renderer/src/lib.rs"
+priority = "high"
+reason = "Rendering with stacking order"
+
+[[expected]]
+path = "crates/css/modules/display/src/lib.rs"
+priority = "medium"
+reason = "Display properties affecting stacking"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/html/src/parser"
+reason = "HTML parsing, not z-index"
+
+[[excluded]]
+path = "crates/js"
+reason = "JavaScript, not CSS positioning"

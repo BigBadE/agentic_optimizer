@@ -4,8 +4,9 @@ use console::{style, Term};
 
 use agentic_context::ContextBuilder;
 use agentic_core::{ModelProvider as _, Query, TokenUsage};
-use agentic_providers::AnthropicProvider;
+use agentic_providers::OpenRouterProvider;
 use agentic_languages::{Language, create_backend};
+use agentic_agent::{Agent, AgentConfig, AgentRequest};
 
 mod cli;
 mod config;
@@ -29,6 +30,12 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
+        Commands::Chat {
+            project,
+            model,
+        } => {
+            handle_chat(project, model).await?;
+        }
         Commands::Query {
             query,
             project,
@@ -56,6 +63,114 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
+async fn handle_chat(
+    project: PathBuf,
+    model: Option<String>,
+) -> Result<()> {
+    let term = Term::stdout();
+    
+    term.write_line(&format!("{}", style("=== Agentic Optimizer - Interactive Chat ===").cyan().bold()))?;
+    term.write_line(&format!("{} {}", 
+        style("Project:").cyan(), 
+        style(project.display()).yellow()
+    ))?;
+    term.write_line("")?;
+
+    let config = Config::load_from_project(&project);
+
+    term.write_line(&format!("{}", style("Initializing agent...").cyan()))?;
+    
+    let mut provider = OpenRouterProvider::from_config_or_env(config.providers.openrouter_key)?;
+    let model_to_use = model.or(config.providers.high_model.clone());
+    if let Some(model_name) = model_to_use {
+        provider = provider.with_model(model_name);
+    }
+    let provider: std::sync::Arc<dyn agentic_core::ModelProvider> = std::sync::Arc::new(provider);
+
+    let backend = create_backend(Language::Rust)?;
+    
+    ollama::ensure_available().await?;
+
+    let config = AgentConfig::new()
+        .with_system_prompt(
+            "You are a helpful AI coding assistant. Analyze the provided code context and help the user with their requests. \
+             Be concise but thorough. When making code changes, provide complete, working code."
+        )
+        .with_max_context_tokens(100_000)
+        .with_top_k_context_files(15);
+
+    let agent = Agent::with_config(provider, config);
+    let mut executor = agent.executor().with_language_backend(backend);
+
+    term.write_line(&format!("{}", style("✓ Agent ready!").green().bold()))?;
+    term.write_line("")?;
+    term.write_line(&format!("{}", style("Type your message (or 'exit' to quit):").cyan()))?;
+    term.write_line("")?;
+
+    loop {
+        term.write_line(&format!("{}", style("You:").green().bold()))?;
+        
+        let input = dialoguer::Input::<String>::new()
+            .with_prompt(">")
+            .interact_text()?;
+
+        let trimmed = input.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if trimmed.eq_ignore_ascii_case("exit") || trimmed.eq_ignore_ascii_case("quit") {
+            term.write_line(&format!("{}", style("Goodbye!").cyan()))?;
+            break;
+        }
+
+        term.write_line("")?;
+        term.write_line(&format!("{}", style("Agent:").blue().bold()))?;
+        
+        let request = AgentRequest::new(trimmed.to_owned(), project.clone());
+        
+        match executor.execute(request).await {
+            Ok(result) => {
+                term.write_line(&result.response.content)?;
+                term.write_line("")?;
+                
+                term.write_line(&format!("{}", style("---").dim()))?;
+                term.write_line(&format!("{} {} | {} {}ms | {} {} tokens", 
+                    style("Provider:").dim(),
+                    style(&result.response.provider_used).dim(),
+                    style("Latency:").dim(),
+                    style(result.metadata.total_time_ms).dim(),
+                    style("Tokens:").dim(),
+                    style(result.response.tokens_used.total()).dim()
+                ))?;
+                
+                if result.response.tokens_used.cache_read > 0 {
+                    term.write_line(&format!("{} {} tokens ({}% cache hit)", 
+                        style("Cache:").dim(),
+                        style(result.response.tokens_used.cache_read).dim(),
+                        style(format!("{:.1}", 
+                            (result.response.tokens_used.cache_read as f64 / 
+                             result.response.tokens_used.total() as f64) * 100.0
+                        )).dim()
+                    ))?;
+                }
+                
+                term.write_line(&format!("{}", style("---").dim()))?;
+                term.write_line("")?;
+            }
+            Err(error) => {
+                term.write_line(&format!("{} {}", 
+                    style("Error:").red().bold(),
+                    style(error.to_string()).red()
+                ))?;
+                term.write_line("")?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
 async fn handle_query(
     query_text: String,
     project: PathBuf,
@@ -64,9 +179,12 @@ async fn handle_query(
 ) -> Result<()> {
     tracing::info!("Processing query: {}", query_text);
 
-    let _config = Config::from_env();
+    let config = Config::load_from_project(&project);
 
-    let provider = AnthropicProvider::from_env()?;
+    let mut provider = OpenRouterProvider::from_config_or_env(config.providers.openrouter_key)?;
+    if let Some(model_name) = config.providers.high_model {
+        provider = provider.with_model(model_name);
+    }
 
     let mut builder = ContextBuilder::new(project);
     if let Some(max) = max_files {
@@ -174,11 +292,17 @@ fn handle_config(full: bool) -> Result<()> {
     } else {
         tracing::info!("Configuration:");
         tracing::info!(
-            "  Anthropic API Key: {status}",
-            status = if config.providers.anthropic_api_key.is_some() { "Set" } else { "Not set" }
+            "  OpenRouter API Key: {status}",
+            status = if config.providers.openrouter_key.is_some() { "Set" } else { "Not set" }
         );
-        tracing::info!("  Max Files: {max}", max = config.context.max_files);
-        tracing::info!("  Max File Size: {size} bytes", size = config.context.max_file_size);
+        tracing::info!(
+            "  High Model: {model}",
+            model = config.providers.high_model.as_deref().unwrap_or("default")
+        );
+        tracing::info!(
+            "  Medium Model: {model}",
+            model = config.providers.medium_model.as_deref().unwrap_or("default")
+        );
     }
 
     Ok(())

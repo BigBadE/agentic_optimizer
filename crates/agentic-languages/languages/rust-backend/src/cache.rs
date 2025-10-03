@@ -98,12 +98,11 @@ impl WorkspaceCache {
             return Ok(false);
         }
 
-        // Check if cache is older than 24 hours
-        if let Ok(elapsed) = self.timestamp.elapsed() {
-            if elapsed.as_secs() > 86400 {
-                tracing::debug!("Cache invalid: older than 24 hours");
-                return Ok(false);
-            }
+        if let Ok(elapsed) = self.timestamp.elapsed()
+            && elapsed.as_secs() > 86400
+        {
+            tracing::debug!("Cache invalid: older than 24 hours");
+            return Ok(false);
         }
 
         // Sample check: verify a few files haven't changed
@@ -111,14 +110,14 @@ impl WorkspaceCache {
         let mut checked = 0;
         
         for (path, cached_time) in self.file_metadata.iter().take(sample_size) {
-            if let Ok(metadata) = fs::metadata(path) {
-                if let Ok(modified) = metadata.modified() {
-                    if modified > *cached_time {
-                        tracing::debug!("Cache invalid: file {} was modified", path.display());
-                        return Ok(false);
-                    }
-                    checked += 1;
+            if let Ok(metadata) = fs::metadata(path)
+                && let Ok(modified) = metadata.modified()
+            {
+                if modified > *cached_time {
+                    tracing::debug!("Cache invalid: file {} was modified", path.display());
+                    return Ok(false);
                 }
+                checked += 1;
             }
         }
 

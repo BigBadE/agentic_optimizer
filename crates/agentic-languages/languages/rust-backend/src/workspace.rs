@@ -3,6 +3,7 @@
 use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::fs;
+use std::time::Duration;
 
 use anyhow::Context as _;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -68,46 +69,34 @@ impl WorkspaceLoader {
     /// # Errors
     /// Returns an error if the workspace cannot be loaded.
     pub fn load(&self) -> Result<(AnalysisHost, Vfs, HashMap<PathBuf, ra_ap_ide::FileId>)> {
-        let multi = if self.config.show_progress {
-            Some(MultiProgress::new())
-        } else {
-            None
-        };
+        let multi = self.config.show_progress.then(MultiProgress::new);
 
-        // Phase 1: Check cache
-        let pb1 = if let Some(m) = &multi {
-            let pb = m.add(ProgressBar::new_spinner());
+        let pb1 = multi.as_ref().map(|multi_progress| {
+            let pb = multi_progress.add(ProgressBar::new_spinner());
             pb.set_style(ProgressStyle::default_spinner());
             pb.set_message("Checking cache...");
-            pb.enable_steady_tick(std::time::Duration::from_millis(100));
-            Some(pb)
-        } else {
-            None
-        };
+            pb.enable_steady_tick(Duration::from_millis(100));
+            pb
+        });
 
-        // Try to use cache if enabled
-        if self.config.use_cache {
-            if let Ok(cache) = WorkspaceCache::load(&self.project_root) {
-                if cache.is_valid(&self.project_root).unwrap_or(false) {
-                    tracing::info!("Using cached rust-analyzer state ({} files)", cache.file_count);
-                }
-            }
+        if self.config.use_cache
+            && let Ok(cache) = WorkspaceCache::load(&self.project_root)
+            && cache.is_valid(&self.project_root).unwrap_or(false)
+        {
+            tracing::info!("Using cached rust-analyzer state ({} files)", cache.file_count);
         }
 
         if let Some(pb) = pb1 {
-            pb.finish_with_message("\x1b[32m✓\x1b[0m Cache checked");
+            pb.finish_with_message("\x1b[32m\u{2713}\x1b[0m Cache checked");
         }
 
-        // Phase 2: Initialize rust-analyzer
-        let pb2 = if let Some(m) = &multi {
-            let pb = m.add(ProgressBar::new_spinner());
+        let pb2 = multi.as_ref().map(|multi_progress| {
+            let pb = multi_progress.add(ProgressBar::new_spinner());
             pb.set_style(ProgressStyle::default_spinner());
             pb.set_message("Initializing rust-analyzer...");
-            pb.enable_steady_tick(std::time::Duration::from_millis(100));
-            Some(pb)
-        } else {
-            None
-        };
+            pb.enable_steady_tick(Duration::from_millis(100));
+            pb
+        });
 
         tracing::info!("Loading Cargo workspace from: {}", self.project_root.display());
 
@@ -140,19 +129,16 @@ impl WorkspaceLoader {
         .map_err(|error| agentic_core::Error::Other(error.to_string()))?;
 
         if let Some(pb) = pb2 {
-            pb.finish_with_message("\x1b[32m✓\x1b[0m Rust-analyzer initialized");
+            pb.finish_with_message("\x1b[32m\u{2713}\x1b[0m Rust-analyzer initialized");
         }
 
-        // Phase 3: Build file index
-        let pb3 = if let Some(m) = &multi {
-            let pb = m.add(ProgressBar::new_spinner());
+        let pb3 = multi.as_ref().map(|multi_progress| {
+            let pb = multi_progress.add(ProgressBar::new_spinner());
             pb.set_style(ProgressStyle::default_spinner());
             pb.set_message("Building file index...");
-            pb.enable_steady_tick(std::time::Duration::from_millis(100));
-            Some(pb)
-        } else {
-            None
-        };
+            pb.enable_steady_tick(Duration::from_millis(100));
+            pb
+        });
 
         let host = AnalysisHost::with_database(db);
         
@@ -165,32 +151,28 @@ impl WorkspaceLoader {
                 if path_buf.to_string_lossy().ends_with(".rs") {
                     file_id_map.insert(path_buf.clone(), file_id);
                     
-                    // Collect metadata for caching
-                    if let Ok(metadata) = fs::metadata(&path_buf) {
-                        if let Ok(modified) = metadata.modified() {
-                            file_metadata.insert(path_buf, modified);
-                        }
+                    if let Ok(metadata) = fs::metadata(&path_buf)
+                        && let Ok(modified) = metadata.modified()
+                    {
+                        file_metadata.insert(path_buf, modified);
                     }
                 }
             }
         }
 
         if let Some(pb) = pb3 {
-            pb.finish_with_message(format!("\x1b[32m✓\x1b[0m Indexed {} Rust files", file_id_map.len()));
+            pb.finish_with_message(format!("\x1b[32m\u{2713}\x1b[0m Indexed {} Rust files", file_id_map.len()));
         }
 
         tracing::info!("Loaded {} Rust files", file_id_map.len());
 
-        // Phase 4: Save cache
-        let pb4 = if let Some(m) = &multi {
-            let pb = m.add(ProgressBar::new_spinner());
+        let pb4 = multi.as_ref().map(|multi_progress| {
+            let pb = multi_progress.add(ProgressBar::new_spinner());
             pb.set_style(ProgressStyle::default_spinner());
             pb.set_message("Saving cache...");
-            pb.enable_steady_tick(std::time::Duration::from_millis(100));
-            Some(pb)
-        } else {
-            None
-        };
+            pb.enable_steady_tick(Duration::from_millis(100));
+            pb
+        });
 
         if self.config.use_cache {
             let cache = WorkspaceCache::new(self.project_root.clone(), file_metadata);
@@ -200,7 +182,7 @@ impl WorkspaceLoader {
         }
 
         if let Some(pb) = pb4 {
-            pb.finish_with_message("\x1b[32m✓\x1b[0m Cache saved");
+            pb.finish_with_message("\x1b[32m\u{2713}\x1b[0m Cache saved");
         }
 
         Ok((host, vfs, file_id_map))

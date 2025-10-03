@@ -141,9 +141,9 @@ impl<'analysis> SymbolSearcher<'analysis> {
                 // refs is a Vec<ReferenceSearchResult>
                 for ref_result in refs {
                     // Each ReferenceSearchResult has references: FileReferenceNode
-                    for (file_id, ranges) in &ref_result.references {
-                        if let Some(path) = self.backend.path_from_file_id(*file_id) {
-                            let Ok(ref_line_index) = self.analysis.file_line_index(*file_id) else {
+                    for (ref_file_id, ranges) in &ref_result.references {
+                        if let Some(path) = self.backend.path_from_file_id(*ref_file_id) {
+                            let Ok(ref_line_index) = self.analysis.file_line_index(*ref_file_id) else {
                                 continue;
                             };
                             
@@ -151,7 +151,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
                                 let line = ref_line_index.line_col(text_range.start()).line;
                                 
                                 results.push(SymbolInfo {
-                                    name: symbol_name.to_string(),
+                                    name: symbol_name.to_owned(),
                                     kind: def.kind,
                                     file_path: path.clone(),
                                     line,

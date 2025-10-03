@@ -8,11 +8,9 @@ use agentic_core::Result;
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
     pub providers: ProvidersConfig,
-    pub context: ContextConfig,
 }
 
 impl Config {
-    #[allow(dead_code, reason = "Unimplemented")]
     pub fn from_file(path: &PathBuf) -> Result<Self> {
         let content = read_to_string(path)?;
         let config: Self = toml::from_str(&content)?;
@@ -22,32 +20,34 @@ impl Config {
     pub fn from_env() -> Self {
         Self::default()
     }
+
+    pub fn load_from_project(project_root: &PathBuf) -> Self {
+        let config_path = project_root.join("config.toml");
+        if config_path.exists() {
+            Self::from_file(&config_path).unwrap_or_else(|error| {
+                eprintln!("Warning: Failed to load config.toml: {}", error);
+                Self::from_env()
+            })
+        } else {
+            Self::from_env()
+        }
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProvidersConfig {
-    pub anthropic_api_key: Option<String>,
+    pub openrouter_key: Option<String>,
+    pub high_model: Option<String>,
+    pub medium_model: Option<String>,
 }
 
 impl Default for ProvidersConfig {
     fn default() -> Self {
         Self {
-            anthropic_api_key: env::var("ANTHROPIC_API_KEY").ok(),
+            openrouter_key: env::var("OPENROUTER_API_KEY").ok(),
+            high_model: Some("anthropic/claude-sonnet-4-20250514".to_owned()),
+            medium_model: Some("anthropic/claude-3.5-sonnet".to_owned()),
         }
     }
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ContextConfig {
-    pub max_files: usize,
-    pub max_file_size: usize,
-}
-
-impl Default for ContextConfig {
-    fn default() -> Self {
-        Self {
-            max_files: 50,
-            max_file_size: 100_000,
-        }
-    }
-}

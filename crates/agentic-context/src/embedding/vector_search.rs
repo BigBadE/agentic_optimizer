@@ -301,7 +301,7 @@ impl VectorSearchManager {
             "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "java" | "c" | "cpp" |
             "h" | "hpp" | "go" | "rb" | "php" | "cs" | "swift" | "kt" | "scala" => 1.7,
             "toml" | "yaml" | "yml" | "json" | "xml" => 0.5,
-            "md" | "txt" => 0.1,  // Heavy penalty for documentation
+            "md" | "txt" => 0.1,  // Heavy penalty for all documentation
             _ => 1.0,
         };
         
@@ -322,6 +322,96 @@ impl VectorSearchManager {
         };
         
         type_boost * location_boost
+    }
+
+    /// Calculate query-file alignment based on keyword matching
+    fn calculate_query_file_alignment(query: &str, file_path: &Path, preview: &str) -> f32 {
+        let mut alignment = 1.0;
+        let query_lower = query.to_lowercase();
+        
+        // Extract query keywords (words longer than 3 chars)
+        let keywords: Vec<&str> = query_lower
+            .split_whitespace()
+            .filter(|w| w.len() > 3 && !matches!(*w, "the" | "and" | "for" | "with" | "from" | "that" | "this"))
+            .collect();
+        
+        if keywords.is_empty() {
+            return alignment;
+        }
+        
+        // Check if filename contains query keywords
+        let filename = file_path.file_name()
+            .and_then(|n| n.to_str())
+            .unwrap_or("")
+            .to_lowercase();
+        
+        for keyword in &keywords {
+            if filename.contains(keyword) {
+                alignment *= 1.4;  // Filename match is strong signal
+            }
+        }
+        
+        // Check parent directory names
+        if let Some(parent) = file_path.parent() {
+            let parent_str = parent.to_str().unwrap_or("").to_lowercase();
+            for keyword in &keywords {
+                if parent_str.contains(keyword) {
+                    alignment *= 1.2;  // Directory match is good signal
+                }
+            }
+        }
+        
+        // Keyword density in preview
+        let preview_lower = preview.to_lowercase();
+        let keyword_count = keywords.iter()
+            .filter(|k| preview_lower.contains(*k))
+            .count();
+        
+        if keyword_count > 0 {
+            let density_boost = 1.0 + (keyword_count as f32 * 0.1);
+            alignment *= density_boost.min(1.5);  // Cap at 1.5x
+        }
+        
+        alignment
+    }
+
+    /// Calculate pattern-based importance boost for code structure
+    fn calculate_pattern_boost(preview: &str) -> f32 {
+        let mut boost = 1.0;
+        
+        // Implementation pattern detection
+        let has_impl = preview.contains("impl ") || preview.contains("impl<");
+        let has_trait = preview.contains("trait ");
+        let has_struct = preview.contains("pub struct") || preview.contains("pub enum");
+        let has_main_fn = preview.contains("fn main(") || preview.contains("pub fn new(");
+        
+        if has_impl && has_struct {
+            boost *= 1.3;  // Core implementation file
+        }
+        
+        if has_trait {
+            boost *= 1.2;  // Trait definitions are important
+        }
+        
+        if has_main_fn {
+            boost *= 1.25;  // Entry point functions
+        }
+        
+        // Count pub items (public API)
+        let pub_count = preview.matches("pub fn").count() 
+            + preview.matches("pub struct").count()
+            + preview.matches("pub enum").count();
+        
+        if pub_count > 5 {
+            boost *= 1.2;  // Rich public API
+        }
+        
+        // Module-level documentation at start
+        if preview.trim_start().starts_with("//!") {
+            boost *= 1.15;  // Module docs indicate important file
+        }
+        
+        boost
     }
 
     /// Calculate chunk quality boost based on content
@@ -466,10 +556,12 @@ impl VectorSearchManager {
                 
                 let vector_contribution = vector_normalized * vector_weight;
 
-                let file_boost = Self::calculate_file_boost(&path);
                 let preview = previews.get(&path).cloned().unwrap_or_default();
+                let file_boost = Self::calculate_file_boost(&path);
+                let query_alignment = Self::calculate_query_file_alignment(query, &path, &preview);
+                let pattern_boost = Self::calculate_pattern_boost(&preview);
                 let chunk_quality = Self::calculate_chunk_quality(&preview);
-                let combined_score = (bm25_contribution + vector_contribution) * file_boost * chunk_quality;
+                let combined_score = (bm25_contribution + vector_contribution) * file_boost * query_alignment * pattern_boost * chunk_quality;
 
                 SearchResult {
                     file_path: path.clone(),

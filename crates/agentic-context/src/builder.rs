@@ -1,5 +1,8 @@
 use std::path::{Path, PathBuf};
+use std::collections::HashMap;
 use walkdir::WalkDir;
+use indicatif::{ProgressBar, ProgressStyle};
+use ignore::WalkBuilder;
 
 use agentic_core::{Context, FileContext, Query, Result};
 use agentic_languages::LanguageProvider;
@@ -135,18 +138,37 @@ impl ContextBuilder {
         }
 
         // Create and check subagent availability
+        let spinner = ProgressBar::new_spinner();
+        spinner.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.cyan} {msg}")
+                .unwrap_or_else(|_| ProgressStyle::default_spinner())
+        );
+        spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+        
+        spinner.set_message("Checking Ollama availability...");
         let agent = LocalContextAgent::new();
         
         if !agent.is_available().await? {
+            spinner.finish_and_clear();
             return Err(agentic_core::Error::Other(
                 "Ollama not available. Please ensure Ollama is running with: ollama serve".into()
             ));
         }
 
+        spinner.set_message("Generating context plan with AI agent...");
         tracing::info!("Using LocalContextAgent (Ollama) to generate context plan");
 
+        // Build lightweight file tree for context
+        let file_tree = self.build_file_tree();
+
         // Generate context plan
-        let plan = agent.generate_plan(intent, query_text).await?;
+        let plan = agent.generate_plan(intent, query_text, &file_tree).await?;
+        
+        spinner.finish_with_message(format!("✓ Context plan: {}", plan.reasoning));
+        eprintln!("  Keywords: {:?}", plan.keywords);
+        eprintln!("  Symbols: {:?}", plan.symbols_to_find);
+        eprintln!("  Patterns: {:?}", plan.file_patterns);
         
         tracing::info!("Context plan generated: {}", plan.reasoning);
         tracing::debug!("Plan details: keywords={:?}, symbols={:?}, patterns={:?}, depth={}", 
@@ -202,6 +224,11 @@ impl ContextBuilder {
     fn is_ignored(entry: &walkdir::DirEntry) -> bool {
         let file_name = entry.file_name().to_string_lossy();
 
+        // Don't filter the root directory itself (depth 0)
+        if entry.depth() == 0 {
+            return false;
+        }
+
         if file_name.starts_with('.') {
             return true;
         }
@@ -219,5 +246,143 @@ impl ContextBuilder {
             let ext = extension.to_string_lossy();
             matches!(ext.as_ref(), "rs" | "toml" | "md" | "txt" | "json" | "yaml" | "yml")
         })
+    }
+
+    /// Build a lightweight file tree for context planning
+    fn build_file_tree(&self) -> String {
+        let mut entries: Vec<(String, bool)> = Vec::new();
+        let mut filtered_count = 0;
+        let mut dir_entry_counts: HashMap<String, usize> = HashMap::new();
+        const MAX_ENTRIES: usize = 1000;
+        const MAX_PER_DIR: usize = 10;
+
+        eprintln!("Building file tree from: {}", self.project_root.display());
+        
+        // Use ignore crate's WalkBuilder which properly handles .gitignore
+        let walker = WalkBuilder::new(&self.project_root)
+            .max_depth(Some(4))
+            .hidden(true)  // Skip hidden files/dirs automatically
+            .git_ignore(true)  // Respect .gitignore
+            .git_global(false)  // Don't use global gitignore
+            .git_exclude(false)  // Don't use .git/info/exclude
+            .filter_entry(|entry| {
+                // Filter out hardcoded ignored directories
+                if let Some(file_name) = entry.path().file_name() {
+                    let name = file_name.to_string_lossy();
+                    if entry.file_type().map_or(false, |ft| ft.is_dir()) 
+                        && IGNORED_DIRS.contains(&name.as_ref()) {
+                        return false;
+                    }
+                }
+                true
+            })
+            .build();
+
+        for entry_result in walker {
+            match entry_result {
+                Ok(entry) => {
+                    if entries.len() >= MAX_ENTRIES {
+                        break;
+                    }
+
+                    let path = entry.path();
+
+                    if let Ok(rel_path) = path.strip_prefix(&self.project_root) {
+                        let path_str = rel_path.to_string_lossy().replace('\\', "/");
+                        
+                        // Skip empty path (root directory itself)
+                        if path_str.is_empty() {
+                            continue;
+                        }
+                        
+                        let is_dir = entry.file_type().map_or(false, |ft| ft.is_dir());
+                        
+                        // Only include source files, not all files
+                        if !is_dir && !Self::is_code_file(path) {
+                            filtered_count += 1;
+                            continue;
+                        }
+                        
+                        // Get parent directory for per-directory limiting
+                        let parent_dir = if let Some(parent) = Path::new(&path_str).parent() {
+                            parent.to_string_lossy().to_string()
+                        } else {
+                            String::from(".")
+                        };
+                        
+                        // Check per-directory limit
+                        let dir_count = dir_entry_counts.entry(parent_dir.clone()).or_insert(0);
+                        if *dir_count >= MAX_PER_DIR {
+                            filtered_count += 1;
+                            continue;
+                        }
+                        *dir_count += 1;
+                        
+                        entries.push((path_str, is_dir));
+                    }
+                }
+                Err(e) => {
+                    eprintln!("Warning: Error walking directory: {}", e);
+                }
+            }
+        }
+
+        // Filter out empty directories (directories with no files under them)
+        let mut non_empty_dirs = std::collections::HashSet::new();
+        
+        // Mark all parent directories of files as non-empty
+        for (path, is_dir) in &entries {
+            if !is_dir {
+                // Mark all parent directories as non-empty
+                let mut current = Path::new(path);
+                while let Some(parent) = current.parent() {
+                    let parent_str = parent.to_string_lossy().replace('\\', "/");
+                    if !parent_str.is_empty() {
+                        non_empty_dirs.insert(parent_str);
+                    }
+                    current = parent;
+                }
+            }
+        }
+        
+        // Filter entries to only include files and non-empty directories
+        let filtered_entries: Vec<_> = entries.into_iter()
+            .filter(|(path, is_dir)| {
+                if *is_dir {
+                    non_empty_dirs.contains(path)
+                } else {
+                    true
+                }
+            })
+            .collect();
+        
+        let dir_count = filtered_entries.iter().filter(|(_, is_dir)| *is_dir).count();
+        let file_count = filtered_entries.len() - dir_count;
+        
+        eprintln!("File tree stats: {} dirs, {} files, {} total entries, {} filtered", 
+            dir_count, file_count, filtered_entries.len(), filtered_count);
+
+        // Build hierarchical tree structure
+        let mut tree = String::from("Project Structure:\n");
+        
+        for (path, is_dir) in &filtered_entries {
+            let depth = path.matches('/').count();
+            let indent = "    ".repeat(depth);
+            let name = Path::new(path).file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or(path);
+            
+            if *is_dir {
+                tree.push_str(&format!("{}{}/\n", indent, name));
+            } else {
+                tree.push_str(&format!("{}{}\n", indent, name));
+            }
+        }
+
+        if filtered_entries.len() >= MAX_ENTRIES {
+            tree.push_str(&format!("\n(Truncated at {} entries)\n", MAX_ENTRIES));
+        }
+
+        tree
     }
 }

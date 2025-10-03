@@ -3,6 +3,7 @@
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
 use walkdir::WalkDir;
+use indicatif::{ProgressBar, ProgressStyle};
 
 use agentic_core::{FileContext, Result};
 use agentic_languages::LanguageProvider;
@@ -38,6 +39,14 @@ impl<'a> ContextExpander<'a> {
     /// # Errors
     /// Returns an error if file operations or semantic analysis fails
     pub fn expand(&self, plan: &ContextPlan) -> Result<Vec<FileContext>> {
+        let spinner = ProgressBar::new_spinner();
+        spinner.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.cyan} {msg}")
+                .unwrap_or_else(|_| ProgressStyle::default_spinner())
+        );
+        spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+        
         tracing::info!("Expanding context with strategy: {:?}", plan.strategy);
         tracing::debug!("Context plan: keywords={:?}, symbols={:?}, patterns={:?}", 
             plan.keywords, plan.symbols_to_find, plan.file_patterns);
@@ -46,7 +55,9 @@ impl<'a> ContextExpander<'a> {
 
         // Step 1: Find seed files based on patterns
         if !plan.file_patterns.is_empty() {
+            spinner.set_message(format!("Searching for files matching patterns: {:?}...", plan.file_patterns));
             let pattern_files = self.find_files_by_patterns(&plan.file_patterns)?;
+            eprintln!("  Found {} files matching patterns", pattern_files.len());
             tracing::info!("Found {} files matching patterns", pattern_files.len());
             files.extend(pattern_files);
         }
@@ -54,22 +65,30 @@ impl<'a> ContextExpander<'a> {
         // Step 2: Execute strategy-specific expansion
         match &plan.strategy {
             ExpansionStrategy::Focused { symbols } => {
-                let focused_files = self.expand_focused(symbols)?;
+                spinner.set_message(format!("Searching for symbols: {:?}...", symbols));
+                let focused_files = self.expand_focused(symbols, &spinner)?;
+                eprintln!("  Found {} files with focused symbols", focused_files.len());
                 tracing::info!("Focused expansion found {} files", focused_files.len());
                 files.extend(focused_files);
             }
             ExpansionStrategy::Broad { patterns } => {
+                spinner.set_message(format!("Broad search with patterns: {:?}...", patterns));
                 let broad_files = self.expand_broad(patterns)?;
+                eprintln!("  Found {} files with broad search", broad_files.len());
                 tracing::info!("Broad expansion found {} files", broad_files.len());
                 files.extend(broad_files);
             }
             ExpansionStrategy::EntryPointBased { entry_files } => {
+                spinner.set_message("Expanding from entry points...");
                 let entry_based = self.expand_from_entry_points(entry_files, plan.max_depth)?;
+                eprintln!("  Found {} files from entry points", entry_based.len());
                 tracing::info!("Entry-point expansion found {} files", entry_based.len());
                 files.extend(entry_based);
             }
             ExpansionStrategy::Semantic { query, top_k } => {
+                spinner.set_message(format!("Semantic search: {}...", query));
                 let semantic_files = self.expand_semantic(query, *top_k)?;
+                eprintln!("  Found {} files with semantic search", semantic_files.len());
                 tracing::info!("Semantic expansion found {} files", semantic_files.len());
                 files.extend(semantic_files);
             }
@@ -77,18 +96,22 @@ impl<'a> ContextExpander<'a> {
 
         // Step 3: Add test files if requested
         if plan.include_tests {
+            spinner.set_message("Finding related test files...");
             let test_files = self.find_test_files(&files)?;
+            eprintln!("  Found {} test files", test_files.len());
             tracing::info!("Found {} test files", test_files.len());
             files.extend(test_files);
         }
 
         // Step 4: Convert paths to FileContext
+        spinner.set_message("Loading file contents...");
         let mut contexts: Vec<FileContext> = files
             .into_iter()
             .filter_map(|path| FileContext::from_path(&path).ok())
             .collect();
 
         // Step 5: Sort by relevance (files matching more keywords come first)
+        spinner.set_message("Ranking files by relevance...");
         contexts.sort_by_cached_key(|ctx| {
             let path_str = ctx.path.to_string_lossy().to_lowercase();
             let content_lower = ctx.content.to_lowercase();
@@ -107,6 +130,7 @@ impl<'a> ContextExpander<'a> {
             std::cmp::Reverse(keyword_score)
         });
 
+        spinner.finish_with_message(format!("✓ Context expansion complete: {} files", contexts.len()));
         tracing::info!("Final context: {} files", contexts.len());
         Ok(contexts)
     }
@@ -144,11 +168,12 @@ impl<'a> ContextExpander<'a> {
     }
 
     /// Expand focused on specific symbols
-    fn expand_focused(&self, symbols: &[String]) -> Result<Vec<PathBuf>> {
+    fn expand_focused(&self, symbols: &[String], spinner: &ProgressBar) -> Result<Vec<PathBuf>> {
         let mut files = Vec::new();
 
         if let Some(backend) = self.backend {
             for symbol in symbols {
+                spinner.set_message(format!("Searching for symbol: {}...", symbol));
                 // Search for the symbol
                 let search_query = agentic_languages::SearchQuery {
                     symbol_name: Some(symbol.clone()),
@@ -158,6 +183,7 @@ impl<'a> ContextExpander<'a> {
                 };
 
                 if let Ok(result) = backend.search_symbols(&search_query) {
+                    eprintln!("    Symbol '{}': {} locations", symbol, result.symbols.len());
                     for symbol_info in result.symbols {
                         files.push(symbol_info.file_path);
                     }

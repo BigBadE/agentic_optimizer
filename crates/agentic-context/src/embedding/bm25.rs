@@ -1,6 +1,7 @@
 //! BM25 keyword search implementation for file ranking.
 
 use std::collections::HashMap;
+use std::collections::HashSet;
 use std::path::PathBuf;
 
 /// BM25 parameters
@@ -23,6 +24,28 @@ pub struct BM25Index {
 }
 
 impl BM25Index {
+    /// Common stop words that should not influence scoring
+    fn stopwords() -> &'static HashSet<&'static str> {
+        use std::sync::OnceLock;
+
+        static STOPWORDS: OnceLock<HashSet<&'static str>> = OnceLock::new();
+        STOPWORDS.get_or_init(|| {
+            [
+                "the", "and", "for", "with", "that", "from", "this", "have", "will", "into",
+                "when", "where", "what", "your", "their", "about", "which", "there", "been",
+                "while", "without", "should", "could", "would", "using", "used", "they", "them",
+                "then", "than", "only", "also", "over", "under", "after", "before", "each",
+                "every", "more", "most", "some", "such", "within", "between", "because", "again",
+                "almost", "always", "never", "being", "having", "through", "across", "please",
+                "however", "though", "whereas", "among", "amongst", "whose", "ourselves", "yourselves",
+                "themselves", "itself", "hers", "his", "herself", "himself", "it", "its",
+                "you", "we", "our", "ours", "can", "cannot", "can't", "cant"
+            ]
+            .into_iter()
+            .collect()
+        })
+    }
+
     /// Create a new empty BM25 index
     #[must_use]
     pub fn new() -> Self {
@@ -112,64 +135,62 @@ impl BM25Index {
             
             score += idf * (numerator / denominator);
         }
-
         score
     }
 
     /// Tokenize text into terms with special token preservation and bigrams
     fn tokenize(text: &str) -> Vec<String> {
+        let stopwords = Self::stopwords();
         let mut terms = Vec::new();
         let words: Vec<&str> = text.split_whitespace().collect();
-        
+
         for word in &words {
             let lower = word.to_lowercase();
-            
-            // Check for special tokens that should be preserved
+
             let has_double_colon = lower.contains("::");
             let has_double_dash = lower.starts_with("--");
             let has_special = has_double_colon || has_double_dash;
-            
+
             if has_special && lower.len() > 2 {
-                // Add the special token as-is (full path/flag)
                 terms.push(lower.clone());
-                
-                // For :: paths, also add individual components for partial matching
+
                 if has_double_colon {
                     for component in lower.split("::") {
-                        if component.len() > 2 {
+                        if component.len() > 2 && !stopwords.contains(component) {
                             terms.push(component.to_string());
                         }
                     }
                 }
             }
-            
-            // Always add cleaned version (for fallback matching)
+
             let clean: String = lower
                 .chars()
                 .filter(|c| c.is_alphanumeric() || *c == '_')
                 .collect();
-            
-            if !clean.is_empty() && clean.len() > 2 {
-                // Only add if different from special token (avoid duplicates)
+
+            if !clean.is_empty() && clean.len() > 2 && !stopwords.contains(clean.as_str()) {
                 if !has_special || clean != lower {
                     terms.push(clean);
                 }
             }
         }
-        
-        // Add bigrams for common phrases
+
         for window in words.windows(2) {
             let w0 = window[0].to_lowercase();
             let w1 = window[1].to_lowercase();
-            
+
             let clean0: String = w0.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
             let clean1: String = w1.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
-            
-            if clean0.len() > 2 && clean1.len() > 2 {
+
+            if clean0.len() > 2
+                && clean1.len() > 2
+                && !stopwords.contains(clean0.as_str())
+                && !stopwords.contains(clean1.as_str())
+            {
                 terms.push(format!("{}_{}", clean0, clean1));
             }
         }
-        
+
         terms
     }
 
@@ -194,7 +215,6 @@ impl BM25Index {
         self.documents.is_empty()
     }
 }
-
 impl Default for BM25Index {
     fn default() -> Self {
         Self::new()

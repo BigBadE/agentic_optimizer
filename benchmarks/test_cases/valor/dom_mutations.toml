@@ -1,0 +1,35 @@
+# Test Case: DOM Mutation Performance
+name = "DOM Mutation Performance"
+description = "Optimize DOM mutation operations"
+query = "optimize performance of frequent DOM appendChild calls"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/html/src/dom/mod.rs"
+priority = "critical"
+reason = "DOM tree manipulation"
+
+[[expected]]
+path = "crates/page_handler/src/document.rs"
+priority = "critical"
+reason = "Document mutation interface"
+
+[[expected]]
+path = "crates/js/src/bindings/dom.rs"
+priority = "high"
+reason = "DOM bindings for JavaScript"
+
+[[expected]]
+path = "crates/page_handler/src/updater.rs"
+priority = "medium"
+reason = "DOM update handling"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/css"
+reason = "CSS styling, not DOM mutations"
+
+[[excluded]]
+path = "crates/renderer"
+reason = "Rendering, not DOM operations"

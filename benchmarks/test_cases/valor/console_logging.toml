@@ -1,0 +1,35 @@
+# Test Case: Console Logging
+name = "Console Logging Implementation"
+description = "Bug fix query about console.log not working"
+query = "fix console.log output not appearing in debug mode"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/js/src/console.rs"
+priority = "critical"
+reason = "Console API implementation"
+
+[[expected]]
+path = "crates/js/src/bindings/logger.rs"
+priority = "critical"
+reason = "Logger bindings for JavaScript"
+
+[[expected]]
+path = "crates/js/src/runtime.rs"
+priority = "high"
+reason = "Runtime setup and configuration"
+
+[[expected]]
+path = "crates/js/src/lib.rs"
+priority = "medium"
+reason = "JS module exports"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/html"
+reason = "HTML parsing, not logging"
+
+[[excluded]]
+path = "crates/css"
+reason = "CSS styling, not console"

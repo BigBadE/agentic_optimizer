@@ -1,0 +1,35 @@
+# Test Case: Viewport Units
+name = "Viewport Units Implementation"
+description = "Implement vh/vw viewport units"
+query = "implement vh and vw viewport-relative units"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/css/modules/core/src/lib.rs"
+priority = "critical"
+reason = "Core CSS value parsing and calculation"
+
+[[expected]]
+path = "crates/css/modules/box/src/lib.rs"
+priority = "high"
+reason = "Size calculations with viewport units"
+
+[[expected]]
+path = "crates/css/orchestrator/src/lib.rs"
+priority = "high"
+reason = "CSS value resolution"
+
+[[expected]]
+path = "crates/page_handler/src/lib.rs"
+priority = "medium"
+reason = "Viewport size management"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/html/src/parser"
+reason = "HTML parsing, not CSS units"
+
+[[excluded]]
+path = "crates/js"
+reason = "JavaScript, not CSS values"

@@ -1,0 +1,30 @@
+# Test Case: Fetch API Implementation
+name = "Fetch API Implementation"
+description = "Feature implementation query"
+query = "implement the fetch() API for network requests"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/js/src/bindings/net.rs"
+priority = "critical"
+reason = "Network bindings implementation"
+
+[[expected]]
+path = "crates/js/src/runtime.rs"
+priority = "high"
+reason = "Runtime integration for async operations"
+
+[[expected]]
+path = "crates/js/src/lib.rs"
+priority = "medium"
+reason = "JS module structure"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/css"
+reason = "CSS styling, not networking"
+
+[[excluded]]
+path = "crates/html/src/parser"
+reason = "HTML parsing, not fetch API"

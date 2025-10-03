@@ -1,0 +1,35 @@
+# Test Case: HTML Error Recovery
+name = "HTML Parse Error Recovery"
+description = "Improve error recovery in HTML parser"
+query = "how does the parser recover from malformed HTML tags"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/html/src/parser/html5ever_engine.rs"
+priority = "critical"
+reason = "HTML5 parsing engine with error recovery"
+
+[[expected]]
+path = "crates/html/src/parser/mod.rs"
+priority = "critical"
+reason = "Parser module coordination"
+
+[[expected]]
+path = "crates/html/src/lib.rs"
+priority = "high"
+reason = "HTML module entry point"
+
+[[expected]]
+path = "crates/html/src/dom/mod.rs"
+priority = "medium"
+reason = "DOM construction from parsed HTML"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/css/modules/selectors"
+reason = "CSS selectors, not HTML parsing"
+
+[[excluded]]
+path = "crates/renderer"
+reason = "Rendering, not parsing"

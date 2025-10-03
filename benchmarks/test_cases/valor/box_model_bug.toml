@@ -1,0 +1,35 @@
+# Test Case: Box Model Calculation Bug
+name = "Box Model Bug Fix"
+description = "Bug in margin collapse calculation"
+query = "where is margin collapse calculated for adjacent elements"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/css/modules/core/src/8_box_model"
+priority = "critical"
+reason = "Box model implementation"
+
+[[expected]]
+path = "crates/css/modules/box/src/lib.rs"
+priority = "critical"
+reason = "Box module properties"
+
+[[expected]]
+path = "crates/css/modules/core/src/lib.rs"
+priority = "high"
+reason = "Core CSS module"
+
+[[expected]]
+path = "crates/css/orchestrator/src/lib.rs"
+priority = "medium"
+reason = "CSS orchestration and calculation"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/renderer/wgpu_backend"
+reason = "Rendering backend, not box model"
+
+[[excluded]]
+path = "crates/html/src/parser"
+reason = "HTML parsing, not margin collapse"

@@ -616,4 +616,22 @@ impl ContextBuilder {
         false
     }
 
+    /// Search for relevant context without building full context (for benchmarking)
+    ///
+    /// # Errors
+    /// Returns an error if search initialization or execution fails.
+    pub async fn search_context(&mut self, query: &str) -> Result<Vec<crate::embedding::SearchResult>> {
+        if self.vector_manager.is_none() {
+            eprintln!("⚙️  Initializing vector search...");
+            let mut manager = VectorSearchManager::new(self.project_root.clone());
+            manager.initialize().await?;
+            self.vector_manager = Some(manager);
+        }
+
+        let manager = self.vector_manager.as_ref().unwrap();
+        let results = manager.search(query, 50).await?;
+
+        Ok(results)
+    }
+
 }

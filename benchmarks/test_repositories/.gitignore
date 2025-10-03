@@ -1,0 +1,6 @@
+# Ignore cloned repositories (they're large and can be re-cloned)
+*/
+
+# But keep the README and pin files
+!README.md
+!*/.git-pin

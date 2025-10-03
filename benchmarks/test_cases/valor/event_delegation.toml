@@ -1,0 +1,35 @@
+# Test Case: Event Delegation
+name = "Event Delegation System"
+description = "Implementation of event bubbling and capture"
+query = "add event delegation support for click handlers"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/js/src/bindings/dom.rs"
+priority = "critical"
+reason = "DOM event bindings"
+
+[[expected]]
+path = "crates/page_handler/src/lib.rs"
+priority = "high"
+reason = "Event handling coordination"
+
+[[expected]]
+path = "crates/html/src/dom/mod.rs"
+priority = "high"
+reason = "DOM tree for event propagation"
+
+[[expected]]
+path = "crates/js/src/runtime.rs"
+priority = "medium"
+reason = "Runtime event loop"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/css"
+reason = "CSS styling, not events"
+
+[[excluded]]
+path = "crates/renderer"
+reason = "Rendering, not event handling"

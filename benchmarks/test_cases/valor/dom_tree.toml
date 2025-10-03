@@ -1,0 +1,44 @@
+# Test Case: DOM Tree Management
+name = "DOM Tree Management"
+description = "Query about DOM tree structure and manipulation"
+query = "where is the DOM tree built and modified"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/html/src/parser/html5ever_engine.rs"
+priority = "critical"
+reason = "HTML5 parser engine that builds the DOM tree"
+
+[[expected]]
+path = "crates/html/src/dom/mod.rs"
+priority = "critical"
+reason = "DOM node structure and tree representation"
+
+[[expected]]
+path = "crates/html/src/parser/mod.rs"
+priority = "high"
+reason = "HTML parser module"
+
+[[expected]]
+path = "crates/page_handler/src/document.rs"
+priority = "high"
+reason = "Document interface for DOM manipulation"
+
+[[expected]]
+path = "crates/html/src/lib.rs"
+priority = "medium"
+reason = "HTML module exports"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/css"
+reason = "CSS styling, not DOM structure"
+
+[[excluded]]
+path = "crates/renderer"
+reason = "Rendering, not DOM tree building"
+
+[[excluded]]
+path = "crates/js/js_engine_v8"
+reason = "JavaScript engine, not DOM tree"

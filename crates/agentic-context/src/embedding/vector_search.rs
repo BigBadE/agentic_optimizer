@@ -1,6 +1,6 @@
 //! Vector search manager with persistent caching.
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
@@ -211,8 +211,8 @@ impl VectorSearchManager {
         let vector_results = self.store.search(&query_embedding, top_k * 2);
         eprintln!("  Vector found {} semantic matches", vector_results.len());
         
-        // Combine results using Reciprocal Rank Fusion (RRF)
-        let mut combined = self.reciprocal_rank_fusion(&bm25_results, &vector_results, top_k);
+        // Combine results using adaptive weighted fusion
+        let mut combined = self.reciprocal_rank_fusion(query, &bm25_results, &vector_results, top_k);
         
         // Apply import-based boosting using preview content
         for result in &mut combined {
@@ -286,19 +286,37 @@ impl VectorSearchManager {
         let path_str = path.to_str().unwrap_or("");
         let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
         
-        let type_boost = match ext {
-            "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "java" | "c" | "cpp" | 
-            "h" | "hpp" | "go" | "rb" | "php" | "cs" | "swift" | "kt" | "scala" => 1.5,
-            "toml" | "yaml" | "yml" | "json" | "xml" => 0.6,
-            "md" | "txt" => 0.5,
+        // Heavy penalty for test files
+        if path_str.contains("/tests/") || path_str.contains("\\tests\\") {
+            return 0.1;
+        }
+        
+        // Heavy penalty for benchmark files
+        if path_str.contains("/benches/") || path_str.contains("\\benches\\") ||
+           path_str.contains("/benchmarks/") || path_str.contains("\\benchmarks\\") {
+            return 0.1;
+        }
+        
+        let mut type_boost = match ext {
+            "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "java" | "c" | "cpp" |
+            "h" | "hpp" | "go" | "rb" | "php" | "cs" | "swift" | "kt" | "scala" => 1.7,
+            "toml" | "yaml" | "yml" | "json" | "xml" => 0.5,
+            "md" | "txt" => 0.1,  // Heavy penalty for documentation
             _ => 1.0,
         };
         
+        // Boost module entry points
+        if path_str.ends_with("/lib.rs") || path_str.ends_with("\\lib.rs") {
+            type_boost *= 1.3;  // Entry points are important
+        } else if path_str.ends_with("/mod.rs") || path_str.ends_with("\\mod.rs") {
+            type_boost *= 1.2;  // Module definitions
+        }
+        
         let location_boost = if path_str.contains("/src/") || path_str.contains("\\src\\") {
-            1.2
-        } else if path_str.contains("/docs/") || path_str.contains("\\docs\\") || 
+            1.3
+        } else if path_str.contains("/docs/") || path_str.contains("\\docs\\") ||
                   path_str.contains("/examples/") || path_str.contains("\\examples\\") {
-            0.7
+            0.5
         } else {
             1.0
         };
@@ -306,66 +324,181 @@ impl VectorSearchManager {
         type_boost * location_boost
     }
 
-    /// Reciprocal Rank Fusion: combines rankings from multiple sources
-    /// RRF score = sum(1 / (k + rank)) where k=60 is a constant
-    /// Normalizes final scores to 0-1 range for compatibility with filtering
+    /// Calculate chunk quality boost based on content
+    fn calculate_chunk_quality(preview: &str) -> f32 {
+        let mut boost = 1.0;
+        
+        // Boost chunks with definitions
+        if preview.contains("pub struct") || preview.contains("pub enum") || preview.contains("pub trait") {
+            boost *= 1.4;
+        }
+        
+        if preview.contains("pub fn") || preview.contains("pub async fn") {
+            boost *= 1.3;
+        }
+        
+        // Boost module-level documentation
+        if preview.trim_start().starts_with("///") || preview.trim_start().starts_with("//!") {
+            boost *= 1.2;
+        }
+        
+        // Penalize chunks that are mostly comments or whitespace
+        let non_whitespace_lines = preview.lines()
+            .filter(|line| {
+                let trimmed = line.trim();
+                !trimmed.is_empty() && !trimmed.starts_with("//") && !trimmed.starts_with("/*")
+            })
+            .count();
+        
+        if non_whitespace_lines < 3 {
+            boost *= 0.5;  // Mostly empty or comments
+        }
+        
+        boost
+    }
+
+    /// Detect query intent from keywords
+    fn detect_query_intent(query: &str) -> &'static str {
+        let query_lower = query.to_lowercase();
+        
+        if query_lower.starts_with("how") || query_lower.contains(" work") {
+            "explanation"
+        } else if query_lower.starts_with("implement") || query_lower.starts_with("add") {
+            "implementation"
+        } else if query_lower.starts_with("fix") || query_lower.starts_with("debug") || query_lower.starts_with("where") {
+            "debugging"
+        } else {
+            "general"
+        }
+    }
+
+    /// Calculate adaptive weights based on query characteristics
+    fn calculate_adaptive_weights(query: &str) -> (f32, f32) {
+        // Detect special tokens that indicate exact matching is important
+        let has_special_tokens = query.contains("::") || query.contains("--") || query.contains("#[");
+        let intent = Self::detect_query_intent(query);
+        
+        if has_special_tokens {
+            // Favor BM25 for exact matches
+            (0.7, 0.3)
+        } else {
+            match intent {
+                "explanation" => (0.3, 0.7),  // Favor semantics for "how does X work"
+                "implementation" => (0.5, 0.5),  // Balanced for "implement X"
+                "debugging" => (0.6, 0.4),  // Favor keywords for "fix/where is X"
+                _ => (0.4, 0.6),  // Default
+            }
+        }
+    }
+
+    /// Combine BM25 keyword scores with vector semantic scores using weighted normalization
     fn reciprocal_rank_fusion(
         &self,
+        query: &str,
         bm25_results: &[(PathBuf, f32)],
         vector_results: &[SearchResult],
         top_k: usize,
     ) -> Vec<SearchResult> {
-        const K: f32 = 60.0;  // RRF constant
-        
-        let mut scores: HashMap<PathBuf, f32> = HashMap::new();
+        let (bm25_weight, vector_weight) = Self::calculate_adaptive_weights(query);
+
         let mut bm25_scores: HashMap<PathBuf, f32> = HashMap::new();
         let mut vector_scores: HashMap<PathBuf, f32> = HashMap::new();
         let mut previews: HashMap<PathBuf, String> = HashMap::new();
-        
-        // Add BM25 scores (weight: 0.4)
-        for (rank, (path, _score)) in bm25_results.iter().enumerate() {
-            let rrf_score = 0.4 / (K + rank as f32 + 1.0);
-            *scores.entry(path.clone()).or_insert(0.0) += rrf_score;
-            bm25_scores.insert(path.clone(), rrf_score);
+        let mut paths: HashSet<PathBuf> = HashSet::new();
+
+        let mut max_bm25 = 0.0f32;
+        for (path, score) in bm25_results.iter() {
+            if *score > 0.0 {
+                bm25_scores.insert(path.clone(), *score);
+                if *score > max_bm25 {
+                    max_bm25 = *score;
+                }
+                paths.insert(path.clone());
+            }
         }
-        
-        // Add vector scores (weight: 0.6 - semantic is more important)
-        for (rank, result) in vector_results.iter().enumerate() {
-            let rrf_score = 0.6 / (K + rank as f32 + 1.0);
-            *scores.entry(result.file_path.clone()).or_insert(0.0) += rrf_score;
-            vector_scores.insert(result.file_path.clone(), rrf_score);
+
+        let mut max_vector = 0.0f32;
+        for result in vector_results {
+            if result.score > 0.0 {
+                vector_scores.insert(result.file_path.clone(), result.score);
+                if result.score > max_vector {
+                    max_vector = result.score;
+                }
+                paths.insert(result.file_path.clone());
+            }
             previews.insert(result.file_path.clone(), result.preview.clone());
         }
-        
-        // Convert to SearchResult and apply file type boosting
-        let mut combined: Vec<SearchResult> = scores
+
+        let mut combined: Vec<SearchResult> = paths
             .into_iter()
-            .map(|(path, score)| {
-                let boost = Self::calculate_file_boost(&path);
+            .map(|path| {
+                let bm25_raw = bm25_scores.get(&path).copied().unwrap_or(0.0);
+                let vector_raw = vector_scores.get(&path).copied().unwrap_or(0.0);
+
+                let bm25_normalized = if max_bm25 > 0.0 { bm25_raw / max_bm25 } else { 0.0 };
+                let vector_normalized = if max_vector > 0.0 { vector_raw / max_vector } else { 0.0 };
+
+                // Apply minimum BM25 threshold - weak matches don't contribute
+                // Tuned threshold: 0.75 balances precision and recall
+                let mut bm25_contribution = if bm25_raw >= 0.75 {
+                    bm25_normalized * bm25_weight
+                } else {
+                    0.0
+                };
+                
+                // Exact match bonus: check if preview contains exact query terms
+                if bm25_contribution > 0.0 {
+                    let preview = previews.get(&path).map(|s| s.to_lowercase()).unwrap_or_default();
+                    let query_lower = query.to_lowercase();
+                    
+                    // Check for special tokens (--flags, ::paths, #[attributes])
+                    let special_tokens: Vec<&str> = query_lower.split_whitespace()
+                        .filter(|t| t.contains("--") || t.contains("::") || t.contains("#["))
+                        .collect();
+                    
+                    for token in special_tokens {
+                        if preview.contains(token) {
+                            bm25_contribution *= 1.5;  // Exact match bonus
+                            break;
+                        }
+                    }
+                }
+                
+                let vector_contribution = vector_normalized * vector_weight;
+
+                let file_boost = Self::calculate_file_boost(&path);
+                let preview = previews.get(&path).cloned().unwrap_or_default();
+                let chunk_quality = Self::calculate_chunk_quality(&preview);
+                let combined_score = (bm25_contribution + vector_contribution) * file_boost * chunk_quality;
+
                 SearchResult {
                     file_path: path.clone(),
-                    score: score * boost,
-                    preview: previews.get(&path).cloned().unwrap_or_default(),
-                    bm25_score: bm25_scores.get(&path).copied(),
-                    vector_score: vector_scores.get(&path).copied(),
+                    score: combined_score,
+                    preview,
+                    bm25_score: if bm25_contribution > 0.0 { Some(bm25_contribution) } else { None },
+                    vector_score: if vector_contribution > 0.0 { Some(vector_contribution) } else { None },
                 }
             })
             .collect();
-        
+
         combined.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
-        
-        // Normalize total scores to 0-1 range (but keep component scores as raw contributions)
+
         if let Some(max_score) = combined.first().map(|r| r.score) {
             if max_score > 0.0 {
                 for result in &mut combined {
                     result.score = result.score / max_score;
-                    // Component scores stay as raw RRF values for debugging
+                    if let Some(b) = result.bm25_score.as_mut() {
+                        *b = *b / max_score;
+                    }
+                    if let Some(v) = result.vector_score.as_mut() {
+                        *v = *v / max_score;
+                    }
                 }
             }
         }
-        
+
         combined.truncate(top_k);
-        
+
         combined
     }
 

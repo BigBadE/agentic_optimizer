@@ -13,6 +13,8 @@ Benchmarks for evaluating context retrieval quality using hybrid BM25 + vector s
 | **NDCG@10** | 0.437 | 0.750 | +0.313 | 🔴 58% of target |
 | **Critical in Top-3** | 25.0% | 65% | +40% | 🔴 38% of target |
 
+**Latest Run**: `benchmarks/latest_results.md` (2025-10-03)
+
 **Test Suite**: 20 diverse test cases covering real-world coding agent scenarios
 
 *Targets set to estimated Cursor/GitHub Copilot performance levels. See `SOLVING_DOC_DOMINANCE.md` for fundamental solutions.*

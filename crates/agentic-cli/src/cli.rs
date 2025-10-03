@@ -11,6 +11,15 @@ pub struct Cli {
 
 #[derive(Subcommand)]
 pub enum Commands {
+    #[command(about = "Start interactive chat session")]
+    Chat {
+        #[arg(short, long, default_value = ".", help = "Project root directory")]
+        project: PathBuf,
+
+        #[arg(long, help = "Model to use (overrides config)")]
+        model: Option<String>,
+    },
+
     #[command(about = "Ask a question or request code changes")]
     Query {
         #[arg(help = "The query to send to the agent")]

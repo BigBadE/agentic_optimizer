@@ -13,6 +13,8 @@ serde_json.workspace = true
 reqwest.workspace = true
 tokio.workspace = true
 ollama-rs.workspace = true
+indicatif.workspace = true
+ignore.workspace = true
 
 [lints]
 workspace = true

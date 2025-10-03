@@ -1,10 +1,12 @@
 //! Local context agent using Ollama.
 
+use std::time::Instant;
 use ollama_rs::{Ollama, generation::chat::ChatMessage};
 use agentic_core::Result;
 use crate::query::{QueryIntent, ContextPlan};
 use super::agent::ContextAgent;
 use super::prompts;
+use serde_json::Value;
 
 /// Local context agent that uses Ollama for planning
 pub struct LocalContextAgent {
@@ -74,8 +76,38 @@ impl LocalContextAgent {
             response.trim()
         };
 
-        serde_json::from_str(json_str)
-            .map_err(|e| agentic_core::Error::Other(format!("Failed to parse context plan: {e}\nResponse: {json_str}")))
+        // First attempt strict parsing
+        match serde_json::from_str::<ContextPlan>(json_str) {
+            Ok(plan) => Ok(plan),
+            Err(first_err) => {
+                // Fallback: be lenient and normalize common schema mistakes
+                let mut value: Value = serde_json::from_str(json_str).map_err(|e| {
+                    agentic_core::Error::Other(format!(
+                        "Failed to parse context plan: {e}\nResponse: {json_str}"
+                    ))
+                })?;
+
+                // Normalize: strategy.Focused with `patterns` -> `symbols`
+                if let Some(strategy) = value.get_mut("strategy") {
+                    if let Some(focused) = strategy.get_mut("Focused") {
+                        if let Some(patterns) = focused.get_mut("patterns") {
+                            let symbols = patterns.clone();
+                            if let Some(obj) = focused.as_object_mut() {
+                                obj.insert("symbols".to_string(), symbols);
+                                obj.remove("patterns");
+                            }
+                        }
+                    }
+                }
+
+                // Try deserializing again after normalization
+                serde_json::from_value::<ContextPlan>(value).map_err(|e| {
+                    agentic_core::Error::Other(format!(
+                        "Failed to parse context plan after normalization. First error: {first_err}. Second error: {e}\nResponse: {json_str}"
+                    ))
+                })
+            }
+        }
     }
 }
 
@@ -87,15 +119,32 @@ impl Default for LocalContextAgent {
 
 impl LocalContextAgent {
     /// Generate a context plan (async version)
-    pub async fn generate_plan(&self, intent: &QueryIntent, query_text: &str) -> Result<ContextPlan> {
+    pub async fn generate_plan(&self, intent: &QueryIntent, query_text: &str, file_tree: &str) -> Result<ContextPlan> {
         let system = prompts::system_prompt();
-        let user = prompts::user_prompt(query_text, intent);
+        let user = prompts::user_prompt(query_text, intent, file_tree);
 
+        let model = std::env::var("OLLAMA_MODEL").unwrap_or_else(|_| "qwen2.5-coder:7b".to_string());
+        eprintln!("  Calling Ollama API (model: {})...", model);
+        
+        let start = Instant::now();
         let response = Self::call_ollama_static(&self.ollama, &system, &user).await?;
+        let elapsed = start.elapsed();
         
-        tracing::debug!("Ollama response: {}", response);
+        let response_chars = response.len();
+        let tokens_estimate = response_chars / 4;
+        let tokens_per_sec = if elapsed.as_secs_f64() > 0.0 {
+            tokens_estimate as f64 / elapsed.as_secs_f64()
+        } else {
+            0.0
+        };
         
-        self.parse_plan(&response)
+        eprintln!("  Received response: {} chars (~{} tokens) in {:.2}s ({:.1} tok/s)", 
+            response_chars, tokens_estimate, elapsed.as_secs_f64(), tokens_per_sec);
+        
+        eprintln!("  Parsing context plan...");
+        let plan = self.parse_plan(&response)?;
+        
+        Ok(plan)
     }
 
     /// Check if Ollama is available (async version)

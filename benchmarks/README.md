@@ -1,125 +1,152 @@
 # Context Fetching Benchmarks
 
-This directory contains benchmarks for evaluating the quality of context retrieval.
+Benchmarks for evaluating context retrieval quality using hybrid BM25 + vector search.
+
+## Current Performance (Phase 4 - Pattern Boost)
+
+| Metric | Current | Target | Gap |
+|--------|---------|--------|-----|
+| **Precision@3** | 25.0% | 40% | +15% |
+| **Precision@10** | 20.5% | 50% | +29.5% |
+| **Recall@10** | 50.4% | 60% | +9.6% |
+| **MRR** | 0.469 | 0.650 | +0.181 |
+| **NDCG@10** | 0.432 | 0.600 | +0.168 |
+| **Critical in Top-3** | 20.0% | 50% | +30% |
+
+**Test Suite**: 20 diverse test cases covering real-world coding agent scenarios
+
+## Quick Start
+
+```bash
+# Run all benchmarks
+cargo run --bin benchmark
+
+# Generate report
+cargo run --bin benchmark --report benchmarks/results.md
+
+# Run specific test
+cargo run --bin benchmark --test css_parsing
+```
 
 ## Structure
 
 ```
 benchmarks/
 ├── README.md                    # This file
-├── USAGE.md                     # Detailed usage guide
-├── SUMMARY.md                   # Overview and best practices
-├── test_cases/                  # Test cases for different projects
-│   └── valor/                   # Test cases for Valor browser engine
-│       ├── css_parsing.toml
-│       ├── rendering_pipeline.toml
-│       ├── dom_tree.toml
-│       └── layout_engine.toml
-└── test_repositories/           # External projects for testing
-    └── valor/                   # Valor browser engine (pinned commit)
+├── SETUP.md                     # Setup and configuration
+├── test_cases/                  # Test case definitions
+│   └── valor/                   # 20 test cases for Valor browser
+└── test_repositories/           # External projects
+    └── valor/                   # Valor browser engine
 ```
+
+## Test Categories
+
+**20 Test Cases** covering:
+- **Core Rendering** (4): CSS parsing, DOM tree, layout engine, rendering pipeline
+- **JavaScript Integration** (4): Runtime, console, modules, event delegation
+- **CSS Advanced** (4): Flexbox, Grid, animations, viewport units
+- **Performance** (3): Selector matching, DOM mutations, async rendering
+- **Debugging** (5): HTML errors, z-index, GPU text, box model, fetch API
 
 ## Test Case Format
 
-Each test case is a TOML file with the following structure:
+Each test case is a TOML file:
 
 ```toml
-# Test metadata
 name = "CSS Parsing Implementation"
-description = "Query about how CSS is parsed in the browser engine"
 query = "how does CSS parsing work"
-project_root = "benchmarks/test_repositories/valor"  # Optional: override default project
+project_root = "benchmarks/test_repositories/valor"
 
-# Expected relevant files (in priority order)
 [[expected]]
 path = "crates/css/src/parser.rs"
 priority = "critical"  # critical, high, medium, low
 reason = "Main CSS parser implementation"
 
-[[expected]]
-path = "crates/css/src/tokenizer.rs"
-priority = "critical"
-reason = "CSS tokenization logic"
-
-[[expected]]
-path = "crates/css/orchestrator/src/lib.rs"
-priority = "high"
-reason = "CSS orchestration and coordination"
-
-# Files that should NOT appear in results
 [[excluded]]
-path = "crates/renderer/wgpu_backend"
-reason = "Rendering backend, not parsing"
-
-[[excluded]]
-path = "crates/html"
-reason = "HTML parsing, different domain"
+path = "crates/renderer"
+reason = "Rendering, not parsing"
 ```
 
-## Priority Levels
+See `SETUP.md` for detailed format documentation.
 
-- **critical**: Must be in top 3 results (weight: 1.0)
-- **high**: Should be in top 5 results (weight: 0.8)
-- **medium**: Should be in top 10 results (weight: 0.5)
-- **low**: Nice to have in top 20 (weight: 0.2)
+## Metrics Explained
 
-## Metrics
+- **Precision@3**: % of top-3 results that are relevant (measures accuracy)
+- **Recall@10**: % of relevant files found in top-10 (measures coverage)
+- **MRR**: Mean Reciprocal Rank - average of 1/rank for first relevant result
+- **NDCG@10**: Normalized Discounted Cumulative Gain - quality-weighted ranking
+- **Critical in Top-3**: % of critical files appearing in top-3 results
 
-The benchmark calculates:
+## Implementation Progress
 
-1. **Precision@K**: Percentage of top-K results that are relevant
-2. **Recall@K**: Percentage of relevant files found in top-K
-3. **Mean Reciprocal Rank (MRR)**: Average of 1/rank for first relevant result
-4. **Normalized Discounted Cumulative Gain (NDCG)**: Quality-weighted ranking metric
-5. **Exclusion Rate**: Percentage of excluded files that don't appear in top-20
+### ✅ Phase 1-2: Base Improvements (0% → 25% P@3)
+- Enhanced BM25 tokenization with n-grams
+- File type boosting (code 1.7x, docs 0.1x)
+- Path-based boosting (/src/ 1.3x, /docs/ 0.5x)
+- Test file filtering (0.1x penalty)
+- Weighted score combination (replaced RRF)
+- Query intent detection ("how"/"implement"/"fix")
+- BM25 threshold filtering (0.75)
 
-## Running Benchmarks
+### ✅ Phase 4: Pattern Boost (25% → 25% P@3, 47.9% → 50.4% R@10)
+- Pattern-based importance boost:
+  - impl + struct: 1.3x
+  - Trait definitions: 1.2x
+  - Public API-rich: 1.2x
+  - Module docs: 1.15x
 
-```bash
-# Run all benchmarks for Valor project (default)
-cargo run --bin benchmark
+### 🔄 Next Steps to Hit Targets
+1. **Result Diversity** - Penalize multiple files from same directory
+2. **File Importance Signals** - Use depth, size, modification time
+3. **Two-Stage Ranking** - Re-rank top-50 with expensive features
+4. **Repository Structure Learning** - Adapt to project patterns
 
-# Run specific test case
-cargo run --bin benchmark --test css_parsing
-
-# Run with detailed output
-cargo run --bin benchmark --verbose
-
-# Generate report
-cargo run --bin benchmark --report benchmarks/report.md
-
-# Use different project
-cargo run --bin benchmark --project other_project
-```
-
-## Adding New Test Cases
-
-1. Create a new `.toml` file in `test_cases/<project>/`
-2. Define the query and expected files
-3. Run the benchmark to validate
-4. Iterate on context fetching improvements
-5. Re-run to measure progress
+See `CONTEXT_IMPROVEMENT.md` in project root for detailed roadmap.
 
 ## Example Output
 
 ```
-Running benchmark: CSS Parsing Implementation
-Query: "how does CSS parsing work"
+═══════════════════════════════════════════════════════════
+Running: CSS Parsing Implementation
+═══════════════════════════════════════════════════════════
 
-Results:
-  Precision@3:  66.7% (2/3 critical files found)
-  Precision@5:  80.0% (4/5 high-priority files found)
-  Precision@10: 60.0% (6/10 relevant files found)
-  Recall@10:    85.7% (6/7 expected files found)
-  MRR:          0.500 (first relevant at rank #2)
-  NDCG@10:      0.765
-  Exclusion:    100.0% (0/3 excluded files in top-20)
+⚙️  Initializing vector search...
+  Hybrid search: 1811 embeddings, 1811 BM25 docs
+  Combined 50 results using weighted scores
+  After filtering: 25 results
 
-Top 10 Results:
-  1. ✅ crates/css/src/parser.rs (expected: critical)
-  2. ✅ crates/css/src/tokenizer.rs (expected: critical)
-  3. ❌ crates/css/src/lib.rs (not expected)
-  4. ✅ crates/css/orchestrator/src/lib.rs (expected: high)
-  5. ✅ crates/css/modules/... (expected: medium)
-  ...
+# Benchmark: CSS Parsing Implementation
+
+**Query**: "how does CSS parsing work"
+
+## Metrics
+- **Precision@3**:  66.7%
+- **Recall@10**:    85.7%
+- **MRR**:          0.500
+- **NDCG@10**:      0.765
+- **Critical in Top-3**: 100.0%
+
+## Top 10 Results
+1. ✅ crates/css/src/parser.rs (expected: Critical)
+2. ✅ crates/css/src/tokenizer.rs (expected: Critical)
+3. ❌ crates/css/src/lib.rs (not expected)
+4. ✅ crates/css/orchestrator/src/lib.rs (expected: High)
+...
+
+═══════════════════════════════════════════════════════════
+SUMMARY (20 test cases)
+═══════════════════════════════════════════════════════════
+
+Average Metrics:
+  Precision@3:        25.0%
+  Recall@10:          50.4%
+  MRR:                0.469
+  Critical in Top-3:  20.0%
 ```
+
+## Files
+
+- **SETUP.md** - Detailed setup and test case format
+- **test_cases/valor/** - 20 test case definitions
+- **phase4_step2_pattern_boost.md** - Latest benchmark results

@@ -105,6 +105,17 @@ agentic_optimizer/
 └── config.example.toml       # Example configuration
 ```
 
+## Context Fetching Performance
+
+**Current Metrics** (Phase 4 - Pattern Boost):
+- **Precision@3**: 25.0% (Target: 40%)
+- **Recall@10**: 50.4% (Target: 60%)
+- **MRR**: 0.469 (Target: 0.650)
+- **NDCG@10**: 0.432 (Target: 0.600)
+- **Critical in Top-3**: 20.0% (Target: 50%)
+
+See `benchmarks/README.md` for detailed benchmark information.
+
 ## Roadmap
 
 - [x] **Phase 0 (MVP)** - Basic Sonnet-only agent

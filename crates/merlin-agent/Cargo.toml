@@ -1,0 +1,25 @@
+[package]
+name = "merlin-agent"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+merlin-core.workspace = true
+merlin-providers.workspace = true
+merlin-context.workspace = true
+merlin-languages.workspace = true
+merlin-tools.workspace = true
+async-trait = "0.1"
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
+tracing.workspace = true
+anyhow.workspace = true
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["rt", "macros"] }
+
+[lints]
+workspace = true
+

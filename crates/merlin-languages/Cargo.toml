@@ -1,0 +1,11 @@
+[package]
+name = "merlin-languages"
+version.workspace = true
+edition.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+merlin-core.workspace = true
+rust-backend.workspace = true

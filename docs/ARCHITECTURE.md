@@ -9,9 +9,9 @@ The project is organized as a Cargo workspace with separate crates for each majo
 - **Easy experimentation** by swapping implementations
 
 ```
-agentic_optimizer/
+merlin/
 ├── crates/
-│   ├── agentic-core/           # Core types, traits, and errors
+│   ├── merlin-core/           # Core types, traits, and errors
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │       ├── lib.rs
@@ -19,7 +19,7 @@ agentic_optimizer/
 │   │       ├── traits.rs       # ModelProvider trait
 │   │       └── error.rs        # Error types and Result
 │   │
-│   ├── agentic-providers/      # Model provider implementations
+│   ├── merlin-providers/      # Model provider implementations
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │       ├── lib.rs
@@ -28,7 +28,7 @@ agentic_optimizer/
 │   │       ├── gemini.rs       # Gemini Flash (Phase 3)
 │   │       └── local.rs        # Ollama integration (Phase 4)
 │   │
-│   ├── agentic-context/        # Context building and indexing
+│   ├── merlin-context/        # Context building and indexing
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │       ├── lib.rs
@@ -39,7 +39,7 @@ agentic_optimizer/
 │   │           ├── dependency.rs
 │   │           └── embeddings.rs
 │   │
-│   ├── agentic-routing/        # Routing engine (Phase 3)
+│   ├── merlin-routing/        # Routing engine (Phase 3)
 │   │   ├── Cargo.toml
 │   │   └── src/
 │   │       ├── lib.rs
@@ -47,7 +47,7 @@ agentic_optimizer/
 │   │       ├── router.rs       # Model tier router
 │   │       └── escalation.rs   # Escalation logic
 │   │
-│   └── agentic-cli/            # CLI application
+│   └── merlin-cli/            # CLI application
 │       ├── Cargo.toml
 │       └── src/
 │           ├── main.rs         # Entry point
@@ -65,28 +65,28 @@ agentic_optimizer/
 ### Crate Dependencies
 
 ```
-agentic-cli
-├── agentic-core
-├── agentic-providers
-│   └── agentic-core
-├── agentic-context
-│   └── agentic-core
-└── agentic-routing (Phase 3+)
-    ├── agentic-core
-    └── agentic-providers
+merlin-cli
+├── merlin-core
+├── merlin-providers
+│   └── merlin-core
+├── merlin-context
+│   └── merlin-core
+└── merlin-routing (Phase 3+)
+    ├── merlin-core
+    └── merlin-providers
 ```
 
 ### Phase 0 (MVP) Crates
 
 Currently implemented:
-- ✅ **agentic-core**: Core types and traits
-- ✅ **agentic-providers**: Anthropic provider only
-- ✅ **agentic-context**: Basic context builder
-- ✅ **agentic-cli**: CLI interface
+- ✅ **merlin-core**: Core types and traits
+- ✅ **merlin-providers**: Anthropic provider only
+- ✅ **merlin-context**: Basic context builder
+- ✅ **merlin-cli**: CLI interface
 
 ### Future Crates (Later Phases)
 
-- **agentic-routing** (Phase 3): Query classification and model routing
+- **merlin-routing** (Phase 3): Query classification and model routing
 - **agentic-observability** (Phase 5): Metrics and cost tracking
 
 ## Core Traits
@@ -685,3 +685,4 @@ tree-sitter-rust = "0.20"
 ```
 
 See `PHASES.md` for incremental implementation plan.
+

@@ -1,0 +1,37 @@
+[package]
+name = "merlin-routing"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+# Core dependencies
+merlin-core.workspace = true
+merlin-providers = { path = "../merlin-providers" }
+merlin-local = { path = "../merlin-local" }
+
+# Async
+async-trait = "0.1"
+tokio.workspace = true
+
+# Data structures
+uuid = { version = "1.11", features = ["v4", "serde"] }
+petgraph = "0.6"
+
+# Serialization
+serde.workspace = true
+serde_json.workspace = true
+
+# Error handling
+thiserror = "2.0"
+anyhow = "1.0"
+
+# TUI
+ratatui = "0.29"
+crossterm = "0.28"
+
+# Utilities
+tempfile = "3.14"
+
+[dev-dependencies]
+tokio-test = "0.4"
+

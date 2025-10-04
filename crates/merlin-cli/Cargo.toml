@@ -1,0 +1,32 @@
+[package]
+name = "merlin-cli"
+version.workspace = true
+edition.workspace = true
+
+[[bin]]
+name = "merlin"
+path = "src/main.rs"
+
+[dependencies]
+merlin-core.workspace = true
+merlin-providers.workspace = true
+merlin-context.workspace = true
+merlin-languages.workspace = true
+merlin-agent.workspace = true
+merlin-routing = { path = "../merlin-routing" }
+merlin-local = { path = "../merlin-local" }
+anyhow.workspace = true
+clap.workspace = true
+serde.workspace = true
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
+console.workspace = true
+dialoguer.workspace = true
+reqwest.workspace = true
+
+[lints]
+workspace = true
+
+

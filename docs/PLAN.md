@@ -1,4 +1,4 @@
-# Agentic Optimizer - Cost Reduction Plan
+# Merlin - Cost Reduction Plan
 
 ## Executive Summary
 
@@ -872,3 +872,4 @@ impl CostTracker {
 *Estimated completion: 5 weeks*  
 *Projected savings: $438+/month (96% reduction)*  
 *ROI: Immediate (development time only)*
+

@@ -2,7 +2,7 @@
 
 ## Overview
 
-This document outlines the phased implementation of the Agentic Optimizer, starting with a minimal viable product (MVP) and progressively adding optimization strategies. Each phase is designed to be independently testable and deployable.
+This document outlines the phased implementation of the Merlin, starting with a minimal viable product (MVP) and progressively adding optimization strategies. Each phase is designed to be independently testable and deployable.
 
 **Timeline**: 4-5 weeks total
 **Approach**: Ship early, optimize incrementally
@@ -905,3 +905,4 @@ Daily Metrics (2025-10-15):
 **Timeline**: 4-5 weeks to full optimization
 **Risk**: Low (incremental, testable phases)
 **ROI**: $441/month savings ($5,292/year)
+

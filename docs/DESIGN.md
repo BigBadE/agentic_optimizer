@@ -1,4 +1,4 @@
-# Design Overview - Agentic Optimizer
+# Design Overview - Merlin
 
 ## Vision
 
@@ -320,3 +320,4 @@ fn handle_response(response: ModelResponse) -> Result<Response> {
 
 See `ARCHITECTURE.md` for detailed module design and trait definitions.
 See `PHASES.md` for phase-by-phase implementation plan.
+

@@ -1,0 +1,16 @@
+[package]
+name = "merlin-providers"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+merlin-core.workspace = true
+async-trait = "0.1"
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tokio.workspace = true
+
+[lints]
+workspace = true
+

@@ -1,5 +1,6 @@
 use std::time::Duration;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::process::Command;
 use tokio::time;
@@ -96,6 +97,7 @@ impl Default for BashTool {
     }
 }
 
+#[async_trait]
 impl Tool for BashTool {
     fn name(&self) -> &'static str {
         "bash"

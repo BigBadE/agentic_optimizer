@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 use tracing::{debug, info};
@@ -74,6 +75,7 @@ impl Default for EditTool {
     }
 }
 
+#[async_trait]
 impl Tool for EditTool {
     fn name(&self) -> &'static str {
         "edit"

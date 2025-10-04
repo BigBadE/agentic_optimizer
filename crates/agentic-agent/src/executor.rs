@@ -6,12 +6,13 @@ use agentic_core::{Context, ModelProvider, Query};
 use agentic_languages::LanguageProvider;
 use tracing::{info, warn};
 
-use crate::{AgentConfig, AgentRequest, AgentResponse, ExecutionMetadata, ExecutionResult};
+use crate::{AgentConfig, AgentRequest, AgentResponse, ExecutionMetadata, ExecutionResult, ToolRegistry};
 
 pub struct AgentExecutor {
     provider: Arc<dyn ModelProvider>,
     config: AgentConfig,
     context_builder: Option<ContextBuilder>,
+    tool_registry: ToolRegistry,
 }
 
 impl AgentExecutor {
@@ -20,6 +21,7 @@ impl AgentExecutor {
             provider,
             config,
             context_builder: None,
+            tool_registry: ToolRegistry::new(),
         }
     }
 
@@ -33,6 +35,10 @@ impl AgentExecutor {
         };
         self.context_builder = Some(builder);
         self
+    }
+
+    pub const fn tool_registry(&self) -> &ToolRegistry {
+        &self.tool_registry
     }
 
     pub async fn execute(&mut self, request: AgentRequest) -> anyhow::Result<ExecutionResult> {
@@ -93,7 +99,7 @@ impl AgentExecutor {
 
         let mut context = builder.build_context(&query).await?;
 
-        context.system_prompt = self.config.system_prompt.clone();
+        context.system_prompt = self.build_system_prompt();
 
         let token_count = context.token_estimate();
         if token_count > self.config.max_context_tokens {
@@ -108,5 +114,33 @@ impl AgentExecutor {
         }
 
         Ok(context)
+    }
+
+    fn build_system_prompt(&self) -> String {
+        let tools = self.tool_registry.list_tools();
+        
+        let mut prompt = self.config.system_prompt.clone();
+        
+        if !tools.is_empty() {
+            prompt.push_str("\n\n# Available Tools\n\n");
+            prompt.push_str("You have access to the following tools to help complete tasks:\n\n");
+            
+            for (name, description) in tools {
+                prompt.push_str(&format!("## {}\n{}\n\n", name, description));
+            }
+            
+            prompt.push_str("To use a tool, respond with a JSON object in the following format:\n");
+            prompt.push_str("```json\n");
+            prompt.push_str("{\n");
+            prompt.push_str("  \"tool\": \"tool_name\",\n");
+            prompt.push_str("  \"params\": {\n");
+            prompt.push_str("    \"param1\": \"value1\",\n");
+            prompt.push_str("    \"param2\": \"value2\"\n");
+            prompt.push_str("  }\n");
+            prompt.push_str("}\n");
+            prompt.push_str("```\n");
+        }
+        
+        prompt
     }
 }

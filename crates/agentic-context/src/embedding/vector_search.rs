@@ -43,7 +43,7 @@ struct VectorCache {
 }
 
 impl VectorCache {
-    const VERSION: u32 = 2;  // Bumped for chunk-based embeddings
+    const VERSION: u32 = 3;  // Bumped for normalized relative paths
 
     fn new() -> Self {
         Self {
@@ -680,7 +680,12 @@ impl VectorSearchManager {
             let path = entry.path();
             
             if entry.file_type().map_or(false, |ft| ft.is_file()) && is_source_file(path) {
-                files.push(path.to_path_buf());
+                let normalized_path = if let Ok(relative) = path.strip_prefix(&self.project_root) {
+                    relative.to_path_buf()
+                } else {
+                    path.to_path_buf()
+                };
+                files.push(normalized_path);
             }
         }
 
@@ -698,14 +703,15 @@ impl VectorSearchManager {
             let mut tasks = JoinSet::new();
             
             for file_path in file_batch {
-                let path = file_path.clone();
+                let relative_path = file_path.clone();
+                let absolute_path = self.project_root.join(file_path);
                 let client = EmbeddingClient::new();
                 
                 tasks.spawn(async move {
-                    let content = match fs::read_to_string(&path) {
+                    let content = match fs::read_to_string(&absolute_path) {
                         Ok(c) => c,
                         Err(e) => {
-                            eprintln!("Warning: Failed to read {}: {}", path.display(), e);
+                            eprintln!("Warning: Failed to read {}: {}", relative_path.display(), e);
                             return Vec::new();
                         }
                     };
@@ -716,7 +722,7 @@ impl VectorSearchManager {
                     }
 
                     // Chunk the file
-                    let chunks = chunk_file(&path, &content);
+                    let chunks = chunk_file(&relative_path, &content);
                     let mut chunk_results = Vec::new();
                     
                     for chunk in chunks {
@@ -724,10 +730,10 @@ impl VectorSearchManager {
                         
                         match client.embed(&chunk.content).await {
                             Ok(embedding) => {
-                                chunk_results.push((path.clone(), chunk, embedding, preview));
+                                chunk_results.push((relative_path.clone(), chunk, embedding, preview));
                             }
                             Err(e) => {
-                                eprintln!("Warning: Failed to embed chunk in {}: {}", path.display(), e);
+                                eprintln!("Warning: Failed to embed chunk in {}: {}", relative_path.display(), e);
                             }
                         }
                     }
@@ -741,12 +747,13 @@ impl VectorSearchManager {
                 match result {
                     Ok(chunk_results) => {
                         if !chunk_results.is_empty() {
-                            let file_path = &chunk_results[0].0;
+                            let relative_path = &chunk_results[0].0;
+                            let absolute_path = self.project_root.join(relative_path);
                             
                             // Track file modification time
-                            if let Ok(metadata) = fs::metadata(file_path) {
+                            if let Ok(metadata) = fs::metadata(&absolute_path) {
                                 if let Ok(modified) = metadata.modified() {
-                                    self.file_times.insert(file_path.clone(), modified);
+                                    self.file_times.insert(relative_path.clone(), modified);
                                 }
                             }
                             
@@ -786,13 +793,15 @@ impl VectorSearchManager {
         let mut invalid = Vec::new();
 
         for entry in entries {
+            let absolute_path = self.project_root.join(&entry.path);
+            
             // Check if file still exists
-            if !entry.path.exists() {
+            if !absolute_path.exists() {
                 continue;
             }
 
             // Check if file was modified
-            match fs::metadata(&entry.path) {
+            match fs::metadata(&absolute_path) {
                 Ok(metadata) => {
                     match metadata.modified() {
                         Ok(modified) => {

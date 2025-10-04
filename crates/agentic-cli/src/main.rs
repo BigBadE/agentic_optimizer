@@ -10,7 +10,6 @@ use agentic_agent::{Agent, AgentConfig, AgentRequest};
 
 mod cli;
 mod config;
-mod ollama;
 
 use clap::Parser as _;
 use cli::{Cli, Commands};
@@ -88,8 +87,6 @@ async fn handle_chat(
     let provider: std::sync::Arc<dyn agentic_core::ModelProvider> = std::sync::Arc::new(provider);
 
     let backend = create_backend(Language::Rust)?;
-    
-    ollama::ensure_available().await?;
 
     let config = AgentConfig::new()
         .with_system_prompt(
@@ -248,13 +245,8 @@ async fn handle_prompt(
     }
 
     // Always enable Rust semantic analysis
-    term.write_line(&format!("{}", style("Enabling Rust semantic analysis...").cyan()))?;
     let backend = create_backend(Language::Rust)?;
     builder = builder.with_language_backend(backend);
-
-    // Ensure Ollama is available for intelligent context fetching (required)
-    term.write_line(&format!("{}", style("Checking Ollama availability...").cyan()))?;
-    ollama::ensure_available().await?;
 
     let query = Query::new(query_text).with_files(files);
 

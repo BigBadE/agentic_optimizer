@@ -1,15 +1,9 @@
 [package]
-name = "agentic-agent"
+name = "agentic-tools"
 version.workspace = true
 edition.workspace = true
 
 [dependencies]
-agentic-core.workspace = true
-agentic-providers.workspace = true
-agentic-context.workspace = true
-agentic-languages.workspace = true
-agentic-tools.workspace = true
-async-trait = "0.1"
 serde.workspace = true
 serde_json.workspace = true
 thiserror.workspace = true
@@ -18,7 +12,7 @@ tracing.workspace = true
 anyhow.workspace = true
 
 [dev-dependencies]
-tokio = { workspace = true, features = ["rt", "macros"] }
+tracing-subscriber.workspace = true
 
 [lints]
 workspace = true

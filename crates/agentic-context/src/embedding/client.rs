@@ -136,10 +136,15 @@ impl EmbeddingClient {
     pub async fn ensure_model_available(&self) -> Result<()> {
         use std::process::Command;
         
-        // List local models
-        let models = self.ollama.list_local_models()
-            .await
-            .map_err(|e| agentic_core::Error::Other(format!("Failed to list Ollama models: {e}")))?;
+        // Check if Ollama is running by trying to list models
+        let models = match self.ollama.list_local_models().await {
+            Ok(m) => m,
+            Err(e) => {
+                return Err(agentic_core::Error::Other(
+                    format!("Failed to connect to Ollama: {}.\n\nPlease ensure Ollama is installed and running:\n  - Install from: https://ollama.ai\n  - Start with: ollama serve", e)
+                ));
+            }
+        };
 
         // Check if our embedding model is available
         let model_available = models.iter().any(|m| m.name.contains(&self.model));

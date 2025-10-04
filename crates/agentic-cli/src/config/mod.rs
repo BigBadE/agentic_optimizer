@@ -5,8 +5,10 @@ use std::path::PathBuf;
 
 use agentic_core::Result;
 
+/// Main configuration for the agentic optimizer
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
+    /// Provider configuration (API keys and models)
     pub providers: ProvidersConfig,
 }
 
@@ -34,10 +36,17 @@ impl Config {
     }
 }
 
+/// Configuration for remote model providers
+/// 
+/// This is where you configure which models to use for different task complexities.
+/// Add or modify models here to customize the AI behavior.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProvidersConfig {
+    /// OpenRouter API key for accessing remote models
     pub openrouter_key: Option<String>,
+    /// High-complexity model for demanding tasks (default: anthropic/claude-sonnet-4-20250514)
     pub high_model: Option<String>,
+    /// Medium-complexity model for balanced performance (default: anthropic/claude-3.5-sonnet)
     pub medium_model: Option<String>,
 }
 

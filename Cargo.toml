@@ -18,6 +18,7 @@ agentic-providers = { path = "crates/agentic-providers" }
 agentic-context = { path = "crates/agentic-context" }
 agentic-languages = { path = "crates/agentic-languages" }
 agentic-agent = { path = "crates/agentic-agent" }
+agentic-tools = { path = "crates/agentic-tools" }
 rust-backend = { path = "crates/agentic-languages/languages/rust-backend" }
 
 # External dependencies

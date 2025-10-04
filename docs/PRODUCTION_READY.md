@@ -55,7 +55,7 @@ cargo run --release -- route "Add error handling to the parser"
 
 ### With Validation
 ```bash
-cargo run --release -- route "Refactor the parser module" --validate --verbose
+cargo run --release -- route "Refactor the parser module" --verbose
 ```
 
 ### TUI Mode
@@ -105,7 +105,7 @@ RoutingConfig {
         timeout_seconds: 300,
     },
     validation: ValidationConfig {
-        enabled: false,  // Use --validate flag
+        enabled: true,
         early_exit: true,
         syntax_check: true,
         build_check: true,
@@ -243,7 +243,7 @@ Summary:
 
 ### Example 2: Complex Refactor
 ```bash
-$ cargo run --release -- route "Refactor the parser module" --validate --verbose
+$ cargo run --release -- route "Refactor the parser module" --verbose
 
 === Multi-Model Routing ===
 Request: Refactor the parser module

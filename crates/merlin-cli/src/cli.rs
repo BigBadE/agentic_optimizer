@@ -2,11 +2,31 @@ use clap::{Parser, Subcommand};
 use std::path::PathBuf;
 
 #[derive(Parser)]
-#[command(name = "agentic-optimizer")]
-#[command(about = "Cost-optimized AI coding agent", long_about = None)]
+#[command(name = "merlin")]
+#[command(about = "Intelligent AI coding assistant with multi-model routing", long_about = None)]
 pub struct Cli {
+    /// Project root directory
+    #[arg(short, long, default_value = ".", global = true)]
+    pub project: PathBuf,
+
+    /// Use only local models (Ollama), disable remote tiers
+    #[arg(long, global = true)]
+    pub local: bool,
+
+    /// Disable validation pipeline (enabled by default)
+    #[arg(long, global = true)]
+    pub no_validate: bool,
+
+    /// Show detailed routing decisions
+    #[arg(long, global = true)]
+    pub verbose: bool,
+
+    /// Disable TUI mode, use plain terminal output
+    #[arg(long, global = true)]
+    pub no_tui: bool,
+
     #[command(subcommand)]
-    pub command: Commands,
+    pub command: Option<Commands>,
 }
 
 #[derive(Subcommand)]
@@ -62,22 +82,5 @@ pub enum Commands {
         daily: bool,
     },
 
-    #[command(about = "Execute request with multi-model routing (TUI by default)")]
-    Route {
-        #[arg(help = "The request to execute")]
-        request: String,
-
-        #[arg(short, long, default_value = ".", help = "Project root directory")]
-        project: PathBuf,
-
-        #[arg(long, help = "Enable validation pipeline")]
-        validate: bool,
-
-        #[arg(long, help = "Show detailed routing decisions (non-TUI mode only)")]
-        verbose: bool,
-
-        #[arg(long, help = "Disable TUI mode, use plain terminal output")]
-        no_tui: bool,
-    },
 }
 

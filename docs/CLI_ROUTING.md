@@ -5,20 +5,22 @@ The `merlin` CLI now includes multi-model routing capabilities through the `rout
 ## Usage
 
 ```bash
-agentic route "your request here" [OPTIONS]
+merlin route "your request here" [OPTIONS]
 ```
 
 ### Options
 
 - `-p, --project <PATH>` - Project root directory (default: current directory)
-- `--validate` - Enable validation pipeline (syntax, build, test, lint)
+- `--local` - Use only local models (Ollama), disable remote tiers
+- `--no-validate` - Disable validation pipeline (enabled by default)
 - `--verbose` - Show detailed routing decisions and task breakdown
+- `--no-tui` - Disable TUI mode (plain terminal output)
 
 ## Examples
 
 ### Basic Request
 ```bash
-agentic route "Add error handling to the parser"
+merlin route "Add error handling to the parser"
 ```
 
 Output:
@@ -48,7 +50,7 @@ Summary:
 
 ### Complex Refactor with Validation
 ```bash
-agentic route "Refactor the parser module" --validate --verbose
+merlin route "Refactor the parser module" --verbose
 ```
 
 Output:
@@ -109,8 +111,19 @@ Summary:
 
 ### Multi-file Modification
 ```bash
-agentic route "Add logging to main.rs and utils.rs" --verbose
+merlin route "Add logging to main.rs and utils.rs" --no-tui --verbose
 ```
+
+### Local-Only Mode (Zero Cost)
+```bash
+merlin route "Add comments to all public functions" --local
+```
+
+This restricts routing to only use Ollama models, ensuring zero API costs. Perfect for:
+- Quick iterations and experiments
+- Working offline
+- Cost-sensitive workflows
+- Learning and testing
 
 ## How It Works
 
@@ -134,8 +147,8 @@ Tasks are executed based on their dependencies:
 - **Parallel**: Independent tasks run concurrently
 - **Pipeline**: Tasks with dependency chains
 
-### 4. Validation (Optional)
-When `--validate` is enabled, each response goes through:
+### 4. Validation (Enabled by Default)
+Every response passes through the validation pipeline unless `--no-validate` is supplied:
 1. **Syntax Check**: Heuristic-based validation (0ms)
 2. **Build Check**: Isolated `cargo check` (~5-30s)
 3. **Test Check**: Isolated `cargo test` (~10-300s)
@@ -173,31 +186,30 @@ Default settings:
 - Groq enabled: `true`
 - Premium enabled: `true`
 - Max concurrent tasks: `4`
-- Validation enabled: `false` (use `--validate` flag)
+- Validation enabled: `true`
 - Early exit on validation failure: `true`
 
 ## Comparison with Other Commands
 
-### `agentic query` vs `agentic route`
+### `merlin query` vs `merlin route`
 
-**`agentic query`**:
-- Single model execution
+**`merlin query`**:
 - Direct provider selection
 - No task decomposition
 - No validation pipeline
 - Simpler, faster for straightforward queries
 
-**`agentic route`**:
+**`merlin route`**:
 - Multi-model routing
 - Automatic tier selection
 - Smart task decomposition
-- Optional validation pipeline
+- Validation pipeline (enabled by default)
 - Better for complex, multi-step requests
 
 ## Tips
 
 1. **Use `--verbose`** for the first few requests to understand how tasks are decomposed
-2. **Enable `--validate`** for critical changes to ensure code quality
+{{ ... }}
 3. **Start simple** - try basic requests before complex refactors
 4. **Check Ollama** - Ensure Ollama is running for local tier access
 5. **Set API keys** - Configure `GROQ_API_KEY` for free tier access to larger models

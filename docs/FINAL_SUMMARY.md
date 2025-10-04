@@ -1,103 +1,27 @@
-# 🎉 Final Summary: Production-Ready Multi-Model Routing System
+# 🦅 Merlin: Production-Ready AI Coding Assistant
 
 ## ✅ Complete Implementation
 
-All requested features have been fully implemented and tested. The system is **production ready** with comprehensive documentation.
+Merlin is a **production-ready** AI coding assistant with multi-model routing, automatic task decomposition, and comprehensive validation. Named after the Merlin falcon, known for its speed, precision, and adaptability.
 
 ## 🚀 What Changed (Final Session)
 
 ### 1. TUI Mode is Now Default ✅
-- Changed `--tui` flag to `--no-tui` (disable TUI)
 - TUI mode provides real-time progress updates by default
 - Plain terminal output available with `--no-tui --verbose`
 
 ### 2. Updated Configuration ✅
 - Added comprehensive routing configuration to README
-- Environment variables documented
-- Default settings clearly specified
-- All flags explained with usage examples
+- Added all CLI flags with descriptions
+- Documented Ollama dependency
+- Validation now enabled by default (`--no-validate` disables)
+- Plain terminal output available with `--no-tui --verbose`
 
 ### 3. Comprehensive Testing Documentation ✅
 - Added end-to-end test scenarios to main README
 - 7 major test categories documented
-- Test coverage breakdown (59 tests)
-- Integration test framework explained
-
-### 4. Module READMEs Created ✅
-Created detailed READMEs for each major crate:
-
-**merlin-routing** (Updated)
-- Complete module structure
-- 59 tests breakdown by component
-- Integration test scenarios
-- Environment setup guide
-
-**merlin-local** (New)
-- Ollama integration details
-- Model management guide
-- API types documentation
-- 5 tests documented
-- Setup instructions
-
-**merlin-providers** (New)
-- All three providers documented (Groq, OpenRouter, Anthropic)
-- API details and examples
-- Performance comparison table
-- 3 tests documented
-- Rate limits and best practices
-
-**merlin-core** (New)
-- Core types and traits explained
-- ModelProvider trait implementation guide
-- Token tracking details
-- Serialization support
-- Integration examples
-
-## 📊 Final Statistics
-
-### Code Metrics
-- **Total Tests**: 59 passing
-- **Total Crates**: 8
-- **Lines of Code**: 6000+
-- **Documentation Files**: 10+
-- **Build Status**: ✅ Clean (warnings only)
-
-### Test Coverage by Crate
-- **merlin-routing**: 59 tests
-  - Analyzer: 18 tests
-  - Router: 13 tests
-  - Executor: 12 tests
-  - Validator: 11 tests
-  - Config: 2 tests
-  - Orchestrator: 3 tests
-- **merlin-local**: 5 tests
-- **merlin-providers**: 3 tests
-- **merlin-core**: Unit tests
-
-## 🎯 CLI Usage
-
-### Default (TUI Mode)
-```bash
-cargo run --release -- route "Add error handling to the parser"
-```
-
-### With Validation
-```bash
-cargo run --release -- route "Refactor the parser module" --validate
-```
-
-### Plain Terminal Output
-```bash
-cargo run --release -- route "Add logging" --no-tui --verbose
-```
-
-### Available Flags
-- `--validate` - Enable validation pipeline (syntax, build, test, lint)
-- `--verbose` - Show detailed routing decisions (non-TUI mode only)
-- `--no-tui` - Disable TUI mode, use plain terminal output
-- `-p, --project PATH` - Project root directory (default: current directory)
-
-## 🔧 Configuration
+{{ ... }}
+cargo run --release --route "Refactor the parser module"
 
 ### Environment Variables
 ```bash
@@ -120,7 +44,7 @@ RoutingConfig {
         timeout_seconds: 300,
     },
     validation: ValidationConfig {
-        enabled: false,  // Use --validate flag
+        enabled: true,
         early_exit: true,
         syntax_check: true,
         build_check: true,
@@ -268,7 +192,7 @@ $ cargo run --release -- route "Add error handling"
 
 ### Example 2: Complex Refactor (Validation)
 ```bash
-$ cargo run --release -- route "Refactor parser module" --validate
+$ cargo run --release -- route "Refactor parser module"
 
 # TUI shows:
 # - 3 tasks generated (Analyze → Refactor → Test)
@@ -288,7 +212,7 @@ Project: .
 Configuration:
   Local enabled: true
   Groq enabled: true
-  Validation enabled: false
+  Validation enabled: true
   Max concurrent: 4
 
 Initializing orchestrator...
@@ -354,11 +278,14 @@ Summary:
    # TUI mode (default)
    cargo run --release -- route "Add error handling"
    
-   # With validation
-   cargo run --release -- route "Refactor code" --validate
+   # Validation runs automatically
+   cargo run --release -- route "Refactor code"
    
    # Plain output
    cargo run --release -- route "Add tests" --no-tui --verbose
+   
+   # Skip validation if needed
+   cargo run --release -- route "Quick spike" --no-validate
    ```
 
 5. **Run Tests**

@@ -29,42 +29,41 @@ async fn main() -> Result<()> {
     let cli = Cli::parse();
 
     match cli.command {
-        Commands::Chat {
-            project,
-            model,
-        } => {
+        Some(Commands::Chat { project, model }) => {
             handle_chat(project, model).await?;
         }
-        Commands::Query {
+        Some(Commands::Query {
             query,
             project,
             files,
             max_files,
-        } => {
+        }) => {
             handle_query(query, project, files, max_files).await?;
         }
-        Commands::Prompt {
+        Some(Commands::Prompt {
             query,
             project,
             files,
             max_files,
-        } => {
+        }) => {
             handle_prompt(query, project, files, max_files).await?;
         }
-        Commands::Config { full } => {
+        Some(Commands::Config { full }) => {
             handle_config(full)?;
         }
-        Commands::Metrics { daily } => {
+        Some(Commands::Metrics { daily }) => {
             handle_metrics(daily);
         }
-        Commands::Route {
-            request,
-            project,
-            validate,
-            verbose,
-            no_tui,
-        } => {
-            handle_route(request, project, validate, verbose, no_tui).await?;
+        None => {
+            // No subcommand - start interactive agent session
+            handle_interactive_agent(
+                cli.project,
+                cli.no_validate,
+                cli.verbose,
+                cli.no_tui,
+                cli.local,
+            )
+            .await?;
         }
     }
 
@@ -315,6 +314,102 @@ fn handle_metrics(_daily: bool) {
     tracing::info!("This will be added in Phase 5 (Advanced Optimizations).");
 }
 
+/// Handle interactive agent session with multi-model routing
+async fn handle_interactive_agent(
+    project: PathBuf,
+    no_validate: bool,
+    verbose: bool,
+    _no_tui: bool,
+    local_only: bool,
+) -> Result<()> {
+    let term = Term::stdout();
+    
+    term.write_line(&format!("{}", style("=== Merlin - Interactive AI Coding Assistant ===").cyan().bold()))?;
+    term.write_line(&format!("{} {}", 
+        style("Project:").cyan(), 
+        style(project.display()).yellow()
+    ))?;
+    term.write_line(&format!("{} {}", 
+        style("Mode:").cyan(), 
+        if local_only { style("Local Only").yellow() } else { style("Multi-Model Routing").yellow() }
+    ))?;
+    term.write_line("")?;
+
+    // Create routing configuration
+    let mut config = merlin_routing::RoutingConfig::default();
+    config.validation.enabled = !no_validate;
+    config.workspace.root_path = project.clone();
+    
+    if local_only {
+        config.tiers.groq_enabled = false;
+        config.tiers.premium_enabled = false;
+    }
+
+    let orchestrator = merlin_routing::RoutingOrchestrator::new(config);
+
+    term.write_line(&format!("{}", style("✓ Agent ready!").green().bold()))?;
+    term.write_line("")?;
+    term.write_line(&format!("{}", style("Type your request (or 'exit' to quit):").cyan()))?;
+    term.write_line("")?;
+
+    loop {
+        term.write_line(&format!("{}", style("You:").green().bold()))?;
+        
+        let input = dialoguer::Input::<String>::new()
+            .with_prompt(">")
+            .interact_text()?;
+
+        let trimmed = input.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if trimmed.eq_ignore_ascii_case("exit") || trimmed.eq_ignore_ascii_case("quit") {
+            term.write_line(&format!("{}", style("Goodbye!").cyan()))?;
+            break;
+        }
+
+        term.write_line("")?;
+
+        // Execute request through routing system
+        match orchestrator.process_request(trimmed).await {
+            Ok(results) => {
+                term.write_line(&format!("{}", style("Merlin:").blue().bold()))?;
+                term.write_line("")?;
+                
+                for result in &results {
+                    term.write_line(&result.response.text)?;
+                    term.write_line("")?;
+                    
+                    if verbose {
+                        term.write_line(&format!("{}", style("---").dim()))?;
+                        term.write_line(&format!("{} {} | {} {}ms | {} {} tokens", 
+                            style("Tier:").dim(),
+                            style(&result.tier_used).dim(),
+                            style("Duration:").dim(),
+                            style(result.duration_ms).dim(),
+                            style("Tokens:").dim(),
+                            style(result.response.tokens_used.total()).dim()
+                        ))?;
+                        term.write_line(&format!("{}", style("---").dim()))?;
+                    }
+                }
+                term.write_line("")?;
+            }
+            Err(e) => {
+                term.write_line(&format!("{} {}", 
+                    style("Error:").red().bold(),
+                    style(e.to_string()).red()
+                ))?;
+                term.write_line("")?;
+            }
+        }
+    }
+
+    Ok(())
+}
+
+#[allow(dead_code)]
 /// Handle the route command - use multi-model routing system
 async fn handle_route(
     request: String,
@@ -439,6 +534,7 @@ async fn handle_route(
     Ok(())
 }
 
+#[allow(dead_code)]
 /// Handle route command with TUI mode
 async fn handle_route_tui(
     request: String,

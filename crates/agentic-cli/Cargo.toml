@@ -13,6 +13,8 @@ agentic-providers.workspace = true
 agentic-context.workspace = true
 agentic-languages.workspace = true
 agentic-agent.workspace = true
+agentic-routing = { path = "../agentic-routing" }
+agentic-local = { path = "../agentic-local" }
 anyhow.workspace = true
 clap.workspace = true
 serde.workspace = true

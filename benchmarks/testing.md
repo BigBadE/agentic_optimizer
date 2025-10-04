@@ -1,1 +1,1 @@
-- [] Tool calls work - agentic-tools and agentic-agent compile cleanly
+- [] Tool calls work - LLM must provide full relative paths, no ambiguity

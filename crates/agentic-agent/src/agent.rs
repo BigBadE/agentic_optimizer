@@ -27,6 +27,6 @@ impl Agent {
     }
 
     pub fn executor(&self) -> AgentExecutor {
-        AgentExecutor::new(self.provider.clone(), self.config.clone())
+        AgentExecutor::new(Arc::clone(&self.provider), self.config.clone())
     }
 }

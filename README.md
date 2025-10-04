@@ -44,6 +44,18 @@ cargo build --release
 
 ### Usage
 
+**Multi-Model Routing (NEW!):**
+```bash
+# Simple request with automatic tier selection
+cargo run -- route "Add error handling to the parser"
+
+# Complex refactor with validation
+cargo run -- route "Refactor the parser module" --validate --verbose
+
+# See detailed task decomposition
+cargo run -- route "Add logging to main.rs" --verbose
+```
+
 **Ask a question:**
 ```bash
 cargo run -- query "Find the main function"
@@ -57,6 +69,11 @@ cargo run -- query "Refactor this function" --files src/main.rs src/lib.rs
 **Query with project path:**
 ```bash
 cargo run -- query "Explain the architecture" --project ./my-project
+```
+
+**Interactive chat:**
+```bash
+cargo run -- chat
 ```
 
 **Show configuration:**

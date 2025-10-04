@@ -22,7 +22,7 @@ impl ToolRegistry {
     }
 
     pub fn register(&mut self, tool: Arc<dyn Tool>) {
-        let name = tool.name().to_string();
+        let name = tool.name().to_owned();
         info!("Registering tool: {}", name);
         self.tools.insert(name, tool);
     }
@@ -38,10 +38,14 @@ impl ToolRegistry {
             .collect()
     }
 
+    /// Execute a tool by name
+    ///
+    /// # Errors
+    /// Returns an error if the tool is not found or execution fails
     pub async fn execute(&self, tool_name: &str, input: ToolInput) -> anyhow::Result<ToolOutput> {
         let tool = self
             .get(tool_name)
-            .ok_or_else(|| anyhow::anyhow!("Tool not found: {}", tool_name))?;
+            .ok_or_else(|| anyhow::anyhow!("Tool not found: {tool_name}"))?;
 
         let output = tool.execute(input).await?;
         Ok(output)

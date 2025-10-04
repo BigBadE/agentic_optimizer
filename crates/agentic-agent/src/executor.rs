@@ -1,9 +1,13 @@
+use std::env;
+use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
 use agentic_context::ContextBuilder;
 use agentic_core::{Context, ModelProvider, Query};
 use agentic_languages::LanguageProvider;
+use agentic_tools::ToolInput;
+use serde_json::Value;
 use tracing::{info, warn};
 
 use crate::{AgentConfig, AgentRequest, AgentResponse, ExecutionMetadata, ExecutionResult, ToolRegistry};
@@ -25,12 +29,13 @@ impl AgentExecutor {
         }
     }
 
+    #[must_use]
     pub fn with_language_backend(mut self, backend: Box<dyn LanguageProvider>) -> Self {
         let builder = if let Some(mut builder) = self.context_builder.take() {
             builder = builder.with_language_backend(backend);
             builder
         } else {
-            ContextBuilder::new(std::env::current_dir().unwrap_or_default())
+            ContextBuilder::new(env::current_dir().unwrap_or_default())
                 .with_language_backend(backend)
         };
         self.context_builder = Some(builder);
@@ -41,6 +46,10 @@ impl AgentExecutor {
         &self.tool_registry
     }
 
+    /// Execute an agent request
+    ///
+    /// # Errors
+    /// Returns an error if context building or provider generation fails
     pub async fn execute(&mut self, request: AgentRequest) -> anyhow::Result<ExecutionResult> {
         let total_start = Instant::now();
 
@@ -58,8 +67,14 @@ impl AgentExecutor {
 
         let provider_start = Instant::now();
         let query = Query::new(&request.query);
-        let response = self.provider.generate(&query, &context).await?;
+        let mut response = self.provider.generate(&query, &context).await?;
         let provider_call_time = provider_start.elapsed().as_millis() as u64;
+
+        // Check if response contains a tool call and execute it
+        if let Some(tool_result) = self.try_execute_tool_call(&response.text, &request.workspace_root).await {
+            info!("Tool call detected and executed");
+            response.text = tool_result;
+        }
 
         let total_time = total_start.elapsed().as_millis() as u64;
 
@@ -69,7 +84,7 @@ impl AgentExecutor {
             provider_used: response.provider,
             tokens_used: response.tokens_used,
             latency_ms: response.latency_ms,
-            context_files_used: context.files.iter().map(|f| f.path.clone()).collect(),
+            context_files_used: context.files.iter().map(|file| file.path.clone()).collect(),
         };
 
         let metadata = ExecutionMetadata {
@@ -93,7 +108,9 @@ impl AgentExecutor {
             );
         }
 
-        let builder = self.context_builder.as_mut().unwrap();
+        let Some(builder) = self.context_builder.as_mut() else {
+            return Err(anyhow::anyhow!("context_builder not initialized"));
+        };
 
         let query = Query::new(&request.query).with_files(request.context_files.clone());
 
@@ -125,8 +142,10 @@ impl AgentExecutor {
             prompt.push_str("\n\n# Available Tools\n\n");
             prompt.push_str("You have access to the following tools to help complete tasks:\n\n");
             
+            #[allow(clippy::let_underscore_must_use, reason = "Writing to String is infallible")]
             for (name, description) in tools {
-                prompt.push_str(&format!("## {}\n{}\n\n", name, description));
+                use std::fmt::Write as _;
+                let _ = write!(prompt, "## {name}\n{description}\n\n");
             }
             
             prompt.push_str("To use a tool, respond with a JSON object in the following format:\n");
@@ -138,9 +157,81 @@ impl AgentExecutor {
             prompt.push_str("    \"param2\": \"value2\"\n");
             prompt.push_str("  }\n");
             prompt.push_str("}\n");
-            prompt.push_str("```\n");
+            prompt.push_str("```\n\n");
+            prompt.push_str("IMPORTANT: For file_path parameters, ALWAYS use the full relative path from the workspace root.\n");
+            prompt.push_str("Examples:\n");
+            prompt.push_str("- CORRECT: \"crates/agentic-tools/src/lib.rs\"\n");
+            prompt.push_str("- CORRECT: \"benchmarks/testing.md\"\n");
+            prompt.push_str("- WRONG: \"lib.rs\" (ambiguous - which lib.rs?)\n");
+            prompt.push_str("- WRONG: \"testing.md\" (ambiguous - which directory?)\n");
         }
         
         prompt
     }
+
+    async fn try_execute_tool_call(&self, response_text: &str, workspace_root: &Path) -> Option<String> {
+        let mut tool_call = Self::extract_tool_call(response_text)?;
+        
+        info!("Detected tool call: {} with params: {:?}", tool_call.tool, tool_call.input.params);
+        
+        // Resolve all file paths relative to workspace root
+        if let Some(params_obj) = tool_call.input.params.as_object_mut()
+            && let Some(file_path) = params_obj.get("file_path").and_then(|value| value.as_str()) {
+            let path = Path::new(file_path);
+            // Always resolve relative to workspace root (even if path looks absolute)
+            let absolute_path = if path.is_absolute() {
+                path.to_path_buf()
+            } else {
+                workspace_root.join(path)
+            };
+            let absolute_path_str = absolute_path.to_string_lossy().to_string();
+            info!("Resolved path '{}' to '{}'", file_path, absolute_path.display());
+            params_obj.insert("file_path".to_owned(), serde_json::json!(absolute_path_str));
+        }
+        
+        match self.tool_registry.execute(&tool_call.tool, tool_call.input.clone()).await {
+            Ok(output) => {
+                let result = if output.success {
+                    format!("Tool '{}' executed successfully:\n{}\n\nData: {:?}", 
+                        tool_call.tool, output.message, output.data)
+                } else {
+                    format!("Tool '{}' failed:\n{}\n\nInput: {:?}", 
+                        tool_call.tool, output.message, tool_call.input.params)
+                };
+                Some(result)
+            }
+            Err(error) => {
+                warn!("Tool execution failed: {} with input: {:?}", error, tool_call.input.params);
+                Some(format!("Tool execution failed: {error}\n\nInput: {:?}", tool_call.input.params))
+            }
+        }
+    }
+
+    fn extract_tool_call(text: &str) -> Option<ToolCall> {
+        let json_str = if let Some(start) = text.find("```json") {
+            let after_start = text.get(start + 7..)?;
+            let end = after_start.find("```")?;
+            after_start.get(..end)?.trim()
+        } else if let Some(start) = text.find('{') {
+            let end = text.rfind('}')?;
+            text.get(start..=end)?
+        } else {
+            return None;
+        };
+
+        let value: Value = serde_json::from_str(json_str).ok()?;
+        
+        let tool = value.get("tool")?.as_str()?.to_owned();
+        let params = value.get("params")?.clone();
+        
+        Some(ToolCall {
+            tool,
+            input: ToolInput { params },
+        })
+    }
+}
+
+struct ToolCall {
+    tool: String,
+    input: ToolInput,
 }

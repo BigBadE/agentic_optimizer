@@ -57,6 +57,14 @@ async fn main() -> Result<()> {
         Commands::Metrics { daily } => {
             handle_metrics(daily);
         }
+        Commands::Route {
+            request,
+            project,
+            validate,
+            verbose,
+        } => {
+            handle_route(request, project, validate, verbose).await?;
+        }
     }
 
     Ok(())
@@ -304,6 +312,124 @@ fn handle_config(full: bool) -> Result<()> {
 fn handle_metrics(_daily: bool) {
     tracing::info!("Metrics tracking not yet implemented in MVP.");
     tracing::info!("This will be added in Phase 5 (Advanced Optimizations).");
+}
+
+/// Handle the route command - use multi-model routing system
+async fn handle_route(
+    request: String,
+    project: PathBuf,
+    validate: bool,
+    verbose: bool,
+) -> Result<()> {
+    let term = Term::stdout();
+    
+    term.write_line(&format!("{}", style("=== Multi-Model Routing ===").cyan().bold()))?;
+    term.write_line(&format!("{} {}", 
+        style("Request:").cyan(), 
+        style(&request).yellow()
+    ))?;
+    term.write_line(&format!("{} {}", 
+        style("Project:").cyan(), 
+        style(project.display()).yellow()
+    ))?;
+    term.write_line("")?;
+
+    // Create routing configuration
+    let mut config = agentic_routing::RoutingConfig::default();
+    config.validation.enabled = validate;
+    config.workspace.root_path = project;
+    
+    if verbose {
+        term.write_line(&format!("{}", style("Configuration:").cyan()))?;
+        term.write_line(&format!("  Local enabled: {}", config.tiers.local_enabled))?;
+        term.write_line(&format!("  Groq enabled: {}", config.tiers.groq_enabled))?;
+        term.write_line(&format!("  Validation enabled: {}", config.validation.enabled))?;
+        term.write_line(&format!("  Max concurrent: {}", config.execution.max_concurrent_tasks))?;
+        term.write_line("")?;
+    }
+
+    // Create orchestrator
+    term.write_line(&format!("{}", style("Initializing orchestrator...").cyan()))?;
+    let orchestrator = agentic_routing::RoutingOrchestrator::new(config);
+    
+    // Analyze request
+    term.write_line(&format!("{}", style("Analyzing request...").cyan()))?;
+    let analysis = orchestrator.analyze_request(&request).await?;
+    
+    term.write_line(&format!("{} {}", 
+        style("✓ Analysis complete:").green().bold(),
+        style(format!("{} task(s) generated", analysis.tasks.len())).yellow()
+    ))?;
+    term.write_line("")?;
+
+    if verbose {
+        term.write_line(&format!("{}", style("Tasks:").cyan()))?;
+        for (i, task) in analysis.tasks.iter().enumerate() {
+            term.write_line(&format!("  {}. {} (complexity: {:?}, priority: {:?})", 
+                i + 1, 
+                task.description, 
+                task.complexity,
+                task.priority
+            ))?;
+            if !task.dependencies.is_empty() {
+                term.write_line(&format!("     Dependencies: {} task(s)", task.dependencies.len()))?;
+            }
+        }
+        term.write_line("")?;
+        term.write_line(&format!("{} {:?}", 
+            style("Execution strategy:").cyan(),
+            analysis.execution_strategy
+        ))?;
+        term.write_line("")?;
+    }
+
+    // Execute tasks
+    term.write_line(&format!("{}", style("Executing tasks...").cyan()))?;
+    let start = std::time::Instant::now();
+    
+    let results = orchestrator.process_request(&request).await?;
+    
+    let duration = start.elapsed();
+    term.write_line(&format!("{} {} task(s) in {:.2}s", 
+        style("✓ Completed:").green().bold(),
+        style(results.len()).yellow(),
+        duration.as_secs_f64()
+    ))?;
+    term.write_line("")?;
+
+    // Show results
+    term.write_line(&format!("{}", style("Results:").cyan().bold()))?;
+    for (i, result) in results.iter().enumerate() {
+        term.write_line(&format!("  {}. Task {:?}", i + 1, result.task_id))?;
+        term.write_line(&format!("     Tier: {}", result.tier_used))?;
+        term.write_line(&format!("     Duration: {}ms", result.duration_ms))?;
+        term.write_line(&format!("     Tokens: {}", result.response.tokens_used.total()))?;
+        
+        if validate && verbose {
+            term.write_line(&format!("     Validation: {} (score: {:.2})", 
+                if result.validation.passed { "✓ PASSED" } else { "✗ FAILED" },
+                result.validation.score
+            ))?;
+        }
+        
+        if verbose {
+            term.write_line(&format!("     Response preview: {}", 
+                result.response.text.chars().take(100).collect::<String>()
+            ))?;
+        }
+        term.write_line("")?;
+    }
+
+    // Summary
+    let total_tokens: u64 = results.iter().map(|r| r.response.tokens_used.total()).sum();
+    let total_duration: u64 = results.iter().map(|r| r.duration_ms).sum();
+    
+    term.write_line(&format!("{}", style("Summary:").cyan().bold()))?;
+    term.write_line(&format!("  Total tokens: {}", total_tokens))?;
+    term.write_line(&format!("  Total duration: {}ms", total_duration))?;
+    term.write_line(&format!("  Average per task: {}ms", total_duration / results.len() as u64))?;
+
+    Ok(())
 }
 
 /// Calculate estimated cost based on token usage.

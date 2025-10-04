@@ -61,4 +61,19 @@ pub enum Commands {
         #[arg(long, help = "Show daily metrics")]
         daily: bool,
     },
+
+    #[command(about = "Execute request with multi-model routing")]
+    Route {
+        #[arg(help = "The request to execute")]
+        request: String,
+
+        #[arg(short, long, default_value = ".", help = "Project root directory")]
+        project: PathBuf,
+
+        #[arg(long, help = "Enable validation pipeline")]
+        validate: bool,
+
+        #[arg(long, help = "Show detailed routing decisions")]
+        verbose: bool,
+    },
 }

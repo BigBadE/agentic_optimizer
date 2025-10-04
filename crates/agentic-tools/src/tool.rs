@@ -1,6 +1,6 @@
-use std::future::Future;
 use std::io::Error as IoError;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
@@ -59,10 +59,11 @@ impl ToolOutput {
     }
 }
 
+#[async_trait]
 pub trait Tool: Send + Sync {
     fn name(&self) -> &'static str;
 
     fn description(&self) -> &'static str;
 
-    fn execute(&self, input: ToolInput) -> impl Future<Output = ToolResult<ToolOutput>> + Send;
+    async fn execute(&self, input: ToolInput) -> ToolResult<ToolOutput>;
 }

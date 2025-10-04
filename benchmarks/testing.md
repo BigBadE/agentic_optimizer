@@ -1,0 +1,1 @@
+- [] Tool calls work - agentic-tools and agentic-agent compile cleanly

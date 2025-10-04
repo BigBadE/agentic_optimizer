@@ -106,15 +106,7 @@ impl LocalContextAgent {
             }
         }
     }
-}
 
-impl Default for LocalContextAgent {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
-impl LocalContextAgent {
     /// Generate a context plan (async version)
     pub async fn generate_plan(&self, intent: &QueryIntent, query_text: &str, file_tree: &str) -> Result<ContextPlan> {
         let system = prompts::system_prompt();
@@ -149,6 +141,12 @@ impl LocalContextAgent {
     pub async fn is_available(&self) -> Result<bool> {
         let result = self.ollama.list_local_models().await;
         Ok(result.is_ok())
+    }
+}
+
+impl Default for LocalContextAgent {
+    fn default() -> Self {
+        Self::new()
     }
 }
 

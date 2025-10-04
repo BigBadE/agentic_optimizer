@@ -1,5 +1,6 @@
 use std::path::PathBuf;
 
+use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use tokio::fs;
 use tracing::debug;
@@ -72,6 +73,7 @@ impl Default for ShowTool {
     }
 }
 
+#[async_trait]
 impl Tool for ShowTool {
     fn name(&self) -> &'static str {
         "show"

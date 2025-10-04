@@ -40,6 +40,16 @@ impl ModelConfig {
             embedding: "nomic-embed-text".to_string(),
         }
     }
+
+    /// Select appropriate model based on task complexity
+    #[must_use]
+    pub fn select_for_task(&self, complexity: TaskComplexity) -> &str {
+        match complexity {
+            TaskComplexity::Simple => &self.small,
+            TaskComplexity::Medium => &self.medium,
+            TaskComplexity::Complex => &self.large,
+        }
+    }
 }
 
 /// Task complexity for model selection
@@ -51,16 +61,4 @@ pub enum TaskComplexity {
     Medium,
     /// Complex tasks (architecture decisions, deep reasoning)
     Complex,
-}
-
-impl ModelConfig {
-    /// Select appropriate model based on task complexity
-    #[must_use]
-    pub fn select_for_task(&self, complexity: TaskComplexity) -> &str {
-        match complexity {
-            TaskComplexity::Simple => &self.small,
-            TaskComplexity::Medium => &self.medium,
-            TaskComplexity::Complex => &self.large,
-        }
-    }
 }

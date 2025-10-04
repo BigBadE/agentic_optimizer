@@ -1,5 +1,7 @@
 //! Context inclusion logic with token counting and limits.
 
+use std::cmp::Ordering;
+
 use agentic_core::FileContext;
 
 /// Maximum tokens allowed in context
@@ -21,18 +23,12 @@ pub struct ContextManager {
 impl ContextManager {
     /// Create a new context manager
     #[must_use]
-    pub fn new(max_tokens: usize) -> Self {
+    pub const fn new(max_tokens: usize) -> Self {
         Self {
             files: Vec::new(),
             token_count: 0,
             max_tokens,
         }
-    }
-
-    /// Create with default max tokens
-    #[must_use]
-    pub fn default() -> Self {
-        Self::new(MAX_CONTEXT_TOKENS)
     }
 
     /// Estimate tokens in text (rough approximation: ~4 chars per token)
@@ -48,7 +44,7 @@ impl ContextManager {
         let char_estimate = chars / 4;
         let word_estimate = (words * 10) / 13;
         
-        (char_estimate + word_estimate) / 2
+        usize::midpoint(char_estimate, word_estimate)
     }
 
     /// Try to add a file to the context
@@ -61,8 +57,9 @@ impl ContextManager {
         }
 
         self.token_count += file_tokens;
+        let result = true;
         self.files.push(file);
-        true
+        result
     }
 
     /// Add a file, truncating if necessary to fit within token limit
@@ -107,7 +104,7 @@ impl ContextManager {
 
     /// Get number of files
     #[must_use]
-    pub fn file_count(&self) -> usize {
+    pub const fn file_count(&self) -> usize {
         self.files.len()
     }
 
@@ -125,6 +122,12 @@ impl ContextManager {
     /// Get files reference
     pub fn files(&self) -> &[FileContext] {
         &self.files
+    }
+}
+
+impl Default for ContextManager {
+    fn default() -> Self {
+        Self::new(MAX_CONTEXT_TOKENS)
     }
 }
 
@@ -180,15 +183,15 @@ pub fn add_prioritized_files(
     mut files: Vec<PrioritizedFile>,
 ) -> usize {
     // Sort by priority (high to low), then by score (high to low)
-    files.sort_by(|a, b| {
-        b.priority
-            .cmp(&a.priority)
+    files.sort_by(|file_a, file_b| {
+        file_b.priority
+            .cmp(&file_a.priority)
             .then_with(|| {
-                match (b.score, a.score) {
-                    (Some(bs), Some(as_)) => bs.partial_cmp(&as_).unwrap_or(std::cmp::Ordering::Equal),
-                    (Some(_), None) => std::cmp::Ordering::Less,
-                    (None, Some(_)) => std::cmp::Ordering::Greater,
-                    (None, None) => std::cmp::Ordering::Equal,
+                match (file_b.score, file_a.score) {
+                    (Some(score_b), Some(score_a)) => score_b.partial_cmp(&score_a).unwrap_or(Ordering::Equal),
+                    (Some(_), None) => Ordering::Less,
+                    (None, Some(_)) => Ordering::Greater,
+                    (None, None) => Ordering::Equal,
                 }
             })
     });

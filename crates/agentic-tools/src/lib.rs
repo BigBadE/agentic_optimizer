@@ -8,7 +8,7 @@ mod edit;
 mod show;
 mod bash;
 
-pub use tool::{Tool, ToolError, ToolResult};
+pub use tool::{Tool, ToolError, ToolResult, ToolInput, ToolOutput};
 pub use edit::EditTool;
 pub use show::ShowTool;
 pub use bash::BashTool;

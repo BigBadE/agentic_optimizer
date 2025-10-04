@@ -1,6 +1,6 @@
 # CLI Routing Integration
 
-The `agentic` CLI now includes multi-model routing capabilities through the `route` command.
+The `merlin` CLI now includes multi-model routing capabilities through the `route` command.
 
 ## Usage
 
@@ -232,5 +232,6 @@ Default settings:
 ## See Also
 
 - [Routing Architecture](ROUTING_ARCHITECTURE.md) - Complete architecture documentation
-- [agentic-routing README](../crates/agentic-routing/README.md) - Library documentation
-- [Integration Tests](../crates/agentic-routing/tests/integration_tests.rs) - Test scenarios
+- [merlin-routing README](../crates/merlin-routing/README.md) - Library documentation
+- [Integration Tests](../crates/merlin-routing/tests/integration_tests.rs) - Test scenarios
+

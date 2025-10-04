@@ -3,78 +3,121 @@
 ## Implementation Checklist
 
 ### Phase 1: Core Types & Traits ✅
-- [x] **agentic-routing/src/types.rs** - Core types (TaskId, Task, Complexity, Priority, etc.)
-- [x] **agentic-routing/src/error.rs** - RoutingError enum
-- [x] **agentic-routing/Cargo.toml** - Crate dependencies
-- [x] **agentic-routing/src/lib.rs** - Crate root with re-exports
-- [x] **agentic-routing/src/analyzer/mod.rs** - TaskAnalyzer trait
-- [x] **agentic-routing/src/router/mod.rs** - ModelRouter trait, ModelTier, RoutingDecision
-- [x] **agentic-routing/src/validator/mod.rs** - Validator trait, ValidationResult
+- [x] **merlin-routing/src/types.rs** - Core types (TaskId, Task, Complexity, Priority, etc.)
+- [x] **merlin-routing/src/error.rs** - RoutingError enum
+- [x] **merlin-routing/Cargo.toml** - Crate dependencies
+- [x] **merlin-routing/src/lib.rs** - Crate root with re-exports
+- [x] **merlin-routing/src/analyzer/mod.rs** - TaskAnalyzer trait
+- [x] **merlin-routing/src/router/mod.rs** - ModelRouter trait, ModelTier, RoutingDecision
+- [x] **merlin-routing/src/validator/mod.rs** - Validator trait, ValidationResult
 
 ### Phase 2: Task Graph & Execution ✅
-- [x] **agentic-routing/src/executor/graph.rs** - TaskGraph with dependency tracking
-- [x] **agentic-routing/src/executor/state.rs** - WorkspaceState with RwLock
-- [x] **agentic-routing/src/executor/pool.rs** - ExecutorPool with parallel execution
-- [x] **agentic-routing/src/executor/mod.rs** - Re-exports
+- [x] **merlin-routing/src/executor/graph.rs** - TaskGraph with dependency tracking
+- [x] **merlin-routing/src/executor/state.rs** - WorkspaceState with RwLock
+- [x] **merlin-routing/src/executor/pool.rs** - ExecutorPool with parallel execution
+- [x] **merlin-routing/src/executor/mod.rs** - Re-exports
 
 ### Phase 3: Isolation & Conflict Management ✅
-- [x] **agentic-routing/src/executor/isolation.rs** - FileLockManager with RAII guards
-- [x] **agentic-routing/src/executor/transaction.rs** - TaskWorkspace with snapshots
-- [x] **agentic-routing/src/executor/build_isolation.rs** - IsolatedBuildEnv with TempDir
-- [x] **agentic-routing/src/executor/scheduler.rs** - ConflictAwareTaskGraph
+- [x] **merlin-routing/src/executor/isolation.rs** - FileLockManager with RAII guards
+- [x] **merlin-routing/src/executor/transaction.rs** - TaskWorkspace with snapshots
+- [x] **merlin-routing/src/executor/build_isolation.rs** - IsolatedBuildEnv with TempDir
+- [x] **merlin-routing/src/executor/scheduler.rs** - ConflictAwareTaskGraph
 
 ### Phase 4: UI Layer ✅
-- [x] **agentic-routing/src/ui/mod.rs** - TuiApp, UiChannel, UiEvent
-- [x] **agentic-routing/src/ui/events.rs** - UI event types
+- [x] **merlin-routing/src/ui/mod.rs** - TuiApp, UiChannel, UiEvent
+- [x] **merlin-routing/src/ui/events.rs** - UI event types
 - [x] **Type-system enforcement** - UiChannel required in ExecutorPool
 
 ### Phase 5: Routing Strategies ✅
-- [x] **agentic-routing/src/router/strategy.rs** - RoutingStrategy trait
-- [x] **agentic-routing/src/router/strategies/complexity.rs** - ComplexityBasedStrategy
-- [x] **agentic-routing/src/router/strategies/cost.rs** - CostOptimizationStrategy
-- [x] **agentic-routing/src/router/strategies/quality.rs** - QualityCriticalStrategy
-- [x] **agentic-routing/src/router/strategies/context.rs** - LongContextStrategy
-- [x] **agentic-routing/src/router/tiers.rs** - StrategyRouter with availability checking
-- [x] **agentic-routing/src/router/strategies/mod.rs** - Strategy re-exports
+- [x] **merlin-routing/src/router/strategy.rs** - RoutingStrategy trait
+- [x] **merlin-routing/src/router/strategies/complexity.rs** - ComplexityBasedStrategy
+- [x] **merlin-routing/src/router/strategies/cost.rs** - CostOptimizationStrategy
+- [x] **merlin-routing/src/router/strategies/quality.rs** - QualityCriticalStrategy
+- [x] **merlin-routing/src/router/strategies/context.rs** - LongContextStrategy
+- [x] **merlin-routing/src/router/tiers.rs** - StrategyRouter with availability checking
+- [x] **merlin-routing/src/router/strategies/mod.rs** - Strategy re-exports
 
 ### Phase 6: Validation Pipeline ✅
-- [x] **agentic-routing/src/validator/pipeline.rs** - ValidationPipeline with early exit
-- [x] **agentic-routing/src/validator/stages/syntax.rs** - SyntaxValidationStage (heuristics)
-- [x] **agentic-routing/src/validator/stages/build.rs** - BuildValidationStage (cargo check)
-- [x] **agentic-routing/src/validator/stages/test.rs** - TestValidationStage (cargo test)
-- [x] **agentic-routing/src/validator/stages/lint.rs** - LintValidationStage (clippy)
-- [x] **agentic-routing/src/validator/stages/mod.rs** - Stage re-exports
+- [x] **merlin-routing/src/validator/pipeline.rs** - ValidationPipeline with early exit
+- [x] **merlin-routing/src/validator/stages/syntax.rs** - SyntaxValidationStage (heuristics)
+- [x] **merlin-routing/src/validator/stages/build.rs** - BuildValidationStage (cargo check)
+- [x] **merlin-routing/src/validator/stages/test.rs** - TestValidationStage (cargo test)
+- [x] **merlin-routing/src/validator/stages/lint.rs** - LintValidationStage (clippy)
+- [x] **merlin-routing/src/validator/stages/mod.rs** - Stage re-exports
 
 ### Phase 7: Task Analysis ✅
-- [x] **agentic-routing/src/analyzer/intent.rs** - Intent extraction (keyword-based)
-- [x] **agentic-routing/src/analyzer/complexity.rs** - Complexity estimation (multi-factor)
-- [x] **agentic-routing/src/analyzer/decompose.rs** - Task decomposition (smart splitting)
-- [x] **agentic-routing/src/analyzer/local.rs** - LocalTaskAnalyzer implementation (no LLM)
+- [x] **merlin-routing/src/analyzer/intent.rs** - Intent extraction (keyword-based)
+- [x] **merlin-routing/src/analyzer/complexity.rs** - Complexity estimation (multi-factor)
+- [x] **merlin-routing/src/analyzer/decompose.rs** - Task decomposition (smart splitting)
+- [x] **merlin-routing/src/analyzer/local.rs** - LocalTaskAnalyzer implementation (no LLM)
 
 ### Phase 8: Local Model Integration ✅
-- [x] **agentic-local/Cargo.toml** - New crate for local models
-- [x] **agentic-local/src/lib.rs** - Crate root with re-exports
-- [x] **agentic-local/src/manager.rs** - Ollama integration and model management
-- [x] **agentic-local/src/models.rs** - Model metadata and API types
-- [x] **agentic-local/src/inference.rs** - LocalModelProvider implementation
-- [x] **agentic-local/src/error.rs** - Local model errors
+- [x] **merlin-local/Cargo.toml** - New crate for local models
+- [x] **merlin-local/src/lib.rs** - Crate root with re-exports
+- [x] **merlin-local/src/manager.rs** - Ollama integration and model management
+- [x] **merlin-local/src/models.rs** - Model metadata and API types
+- [x] **merlin-local/src/inference.rs** - LocalModelProvider implementation
+- [x] **merlin-local/src/error.rs** - Local model errors
 
 ### Phase 9: Groq Provider ✅
-- [x] **agentic-providers/src/groq.rs** - Groq API client (free tier)
-- [x] **agentic-providers/src/lib.rs** - Add Groq export
+- [x] **merlin-providers/src/groq.rs** - Groq API client (free tier)
+- [x] **merlin-providers/src/lib.rs** - Add Groq export
 
 ### Phase 10: Orchestrator ✅
-- [x] **agentic-routing/src/orchestrator.rs** - High-level coordinator
-- [x] **agentic-routing/src/config.rs** - RoutingConfig with all sub-configs
-- [x] **agentic-routing/src/lib.rs** - Complete re-exports
+- [x] **merlin-routing/src/orchestrator.rs** - High-level coordinator
+- [x] **merlin-routing/src/config.rs** - RoutingConfig with all sub-configs
+- [x] **merlin-routing/src/lib.rs** - Complete re-exports
 
 ### Phase 11: Integration & Testing ✅
-- [x] **agentic-routing/tests/integration_tests.rs** - Integration test framework (TODO: implement tests)
-- [x] **agentic-routing/examples/basic_routing.rs** - Complete example
-- [x] **agentic-routing/README.md** - Comprehensive documentation
-- [x] **Update agentic-cli** - Integrate routing system with `route` command
+- [x] **merlin-routing/tests/integration_tests.rs** - Integration test framework (TODO: implement tests)
+- [x] **merlin-routing/examples/basic_routing.rs** - Complete example
+- [x] **merlin-routing/README.md** - Comprehensive documentation
+- [x] **Update merlin-cli** - Integrate routing system with `route` command
 - [x] **docs/CLI_ROUTING.md** - CLI routing documentation
 - [x] **README.md** - Updated with routing examples
+
+---
+
+## TODO: Remaining Work
+
+### High Priority (Production Ready) ✅ COMPLETE
+- [x] **Provider Integration** - Connect orchestrator to actual providers
+  - [x] Implement provider factory in orchestrator
+  - [x] Map ModelTier to concrete providers (LocalModelProvider, GroqProvider, etc.)
+  - [x] Handle provider initialization and API keys
+  - [x] Add provider fallback logic with escalation
+- [x] **Real Execution** - Replace mock results with actual model calls
+  - [x] Remove mock response generation
+  - [x] Execute tasks through selected providers
+  - [x] Handle provider errors and retries (up to 3 attempts)
+  - [x] Implement escalation on failure (automatic tier upgrade)
+- [x] **TUI Mode** - Interactive routing interface
+  - [x] Add `--tui` flag to route command
+  - [x] Integrate TuiApp with orchestrator
+  - [x] Real-time progress updates
+  - [x] Task status display
+
+### Medium Priority (Enhanced Features)
+- [ ] **Config Files** - TOML/JSON configuration support
+  - [ ] Load config from `~/.agentic/config.toml`
+  - [ ] Project-specific `.agentic.toml`
+  - [ ] Environment variable overrides
+- [ ] **Response Caching** - Cache responses for identical queries
+  - [ ] Implement cache key generation
+  - [ ] Store responses in local cache
+  - [ ] Cache invalidation strategy
+- [ ] **Metrics Tracking** - Track costs, latency, success rates
+  - [ ] Record all executions to database
+  - [ ] Generate daily/weekly reports
+  - [ ] Cost analysis and optimization suggestions
+
+### Low Priority (Future Enhancements)
+- [ ] **Streaming Responses** - Support streaming for real-time feedback
+- [ ] **Multi-turn Conversations** - Maintain conversation context
+- [ ] **Custom Strategies** - Plugin system for routing strategies
+- [ ] **Learning System** - Adjust routing based on historical performance
+- [ ] **Integration Tests** - Comprehensive end-to-end tests using valor
+  - See `tests/integration_tests.rs` for test scenarios
 
 ---
 
@@ -131,7 +174,7 @@ Task B: Add usage of type Foo
 
 #### Layer 1: File-Level Locking
 
-**File**: `agentic-routing/src/executor/isolation.rs`
+**File**: `merlin-routing/src/executor/isolation.rs`
 
 ```rust
 use std::collections::{HashMap, HashSet};
@@ -257,7 +300,7 @@ impl Drop for WriteLockGuard<'_> {
 
 #### Layer 2: Transactional Workspace
 
-**File**: `agentic-routing/src/executor/transaction.rs`
+**File**: `merlin-routing/src/executor/transaction.rs`
 
 ```rust
 use std::collections::HashMap;
@@ -411,7 +454,7 @@ pub struct FileConflict {
 
 #### Layer 3: Build State Isolation
 
-**File**: `agentic-routing/src/executor/build_isolation.rs`
+**File**: `merlin-routing/src/executor/build_isolation.rs`
 
 ```rust
 use std::path::PathBuf;
@@ -498,7 +541,7 @@ impl IsolatedBuildEnv {
 
 #### Layer 4: Dependency-Aware Scheduling
 
-**File**: `agentic-routing/src/executor/scheduler.rs`
+**File**: `merlin-routing/src/executor/scheduler.rs`
 
 ```rust
 /// Enhanced task graph with file conflict detection
@@ -785,7 +828,7 @@ impl ExecutorPool {
 
 ### Core TUI Architecture
 
-**File**: `agentic-routing/src/ui/mod.rs`
+**File**: `merlin-routing/src/ui/mod.rs`
 
 ```rust
 use ratatui::{
@@ -1161,7 +1204,7 @@ impl TuiApp {
             .count();
         
         let header = Paragraph::new(format!(
-            "Agentic Optimizer - Tasks: {} running | {} completed | {} failed",
+            "Merlin - Tasks: {} running | {} completed | {} failed",
             running, completed, failed
         ))
         .block(Block::default().borders(Borders::ALL).title("Status"));
@@ -1333,7 +1376,7 @@ impl TuiApp {
 
 ### Type-System Enforcement: UiChannel is REQUIRED
 
-**File**: `agentic-routing/src/executor/pool.rs` (Updated)
+**File**: `merlin-routing/src/executor/pool.rs` (Updated)
 
 ```rust
 /// ExecutorPool now REQUIRES UiChannel - cannot be constructed without it
@@ -1503,7 +1546,7 @@ impl ExecutorPool {
 
 ### Validator Trait Extension with Feedback
 
-**File**: `agentic-routing/src/validator/mod.rs` (Updated)
+**File**: `merlin-routing/src/validator/mod.rs` (Updated)
 
 ```rust
 #[async_trait]
@@ -1569,7 +1612,7 @@ impl ValidationPipeline {
 
 ### Main Application Integration
 
-**File**: `agentic-routing/src/orchestrator.rs`
+**File**: `merlin-routing/src/orchestrator.rs`
 
 ```rust
 use tokio::task::JoinHandle;
@@ -1718,17 +1761,17 @@ When editing (press 'i'):
 ## Crate Structure
 
 ```
-agentic-optimizer/
-├── agentic-core/              # Core traits, no routing logic
-├── agentic-providers/         # Cloud provider implementations
-├── agentic-local/             # NEW: Local model management
-├── agentic-routing/           # NEW: Multi-model routing
+merlin/
+├── merlin-core/              # Core traits, no routing logic
+├── merlin-providers/         # Cloud provider implementations
+├── merlin-local/             # NEW: Local model management
+├── merlin-routing/           # NEW: Multi-model routing
 │   ├── analyzer/              # Task analysis
 │   ├── router/                # Model selection
 │   ├── executor/              # Task execution
 │   ├── validator/             # Validation pipeline
 │   └── orchestrator.rs        # High-level coordinator
-└── agentic-context/           # Context management (existing)
+└── merlin-context/           # Context management (existing)
 ```
 
 ---
@@ -1737,7 +1780,7 @@ agentic-optimizer/
 
 ### 1. Task Analysis Layer
 
-**File**: `agentic-routing/src/analyzer/mod.rs`
+**File**: `merlin-routing/src/analyzer/mod.rs`
 
 ```rust
 use async_trait::async_trait;
@@ -1810,7 +1853,7 @@ pub trait TaskAnalyzer: Send + Sync {
 
 ### 2. Model Routing Layer
 
-**File**: `agentic-routing/src/router/mod.rs`
+**File**: `merlin-routing/src/router/mod.rs`
 
 ```rust
 use async_trait::async_trait;
@@ -1886,7 +1929,7 @@ pub struct StrategyRouter {
 
 ### 3. Parallel Execution Layer
 
-**File**: `agentic-routing/src/executor/graph.rs`
+**File**: `merlin-routing/src/executor/graph.rs`
 
 ```rust
 use petgraph::graph::{DiGraph, NodeIndex};
@@ -1956,7 +1999,7 @@ impl TaskGraph {
 }
 ```
 
-**File**: `agentic-routing/src/executor/pool.rs`
+**File**: `merlin-routing/src/executor/pool.rs`
 
 ```rust
 use tokio::sync::{RwLock, Semaphore};
@@ -2140,7 +2183,7 @@ pub enum FileChange {
 
 ### 4. Validation Layer
 
-**File**: `agentic-routing/src/validator/mod.rs`
+**File**: `merlin-routing/src/validator/mod.rs`
 
 ```rust
 use async_trait::async_trait;
@@ -2852,3 +2895,4 @@ spawn(Task B);
 ---
 
 **End of Architecture Document**
+

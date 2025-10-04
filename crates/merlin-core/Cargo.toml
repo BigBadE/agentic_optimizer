@@ -1,0 +1,16 @@
+[package]
+name = "merlin-core"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+async-trait = "0.1"
+serde.workspace = true
+thiserror.workspace = true
+reqwest.workspace = true
+serde_json.workspace = true
+toml.workspace = true
+
+[lints]
+workspace = true
+

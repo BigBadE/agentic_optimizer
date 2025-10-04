@@ -4,7 +4,7 @@ cargo-features = ["codegen-backend"]
 resolver = "3"
 members = [
     "crates/*",
-    "crates/agentic-languages/languages/*"
+    "crates/merlin-languages/languages/*"
 ]
 
 [workspace.package]
@@ -13,13 +13,13 @@ edition = "2024"
 
 [workspace.dependencies]
 # Internal workspace crates
-agentic-core = { path = "crates/agentic-core" }
-agentic-providers = { path = "crates/agentic-providers" }
-agentic-context = { path = "crates/agentic-context" }
-agentic-languages = { path = "crates/agentic-languages" }
-agentic-agent = { path = "crates/agentic-agent" }
-agentic-tools = { path = "crates/agentic-tools" }
-rust-backend = { path = "crates/agentic-languages/languages/rust-backend" }
+merlin-core = { path = "crates/merlin-core" }
+merlin-providers = { path = "crates/merlin-providers" }
+merlin-context = { path = "crates/merlin-context" }
+merlin-languages = { path = "crates/merlin-languages" }
+merlin-agent = { path = "crates/merlin-agent" }
+merlin-tools = { path = "crates/merlin-tools" }
+rust-backend = { path = "crates/merlin-languages/languages/rust-backend" }
 
 # External dependencies
 anyhow = "1.0"

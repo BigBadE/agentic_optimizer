@@ -1,4 +1,4 @@
-# Agentic Optimizer Usage Guide
+# Merlin Usage Guide
 
 ## Interactive Chat
 
@@ -6,16 +6,16 @@ Start an interactive chat session with the AI agent:
 
 ```bash
 # Using Anthropic (default)
-cargo run -p agentic-cli -- chat
+cargo run -p merlin-cli -- chat
 
 # Using OpenRouter with prompt caching
-cargo run -p agentic-cli -- chat --openrouter
+cargo run -p merlin-cli -- chat --openrouter
 
 # Using OpenRouter with a specific model
-cargo run -p agentic-cli -- chat --openrouter --model "anthropic/claude-sonnet-4-20250514"
+cargo run -p merlin-cli -- chat --openrouter --model "anthropic/claude-sonnet-4-20250514"
 
 # Specify a different project directory
-cargo run -p agentic-cli -- chat --project /path/to/project
+cargo run -p merlin-cli -- chat --project /path/to/project
 ```
 
 ### Environment Variables
@@ -50,7 +50,7 @@ Ensure Ollama is running locally with the `qwen2.5-coder:1.5b` model installed.
 ### Example Session
 
 ```
-=== Agentic Optimizer - Interactive Chat ===
+=== Merlin - Interactive Chat ===
 Project: .
 Provider: OpenRouter
 
@@ -82,7 +82,7 @@ Goodbye!
 For one-off queries without interactive mode:
 
 ```bash
-cargo run -p agentic-cli -- query "Explain the agent architecture" --project .
+cargo run -p merlin-cli -- query "Explain the agent architecture" --project .
 ```
 
 ## Context Preview
@@ -90,7 +90,7 @@ cargo run -p agentic-cli -- query "Explain the agent architecture" --project .
 Preview what context would be gathered without sending to LLM:
 
 ```bash
-cargo run -p agentic-cli -- prompt "How does caching work?" --project .
+cargo run -p merlin-cli -- prompt "How does caching work?" --project .
 ```
 
 ## Configuration
@@ -98,6 +98,7 @@ cargo run -p agentic-cli -- prompt "How does caching work?" --project .
 View current configuration:
 
 ```bash
-cargo run -p agentic-cli -- config
-cargo run -p agentic-cli -- config --full
+cargo run -p merlin-cli -- config
+cargo run -p merlin-cli -- config --full
 ```
+

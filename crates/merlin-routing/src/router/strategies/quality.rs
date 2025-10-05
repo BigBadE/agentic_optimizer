@@ -6,6 +6,7 @@ use super::super::strategy::RoutingStrategy;
 pub struct QualityCriticalStrategy;
 
 impl QualityCriticalStrategy {
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }

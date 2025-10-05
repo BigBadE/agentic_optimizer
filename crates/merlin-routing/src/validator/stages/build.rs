@@ -10,6 +10,7 @@ pub struct BuildValidationStage {
 }
 
 impl BuildValidationStage {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             timeout_seconds: 60,
@@ -17,6 +18,7 @@ impl BuildValidationStage {
         }
     }
     
+    #[must_use] 
     pub fn with_timeout(mut self, timeout_seconds: u64) -> Self {
         self.timeout_seconds = timeout_seconds;
         self

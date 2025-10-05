@@ -24,6 +24,7 @@ const fn default_timeout() -> u64 {
 pub struct BashTool;
 
 impl BashTool {
+    #[must_use] 
     pub const fn new() -> Self {
         Self
     }

@@ -22,6 +22,7 @@ pub enum ModelTier {
 
 impl ModelTier {
     /// Get next higher tier for escalation
+    #[must_use] 
     pub fn escalate(&self) -> Option<Self> {
         match self {
             Self::Local { .. } => Some(Self::Groq {
@@ -51,9 +52,9 @@ impl ModelTier {
 impl std::fmt::Display for ModelTier {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Local { model_name } => write!(f, "Local({})", model_name),
-            Self::Groq { model_name } => write!(f, "Groq({})", model_name),
-            Self::Premium { provider, model_name } => write!(f, "{}/{}", provider, model_name),
+            Self::Local { model_name } => write!(f, "Local({model_name})"),
+            Self::Groq { model_name } => write!(f, "Groq({model_name})"),
+            Self::Premium { provider, model_name } => write!(f, "{provider}/{model_name}"),
         }
     }
 }

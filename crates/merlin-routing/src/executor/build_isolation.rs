@@ -15,7 +15,7 @@ impl IsolatedBuildEnv {
     /// Create isolated build environment
     pub async fn new(workspace: &WorkspaceState) -> Result<Self> {
         let temp_dir = TempDir::new()
-            .map_err(|e| RoutingError::Other(format!("Failed to create temp dir: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Failed to create temp dir: {e}")))?;
         
         // TODO: Copy workspace files for full isolation
         // For now, we just create an empty temp directory
@@ -23,7 +23,7 @@ impl IsolatedBuildEnv {
         
         Ok(Self {
             temp_dir,
-            _original_workspace: workspace.root_path().to_path_buf(),
+            _original_workspace: workspace.root_path().clone(),
         })
     }
     

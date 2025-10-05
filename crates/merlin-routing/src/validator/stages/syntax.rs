@@ -8,12 +8,14 @@ pub struct SyntaxValidationStage {
 }
 
 impl SyntaxValidationStage {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             min_score_threshold: 0.8,
         }
     }
     
+    #[must_use] 
     pub fn with_threshold(mut self, threshold: f64) -> Self {
         self.min_score_threshold = threshold;
         self

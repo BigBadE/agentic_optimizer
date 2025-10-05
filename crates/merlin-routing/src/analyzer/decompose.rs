@@ -1,14 +1,16 @@
-use crate::{Task, TaskId};
-use super::intent::{Action, Intent, Scope};
+use crate::Task;
+use super::intent::{Action, Intent};
 
 /// Decomposes complex requests into smaller tasks
 pub struct TaskDecomposer;
 
 impl TaskDecomposer {
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
     
+    #[must_use] 
     pub fn decompose(&self, intent: &Intent, request: &str) -> Vec<Task> {
         match &intent.action {
             Action::Refactor => self.decompose_refactor(intent, request),
@@ -25,18 +27,18 @@ impl TaskDecomposer {
     fn decompose_refactor(&self, intent: &Intent, request: &str) -> Vec<Task> {
         let mut tasks = Vec::new();
         
-        let analyze_task = Task::new(format!("Analyze current structure: {}", request))
+        let analyze_task = Task::new(format!("Analyze current structure: {request}"))
             .with_complexity(crate::Complexity::Medium)
             .with_priority(intent.priority);
         tasks.push(analyze_task.clone());
         
-        let refactor_task = Task::new(format!("Refactor: {}", request))
+        let refactor_task = Task::new(format!("Refactor: {request}"))
             .with_complexity(crate::Complexity::Complex)
             .with_priority(intent.priority)
             .with_dependencies(vec![analyze_task.id]);
         tasks.push(refactor_task.clone());
         
-        let test_task = Task::new(format!("Test refactored code: {}", request))
+        let test_task = Task::new(format!("Test refactored code: {request}"))
             .with_complexity(crate::Complexity::Medium)
             .with_priority(intent.priority)
             .with_dependencies(vec![refactor_task.id]);
@@ -48,18 +50,18 @@ impl TaskDecomposer {
     fn decompose_creation(&self, intent: &Intent, request: &str) -> Vec<Task> {
         let mut tasks = Vec::new();
         
-        let design_task = Task::new(format!("Design structure: {}", request))
+        let design_task = Task::new(format!("Design structure: {request}"))
             .with_complexity(crate::Complexity::Simple)
             .with_priority(intent.priority);
         tasks.push(design_task.clone());
         
-        let implement_task = Task::new(format!("Implement: {}", request))
+        let implement_task = Task::new(format!("Implement: {request}"))
             .with_complexity(crate::Complexity::Medium)
             .with_priority(intent.priority)
             .with_dependencies(vec![design_task.id]);
         tasks.push(implement_task.clone());
         
-        let test_task = Task::new(format!("Add tests: {}", request))
+        let test_task = Task::new(format!("Add tests: {request}"))
             .with_complexity(crate::Complexity::Simple)
             .with_priority(intent.priority)
             .with_dependencies(vec![implement_task.id]);
@@ -71,18 +73,18 @@ impl TaskDecomposer {
     fn decompose_fix(&self, intent: &Intent, request: &str) -> Vec<Task> {
         let mut tasks = Vec::new();
         
-        let diagnose_task = Task::new(format!("Diagnose issue: {}", request))
+        let diagnose_task = Task::new(format!("Diagnose issue: {request}"))
             .with_complexity(crate::Complexity::Medium)
             .with_priority(intent.priority);
         tasks.push(diagnose_task.clone());
         
-        let fix_task = Task::new(format!("Fix: {}", request))
+        let fix_task = Task::new(format!("Fix: {request}"))
             .with_complexity(crate::Complexity::Medium)
             .with_priority(intent.priority)
             .with_dependencies(vec![diagnose_task.id]);
         tasks.push(fix_task.clone());
         
-        let verify_task = Task::new(format!("Verify fix: {}", request))
+        let verify_task = Task::new(format!("Verify fix: {request}"))
             .with_complexity(crate::Complexity::Simple)
             .with_priority(intent.priority)
             .with_dependencies(vec![fix_task.id]);

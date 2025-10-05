@@ -2,6 +2,7 @@
 name = "merlin-cli"
 version.workspace = true
 edition.workspace = true
+default-run = "merlin"
 
 [[bin]]
 name = "merlin"

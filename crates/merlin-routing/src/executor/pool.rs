@@ -29,6 +29,40 @@ impl ExecutorPool {
         }
     }
     
+    fn create_provider_for_tier(tier: &crate::ModelTier) -> Result<Arc<dyn merlin_core::ModelProvider>> {
+        use std::env;
+        
+        match tier {
+            crate::ModelTier::Local { model_name } => {
+                Ok(Arc::new(merlin_local::LocalModelProvider::new(model_name.clone())))
+            }
+            crate::ModelTier::Groq { model_name } => {
+                let provider = merlin_providers::GroqProvider::new()
+                    .map_err(|e| RoutingError::Other(e.to_string()))?
+                    .with_model(model_name.clone());
+                Ok(Arc::new(provider))
+            }
+            crate::ModelTier::Premium { provider: provider_name, model_name } => {
+                match provider_name.as_str() {
+                    "openrouter" => {
+                        let api_key = env::var("OPENROUTER_API_KEY")
+                            .map_err(|_| RoutingError::Other("OPENROUTER_API_KEY not set".to_string()))?;
+                        let provider = merlin_providers::OpenRouterProvider::new(api_key)?
+                            .with_model(model_name.clone());
+                        Ok(Arc::new(provider))
+                    }
+                    "anthropic" => {
+                        let api_key = env::var("ANTHROPIC_API_KEY")
+                            .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_string()))?;
+                        let provider = merlin_providers::AnthropicProvider::new(api_key)?;
+                        Ok(Arc::new(provider))
+                    }
+                    _ => Err(RoutingError::Other(format!("Unknown provider: {provider_name}")))
+                }
+            }
+        }
+    }
+    
     /// Execute task graph with parallel execution
     pub async fn execute_graph(&self, graph: TaskGraph) -> Result<Vec<TaskResult>> {
         if graph.has_cycles() {
@@ -93,19 +127,48 @@ impl ExecutorPool {
         task: Task,
         router: Arc<dyn ModelRouter>,
         validator: Arc<dyn Validator>,
-        _workspace: Arc<WorkspaceState>,
+        workspace: Arc<WorkspaceState>,
     ) -> Result<TaskResult> {
         let start = std::time::Instant::now();
         
         let routing_decision = router.route(&task).await?;
         
-        let response = merlin_core::Response {
-            text: format!("Executed task: {}", task.description),
-            confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
-            provider: routing_decision.tier.to_string(),
-            latency_ms: 0,
-        };
+        // Create provider based on tier
+        let provider = Self::create_provider_for_tier(&routing_decision.tier)?;
+        
+        // Build context from task with agent-aware system prompt
+        let system_prompt = format!(
+            "You are Merlin, an AI coding agent working directly in the user's codebase at '{}'.\n\n\
+            Your role:\n\
+            - Analyze the existing code structure and patterns\n\
+            - Provide code changes that integrate seamlessly with the existing codebase\n\
+            - Follow the project's coding style and conventions\n\
+            - Give specific, actionable suggestions with file paths and line numbers when relevant\n\
+            - Explain your reasoning when making architectural decisions\n\n\
+            Task: {}\n\n\
+            Provide clear, correct, and contextually appropriate code solutions.",
+            workspace.root_path().display(),
+            task.description
+        );
+        
+        let mut context = merlin_core::Context::new(&system_prompt);
+        
+        // Add files from workspace if specified
+        for file_path in &task.context_needs.required_files {
+            if let Some(content) = workspace.read_file(file_path).await {
+                context = context.with_files(vec![merlin_core::FileContext::new(
+                    file_path.clone(),
+                    content,
+                )]);
+            }
+        }
+        
+        // Create query
+        let query = merlin_core::Query::new(task.description.clone());
+        
+        // Execute with provider
+        let response = provider.generate(&query, &context).await
+            .map_err(|e| RoutingError::Other(e.to_string()))?;
         
         let validation = validator.validate(&response, &task).await?;
         
@@ -168,6 +231,7 @@ mod tests {
     }
     
     #[tokio::test]
+    #[ignore] // Requires actual Ollama instance
     async fn test_executor_pool_basic() {
         let router = Arc::new(MockRouter);
         let validator = Arc::new(MockValidator);

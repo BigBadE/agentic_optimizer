@@ -10,6 +10,7 @@ pub struct ConflictAwareTaskGraph {
 }
 
 impl ConflictAwareTaskGraph {
+    #[must_use] 
     pub fn from_tasks(tasks: Vec<Task>) -> Self {
         let mut file_access_map: HashMap<PathBuf, Vec<TaskId>> = HashMap::new();
         
@@ -17,7 +18,7 @@ impl ConflictAwareTaskGraph {
             for file in &task.context_needs.required_files {
                 file_access_map
                     .entry(file.clone())
-                    .or_insert_with(Vec::new)
+                    .or_default()
                     .push(task.id);
             }
         }
@@ -31,6 +32,7 @@ impl ConflictAwareTaskGraph {
     }
     
     /// Get ready tasks that don't conflict with running tasks
+    #[must_use] 
     pub fn ready_non_conflicting_tasks(
         &self,
         completed: &HashSet<TaskId>,
@@ -60,16 +62,19 @@ impl ConflictAwareTaskGraph {
     }
     
     /// Check if all tasks completed
+    #[must_use] 
     pub fn is_complete(&self, completed: &HashSet<TaskId>) -> bool {
         self.graph.is_complete(completed)
     }
     
     /// Detect cycles
+    #[must_use] 
     pub fn has_cycles(&self) -> bool {
         self.graph.has_cycles()
     }
     
     /// Get total task count
+    #[must_use] 
     pub fn task_count(&self) -> usize {
         self.graph.task_count()
     }

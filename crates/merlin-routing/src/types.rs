@@ -7,6 +7,7 @@ use uuid::Uuid;
 pub struct TaskId(Uuid);
 
 impl TaskId {
+    #[must_use] 
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
@@ -30,6 +31,7 @@ pub struct Task {
 }
 
 impl Task {
+    #[must_use] 
     pub fn new(description: String) -> Self {
         Self {
             id: TaskId::new(),
@@ -65,6 +67,7 @@ impl Task {
         self
     }
 
+    #[must_use] 
     pub fn requires_build_check(&self) -> bool {
         !self.context_needs.required_files.is_empty()
     }
@@ -97,6 +100,7 @@ pub struct ContextRequirements {
 }
 
 impl ContextRequirements {
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }
@@ -218,6 +222,7 @@ pub enum FileChange {
 }
 
 impl FileChange {
+    #[must_use] 
     pub const fn path(&self) -> &PathBuf {
         match self {
             Self::Create { path, .. } | Self::Modify { path, .. } | Self::Delete { path } => path,

@@ -10,7 +10,7 @@ use merlin_core::Result;
 #[command(name = "benchmark")]
 #[command(about = "Run context fetching benchmarks")]
 struct Args {
-    /// Project to benchmark (directory name in benchmarks/test_cases/)
+    /// Project to benchmark (directory name in `benchmarks/test_cases`/)
     #[arg(short, long, default_value = "valor")]
     project: String,
 
@@ -65,8 +65,7 @@ async fn main() -> Result<()> {
             .filter(|(path, _)| {
                 path.file_stem()
                     .and_then(|s| s.to_str())
-                    .map(|s| s == test_name)
-                    .unwrap_or(false)
+                    .is_some_and(|s| s == test_name)
             })
             .collect()
     } else {
@@ -83,9 +82,9 @@ async fn main() -> Result<()> {
     let mut all_results = Vec::new();
 
     for (_test_path, test_case) in filtered_cases {
-        println!("═══════════════════════════════════════════════════════════");
+        println!("\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}");
         println!("Running: {}", test_case.name);
-        println!("═══════════════════════════════════════════════════════════\n");
+        println!("\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\n");
 
         let result = run_benchmark(&args.root, &test_case, args.verbose).await?;
 
@@ -150,9 +149,9 @@ async fn run_benchmark(
 }
 
 fn print_summary(results: &[BenchmarkResult]) {
-    println!("═══════════════════════════════════════════════════════════");
+    println!("\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}");
     println!("SUMMARY");
-    println!("═══════════════════════════════════════════════════════════\n");
+    println!("\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\n");
 
     let avg_precision_3 = results.iter().map(|r| r.metrics.precision_at_3).sum::<f32>() / results.len() as f32;
     let avg_precision_5 = results.iter().map(|r| r.metrics.precision_at_5).sum::<f32>() / results.len() as f32;
@@ -169,8 +168,8 @@ fn print_summary(results: &[BenchmarkResult]) {
     println!("  Precision@5:        {:.1}%", avg_precision_5 * 100.0);
     println!("  Precision@10:       {:.1}%", avg_precision_10 * 100.0);
     println!("  Recall@10:          {:.1}%", avg_recall_10 * 100.0);
-    println!("  MRR:                {:.3}", avg_mrr);
-    println!("  NDCG@10:            {:.3}", avg_ndcg);
+    println!("  MRR:                {avg_mrr:.3}");
+    println!("  NDCG@10:            {avg_ndcg:.3}");
     println!("  Exclusion Rate:     {:.1}%", avg_exclusion * 100.0);
     println!("  Critical in Top-3:  {:.1}%", avg_critical * 100.0);
     println!("  High in Top-5:      {:.1}%", avg_high * 100.0);
@@ -202,8 +201,8 @@ fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
     report.push_str(&format!("| Precision@5 | {:.1}% |\n", avg_precision_5 * 100.0));
     report.push_str(&format!("| Precision@10 | {:.1}% |\n", avg_precision_10 * 100.0));
     report.push_str(&format!("| Recall@10 | {:.1}% |\n", avg_recall_10 * 100.0));
-    report.push_str(&format!("| MRR | {:.3} |\n", avg_mrr));
-    report.push_str(&format!("| NDCG@10 | {:.3} |\n", avg_ndcg));
+    report.push_str(&format!("| MRR | {avg_mrr:.3} |\n"));
+    report.push_str(&format!("| NDCG@10 | {avg_ndcg:.3} |\n"));
     report.push_str(&format!("| Exclusion Rate | {:.1}% |\n", avg_exclusion * 100.0));
     report.push_str(&format!("| Critical in Top-3 | {:.1}% |\n", avg_critical * 100.0));
     report.push_str(&format!("| High in Top-5 | {:.1}% |\n\n", avg_high * 100.0));
@@ -213,7 +212,7 @@ fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
     for result in results {
         report.push_str("---\n\n");
         report.push_str(&result.format_report());
-        report.push_str("\n");
+        report.push('\n');
     }
 
     std::fs::write(path, report)?;

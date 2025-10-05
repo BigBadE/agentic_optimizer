@@ -19,6 +19,7 @@ struct EditParams {
 pub struct EditTool;
 
 impl EditTool {
+    #[must_use] 
     pub const fn new() -> Self {
         Self
     }

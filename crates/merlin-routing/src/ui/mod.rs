@@ -209,6 +209,7 @@ struct UiState {
     loading_tasks: bool,
     active_running_tasks: std::collections::HashSet<TaskId>,
     collapsed_tasks: std::collections::HashSet<TaskId>,
+    pending_delete_task_id: Option<TaskId>,
 }
 
 #[derive(Clone)]
@@ -573,17 +574,38 @@ impl TuiApp {
                         }
                     }
                     KeyCode::Up if self.focused_pane == FocusedPane::Tasks => {
+                        self.state.pending_delete_task_id = None;
                         self.navigate_tasks_up();
                     }
                     KeyCode::Down if self.focused_pane == FocusedPane::Tasks => {
+                        self.state.pending_delete_task_id = None;
                         self.navigate_tasks_down();
                     }
                     KeyCode::Left if self.focused_pane == FocusedPane::Tasks => {
                         // Deselect current task
                         self.state.active_task_id = None;
                         self.state.selected_task_index = usize::MAX;
+                        // Clear any pending delete
+                        self.state.pending_delete_task_id = None;
+                    }
+                    KeyCode::Backspace if self.focused_pane == FocusedPane::Tasks => {
+                        // Two-step delete confirmation
+                        if let Some(&selected_task_id) = self.state.task_order.get(self.state.selected_task_index) {
+                            if self.state.pending_delete_task_id == Some(selected_task_id) {
+                                // Second press - actually delete
+                                self.delete_task(selected_task_id);
+                                self.state.pending_delete_task_id = None;
+                            } else {
+                                // First press - mark for deletion
+                                self.state.pending_delete_task_id = Some(selected_task_id);
+                            }
+                        }
                     }
                     _ => {
+                        // Clear pending delete on any other key
+                        if self.focused_pane == FocusedPane::Tasks {
+                            self.state.pending_delete_task_id = None;
+                        }
                         match self.focused_pane {
                             FocusedPane::Input => {
                                 // Auto-wrap on text changes using textwrap
@@ -836,6 +858,43 @@ impl TuiApp {
         (last_row, last_col)
     }
     
+    fn delete_task(&mut self, task_id: TaskId) {
+        // Remove from tasks map
+        self.state.tasks.remove(&task_id);
+        
+        // Remove from task order
+        if let Some(pos) = self.state.task_order.iter().position(|&id| id == task_id) {
+            self.state.task_order.remove(pos);
+            
+            // Adjust selected index if needed
+            if self.state.selected_task_index >= self.state.task_order.len() {
+                self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
+            }
+        }
+        
+        // Remove from active running tasks
+        self.state.active_running_tasks.remove(&task_id);
+        
+        // Remove from collapsed tasks
+        self.state.collapsed_tasks.remove(&task_id);
+        
+        // If this was the active task, clear it
+        if self.state.active_task_id == Some(task_id) {
+            self.state.active_task_id = None;
+        }
+        
+        // Delete the saved task file
+        if let Some(ref tasks_dir) = self.tasks_dir {
+            let task_id_str = format!("{:?}", task_id);
+            let clean_id = task_id_str
+                .strip_prefix("TaskId(")
+                .and_then(|s| s.strip_suffix(")"))
+                .unwrap_or(&task_id_str);
+            let task_file = tasks_dir.join(format!("{}.json.gz", clean_id));
+            let _ = std::fs::remove_file(task_file);
+        }
+    }
+    
     fn auto_wrap_input(&mut self) {
         // Calculate available width
         let terminal_width = self.terminal.size().map(|s| s.width).unwrap_or(80);
@@ -1073,11 +1132,9 @@ impl TuiApp {
                     self.state.collapsed_tasks.remove(&parent_id);
                 }
                 
-                // Only auto-select if no task is currently selected
-                if self.state.selected_task_index >= self.state.task_order.len() - 1 {
-                    self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
-                    self.state.active_task_id = Some(task_id);
-                }
+                // Always select newly created tasks - simple and predictable
+                self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
+                self.state.active_task_id = Some(task_id);
                 
                 if let Some(task) = self.state.tasks.get(&task_id) {
                     self.save_task(task_id, task);
@@ -1093,10 +1150,7 @@ impl TuiApp {
             UiEvent::TaskOutput { task_id, output } => {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.output_lines.push(output.clone());
-                    // Add newline only if there's already content
-                    if !task.output_area.lines()[0].is_empty() {
-                        task.output_area.insert_str("\n");
-                    }
+                    task.output_area.insert_str("\n");
                     task.output_area.insert_str(&output);
                 }
                 self.auto_wrap_output(task_id);
@@ -1108,10 +1162,7 @@ impl TuiApp {
                     task.status = TaskStatus::Completed;
                     task.end_time = Some(Instant::now());
                     
-                    // Add newline only if there's already content
-                    if !task.output_area.lines()[0].is_empty() {
-                        task.output_area.insert_str("\n");
-                    }
+                    task.output_area.insert_str("\n");
                     task.output_area.insert_str(&result.response.text);
                 }
                 self.auto_wrap_output(task_id);
@@ -1132,10 +1183,8 @@ impl TuiApp {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.status = TaskStatus::Failed;
                     task.end_time = Some(Instant::now());
-                    // Add newline only if there's already content
-                    if !task.output_area.lines()[0].is_empty() {
-                        task.output_area.insert_str("\n");
-                    }
+                    
+                    task.output_area.insert_str("\n");
                     let error_msg = format!("Error: {error}");
                     task.output_area.insert_str(&error_msg);
                 }
@@ -1154,6 +1203,7 @@ impl TuiApp {
                     MessageLevel::Success => "✓",
                 };
                 
+                // Send to active task only (this is a global message)
                 if let Some(task_id) = self.state.active_task_id {
                     if let Some(task) = self.state.tasks.get_mut(&task_id) {
                         task.output_area.insert_str(&format!("\n{prefix} {message}"));
@@ -1236,11 +1286,16 @@ impl TuiApp {
                 // Show only first line of description, truncate if too long
                 let first_line = task.description.lines().next().unwrap_or("");
                 let max_desc_len = 50;
-                let description = if first_line.len() > max_desc_len {
+                let mut description = if first_line.len() > max_desc_len {
                     format!("{}...", &first_line[..max_desc_len])
                 } else {
                     first_line.to_string()
                 };
+                
+                // Add delete confirmation prompt if this task is pending deletion
+                if self.state.pending_delete_task_id == Some(*task_id) {
+                    description.push_str(" [DELETE?]");
+                }
                 
                 let mut text = if is_failed || task.status == TaskStatus::Completed || task.status == TaskStatus::Failed {
                     // No timer for failed/orphaned/completed tasks

@@ -9,6 +9,7 @@ pub struct OllamaManager {
 }
 
 impl OllamaManager {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             client: Client::new(),
@@ -16,6 +17,7 @@ impl OllamaManager {
         }
     }
     
+    #[must_use] 
     pub fn with_url(mut self, url: String) -> Self {
         self.base_url = url;
         self
@@ -24,7 +26,7 @@ impl OllamaManager {
     /// Check if Ollama is running
     pub async fn is_available(&self) -> bool {
         self.client
-            .get(&format!("{}/api/tags", self.base_url))
+            .get(format!("{}/api/tags", self.base_url))
             .send()
             .await
             .is_ok()
@@ -33,7 +35,7 @@ impl OllamaManager {
     /// List installed models
     pub async fn list_models(&self) -> Result<Vec<OllamaModel>> {
         let response = self.client
-            .get(&format!("{}/api/tags", self.base_url))
+            .get(format!("{}/api/tags", self.base_url))
             .send()
             .await
             .map_err(|e| LocalError::OllamaUnavailable(e.to_string()))?;
@@ -51,7 +53,7 @@ impl OllamaManager {
     /// Pull a model from Ollama registry
     pub async fn pull_model(&self, model_name: &str) -> Result<()> {
         let response = self.client
-            .post(&format!("{}/api/pull", self.base_url))
+            .post(format!("{}/api/pull", self.base_url))
             .json(&serde_json::json!({
                 "name": model_name,
                 "stream": false
@@ -79,6 +81,7 @@ impl OllamaManager {
     }
     
     /// Get recommended models for code tasks
+    #[must_use] 
     pub fn recommended_models() -> Vec<ModelInfo> {
         vec![
             ModelInfo::qwen_coder_7b(),

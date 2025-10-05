@@ -43,6 +43,7 @@ pub struct TokenUsage {
 }
 
 impl TokenUsage {
+    #[must_use] 
     pub const fn total(&self) -> u64 {
         self.input + self.output + self.cache_read + self.cache_write
     }
@@ -68,6 +69,7 @@ impl Context {
         self
     }
 
+    #[must_use] 
     pub fn files_to_string(&self) -> String {
         self.files
             .iter()
@@ -76,6 +78,7 @@ impl Context {
             .join("\n")
     }
 
+    #[must_use] 
     pub fn token_estimate(&self) -> usize {
         let files_len: usize = self.files.iter().map(|file| file.content.len()).sum();
         (self.system_prompt.len() + files_len) / 4
@@ -101,6 +104,7 @@ impl FileContext {
         })
     }
 
+    #[must_use] 
     pub const fn new(path: PathBuf, content: String) -> Self {
         Self { path, content }
     }

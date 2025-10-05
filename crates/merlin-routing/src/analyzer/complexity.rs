@@ -5,10 +5,12 @@ use super::intent::{Action, Intent};
 pub struct ComplexityEstimator;
 
 impl ComplexityEstimator {
+    #[must_use] 
     pub fn new() -> Self {
         Self
     }
     
+    #[must_use] 
     pub fn estimate(&self, intent: &Intent, request: &str) -> Complexity {
         let mut score = 0;
         
@@ -18,12 +20,13 @@ impl ComplexityEstimator {
         score += self.score_keywords(request);
         
         if let Some(hint) = intent.complexity_hint {
-            score = (score + self.complexity_to_score(hint)) / 2;
+            score = usize::midpoint(score, self.complexity_to_score(hint));
         }
         
         self.score_to_complexity(score)
     }
     
+    #[must_use] 
     pub fn estimate_context_needs(&self, intent: &Intent, request: &str) -> ContextRequirements {
         let estimated_tokens = self.estimate_token_count(request);
         let required_files = self.extract_file_references(request);

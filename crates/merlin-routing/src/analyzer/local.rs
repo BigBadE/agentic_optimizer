@@ -13,6 +13,7 @@ pub struct LocalTaskAnalyzer {
 }
 
 impl LocalTaskAnalyzer {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             intent_extractor: IntentExtractor::new(),
@@ -22,6 +23,7 @@ impl LocalTaskAnalyzer {
         }
     }
     
+    #[must_use] 
     pub fn with_max_parallel(mut self, max: usize) -> Self {
         self.max_parallel_tasks = max;
         self

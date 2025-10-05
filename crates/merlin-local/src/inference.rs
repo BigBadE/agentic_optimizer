@@ -14,6 +14,7 @@ pub struct LocalModelProvider {
 }
 
 impl LocalModelProvider {
+    #[must_use] 
     pub fn new(model_name: String) -> Self {
         Self {
             client: Client::new(),
@@ -23,6 +24,7 @@ impl LocalModelProvider {
         }
     }
     
+    #[must_use] 
     pub fn with_url(mut self, url: String) -> Self {
         self.base_url = url.clone();
         self.manager = self.manager.with_url(url);
@@ -40,11 +42,11 @@ impl LocalModelProvider {
         };
         
         let response = self.client
-            .post(&format!("{}/api/generate", self.base_url))
+            .post(format!("{}/api/generate", self.base_url))
             .json(&request)
             .send()
             .await
-            .map_err(|e| merlin_core::Error::Other(format!("Ollama request failed: {}", e)))?;
+            .map_err(|e| merlin_core::Error::Other(format!("Ollama request failed: {e}")))?;
         
         if !response.status().is_success() {
             return Err(merlin_core::Error::Other(format!(
@@ -54,7 +56,7 @@ impl LocalModelProvider {
         }
         
         let ollama_response: OllamaGenerateResponse = response.json().await
-            .map_err(|e| merlin_core::Error::Other(format!("Failed to parse Ollama response: {}", e)))?;
+            .map_err(|e| merlin_core::Error::Other(format!("Failed to parse Ollama response: {e}")))?;
         
         Ok(ollama_response)
     }

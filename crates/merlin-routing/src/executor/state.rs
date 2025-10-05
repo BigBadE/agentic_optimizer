@@ -12,6 +12,7 @@ pub struct WorkspaceState {
 }
 
 impl WorkspaceState {
+    #[must_use] 
     pub fn new(root_path: PathBuf) -> Arc<Self> {
         Arc::new(Self {
             files: RwLock::new(HashMap::new()),
@@ -74,6 +75,7 @@ pub struct WorkspaceSnapshot {
 }
 
 impl WorkspaceSnapshot {
+    #[must_use] 
     pub fn get(&self, path: &PathBuf) -> Option<String> {
         self.files.get(path).cloned()
     }

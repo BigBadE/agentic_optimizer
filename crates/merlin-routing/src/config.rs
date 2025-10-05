@@ -11,6 +11,7 @@ pub struct RoutingConfig {
 }
 
 impl RoutingConfig {
+    #[must_use] 
     pub fn default_config() -> Self {
         Self {
             tiers: TierConfig::default(),

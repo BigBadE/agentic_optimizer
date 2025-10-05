@@ -11,6 +11,7 @@ pub struct ModelInfo {
 }
 
 impl ModelInfo {
+    #[must_use] 
     pub fn qwen_coder_7b() -> Self {
         Self {
             name: "qwen2.5-coder:7b".to_string(),
@@ -21,6 +22,7 @@ impl ModelInfo {
         }
     }
     
+    #[must_use] 
     pub fn deepseek_coder_6_7b() -> Self {
         Self {
             name: "deepseek-coder:6.7b".to_string(),
@@ -31,6 +33,7 @@ impl ModelInfo {
         }
     }
     
+    #[must_use] 
     pub fn codellama_7b() -> Self {
         Self {
             name: "codellama:7b".to_string(),

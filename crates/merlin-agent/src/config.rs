@@ -20,6 +20,7 @@ impl Default for AgentConfig {
 }
 
 impl AgentConfig {
+    #[must_use] 
     pub fn new() -> Self {
         Self::default()
     }

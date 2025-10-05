@@ -10,6 +10,7 @@ pub struct LintValidationStage {
 }
 
 impl LintValidationStage {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             workspace: None,
@@ -22,6 +23,7 @@ impl LintValidationStage {
         self
     }
     
+    #[must_use] 
     pub fn with_max_warnings(mut self, max_warnings: usize) -> Self {
         self.max_warnings = max_warnings;
         self

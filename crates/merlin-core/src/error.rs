@@ -43,6 +43,7 @@ pub enum Error {
 }
 
 impl Error {
+    #[must_use] 
     pub const fn is_retryable(&self) -> bool {
         matches!(
             self,

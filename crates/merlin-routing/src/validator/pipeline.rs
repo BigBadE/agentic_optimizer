@@ -29,6 +29,7 @@ pub struct ValidationPipeline {
 }
 
 impl ValidationPipeline {
+    #[must_use] 
     pub fn new(stages: Vec<Arc<dyn ValidationStage>>) -> Self {
         Self {
             stages,
@@ -36,13 +37,15 @@ impl ValidationPipeline {
         }
     }
     
+    #[must_use] 
     pub fn with_early_exit(mut self, early_exit: bool) -> Self {
         self.early_exit = early_exit;
         self
     }
     
+    #[must_use] 
     pub fn with_default_stages() -> Self {
-        use super::stages::*;
+        use super::stages::{SyntaxValidationStage, BuildValidationStage, TestValidationStage, LintValidationStage};
         
         let stages: Vec<Arc<dyn ValidationStage>> = vec![
             Arc::new(SyntaxValidationStage::new()),

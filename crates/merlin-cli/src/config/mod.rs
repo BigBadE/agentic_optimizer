@@ -27,7 +27,7 @@ impl Config {
         let config_path = project_root.join("config.toml");
         if config_path.exists() {
             Self::from_file(&config_path).unwrap_or_else(|error| {
-                eprintln!("Warning: Failed to load config.toml: {}", error);
+                eprintln!("Warning: Failed to load config.toml: {error}");
                 Self::from_env()
             })
         } else {
@@ -42,7 +42,7 @@ impl Config {
 /// Add or modify models here to customize the AI behavior.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ProvidersConfig {
-    /// OpenRouter API key for accessing remote models
+    /// `OpenRouter` API key for accessing remote models
     pub openrouter_key: Option<String>,
     /// High-complexity model for demanding tasks (default: anthropic/claude-sonnet-4-20250514)
     pub high_model: Option<String>,

@@ -42,6 +42,7 @@ impl AgentExecutor {
         self
     }
 
+    #[must_use] 
     pub const fn tool_registry(&self) -> &ToolRegistry {
         &self.tool_registry
     }

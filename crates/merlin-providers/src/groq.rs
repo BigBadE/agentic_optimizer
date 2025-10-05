@@ -18,20 +18,22 @@ pub struct GroqProvider {
 impl GroqProvider {
     pub fn new() -> Result<Self> {
         let api_key = env::var("GROQ_API_KEY")
-            .map_err(|_| Error::Other("GROQ_API_KEY not set".to_string()))?;
+            .map_err(|_| Error::Other("GROQ_API_KEY not set".to_owned()))?;
         
         Ok(Self {
             client: Client::new(),
             api_key,
-            model: DEFAULT_MODEL.to_string(),
+            model: DEFAULT_MODEL.to_owned(),
         })
     }
     
+    #[must_use] 
     pub fn with_model(mut self, model: String) -> Self {
         self.model = model;
         self
     }
     
+    #[must_use] 
     pub fn with_api_key(mut self, api_key: String) -> Self {
         self.api_key = api_key;
         self
@@ -89,8 +91,8 @@ impl ModelProvider for GroqProvider {
         
         let mut messages = vec![
             GroqMessage {
-                role: "system".to_string(),
-                content: "You are an expert coding assistant. Provide clear, concise, and correct code solutions.".to_string(),
+                role: "system".to_owned(),
+                content: "You are an expert coding assistant. Provide clear, concise, and correct code solutions.".to_owned(),
             }
         ];
         
@@ -107,7 +109,7 @@ impl ModelProvider for GroqProvider {
         }
         
         messages.push(GroqMessage {
-            role: "user".to_string(),
+            role: "user".to_owned(),
             content: user_content,
         });
         
@@ -125,23 +127,23 @@ impl ModelProvider for GroqProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| Error::Other(format!("Groq API request failed: {}", e)))?;
+            .map_err(|e| Error::Other(format!("Groq API request failed: {e}")))?;
         
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_string());
-            return Err(Error::Other(format!("Groq API error {}: {}", status, error_text)));
+            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_owned());
+            return Err(Error::Other(format!("Groq API error {status}: {error_text}")));
         }
         
         let groq_response: GroqResponse = response.json().await
-            .map_err(|e| Error::Other(format!("Failed to parse Groq response: {}", e)))?;
+            .map_err(|e| Error::Other(format!("Failed to parse Groq response: {e}")))?;
         
         let latency_ms = start.elapsed().as_millis() as u64;
         
         let text = groq_response.choices
             .first()
             .map(|c| c.message.content.clone())
-            .ok_or_else(|| Error::Other("No response from Groq".to_string()))?;
+            .ok_or_else(|| Error::Other("No response from Groq".to_owned()))?;
         
         let tokens_used = TokenUsage {
             input: groq_response.usage.prompt_tokens as u64,

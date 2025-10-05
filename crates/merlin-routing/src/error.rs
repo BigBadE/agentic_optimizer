@@ -76,6 +76,7 @@ pub enum RoutingError {
 }
 
 impl RoutingError {
+    #[must_use] 
     pub const fn is_retryable(&self) -> bool {
         matches!(
             self,
@@ -83,6 +84,7 @@ impl RoutingError {
         )
     }
 
+    #[must_use] 
     pub const fn can_escalate(&self) -> bool {
         matches!(self, Self::MaxRetriesExceeded { .. })
     }

@@ -11,6 +11,7 @@ pub struct TestValidationStage {
 }
 
 impl TestValidationStage {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             timeout_seconds: 300,
@@ -19,6 +20,7 @@ impl TestValidationStage {
         }
     }
     
+    #[must_use] 
     pub fn with_timeout(mut self, timeout_seconds: u64) -> Self {
         self.timeout_seconds = timeout_seconds;
         self
@@ -29,6 +31,7 @@ impl TestValidationStage {
         self
     }
     
+    #[must_use] 
     pub fn with_min_pass_rate(mut self, min_pass_rate: f64) -> Self {
         self.min_pass_rate = min_pass_rate;
         self

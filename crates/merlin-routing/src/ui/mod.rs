@@ -1,16 +1,21 @@
 use crossterm::event::{self, Event, KeyCode};
+use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use ratatui::{
     backend::CrosstermBackend,
     layout::{Constraint, Direction, Layout},
     style::{Color, Modifier, Style},
-    text::{Line, Span},
     widgets::{Block, Borders, List, ListItem, Paragraph},
     Terminal,
 };
-use std::collections::HashMap;
-use std::io;
-use std::time::{Duration, Instant};
+use serde::{Deserialize, Serialize};
+use std::{
+    collections::HashMap,
+    io::{self, Read, Write},
+    path::PathBuf,
+    time::{Duration, Instant, SystemTime},
+};
 use tokio::sync::mpsc;
+use tui_textarea::TextArea;
 use crate::{TaskId, TaskResult};
 
 pub mod events;
@@ -66,38 +71,169 @@ pub struct TuiApp {
     terminal: Terminal<CrosstermBackend<io::Stdout>>,
     event_receiver: mpsc::UnboundedReceiver<UiEvent>,
     state: UiState,
+    pending_input: Option<String>,
+    input_area: TextArea<'static>,
+    output_area: TextArea<'static>,
+    focused_pane: FocusedPane,
+    tasks_dir: Option<std::path::PathBuf>,
+    theme: Theme,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum FocusedPane {
+    Input,
+    Output,
+    Tasks,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+enum Theme {
+    Nord,
+    Dracula,
+    Gruvbox,
+    TokyoNight,
+    Catppuccin,
+    Monochrome,
+}
+
+impl Theme {
+    fn next(self) -> Self {
+        match self {
+            Theme::Nord => Theme::Dracula,
+            Theme::Dracula => Theme::Gruvbox,
+            Theme::Gruvbox => Theme::TokyoNight,
+            Theme::TokyoNight => Theme::Catppuccin,
+            Theme::Catppuccin => Theme::Monochrome,
+            Theme::Monochrome => Theme::Nord,
+        }
+    }
+    
+    fn name(self) -> &'static str {
+        match self {
+            Theme::Nord => "Nord",
+            Theme::Dracula => "Dracula",
+            Theme::Gruvbox => "Gruvbox",
+            Theme::TokyoNight => "Tokyo Night",
+            Theme::Catppuccin => "Catppuccin",
+            Theme::Monochrome => "Monochrome",
+        }
+    }
+    
+    fn focused_border(self) -> Color {
+        match self {
+            Theme::Nord => Color::Rgb(136, 192, 208),
+            Theme::Dracula => Color::Rgb(189, 147, 249),
+            Theme::Gruvbox => Color::Rgb(251, 184, 108),
+            Theme::TokyoNight => Color::Rgb(122, 162, 247),
+            Theme::Catppuccin => Color::Rgb(137, 180, 250),
+            Theme::Monochrome => Color::Rgb(100, 200, 255),
+        }
+    }
+    
+    fn unfocused_border(self) -> Color {
+        match self {
+            Theme::Nord => Color::Rgb(216, 222, 233),
+            Theme::Dracula => Color::Rgb(98, 114, 164),
+            Theme::Gruvbox => Color::Rgb(168, 153, 132),
+            Theme::TokyoNight => Color::Rgb(86, 95, 137),
+            Theme::Catppuccin => Color::Rgb(108, 112, 134),
+            Theme::Monochrome => Color::Rgb(128, 128, 128),
+        }
+    }
+    
+    fn text(self) -> Color {
+        match self {
+            Theme::Nord => Color::Rgb(236, 239, 244),
+            Theme::Dracula => Color::Rgb(248, 248, 242),
+            Theme::Gruvbox => Color::Rgb(235, 219, 178),
+            Theme::TokyoNight => Color::Rgb(192, 202, 245),
+            Theme::Catppuccin => Color::Rgb(205, 214, 244),
+            Theme::Monochrome => Color::Rgb(255, 255, 255),
+        }
+    }
+    
+    fn success(self) -> Color {
+        match self {
+            Theme::Nord => Color::Rgb(163, 190, 140),
+            Theme::Dracula => Color::Rgb(80, 250, 123),
+            Theme::Gruvbox => Color::Rgb(184, 187, 38),
+            Theme::TokyoNight => Color::Rgb(158, 206, 106),
+            Theme::Catppuccin => Color::Rgb(166, 227, 161),
+            Theme::Monochrome => Color::Rgb(100, 255, 100),
+        }
+    }
+    
+    fn error(self) -> Color {
+        match self {
+            Theme::Nord => Color::Rgb(191, 97, 106),
+            Theme::Dracula => Color::Rgb(255, 85, 85),
+            Theme::Gruvbox => Color::Rgb(251, 73, 52),
+            Theme::TokyoNight => Color::Rgb(247, 118, 142),
+            Theme::Catppuccin => Color::Rgb(243, 139, 168),
+            Theme::Monochrome => Color::Rgb(255, 100, 100),
+        }
+    }
+    
+    fn warning(self) -> Color {
+        match self {
+            Theme::Nord => Color::Rgb(235, 203, 139),
+            Theme::Dracula => Color::Rgb(241, 250, 140),
+            Theme::Gruvbox => Color::Rgb(250, 189, 47),
+            Theme::TokyoNight => Color::Rgb(224, 175, 104),
+            Theme::Catppuccin => Color::Rgb(249, 226, 175),
+            Theme::Monochrome => Color::Rgb(255, 200, 100),
+        }
+    }
+    
+    fn highlight(self) -> Color {
+        self.focused_border()
+    }
 }
 
 #[derive(Default)]
 struct UiState {
     tasks: HashMap<TaskId, TaskDisplay>,
     task_order: Vec<TaskId>,
-    output_buffer: Vec<OutputLine>,
-    scroll_offset: usize,
-    input_buffer: String,
-    input_mode: InputMode,
+    conversation_history: Vec<ConversationEntry>,
+    selected_task_index: usize,
+    active_task_id: Option<TaskId>,
+    loading_tasks: bool,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum InputMode {
-    Normal,
-    Editing,
+#[derive(Clone)]
+struct ConversationEntry {
+    role: ConversationRole,
+    text: String,
+    timestamp: Instant,
 }
 
-impl Default for InputMode {
-    fn default() -> Self {
-        Self::Normal
-    }
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum ConversationRole {
+    User,
+    Assistant,
+    System,
 }
 
 struct TaskDisplay {
-    id: TaskId,
     description: String,
     status: TaskStatus,
     progress: Option<TaskProgress>,
     output_lines: Vec<String>,
     start_time: Instant,
     end_time: Option<Instant>,
+    parent_id: Option<TaskId>,
+    output_area: TextArea<'static>,
+}
+
+#[derive(Serialize, Deserialize)]
+struct SerializableTask {
+    id: TaskId,
+    description: String,
+    status: String,
+    output_text: String,
+    start_time: SystemTime,
+    end_time: Option<SystemTime>,
+    parent_id: Option<TaskId>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -107,15 +243,13 @@ enum TaskStatus {
     Failed,
 }
 
-struct OutputLine {
-    task_id: Option<TaskId>,
-    timestamp: Instant,
-    level: MessageLevel,
-    text: String,
-}
 
 impl TuiApp {
     pub fn new() -> crate::Result<(Self, UiChannel)> {
+        Self::new_with_storage(None)
+    }
+    
+    pub fn new_with_storage(tasks_dir: impl Into<Option<PathBuf>>) -> crate::Result<(Self, UiChannel)> {
         let (sender, receiver) = mpsc::unbounded_channel();
         
         let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))
@@ -124,10 +258,45 @@ impl TuiApp {
         terminal.clear()
             .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
         
+        let mut input_area = TextArea::default();
+        input_area.set_block(
+            Block::default()
+                .borders(Borders::ALL)
+                .title(" Input ")
+                .padding(ratatui::widgets::Padding::horizontal(1))
+        );
+        input_area.set_cursor_line_style(Style::default());
+        input_area.set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
+        input_area.set_tab_length(4);
+        
+        let mut output_area = TextArea::default();
+        output_area.set_block(Block::default().borders(Borders::ALL).title("Output (Read-Only)"));
+        
+        let tasks_dir = tasks_dir.into();
+        let mut state = UiState::default();
+        
+        // Mark as loading if we have a tasks directory
+        if tasks_dir.is_some() {
+            state.loading_tasks = true;
+        }
+        
+        // Load saved theme or use Tokyo Night as default
+        let theme = if let Some(ref dir) = tasks_dir {
+            Self::load_theme(dir).unwrap_or(Theme::TokyoNight)
+        } else {
+            Theme::TokyoNight
+        };
+        
         let app = Self {
             terminal,
             event_receiver: receiver,
-            state: UiState::default(),
+            state,
+            pending_input: None,
+            input_area,
+            output_area,
+            focused_pane: FocusedPane::Input,
+            tasks_dir,
+            theme,
         };
         
         let channel = UiChannel { sender };
@@ -135,128 +304,508 @@ impl TuiApp {
         Ok((app, channel))
     }
     
-    pub async fn run(mut self) -> crate::Result<()> {
-        loop {
-            while let Ok(event) = self.event_receiver.try_recv() {
-                self.handle_event(event);
+    pub async fn load_tasks_async(&mut self) {
+        if let Some(ref tasks_dir) = self.tasks_dir {
+            let dir = tasks_dir.clone();
+            
+            // Spawn async task loading
+            let loaded_tasks = tokio::task::spawn_blocking(move || {
+                Self::load_tasks(&dir)
+            }).await;
+            
+            if let Ok(Ok(tasks)) = loaded_tasks {
+                for (task_id, task_display) in tasks {
+                    self.state.tasks.insert(task_id, task_display);
+                    self.state.task_order.push(task_id);
+                }
+                if let Some(&first_task) = self.state.task_order.first() {
+                    self.state.active_task_id = Some(first_task);
+                }
             }
             
-            self.render()
-                .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
+            self.state.loading_tasks = false;
+        }
+    }
+    
+    fn load_tasks(tasks_dir: &PathBuf) -> io::Result<HashMap<TaskId, TaskDisplay>> {
+        use std::fs;
+        
+        let mut tasks = HashMap::new();
+        
+        if !tasks_dir.exists() {
+            return Ok(tasks);
+        }
+        
+        for entry in fs::read_dir(tasks_dir)? {
+            let entry = entry?;
+            let path = entry.path();
             
-            if event::poll(Duration::from_millis(50))
-                .map_err(|e| crate::RoutingError::Other(e.to_string()))? 
-            {
-                if let Event::Key(key) = event::read()
-                    .map_err(|e| crate::RoutingError::Other(e.to_string()))?
-                {
-                    match self.state.input_mode {
-                        InputMode::Normal => {
-                            match key.code {
-                                KeyCode::Char('q') => break,
-                                KeyCode::Char('i') => {
-                                    self.state.input_mode = InputMode::Editing;
-                                }
-                                KeyCode::Up => self.scroll_up(),
-                                KeyCode::Down => self.scroll_down(),
-                                KeyCode::PageUp => self.page_up(),
-                                KeyCode::PageDown => self.page_down(),
-                                _ => {}
-                            }
-                        }
-                        InputMode::Editing => {
-                            match key.code {
-                                KeyCode::Esc => {
-                                    self.state.input_mode = InputMode::Normal;
-                                }
-                                KeyCode::Enter => {
-                                    self.submit_input();
-                                    self.state.input_mode = InputMode::Normal;
-                                }
-                                KeyCode::Backspace => {
-                                    self.state.input_buffer.pop();
-                                }
-                                KeyCode::Char(c) => {
-                                    self.state.input_buffer.push(c);
-                                }
-                                _ => {}
-                            }
+            // Look for .gz compressed files
+            if path.extension().and_then(|s| s.to_str()) == Some("gz") {
+                if let Ok(file) = fs::File::open(&path) {
+                    let mut decoder = GzDecoder::new(file);
+                    let mut json_str = String::new();
+                    
+                    if decoder.read_to_string(&mut json_str).is_ok() {
+                        if let Ok(serializable) = serde_json::from_str::<SerializableTask>(&json_str) {
+                            let mut output_area = TextArea::default();
+                            output_area.set_block(Block::default().borders(Borders::ALL).title("Task Output"));
+                            output_area.insert_str(&serializable.output_text);
+                            
+                            let status = match serializable.status.as_str() {
+                                "Running" => TaskStatus::Running,
+                                "Completed" => TaskStatus::Completed,
+                                "Failed" => TaskStatus::Failed,
+                                _ => TaskStatus::Running,
+                            };
+                            
+                            let task_display = TaskDisplay {
+                                description: serializable.description,
+                                status,
+                                progress: None,
+                                output_lines: Vec::new(),
+                                start_time: Instant::now(),
+                                end_time: if serializable.end_time.is_some() { Some(Instant::now()) } else { None },
+                                parent_id: serializable.parent_id,
+                                output_area,
+                            };
+                            
+                            tasks.insert(serializable.id, task_display);
                         }
                     }
                 }
             }
-            
-            tokio::time::sleep(Duration::from_millis(50)).await;
         }
         
-        self.terminal.clear()
-            .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
+        Ok(tasks)
+    }
+    
+    fn load_theme(tasks_dir: &PathBuf) -> io::Result<Theme> {
+        let theme_file = tasks_dir.parent()
+            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No parent directory"))?
+            .join("theme.json");
         
-        Ok(())
+        if !theme_file.exists() {
+            return Err(io::Error::new(io::ErrorKind::NotFound, "Theme file not found"));
+        }
+        
+        let content = std::fs::read_to_string(theme_file)?;
+        serde_json::from_str(&content)
+            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+    }
+    
+    fn save_theme(&self) {
+        if let Some(ref tasks_dir) = self.tasks_dir {
+            if let Some(parent) = tasks_dir.parent() {
+                let theme_file = parent.join("theme.json");
+                if let Ok(json) = serde_json::to_string(&self.theme) {
+                    drop(std::fs::write(theme_file, json));
+                }
+            }
+        }
+    }
+    
+    fn save_task(&self, task_id: TaskId, task: &TaskDisplay) {
+        if let Some(ref tasks_dir) = self.tasks_dir {
+            let status_str = match task.status {
+                TaskStatus::Running => "Running",
+                TaskStatus::Completed => "Completed",
+                TaskStatus::Failed => "Failed",
+            };
+            
+            let serializable = SerializableTask {
+                id: task_id,
+                description: task.description.clone(),
+                status: status_str.to_string(),
+                output_text: task.output_area.lines().join("\n"),
+                start_time: SystemTime::now(),
+                end_time: if task.end_time.is_some() { Some(SystemTime::now()) } else { None },
+                parent_id: task.parent_id,
+            };
+            
+            // Clean filename: just the UUID part without "TaskId()" wrapper
+            let task_id_str = format!("{:?}", task_id);
+            let clean_id = task_id_str
+                .strip_prefix("TaskId(")
+                .and_then(|s| s.strip_suffix(")"))
+                .unwrap_or(&task_id_str);
+            
+            let filename = format!("{}.json.gz", clean_id);
+            let path = tasks_dir.join(filename);
+            
+            // Compress with gzip (fast compression)
+            if let Ok(json) = serde_json::to_string(&serializable) {
+                if let Ok(file) = std::fs::File::create(path) {
+                    let mut encoder = GzEncoder::new(file, Compression::fast());
+                    drop(encoder.write_all(json.as_bytes()));
+                }
+            }
+        }
+    }
+    
+    pub fn enable_raw_mode(&self) -> crate::Result<()> {
+        crossterm::terminal::enable_raw_mode()
+            .map_err(|e| crate::RoutingError::Other(e.to_string()))
+    }
+    
+    pub fn disable_raw_mode(&mut self) -> crate::Result<()> {
+        crossterm::terminal::disable_raw_mode()
+            .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
+        self.terminal.clear()
+            .map_err(|e| crate::RoutingError::Other(e.to_string()))
+    }
+    
+    pub async fn tick(&mut self) -> crate::Result<bool> {
+        while let Ok(event) = self.event_receiver.try_recv() {
+            self.handle_event(event);
+            self.render()
+                .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
+        }
+        
+        if event::poll(Duration::from_millis(50))
+            .map_err(|e| crate::RoutingError::Other(e.to_string()))? 
+        {
+            let event = event::read()
+                .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
+            
+            if let Event::Key(key) = &event {
+                match key.kind {
+                    crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat => {},
+                    _ => return Ok(false),
+                }
+                
+                match key.code {
+                    KeyCode::Char('q') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => return Ok(true),
+                    KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => return Ok(true),
+                    // Ctrl+P for theme (P for Palette)
+                    KeyCode::Char('p') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        self.theme = self.theme.next();
+                        self.save_theme();
+                    }
+                    // Ctrl+T for tasks
+                    KeyCode::Char('t') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        self.focused_pane = match self.focused_pane {
+                            FocusedPane::Tasks => FocusedPane::Input,
+                            _ => FocusedPane::Tasks,
+                        };
+                    }
+                    KeyCode::Tab => {
+                        self.focused_pane = match self.focused_pane {
+                            FocusedPane::Input => FocusedPane::Output,
+                            FocusedPane::Output => FocusedPane::Input,
+                            FocusedPane::Tasks => FocusedPane::Input,
+                        };
+                    }
+                    KeyCode::Enter if self.focused_pane == FocusedPane::Input => {
+                        if self.submit_input() {
+                            return Ok(true);
+                        }
+                    }
+                    KeyCode::Up if self.focused_pane == FocusedPane::Tasks => {
+                        if self.state.selected_task_index > 0 {
+                            self.state.selected_task_index -= 1;
+                            self.switch_to_selected_task();
+                        }
+                    }
+                    KeyCode::Down if self.focused_pane == FocusedPane::Tasks => {
+                        if self.state.selected_task_index < self.state.task_order.len().saturating_sub(1) {
+                            self.state.selected_task_index += 1;
+                            self.switch_to_selected_task();
+                        }
+                    }
+                    _ => {
+                        match self.focused_pane {
+                            FocusedPane::Input => {
+                                // Only auto-wrap on text changes, not cursor movement
+                                let should_wrap = matches!(key.code,
+                                    KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete | 
+                                    KeyCode::Enter
+                                );
+                                
+                                self.input_area.input(event);
+                                
+                                if should_wrap {
+                                    self.auto_wrap_input();
+                                }
+                            }
+                            FocusedPane::Output => {
+                                // Output is read-only, only allow scrolling
+                                if let Some(task_id) = self.state.active_task_id {
+                                    if let Some(task) = self.state.tasks.get_mut(&task_id) {
+                                        match key.code {
+                                            KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right |
+                                            KeyCode::Home | KeyCode::End | KeyCode::PageUp | KeyCode::PageDown => {
+                                                task.output_area.input(event);
+                                            }
+                                            _ => {} // Ignore all other keys (read-only)
+                                        }
+                                    }
+                                }
+                            }
+                            FocusedPane::Tasks => {}
+                        }
+                    }
+                }
+                
+                self.render()
+                    .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
+            }
+        }
+        
+        Ok(false)
+    }
+    
+    
+    fn switch_to_selected_task(&mut self) {
+        if let Some(&task_id) = self.state.task_order.get(self.state.selected_task_index) {
+            self.state.active_task_id = Some(task_id);
+        }
+    }
+    
+    fn auto_wrap_input(&mut self) {
+        // Calculate available width more accurately
+        let terminal_width = self.terminal.size().map(|s| s.width).unwrap_or(80);
+        let input_width = (terminal_width as f32 * 0.7) as usize;
+        // Account for: borders (2) + padding (2)
+        let max_line_width = input_width.saturating_sub(4);
+        
+        let (cursor_row, cursor_col) = self.input_area.cursor();
+        let lines = self.input_area.lines().to_vec();
+        
+        if cursor_row >= lines.len() {
+            return;
+        }
+        
+        // Try to unwrap with next line (merge current + next)
+        if cursor_row + 1 < lines.len() {
+            let current_line = &lines[cursor_row];
+            let next_line = &lines[cursor_row + 1];
+            
+            // Check if merging would fit (+1 for space, +1 for potential next char)
+            let combined_len = current_line.len() + 1 + next_line.len();
+            if combined_len < max_line_width {
+                let combined = if current_line.is_empty() {
+                    next_line.to_string()
+                } else if next_line.is_empty() {
+                    current_line.to_string()
+                } else {
+                    format!("{} {}", current_line, next_line)
+                };
+                
+                // Save cursor position
+                let saved_col = cursor_col;
+                
+                // Replace lines
+                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+                self.input_area.delete_line_by_end();
+                self.input_area.insert_str(&combined);
+                self.input_area.move_cursor(tui_textarea::CursorMove::Down);
+                self.input_area.delete_line_by_head();
+                self.input_area.delete_line_by_end();
+                
+                // Restore cursor
+                self.input_area.move_cursor(tui_textarea::CursorMove::Up);
+                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+                for _ in 0..saved_col.min(combined.len()) {
+                    self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
+                }
+                return;
+            }
+        }
+        
+        // Try to pull from previous line (when current line is short)
+        if cursor_row > 0 {
+            let prev_line = &lines[cursor_row - 1];
+            let current_line = &lines[cursor_row];
+            
+            // If previous line has content and current is short, try to pull last word
+            if !prev_line.is_empty() && current_line.len() < max_line_width / 2 {
+                // Find last word in previous line
+                if let Some(last_space_pos) = prev_line.rfind(' ') {
+                    let prev_first = &prev_line[..last_space_pos];
+                    let prev_last_word = &prev_line[last_space_pos..].trim_start();
+                    
+                    // Check if pulling would fit
+                    let new_current_len = prev_last_word.len() + 1 + current_line.len();
+                    if new_current_len < max_line_width {
+                        let new_current = if current_line.is_empty() {
+                            prev_last_word.to_string()
+                        } else {
+                            format!("{} {}", prev_last_word, current_line)
+                        };
+                        
+                        let saved_col = cursor_col;
+                        
+                        // Update previous line
+                        self.input_area.move_cursor(tui_textarea::CursorMove::Up);
+                        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+                        self.input_area.delete_line_by_end();
+                        self.input_area.insert_str(prev_first);
+                        
+                        // Update current line
+                        self.input_area.move_cursor(tui_textarea::CursorMove::Down);
+                        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+                        self.input_area.delete_line_by_end();
+                        self.input_area.insert_str(&new_current);
+                        
+                        // Restore cursor (adjusted for pulled word)
+                        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+                        let new_col = saved_col + prev_last_word.len() + 1;
+                        for _ in 0..new_col.min(new_current.len()) {
+                            self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
+                        }
+                        return;
+                    }
+                }
+            }
+        }
+        
+        // Check if current line needs wrapping
+        let current_line = &lines[cursor_row];
+        if current_line.len() <= max_line_width {
+            return;
+        }
+        
+        // Check if next line exists and would be affected
+        let has_next_line = cursor_row + 1 < lines.len();
+        
+        // Find wrap position (last space before limit)
+        let wrap_pos = current_line[..max_line_width]
+            .rfind(' ')
+            .unwrap_or(max_line_width.saturating_sub(1));
+        
+        // Split line
+        let first_part = current_line[..wrap_pos].to_string();
+        let second_part = current_line[wrap_pos..].trim_start().to_string();
+        
+        // Save cursor column
+        let saved_col = cursor_col;
+        
+        // If there's a next line, we need to merge the wrapped part with it
+        if has_next_line {
+            let next_line = &lines[cursor_row + 1];
+            let second_part_len = second_part.len();
+            let merged_second = if second_part.is_empty() {
+                next_line.to_string()
+            } else if next_line.is_empty() {
+                second_part.clone()
+            } else {
+                format!("{} {}", second_part, next_line)
+            };
+            
+            // Replace current line with first part
+            self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+            self.input_area.delete_line_by_end();
+            self.input_area.insert_str(&first_part);
+            
+            // Replace next line with merged second part
+            self.input_area.move_cursor(tui_textarea::CursorMove::Down);
+            self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+            self.input_area.delete_line_by_end();
+            self.input_area.insert_str(&merged_second);
+            
+            // Position cursor
+            if saved_col <= first_part.len() {
+                self.input_area.move_cursor(tui_textarea::CursorMove::Up);
+                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+                for _ in 0..saved_col.min(first_part.len()) {
+                    self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
+                }
+            } else {
+                let new_col = saved_col.saturating_sub(wrap_pos).saturating_sub(current_line[wrap_pos..].len() - second_part_len);
+                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+                for _ in 0..new_col.min(merged_second.len()) {
+                    self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
+                }
+            }
+        } else {
+            // No next line, create new one
+            self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+            self.input_area.delete_line_by_end();
+            self.input_area.insert_str(&first_part);
+            self.input_area.insert_newline();
+            self.input_area.insert_str(&second_part);
+            
+            // Position cursor
+            if saved_col <= first_part.len() {
+                self.input_area.move_cursor(tui_textarea::CursorMove::Up);
+                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+                for _ in 0..saved_col.min(first_part.len()) {
+                    self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
+                }
+            } else {
+                let new_col = saved_col.saturating_sub(wrap_pos).saturating_sub(current_line[wrap_pos..].len() - second_part.len());
+                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+                for _ in 0..new_col.min(second_part.len()) {
+                    self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
+                }
+            }
+        }
     }
     
     fn handle_event(&mut self, event: UiEvent) {
         match event {
-            UiEvent::TaskStarted { task_id, description, parent_id: _ } => {
+            UiEvent::TaskStarted { task_id, description, parent_id } => {
+                let mut output_area = TextArea::default();
+                output_area.set_block(Block::default().borders(Borders::ALL).title("Task Output"));
+                output_area.insert_str(format!("▶ Started: {description}"));
+                
                 let task_display = TaskDisplay {
-                    id: task_id,
                     description: description.clone(),
                     status: TaskStatus::Running,
                     progress: None,
                     output_lines: Vec::new(),
                     start_time: Instant::now(),
                     end_time: None,
+                    parent_id,
+                    output_area,
                 };
                 
                 self.state.tasks.insert(task_id, task_display);
                 self.state.task_order.push(task_id);
                 
-                self.state.output_buffer.push(OutputLine {
-                    task_id: Some(task_id),
-                    timestamp: Instant::now(),
-                    level: MessageLevel::Info,
-                    text: format!("▶ Started: {}", description),
-                });
+                if self.state.active_task_id.is_none() {
+                    self.state.active_task_id = Some(task_id);
+                }
+                
+                if let Some(task) = self.state.tasks.get(&task_id) {
+                    self.save_task(task_id, task);
+                }
             }
             
             UiEvent::TaskProgress { task_id, progress } => {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.output_lines.push(format!("  {} - {}", progress.stage, progress.message));
+                    task.output_area.insert_str(format!("\n  {} - {}", progress.stage, progress.message));
                     task.progress = Some(progress.clone());
                 }
-                
-                self.state.output_buffer.push(OutputLine {
-                    task_id: Some(task_id),
-                    timestamp: Instant::now(),
-                    level: MessageLevel::Info,
-                    text: format!("  {} - {}", progress.stage, progress.message),
-                });
             }
             
             UiEvent::TaskOutput { task_id, output } => {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.output_lines.push(output.clone());
+                    task.output_area.insert_str(format!("\n{output}"));
                 }
-                
-                self.state.output_buffer.push(OutputLine {
-                    task_id: Some(task_id),
-                    timestamp: Instant::now(),
-                    level: MessageLevel::Info,
-                    text: output,
-                });
             }
             
             UiEvent::TaskCompleted { task_id, result } => {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.status = TaskStatus::Completed;
                     task.end_time = Some(Instant::now());
+                    
+                    let duration_secs = result.duration_ms as f64 / 1000.0;
+                    task.output_area.insert_str(format!("\nMerlin: {}", result.response.text));
+                    task.output_area.insert_str(format!("\n✓ Completed ({:.2}s)", duration_secs));
                 }
                 
-                self.state.output_buffer.push(OutputLine {
-                    task_id: Some(task_id),
+                if let Some(task) = self.state.tasks.get(&task_id) {
+                    self.save_task(task_id, task);
+                }
+                
+                self.state.conversation_history.push(ConversationEntry {
+                    role: ConversationRole::Assistant,
+                    text: result.response.text,
                     timestamp: Instant::now(),
-                    level: MessageLevel::Success,
-                    text: format!("✓ Completed ({}ms)", result.duration_ms),
                 });
             }
             
@@ -264,22 +813,32 @@ impl TuiApp {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.status = TaskStatus::Failed;
                     task.end_time = Some(Instant::now());
+                    task.output_area.insert_str(format!("\n✗ Failed: {error}"));
                 }
                 
-                self.state.output_buffer.push(OutputLine {
-                    task_id: Some(task_id),
-                    timestamp: Instant::now(),
-                    level: MessageLevel::Error,
-                    text: format!("✗ Failed: {}", error),
-                });
+                if let Some(task) = self.state.tasks.get(&task_id) {
+                    self.save_task(task_id, task);
+                }
             }
             
             UiEvent::SystemMessage { level, message } => {
-                self.state.output_buffer.push(OutputLine {
-                    task_id: None,
-                    timestamp: Instant::now(),
-                    level,
+                let prefix = match level {
+                    MessageLevel::Info => "ℹ",
+                    MessageLevel::Warning => "⚠",
+                    MessageLevel::Error => "✗",
+                    MessageLevel::Success => "✓",
+                };
+                
+                if let Some(task_id) = self.state.active_task_id {
+                    if let Some(task) = self.state.tasks.get_mut(&task_id) {
+                        task.output_area.insert_str(format!("\n{prefix} {message}"));
+                    }
+                }
+                
+                self.state.conversation_history.push(ConversationEntry {
+                    role: ConversationRole::System,
                     text: message,
+                    timestamp: Instant::now(),
                 });
             }
         }
@@ -296,38 +855,13 @@ impl TuiApp {
             .filter(|t| t.status == TaskStatus::Failed)
             .count();
         
-        let visible_lines = 30;
-        let start = self.state.scroll_offset;
-        let end = (start + visible_lines).min(self.state.output_buffer.len());
-        
-        let output_lines: Vec<Line> = self.state.output_buffer[start..end]
-            .iter()
-            .map(|line| {
-                let level_icon = match line.level {
-                    MessageLevel::Info => "ℹ",
-                    MessageLevel::Warning => "⚠",
-                    MessageLevel::Error => "✗",
-                    MessageLevel::Success => "✓",
-                };
-                
-                let style = match line.level {
-                    MessageLevel::Error => Style::default().fg(Color::Red),
-                    MessageLevel::Warning => Style::default().fg(Color::Yellow),
-                    MessageLevel::Success => Style::default().fg(Color::Green),
-                    MessageLevel::Info => Style::default(),
-                };
-                
-                Line::from(vec![
-                    Span::styled(format!("{} ", level_icon), style),
-                    Span::raw(&line.text),
-                ])
-            })
-            .collect();
-        
         let task_items: Vec<ListItem> = self.state.task_order
             .iter()
-            .filter_map(|task_id| self.state.tasks.get(task_id))
-            .map(|task| {
+            .enumerate()
+            .filter_map(|(idx, task_id)| {
+                self.state.tasks.get(task_id).map(|task| (idx, task_id, task))
+            })
+            .map(|(idx, task_id, task)| {
                 let status_icon = match task.status {
                     TaskStatus::Running => "▶",
                     TaskStatus::Completed => "✓",
@@ -337,10 +871,15 @@ impl TuiApp {
                 let elapsed = task.end_time
                     .unwrap_or_else(Instant::now)
                     .duration_since(task.start_time)
-                    .as_millis();
+                    .as_secs_f64();
+                
+                let indent = if task.parent_id.is_some() { "  " } else { "" };
+                let selected = if idx == self.state.selected_task_index { "► " } else { "" };
                 
                 let mut text = format!(
-                    "{} {} ({}ms)",
+                    "{}{}{} {} ({:.0}s)",
+                    indent,
+                    selected,
                     status_icon,
                     task.description,
                     elapsed
@@ -351,106 +890,215 @@ impl TuiApp {
                     
                     if let Some(total) = progress.total {
                         let percent = (progress.current as f64 / total as f64 * 100.0) as u16;
-                        text.push_str(&format!(" [{}%]", percent));
+                        text.push_str(&format!(" [{percent}%]"));
                     }
                 }
                 
-                let style = match task.status {
-                    TaskStatus::Completed => Style::default().fg(Color::Green),
-                    TaskStatus::Failed => Style::default().fg(Color::Red),
-                    TaskStatus::Running => Style::default().add_modifier(Modifier::BOLD),
+                let mut style = match task.status {
+                    TaskStatus::Completed => Style::default().fg(self.theme.success()),
+                    TaskStatus::Failed => Style::default().fg(self.theme.error()),
+                    TaskStatus::Running => Style::default().fg(self.theme.text()).add_modifier(Modifier::BOLD),
                 };
+                
+                if idx == self.state.selected_task_index && self.focused_pane == FocusedPane::Tasks {
+                    style = style.fg(self.theme.highlight()).add_modifier(Modifier::BOLD);
+                }
                 
                 ListItem::new(text).style(style)
             })
             .collect();
         
-        let input_text = if self.state.input_mode == InputMode::Editing {
-            format!("> {}_", self.state.input_buffer)
-        } else {
-            format!("> {} (press 'i' to edit)", self.state.input_buffer)
-        };
+        if let Some(task_id) = self.state.active_task_id {
+            if let Some(task) = self.state.tasks.get_mut(&task_id) {
+                if self.focused_pane == FocusedPane::Output {
+                    task.output_area.set_block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(format!("─── Task Output: {} ", task.description))
+                            .border_style(Style::default().fg(self.theme.focused_border()))
+                            .padding(ratatui::widgets::Padding::horizontal(1))
+                    );
+                    task.output_area.set_style(Style::default().fg(self.theme.text()));
+                    task.output_area.set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
+                } else {
+                    task.output_area.set_block(
+                        Block::default()
+                            .borders(Borders::ALL)
+                            .title(format!("─── Task Output: {} ", task.description))
+                            .border_style(Style::default().fg(self.theme.unfocused_border()))
+                            .padding(ratatui::widgets::Padding::horizontal(1))
+                    );
+                    task.output_area.set_style(Style::default().fg(self.theme.text()));
+                    task.output_area.set_cursor_style(Style::default());
+                }
+            }
+        }
         
-        let help = match self.state.input_mode {
-            InputMode::Normal => "i: Input | ↑/↓: Scroll | PgUp/PgDn: Page | q: Quit",
-            InputMode::Editing => "ESC: Cancel | ENTER: Submit",
-        };
+        if self.focused_pane == FocusedPane::Input {
+            self.input_area.set_block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("─── Input ")
+                    .border_style(Style::default().fg(self.theme.focused_border()))
+                    .padding(ratatui::widgets::Padding::horizontal(1))
+            );
+            self.input_area.set_style(Style::default().fg(self.theme.text()));
+            self.input_area.set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
+        } else {
+            self.input_area.set_block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("─── Input ")
+                    .border_style(Style::default().fg(self.theme.unfocused_border()))
+                    .padding(ratatui::widgets::Padding::horizontal(1))
+            );
+            self.input_area.set_style(Style::default().fg(self.theme.text()));
+            self.input_area.set_cursor_style(Style::default());
+        }
         
         self.terminal.draw(|frame| {
-            let chunks = Layout::default()
-                .direction(Direction::Vertical)
+            let main_chunks = Layout::default()
+                .direction(Direction::Horizontal)
                 .constraints([
-                    Constraint::Length(3),
+                    Constraint::Percentage(70),
                     Constraint::Percentage(30),
-                    Constraint::Min(10),
-                    Constraint::Length(3),
-                    Constraint::Length(3),
                 ])
                 .split(frame.area());
             
-            let header = Paragraph::new(format!(
-                "Agentic Optimizer - Tasks: {} running | {} completed | {} failed",
-                running, completed, failed
-            ))
-            .block(Block::default().borders(Borders::ALL).title("Status"));
-            frame.render_widget(header, chunks[0]);
+            // Calculate input height based on number of lines (max 10)
+            let input_lines = self.input_area.lines().len().max(1).min(10);
+            let input_height = (input_lines + 2) as u16; // +2 for borders
             
-            let paragraph = Paragraph::new(output_lines)
-                .block(Block::default()
-                    .borders(Borders::ALL)
-                    .title(format!("Output (scroll: {}/{})", start, self.state.output_buffer.len())));
-            frame.render_widget(paragraph, chunks[1]);
+            let left_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Min(5),
+                    Constraint::Length(input_height),
+                ])
+                .split(main_chunks[0]);
+            
+            let right_chunks = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    Constraint::Min(5),
+                    Constraint::Length(3),
+                ])
+                .split(main_chunks[1]);
+            
+            if self.state.loading_tasks {
+                // Show loading indicator
+                let loading_text = Paragraph::new("Loading tasks...")
+                    .style(Style::default().fg(self.theme.warning()))
+                    .block(Block::default()
+                        .borders(Borders::ALL)
+                        .title("─── Task Output ")
+                        .padding(ratatui::widgets::Padding::horizontal(1)))
+                    .alignment(ratatui::layout::Alignment::Center);
+                frame.render_widget(loading_text, left_chunks[0]);
+            } else if let Some(task_id) = self.state.active_task_id {
+                if let Some(task) = self.state.tasks.get(&task_id) {
+                    frame.render_widget(&task.output_area, left_chunks[0]);
+                }
+            } else {
+                // Show instructions when no task is active
+                let instructions = vec![
+                    "Welcome to Merlin!",
+                    "",
+                    "Getting Started:",
+                    "  • Type your request in the Input box below",
+                    "  • Press ENTER to submit",
+                    "  • Each request creates a new task",
+                    "",
+                    "Navigation:",
+                    "  • TAB: Switch between Input and Output",
+                    "  • Ctrl+T: Focus task list",
+                    "  • Ctrl+P: Change theme (Palette)",
+                    "  • ↑/↓: Navigate tasks (when task list focused)",
+                    "",
+                    "The output pane will show the selected task's progress.",
+                ];
+                
+                let help_text = Paragraph::new(instructions.join("\n"))
+                    .style(Style::default().fg(Color::DarkGray))
+                    .block(Block::default()
+                        .borders(Borders::ALL)
+                        .title("─── Task Output ")
+                        .border_style(Style::default().fg(self.theme.unfocused_border()))
+                        .padding(ratatui::widgets::Padding::horizontal(1)))
+                    .alignment(ratatui::layout::Alignment::Left);
+                frame.render_widget(help_text, left_chunks[0]);
+            }
+            frame.render_widget(&self.input_area, left_chunks[1]);
+            
+            let list_title = "─── Active Tasks ";
+            let list_border_style = if self.focused_pane == FocusedPane::Tasks {
+                Style::default().fg(self.theme.focused_border())
+            } else {
+                Style::default().fg(self.theme.unfocused_border())
+            };
             
             let list = List::new(task_items)
-                .block(Block::default().borders(Borders::ALL).title("Active Tasks"));
-            frame.render_widget(list, chunks[2]);
-            
-            let input = Paragraph::new(input_text)
                 .block(Block::default()
                     .borders(Borders::ALL)
-                    .title(match self.state.input_mode {
-                        InputMode::Normal => "Input (Normal Mode)",
-                        InputMode::Editing => "Input (Editing - ESC to cancel, ENTER to submit)",
-                    }));
-            frame.render_widget(input, chunks[3]);
+                    .title(list_title)
+                    .border_style(list_border_style))
+                .style(Style::default().fg(Color::White));
+            frame.render_widget(list, right_chunks[0]);
             
-            let status = Paragraph::new(help)
-                .block(Block::default().borders(Borders::ALL));
-            frame.render_widget(status, chunks[4]);
+            let status = Paragraph::new(format!(
+                "Tasks: {running} running | {completed} completed | {failed} failed | Theme: {}",
+                self.theme.name()
+            ))
+            .style(Style::default().fg(self.theme.text()))
+            .block(Block::default()
+                .borders(Borders::ALL)
+                .title("─── Status ")
+                .padding(ratatui::widgets::Padding::horizontal(1)));
+            frame.render_widget(status, right_chunks[1]);
         })?;
         
         Ok(())
     }
     
     
-    fn submit_input(&mut self) {
-        if !self.state.input_buffer.is_empty() {
-            self.state.output_buffer.push(OutputLine {
-                task_id: None,
+    fn submit_input(&mut self) -> bool {
+        let input = self.input_area.lines()[0].trim().to_string();
+        
+        if !input.is_empty() {
+            if input.eq_ignore_ascii_case("exit") || input.eq_ignore_ascii_case("quit") {
+                return true;
+            }
+            
+            self.state.conversation_history.push(ConversationEntry {
+                role: ConversationRole::User,
+                text: input.clone(),
                 timestamp: Instant::now(),
-                level: MessageLevel::Info,
-                text: format!("User input: {}", self.state.input_buffer),
             });
             
-            self.state.input_buffer.clear();
+            self.output_area.insert_str(format!("\nYou: {input}"));
+            self.output_area.move_cursor(tui_textarea::CursorMove::End);
+            
+            self.pending_input = Some(input);
+            self.input_area = TextArea::default();
+            self.input_area.set_block(Block::default().borders(Borders::ALL).title("Input"));
+            self.input_area.set_cursor_line_style(Style::default());
+            self.input_area.set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
         }
+        false
     }
     
-    fn scroll_up(&mut self) {
-        self.state.scroll_offset = self.state.scroll_offset.saturating_sub(1);
+    pub fn take_pending_input(&mut self) -> Option<String> {
+        self.pending_input.take()
     }
     
-    fn scroll_down(&mut self) {
-        let max_scroll = self.state.output_buffer.len().saturating_sub(1);
-        self.state.scroll_offset = (self.state.scroll_offset + 1).min(max_scroll);
+    pub fn add_assistant_response(&mut self, text: String) {
+        self.state.conversation_history.push(ConversationEntry {
+            role: ConversationRole::Assistant,
+            text: text.clone(),
+            timestamp: Instant::now(),
+        });
+        
+        self.output_area.insert_str(format!("\n✓ Merlin: {text}"));
     }
     
-    fn page_up(&mut self) {
-        self.state.scroll_offset = self.state.scroll_offset.saturating_sub(10);
-    }
-    
-    fn page_down(&mut self) {
-        let max_scroll = self.state.output_buffer.len().saturating_sub(1);
-        self.state.scroll_offset = (self.state.scroll_offset + 10).min(max_scroll);
-    }
 }

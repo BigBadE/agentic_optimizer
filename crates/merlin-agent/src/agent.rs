@@ -26,6 +26,7 @@ impl Agent {
         &self.config
     }
 
+    #[must_use] 
     pub fn executor(&self) -> AgentExecutor {
         AgentExecutor::new(Arc::clone(&self.provider), self.config.clone())
     }

@@ -26,8 +26,12 @@ thiserror = "2.0"
 anyhow = "1.0"
 
 # TUI
-ratatui = "0.29"
+ratatui = "0.28"
 crossterm = "0.28"
+tui-textarea = "0.6"
+
+# Compression
+flate2 = "1.0"
 
 # Utilities
 tempfile = "3.14"

@@ -9,6 +9,7 @@ pub struct AvailabilityChecker {
 }
 
 impl AvailabilityChecker {
+    #[must_use] 
     pub fn new() -> Self {
         Self {}
     }
@@ -34,9 +35,13 @@ impl Default for AvailabilityChecker {
 pub struct StrategyRouter {
     strategies: Vec<Arc<dyn RoutingStrategy>>,
     availability_checker: Arc<AvailabilityChecker>,
+    local_enabled: bool,
+    groq_enabled: bool,
+    premium_enabled: bool,
 }
 
 impl StrategyRouter {
+    #[must_use] 
     pub fn new(strategies: Vec<Arc<dyn RoutingStrategy>>) -> Self {
         let mut sorted_strategies = strategies;
         sorted_strategies.sort_by_key(|s| std::cmp::Reverse(s.priority()));
@@ -44,11 +49,23 @@ impl StrategyRouter {
         Self {
             strategies: sorted_strategies,
             availability_checker: Arc::new(AvailabilityChecker::new()),
+            local_enabled: true,
+            groq_enabled: true,
+            premium_enabled: true,
         }
     }
     
+    #[must_use] 
+    pub fn with_tier_config(mut self, local: bool, groq: bool, premium: bool) -> Self {
+        self.local_enabled = local;
+        self.groq_enabled = groq;
+        self.premium_enabled = premium;
+        self
+    }
+    
+    #[must_use] 
     pub fn with_default_strategies() -> Self {
-        use super::strategies::*;
+        use super::strategies::{QualityCriticalStrategy, LongContextStrategy, CostOptimizationStrategy, ComplexityBasedStrategy};
         
         let strategies: Vec<Arc<dyn RoutingStrategy>> = vec![
             Arc::new(QualityCriticalStrategy::new()),
@@ -99,7 +116,14 @@ impl ModelRouter for StrategyRouter {
             
             let tier = strategy.select_tier(task).await?;
             
-            if self.is_available(&tier).await {
+            // Check if tier is enabled in config
+            let tier_enabled = match &tier {
+                ModelTier::Local { .. } => self.local_enabled,
+                ModelTier::Groq { .. } => self.groq_enabled,
+                ModelTier::Premium { .. } => self.premium_enabled,
+            };
+            
+            if tier_enabled && self.is_available(&tier).await {
                 return Ok(RoutingDecision {
                     tier: tier.clone(),
                     estimated_cost: self.estimate_cost(&tier, task),

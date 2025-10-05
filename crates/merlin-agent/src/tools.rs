@@ -9,6 +9,7 @@ pub struct ToolRegistry {
 }
 
 impl ToolRegistry {
+    #[must_use] 
     pub fn new() -> Self {
         let mut registry = Self {
             tools: HashMap::new(),
@@ -27,10 +28,12 @@ impl ToolRegistry {
         self.tools.insert(name, tool);
     }
 
+    #[must_use] 
     pub fn get(&self, name: &str) -> Option<&Arc<dyn Tool>> {
         self.tools.get(name)
     }
 
+    #[must_use] 
     pub fn list_tools(&self) -> Vec<(&str, &str)> {
         self.tools
             .values()

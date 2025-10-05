@@ -8,6 +8,7 @@ use crate::{
 use merlin_core::{Context, ModelProvider, Query};
 
 /// High-level orchestrator that coordinates all routing components
+#[derive(Clone)]
 pub struct RoutingOrchestrator {
     config: RoutingConfig,
     analyzer: Arc<dyn TaskAnalyzer>,
@@ -18,13 +19,19 @@ pub struct RoutingOrchestrator {
 }
 
 impl RoutingOrchestrator {
+    #[must_use] 
     pub fn new(config: RoutingConfig) -> Self {
         let lock_manager = FileLockManager::new();
         
         let analyzer = Arc::new(LocalTaskAnalyzer::new()
             .with_max_parallel(config.execution.max_concurrent_tasks));
         
-        let router = Arc::new(StrategyRouter::with_default_strategies());
+        let router = Arc::new(StrategyRouter::with_default_strategies()
+            .with_tier_config(
+                config.tiers.local_enabled,
+                config.tiers.groq_enabled,
+                config.tiers.premium_enabled
+            ));
         
         let validator = Arc::new(ValidationPipeline::with_default_stages()
             .with_early_exit(config.validation.early_exit));
@@ -133,14 +140,28 @@ impl RoutingOrchestrator {
                         let provider = merlin_providers::AnthropicProvider::new(api_key)?;
                         Ok(Arc::new(provider))
                     }
-                    _ => Err(crate::RoutingError::Other(format!("Unknown provider: {}", provider_name)))
+                    _ => Err(crate::RoutingError::Other(format!("Unknown provider: {provider_name}")))
                 }
             }
         }
     }
     
     async fn build_context(&self, task: &Task) -> Result<Context> {
-        let mut context = Context::new("You are an expert coding assistant. Provide clear, concise, and correct code solutions.");
+        let system_prompt = format!(
+            "You are Merlin, an AI coding agent working directly in the user's codebase at '{}'.\n\n\
+            Your role:\n\
+            - Analyze the existing code structure and patterns\n\
+            - Provide code changes that integrate seamlessly with the existing codebase\n\
+            - Follow the project's coding style and conventions\n\
+            - Give specific, actionable suggestions with file paths and line numbers when relevant\n\
+            - Explain your reasoning when making architectural decisions\n\n\
+            Task: {}\n\n\
+            Provide clear, correct, and contextually appropriate code solutions.",
+            self.workspace.root_path().display(),
+            task.description
+        );
+        
+        let mut context = Context::new(&system_prompt);
         
         // Add files from workspace if specified
         for file_path in &task.context_needs.required_files {
@@ -181,9 +202,7 @@ impl RoutingOrchestrator {
                         }
                         
                         return Err(crate::RoutingError::Other(format!(
-                            "Failed after {} retries: {}",
-                            max_retries,
-                            e
+                            "Failed after {max_retries} retries: {e}"
                         )));
                     }
                     
@@ -238,10 +257,12 @@ impl RoutingOrchestrator {
         self.execute_tasks(analysis.tasks).await
     }
     
+    #[must_use] 
     pub fn config(&self) -> &RoutingConfig {
         &self.config
     }
     
+    #[must_use] 
     pub fn workspace(&self) -> Arc<WorkspaceState> {
         self.workspace.clone()
     }
@@ -269,6 +290,7 @@ mod tests {
     }
     
     #[tokio::test]
+    #[ignore] // Requires actual provider instances
     async fn test_process_simple_request() {
         let config = RoutingConfig::default();
         let orchestrator = RoutingOrchestrator::new(config);

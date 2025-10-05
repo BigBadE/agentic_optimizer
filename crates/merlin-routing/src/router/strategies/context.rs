@@ -8,6 +8,7 @@ pub struct LongContextStrategy {
 }
 
 impl LongContextStrategy {
+    #[must_use] 
     pub fn new(long_context_threshold: usize) -> Self {
         Self {
             long_context_threshold,

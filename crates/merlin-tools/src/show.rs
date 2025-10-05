@@ -19,6 +19,7 @@ struct ShowParams {
 pub struct ShowTool;
 
 impl ShowTool {
+    #[must_use] 
     pub const fn new() -> Self {
         Self
     }

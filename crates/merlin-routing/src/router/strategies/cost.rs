@@ -8,6 +8,7 @@ pub struct CostOptimizationStrategy {
 }
 
 impl CostOptimizationStrategy {
+    #[must_use] 
     pub fn new(max_tokens_for_local: usize) -> Self {
         Self {
             max_tokens_for_local,

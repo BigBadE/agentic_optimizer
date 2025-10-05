@@ -1,15 +1,15 @@
 # Merlin 
-
 An intelligent AI coding assistant with multi-model routing, automatic task decomposition, and comprehensive validation. Named after the Merlin falcon, known for its speed, precision, and adaptability.
 
 ## Current Status: Production Ready
 
 **Core Features:**
+- **Interactive Agent** - Continuous conversation with context retention
 - **Multi-Model Routing** - Intelligent tier selection (Local/Groq/Premium)
 - **Task Decomposition** - Automatic splitting of complex requests
 - **Parallel Execution** - Concurrent task execution with dependency tracking
-- **Validation Pipeline** - Syntax, build, test, and lint checking
-- **TUI Mode** - Interactive real-time progress display
+- **Validation Pipeline** - Syntax, build, test, and lint checking (enabled by default)
+- **TUI Mode** - Real-time visual feedback with task progress
 - **Cost Optimization** - Prefer free tiers when appropriate
 - **Automatic Escalation** - Retry with higher tier on failure
 
@@ -17,6 +17,7 @@ An intelligent AI coding assistant with multi-model routing, automatic task deco
 - **Local** - Ollama (Qwen 2.5 Coder, DeepSeek Coder) - $0, ~100ms
 - **Groq** - Llama 3.1 70B - $0 (free tier), ~500ms
 - **Premium** - Claude 3.5 Sonnet, DeepSeek Coder - Paid, ~2000ms
+{{ ... }}
 
 **Test Coverage:** 72 tests passing across all modules
 

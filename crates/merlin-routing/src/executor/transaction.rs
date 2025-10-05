@@ -57,6 +57,7 @@ impl TaskWorkspace {
     }
     
     /// Read file (sees pending changes + base snapshot)
+    #[must_use] 
     pub fn read_file(&self, path: &PathBuf) -> Option<String> {
         if let Some(state) = self.pending_changes.get(path) {
             return match state {
@@ -77,7 +78,7 @@ impl TaskWorkspace {
     ) -> Result<ConflictReport> {
         let mut conflicts = Vec::new();
         
-        for (path, _) in &self.pending_changes {
+        for path in self.pending_changes.keys() {
             let base_version = self.base_snapshot.get(path);
             let current_version = global_state.read_file(path).await;
             

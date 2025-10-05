@@ -475,19 +475,6 @@ async fn run_tui_interactive(
     // Enable raw mode before loading
     tui_app.enable_raw_mode()?;
     
-    ui_channel.send(UiEvent::SystemMessage {
-        level: MessageLevel::Info,
-        message: format!("Merlin - Project: {}", project.display()),
-    });
-    ui_channel.send(UiEvent::SystemMessage {
-        level: MessageLevel::Info,
-        message: format!("Mode: {}", if local_only { "Local Only" } else { "Multi-Model Routing" }),
-    });
-    ui_channel.send(UiEvent::SystemMessage {
-        level: MessageLevel::Success,
-        message: "Agent ready! Type in the input box below and press ENTER.".to_owned(),
-    });
-    
     // Load tasks in background
     tui_app.load_tasks_async().await;
     
@@ -512,9 +499,34 @@ async fn run_tui_interactive(
             let ui_channel_clone = ui_channel.clone();
             let verbose_clone = verbose;
             let mut log_clone = log_file.try_clone()?;
+            // If selected task is a child, use its parent; otherwise use the selected task itself
+            let parent_task_id = tui_app.get_selected_task_parent()
+                .or_else(|| tui_app.get_selected_task_id());
+            
+            // Get thread context for conversation continuity
+            let thread_context = tui_app.get_thread_context();
+            let context_str = if !thread_context.is_empty() {
+                let mut ctx = String::from("\n\n=== Previous Conversation Context ===\n");
+                for (idx, (_task_id, description, output)) in thread_context.iter().enumerate() {
+                    ctx.push_str(&format!("\n[Task {}] {}\n", idx + 1, description));
+                    if !output.is_empty() {
+                        ctx.push_str(&format!("Output:\n{}\n", output));
+                    }
+                }
+                ctx.push_str("\n=== End Context ===\n\n");
+                ctx
+            } else {
+                String::new()
+            };
+            
+            let enhanced_input = if context_str.is_empty() {
+                user_input.clone()
+            } else {
+                format!("{}{}", context_str, user_input)
+            };
             
             tokio::spawn(async move {
-                match orchestrator_clone.analyze_request(&user_input).await {
+                match orchestrator_clone.analyze_request(&enhanced_input).await {
                     Ok(analysis) => {
                         writeln!(log_clone, "Analysis: {} tasks", analysis.tasks.len()).ok();
                         
@@ -524,7 +536,7 @@ async fn run_tui_interactive(
                         });
                         
                         for task in &analysis.tasks {
-                            ui_channel_clone.task_started(task.id, task.description.clone());
+                            ui_channel_clone.task_started_with_parent(task.id, task.description.clone(), parent_task_id);
                         }
                         
                         match orchestrator_clone.execute_tasks(analysis.tasks).await {

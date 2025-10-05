@@ -29,6 +29,7 @@ anyhow = "1.0"
 ratatui = "0.28"
 crossterm = "0.28"
 tui-textarea = "0.6"
+textwrap = "0.16"
 
 # Compression
 flate2 = "1.0"

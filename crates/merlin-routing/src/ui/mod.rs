@@ -16,12 +16,12 @@ use std::{
 };
 use tokio::sync::mpsc;
 use tui_textarea::TextArea;
+use textwrap::Options;
 use crate::{TaskId, TaskResult};
 
 pub mod events;
 
 pub use events::{MessageLevel, TaskProgress, UiEvent};
-
 /// UI update channel - REQUIRED for all task execution
 #[derive(Clone)]
 pub struct UiChannel {
@@ -77,6 +77,7 @@ pub struct TuiApp {
     focused_pane: FocusedPane,
     tasks_dir: Option<std::path::PathBuf>,
     theme: Theme,
+    manual_newlines: std::collections::HashSet<usize>, // Track line indices with manual newlines after them
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -262,12 +263,8 @@ impl TuiApp {
         input_area.set_block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(" Input ")
-                .padding(ratatui::widgets::Padding::horizontal(1))
+                .title("Input")
         );
-        input_area.set_cursor_line_style(Style::default());
-        input_area.set_cursor_style(Style::default().add_modifier(Modifier::REVERSED));
-        input_area.set_tab_length(4);
         
         let mut output_area = TextArea::default();
         output_area.set_block(Block::default().borders(Borders::ALL).title("Output (Read-Only)"));
@@ -297,6 +294,7 @@ impl TuiApp {
             focused_pane: FocusedPane::Input,
             tasks_dir,
             theme,
+            manual_newlines: std::collections::HashSet::new(),
         };
         
         let channel = UiChannel { sender };
@@ -482,11 +480,11 @@ impl TuiApp {
             let mut should_quit = false;
             for event in events {
                 if let Event::Key(key) = &event {
-                match key.kind {
+                    match key.kind {
                     crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat => {},
                     _ => continue,
                 }
-                
+
                 match key.code {
                     KeyCode::Char('q') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => should_quit = true,
                     KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => should_quit = true,
@@ -509,9 +507,31 @@ impl TuiApp {
                             FocusedPane::Tasks => FocusedPane::Input,
                         };
                     }
-                    KeyCode::Enter if self.focused_pane == FocusedPane::Input => {
-                        if self.submit_input() {
-                            return Ok(true);
+                    KeyCode::Char('n') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
+                        if self.focused_pane == FocusedPane::Input {
+                            // Ctrl+N creates a newline
+                            let (row, _) = self.input_area.cursor();
+                            self.input_area.insert_newline();
+                            self.manual_newlines.insert(row);
+                        }
+                    }
+                    KeyCode::Enter => {
+                        if self.focused_pane == FocusedPane::Input {
+                            // Shift+Enter creates a newline (if terminal supports it), Enter submits
+                            if key.modifiers.contains(crossterm::event::KeyModifiers::SHIFT) {
+                                // Manually insert newline without using TextArea's input handler
+                                let (row, _) = self.input_area.cursor();
+                                self.input_area.insert_newline();
+                                self.manual_newlines.insert(row);
+                            } else {
+                                // Only submit if NOT Shift
+                                if self.submit_input() {
+                                    self.pending_input = Some(self.input_area.lines()[0].clone());
+                                    self.input_area = TextArea::default();
+                                    self.input_area.set_block(Block::default().borders(Borders::ALL).title("Input"));
+                                    self.manual_newlines.clear();
+                                }
+                            }
                         }
                     }
                     KeyCode::Up if self.focused_pane == FocusedPane::Tasks => {
@@ -529,7 +549,7 @@ impl TuiApp {
                     _ => {
                         match self.focused_pane {
                             FocusedPane::Input => {
-                                // Only auto-wrap on text changes, not cursor movement
+                                // Auto-wrap on text changes using textwrap
                                 let should_wrap = matches!(key.code,
                                     KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete
                                 );
@@ -593,62 +613,127 @@ impl TuiApp {
             return;
         }
         
-        // Get the full text by joining lines (they're all part of the same input)
-        // Since we only have one logical paragraph, join with spaces
-        let full_text = lines.join(" ");
+        // Split into paragraphs (separated by empty lines OR manual newlines)
+        let mut paragraphs: Vec<Vec<String>> = Vec::new();
+        let mut current_para: Vec<String> = Vec::new();
         
-        // Calculate cursor position in the full text
+        for (idx, line) in lines.iter().enumerate() {
+            if line.is_empty() {
+                if !current_para.is_empty() {
+                    paragraphs.push(current_para);
+                    current_para = Vec::new();
+                }
+                paragraphs.push(vec![String::new()]); // Empty line as paragraph separator
+            } else {
+                current_para.push(line.clone());
+                
+                // Check if there's a manual newline after this line
+                if self.manual_newlines.contains(&idx) {
+                    // This line has a manual newline after it - end paragraph
+                    paragraphs.push(current_para);
+                    current_para = Vec::new();
+                }
+            }
+        }
+        if !current_para.is_empty() {
+            paragraphs.push(current_para);
+        }
+        
+        // Calculate cursor position in original text
         let mut cursor_pos = 0;
-        for (i, line) in lines.iter().enumerate() {
-            if i < cursor_row {
-                cursor_pos += line.len() + 1; // +1 for the space we added in join
-            } else if i == cursor_row {
-                cursor_pos += cursor_col;
+        let mut cursor_paragraph = 0;
+        let mut pos_in_paragraph = 0;
+        let mut current_pos = 0;
+        
+        for (para_idx, para) in paragraphs.iter().enumerate() {
+            for (line_idx, line) in para.iter().enumerate() {
+                if current_pos == cursor_row {
+                    cursor_paragraph = para_idx;
+                    pos_in_paragraph = cursor_pos + cursor_col;
+                    break;
+                }
+                cursor_pos += line.len();
+                if line_idx < para.len() - 1 || para_idx < paragraphs.len() - 1 {
+                    cursor_pos += 1; // Space or newline
+                }
+                current_pos += 1;
+            }
+            if current_pos > cursor_row {
                 break;
             }
         }
         
-        // Re-wrap everything from scratch
-        let new_lines = self.wrap_text(&full_text, max_line_width);
+        // Wrap each paragraph independently
+        let mut new_lines: Vec<String> = Vec::new();
+        let mut new_cursor_row = 0;
+        let mut new_cursor_col = 0;
+        let mut found_cursor = false;
+        let mut new_manual_newlines = std::collections::HashSet::new();
+        
+        for (para_idx, para) in paragraphs.iter().enumerate() {
+            if para.len() == 1 && para[0].is_empty() {
+                // Preserve empty line
+                new_lines.push(String::new());
+                if para_idx < cursor_paragraph {
+                    new_cursor_row += 1;
+                }
+            } else {
+                // Wrap this paragraph
+                // Join lines with spaces - they're either from previous wrapping or separate content
+                let para_text = para.join(" ");
+                
+                // Only wrap if needed - preserve single short lines as-is
+                let wrapped = if para.len() == 1 && para[0].len() < max_line_width {
+                    vec![para[0].clone()]
+                } else {
+                    self.wrap_text(&para_text, max_line_width)
+                };
+                
+                // Find cursor in this paragraph
+                if para_idx == cursor_paragraph && !found_cursor {
+                    let (row_offset, col) = self.find_cursor_position(&wrapped, pos_in_paragraph);
+                    new_cursor_row += row_offset;
+                    new_cursor_col = col;
+                    found_cursor = true;
+                } else if para_idx < cursor_paragraph {
+                    new_cursor_row += wrapped.len();
+                }
+                
+                let para_start_line = new_lines.len();
+                new_lines.extend(wrapped);
+                
+                // Mark the last line of this paragraph as having a manual newline
+                // (unless it's the last paragraph)
+                if para_idx < paragraphs.len() - 1 {
+                    new_manual_newlines.insert(new_lines.len() - 1);
+                }
+            }
+        }
+        
+        // Update manual newlines set
+        self.manual_newlines = new_manual_newlines;
         
         // If nothing changed, don't update
         if new_lines == lines {
             return;
         }
         
-        // Find new cursor position
-        let (new_row, new_col) = self.find_cursor_position(&new_lines, cursor_pos);
+        // Create a completely new TextArea with the wrapped content
+        let mut new_input = TextArea::new(new_lines);
         
-        // Clear all existing content
-        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-        for _ in 0..lines.len() {
-            self.input_area.move_cursor(tui_textarea::CursorMove::End);
-            self.input_area.delete_line_by_end();
-            if self.input_area.cursor().0 > 0 {
-                self.input_area.move_cursor(tui_textarea::CursorMove::Up);
-                self.input_area.move_cursor(tui_textarea::CursorMove::End);
-                self.input_area.delete_char();
-            }
+        // Copy all styling from the old textarea
+        if let Some(block) = self.input_area.block() {
+            new_input.set_block(block.clone());
         }
+        new_input.set_style(self.input_area.style());
+        new_input.set_cursor_style(self.input_area.cursor_style());
+        new_input.set_cursor_line_style(self.input_area.cursor_line_style());
         
-        // Insert all new content
-        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-        self.input_area.delete_line_by_end();
-        for (i, line) in new_lines.iter().enumerate() {
-            if i > 0 {
-                self.input_area.insert_newline();
-            }
-            self.input_area.insert_str(line);
-        }
+        // Set cursor position
+        new_input.move_cursor(tui_textarea::CursorMove::Jump(new_cursor_row as u16, new_cursor_col as u16));
         
-        // Restore cursor position
-        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-        for _ in 0..new_row {
-            self.input_area.move_cursor(tui_textarea::CursorMove::Down);
-        }
-        for _ in 0..new_col {
-            self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
-        }
+        // Replace the textarea
+        self.input_area = new_input;
     }
     
     fn wrap_text(&self, text: &str, max_width: usize) -> Vec<String> {
@@ -656,69 +741,34 @@ impl TuiApp {
             return vec![String::new()];
         }
         
-        let mut lines = Vec::new();
-        let mut current_line = String::new();
-        let mut chars_iter = text.chars().peekable();
-        let mut current_word = String::new();
+        // Use textwrap with break_words option to handle long words
+        let options = Options::new(max_width)
+            .break_words(true)
+            .word_separator(textwrap::WordSeparator::AsciiSpace);
         
-        while let Some(ch) = chars_iter.next() {
-            if ch.is_whitespace() {
-                // Flush current word
-                if !current_word.is_empty() {
-                    if current_line.is_empty() {
-                        current_line = current_word.clone();
-                    } else if current_line.len() + 1 + current_word.len() <= max_width {
-                        current_line.push(' ');
-                        current_line.push_str(&current_word);
-                    } else {
-                        lines.push(current_line);
-                        current_line = current_word.clone();
-                    }
-                    current_word.clear();
-                }
-                
-                // Add space if we're building a line and next char isn't whitespace
-                if !current_line.is_empty() && chars_iter.peek().map(|c| !c.is_whitespace()).unwrap_or(false) {
-                    // Space will be added when next word is appended
-                }
-            } else {
-                current_word.push(ch);
-            }
-        }
-        
-        // Flush final word
-        if !current_word.is_empty() {
-            if current_line.is_empty() {
-                current_line = current_word;
-            } else if current_line.len() + 1 + current_word.len() <= max_width {
-                current_line.push(' ');
-                current_line.push_str(&current_word);
-            } else {
-                lines.push(current_line);
-                current_line = current_word;
-            }
-        }
-        
-        if !current_line.is_empty() {
-            lines.push(current_line);
-        }
-        
-        if lines.is_empty() {
-            lines.push(String::new());
-        }
-        
-        lines
+        textwrap::wrap(text, options)
+            .into_iter()
+            .map(|cow| cow.into_owned())
+            .collect()
     }
     
     fn find_cursor_position(&self, lines: &[String], cursor_pos: usize) -> (usize, usize) {
         let mut pos = 0;
         for (row, line) in lines.iter().enumerate() {
-            // Check if cursor is within this line
-            if cursor_pos <= pos + line.len() {
+            let line_end = pos + line.len();
+            
+            // Check if cursor is within this line (not including the space after)
+            if cursor_pos < line_end || (cursor_pos == line_end && row == lines.len() - 1) {
                 let col = cursor_pos.saturating_sub(pos).min(line.len());
                 return (row, col);
             }
-            pos += line.len() + 1; // +1 for space between lines
+            
+            // If cursor is at the space right after this line, it belongs to this line
+            if cursor_pos == line_end && row < lines.len() - 1 {
+                return (row, line.len());
+            }
+            
+            pos = line_end + 1; // +1 for space between lines
         }
         
         // Cursor at end
@@ -993,6 +1043,7 @@ impl TuiApp {
                     "Getting Started:",
                     "  • Type your request in the Input box below",
                     "  • Press ENTER to submit",
+                    "  • Ctrl+N or Shift+Enter: New line (multi-line input)",
                     "  • Each request creates a new task",
                     "",
                     "Navigation:",

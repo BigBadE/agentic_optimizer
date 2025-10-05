@@ -537,6 +537,9 @@ async fn run_tui_interactive(
                         
                         for task in &analysis.tasks {
                             ui_channel_clone.task_started_with_parent(task.id, task.description.clone(), parent_task_id);
+                            // Send the prompt as the first output
+                            let first_line = task.description.lines().next().unwrap_or(&task.description);
+                            ui_channel_clone.output(task.id, first_line.to_string());
                         }
                         
                         match orchestrator_clone.execute_tasks(analysis.tasks).await {

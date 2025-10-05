@@ -14,9 +14,9 @@ use std::{
     path::PathBuf,
     time::{Duration, Instant, SystemTime},
 };
+use textwrap::Options;
 use tokio::sync::mpsc;
 use tui_textarea::TextArea;
-use textwrap::Options;
 use crate::{TaskId, TaskResult};
 
 pub mod events;
@@ -330,6 +330,13 @@ impl TuiApp {
                     self.state.tasks.insert(task_id, task_display);
                     self.state.task_order.push(task_id);
                 }
+                
+                // Wrap all loaded task outputs
+                let task_ids: Vec<TaskId> = self.state.task_order.clone();
+                for task_id in task_ids {
+                    self.auto_wrap_output(task_id);
+                }
+                
                 if let Some(&last_task) = self.state.task_order.last() {
                     self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
                     self.state.active_task_id = Some(last_task);
@@ -782,6 +789,53 @@ impl TuiApp {
         prefix
     }
     
+    fn wrap_text(&self, text: &str, max_width: usize) -> Vec<String> {
+        if text.is_empty() {
+            return vec![String::new()];
+        }
+        
+        let ends_with_space = text.ends_with(' ');
+        
+        let options = Options::new(max_width)
+            .break_words(true)
+            .word_separator(textwrap::WordSeparator::AsciiSpace);
+        
+        let mut wrapped: Vec<String> = textwrap::wrap(text, options)
+            .into_iter()
+            .map(|cow| cow.into_owned())
+            .collect();
+        
+        if ends_with_space && !wrapped.is_empty() {
+            if let Some(last) = wrapped.last_mut() {
+                last.push(' ');
+            }
+        }
+        
+        wrapped
+    }
+    
+    fn find_cursor_position(&self, lines: &[String], cursor_pos: usize) -> (usize, usize) {
+        if lines.is_empty() {
+            return (0, 0);
+        }
+        
+        let mut chars_seen = 0;
+        for (row, line) in lines.iter().enumerate() {
+            let line_len = line.len();
+            
+            if chars_seen + line_len >= cursor_pos {
+                let col = cursor_pos - chars_seen;
+                return (row, col);
+            }
+            
+            chars_seen += line_len + 1; // +1 for space
+        }
+        
+        let last_row = lines.len() - 1;
+        let last_col = lines[last_row].len();
+        (last_row, last_col)
+    }
+    
     fn auto_wrap_input(&mut self) {
         // Calculate available width
         let terminal_width = self.terminal.size().map(|s| s.width).unwrap_or(80);
@@ -927,93 +981,69 @@ impl TuiApp {
         self.input_area = new_input;
     }
     
-    fn wrap_text(&self, text: &str, max_width: usize) -> Vec<String> {
-        if text.is_empty() {
-            return vec![String::new()];
-        }
+    fn auto_wrap_output(&mut self, task_id: TaskId) {
+        let terminal_width = self.terminal.size().map(|s| s.width).unwrap_or(80);
+        let output_width = (terminal_width as f32 * 0.7) as usize;
+        let max_line_width = output_width.saturating_sub(6).max(40);
         
-        // Check if text ends with space - textwrap strips trailing spaces
-        let ends_with_space = text.ends_with(' ');
+        // Get data before mutable borrow
+        let (lines, cursor_row, cursor_col) = {
+            let task = match self.state.tasks.get(&task_id) {
+                Some(t) => t,
+                None => return,
+            };
+            (task.output_area.lines().to_vec(), task.output_area.cursor().0, task.output_area.cursor().1)
+        };
         
-        // Use textwrap with break_words option to handle long words
-        let options = Options::new(max_width)
-            .break_words(true)
-            .word_separator(textwrap::WordSeparator::AsciiSpace);
-        
-        let mut wrapped: Vec<String> = textwrap::wrap(text, options)
-            .into_iter()
-            .map(|cow| cow.into_owned())
-            .collect();
-        
-        // If original text ended with space, preserve it on the last line
-        if ends_with_space && !wrapped.is_empty() {
-            if let Some(last) = wrapped.last_mut() {
-                last.push(' ');
+        // Calculate cursor position in original text
+        let mut cursor_pos = 0;
+        for (idx, line) in lines.iter().enumerate() {
+            if idx < cursor_row {
+                cursor_pos += line.len() + 1;
+            } else if idx == cursor_row {
+                cursor_pos += cursor_col;
+                break;
             }
         }
         
-        wrapped
-    }
-    
-    fn wrap_output_text(&self, text: &str) -> String {
-        // Calculate available width for output (70% of terminal width)
-        let terminal_width = self.terminal.size().map(|s| s.width).unwrap_or(80);
-        let output_width = (terminal_width as f32 * 0.7) as usize;
-        // Account for borders (2), padding (2), and some safety margin
-        let max_line_width = output_width.saturating_sub(6).max(40);
-        
-        // Split text into lines and wrap each line
+        // Wrap all lines
         let mut wrapped_lines = Vec::new();
-        for line in text.lines() {
+        for line in &lines {
             if line.is_empty() {
                 wrapped_lines.push(String::new());
             } else if line.len() <= max_line_width {
-                // Line fits, no wrapping needed
-                wrapped_lines.push(line.to_string());
+                wrapped_lines.push(line.clone());
             } else {
-                // Wrap the line
-                let wrapped = self.wrap_text(line, max_line_width);
-                wrapped_lines.extend(wrapped);
+                wrapped_lines.extend(self.wrap_text(line, max_line_width));
             }
         }
         
-        wrapped_lines.join("\n")
+        // Find new cursor position
+        let (new_row, new_col) = self.find_cursor_position(&wrapped_lines, cursor_pos);
+        
+        // Now get mutable borrow and update
+        let task = match self.state.tasks.get_mut(&task_id) {
+            Some(t) => t,
+            None => return,
+        };
+        
+        // Create new TextArea with wrapped content
+        let mut new_output = TextArea::new(wrapped_lines);
+        
+        // Copy styling
+        if let Some(block) = task.output_area.block() {
+            new_output.set_block(block.clone());
+        }
+        new_output.set_style(task.output_area.style());
+        new_output.set_cursor_style(task.output_area.cursor_style());
+        new_output.set_cursor_line_style(task.output_area.cursor_line_style());
+        
+        // Set cursor position
+        new_output.move_cursor(tui_textarea::CursorMove::Jump(new_row as u16, new_col as u16));
+        
+        task.output_area = new_output;
     }
     
-    fn find_cursor_position(&self, lines: &[String], cursor_pos: usize) -> (usize, usize) {
-        if lines.is_empty() {
-            return (0, 0);
-        }
-        
-        // Reconstruct the original text to match how we joined it
-        let reconstructed = lines.join(" ");
-        
-        // Clamp cursor_pos to valid range
-        let cursor_pos = cursor_pos.min(reconstructed.len());
-        
-        // Walk through the wrapped lines and find where cursor_pos falls
-        let mut char_count = 0;
-        for (row, line) in lines.iter().enumerate() {
-            let line_len = line.len();
-            
-            // Check if cursor is within this line
-            if cursor_pos <= char_count + line_len {
-                let col = (cursor_pos - char_count).min(line_len);
-                return (row, col);
-            }
-            
-            // Move past this line and the space after it
-            char_count += line_len;
-            if row < lines.len() - 1 {
-                char_count += 1; // Space between lines
-            }
-        }
-        
-        // Cursor at end of last line
-        let last_row = lines.len() - 1;
-        let last_col = lines[last_row].len();
-        (last_row, last_col)
-    }
     
     fn handle_event(&mut self, event: UiEvent) {
         match event {
@@ -1043,9 +1073,11 @@ impl TuiApp {
                     self.state.collapsed_tasks.remove(&parent_id);
                 }
                 
-                // Automatically select new task and scroll to bottom
-                self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
-                self.state.active_task_id = Some(task_id);
+                // Only auto-select if no task is currently selected
+                if self.state.selected_task_index >= self.state.task_order.len() - 1 {
+                    self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
+                    self.state.active_task_id = Some(task_id);
+                }
                 
                 if let Some(task) = self.state.tasks.get(&task_id) {
                     self.save_task(task_id, task);
@@ -1059,20 +1091,19 @@ impl TuiApp {
             }
             
             UiEvent::TaskOutput { task_id, output } => {
-                let wrapped_output = self.wrap_output_text(&output);
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.output_lines.push(output.clone());
                     // Add newline only if there's already content
                     if !task.output_area.lines()[0].is_empty() {
                         task.output_area.insert_str("\n");
                     }
-                    task.output_area.insert_str(&wrapped_output);
+                    task.output_area.insert_str(&output);
                 }
+                self.auto_wrap_output(task_id);
             }
             
             UiEvent::TaskCompleted { task_id, result } => {
                 self.state.active_running_tasks.remove(&task_id); // No longer running
-                let wrapped_output = self.wrap_output_text(&result.response.text);
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.status = TaskStatus::Completed;
                     task.end_time = Some(Instant::now());
@@ -1081,8 +1112,9 @@ impl TuiApp {
                     if !task.output_area.lines()[0].is_empty() {
                         task.output_area.insert_str("\n");
                     }
-                    task.output_area.insert_str(&wrapped_output);
+                    task.output_area.insert_str(&result.response.text);
                 }
+                self.auto_wrap_output(task_id);
                 
                 if let Some(task) = self.state.tasks.get(&task_id) {
                     self.save_task(task_id, task);
@@ -1097,8 +1129,6 @@ impl TuiApp {
             
             UiEvent::TaskFailed { task_id, error } => {
                 self.state.active_running_tasks.remove(&task_id); // No longer running
-                let error_msg = format!("Error: {error}");
-                let wrapped_output = self.wrap_output_text(&error_msg);
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.status = TaskStatus::Failed;
                     task.end_time = Some(Instant::now());
@@ -1106,8 +1136,10 @@ impl TuiApp {
                     if !task.output_area.lines()[0].is_empty() {
                         task.output_area.insert_str("\n");
                     }
-                    task.output_area.insert_str(&wrapped_output);
+                    let error_msg = format!("Error: {error}");
+                    task.output_area.insert_str(&error_msg);
                 }
+                self.auto_wrap_output(task_id);
                 
                 if let Some(task) = self.state.tasks.get(&task_id) {
                     self.save_task(task_id, task);
@@ -1122,13 +1154,11 @@ impl TuiApp {
                     MessageLevel::Success => "✓",
                 };
                 
-                let msg = format!("{prefix} {message}");
-                let wrapped_msg = self.wrap_output_text(&msg);
-                
                 if let Some(task_id) = self.state.active_task_id {
                     if let Some(task) = self.state.tasks.get_mut(&task_id) {
-                        task.output_area.insert_str(&format!("\n{}", wrapped_msg));
+                        task.output_area.insert_str(&format!("\n{prefix} {message}"));
                     }
+                    self.auto_wrap_output(task_id);
                 }
                 
                 self.state.conversation_history.push(ConversationEntry {
@@ -1290,18 +1320,6 @@ impl TuiApp {
             self.input_area.set_cursor_style(Style::default());
         }
         
-        // Pre-calculate wrapped output text before drawing
-        let wrapped_output_text = if let Some(task_id) = self.state.active_task_id {
-            if let Some(task) = self.state.tasks.get(&task_id) {
-                let output_text = task.output_area.lines().join("\n");
-                Some(self.wrap_output_text(&output_text))
-            } else {
-                None
-            }
-        } else {
-            None
-        };
-        
         self.terminal.draw(|frame| {
             let main_chunks = Layout::default()
                 .direction(Direction::Horizontal)
@@ -1343,10 +1361,6 @@ impl TuiApp {
                 frame.render_widget(loading_text, left_chunks[0]);
             } else if let Some(task_id) = self.state.active_task_id {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
-                    let wrapped_text = wrapped_output_text.as_ref().unwrap();
-                    // Create a new TextArea with wrapped content
-                    let mut wrapped_output = TextArea::new(wrapped_text.lines().map(|s| s.to_string()).collect());
-                    
                     // Apply styling based on focus
                     let (border_color, cursor_style) = if self.focused_pane == FocusedPane::Output {
                         (self.theme.focused_border(), Style::default().add_modifier(Modifier::REVERSED))
@@ -1354,24 +1368,17 @@ impl TuiApp {
                         (self.theme.unfocused_border(), Style::default())
                     };
                     
-                    wrapped_output.set_block(
+                    task.output_area.set_block(
                         Block::default()
                             .borders(Borders::ALL)
                             .title("─── Task Output ")
                             .border_style(Style::default().fg(border_color))
                             .padding(ratatui::widgets::Padding::horizontal(1))
                     );
-                    wrapped_output.set_style(Style::default().fg(self.theme.text()));
-                    wrapped_output.set_cursor_style(cursor_style);
-                    wrapped_output.set_cursor_line_style(Style::default());
+                    task.output_area.set_style(Style::default().fg(self.theme.text()));
+                    task.output_area.set_cursor_style(cursor_style);
                     
-                    // Move cursor to match original position if Output is focused
-                    if self.focused_pane == FocusedPane::Output {
-                        let (row, col) = task.output_area.cursor();
-                        wrapped_output.move_cursor(tui_textarea::CursorMove::Jump(row as u16, col as u16));
-                    }
-                    
-                    frame.render_widget(&wrapped_output, left_chunks[0]);
+                    frame.render_widget(&task.output_area, left_chunks[0]);
                 }
             } else {
                 // Show instructions when no task is active

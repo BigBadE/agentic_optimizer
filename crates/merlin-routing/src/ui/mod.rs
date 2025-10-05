@@ -199,6 +199,7 @@ struct UiState {
     selected_task_index: usize,
     active_task_id: Option<TaskId>,
     loading_tasks: bool,
+    active_running_tasks: std::collections::HashSet<TaskId>, // Tasks that are actually running
 }
 
 #[derive(Clone)]
@@ -270,6 +271,8 @@ impl TuiApp {
         
         let mut output_area = TextArea::default();
         output_area.set_block(Block::default().borders(Borders::ALL).title("Output (Read-Only)"));
+        // Disable cursor line highlighting (no underline)
+        output_area.set_cursor_line_style(Style::default());
         
         let tasks_dir = tasks_dir.into();
         let mut state = UiState::default();
@@ -350,6 +353,7 @@ impl TuiApp {
                         if let Ok(serializable) = serde_json::from_str::<SerializableTask>(&json_str) {
                             let mut output_area = TextArea::default();
                             output_area.set_block(Block::default().borders(Borders::ALL).title("Task Output"));
+                            output_area.set_cursor_line_style(Style::default());
                             output_area.insert_str(&serializable.output_text);
                             
                             let status = match serializable.status.as_str() {
@@ -456,8 +460,15 @@ impl TuiApp {
     }
     
     pub async fn tick(&mut self) -> crate::Result<bool> {
+        // Process all pending UI events
+        let mut had_events = false;
         while let Ok(event) = self.event_receiver.try_recv() {
             self.handle_event(event);
+            had_events = true;
+        }
+        
+        // Render if we had events
+        if had_events {
             self.render()
                 .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
         }
@@ -588,6 +599,10 @@ impl TuiApp {
                 .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
             
             return Ok(should_quit);
+        } else {
+            // No keyboard events, but still render periodically for timers/progress
+            self.render()
+                .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
         }
         
         Ok(false)
@@ -813,7 +828,7 @@ impl TuiApp {
             UiEvent::TaskStarted { task_id, description, parent_id } => {
                 let mut output_area = TextArea::default();
                 output_area.set_block(Block::default().borders(Borders::ALL).title("Task Output"));
-                output_area.insert_str(format!("▶ Started: {description}"));
+                output_area.set_cursor_line_style(Style::default());
                 
                 let task_display = TaskDisplay {
                     description: description.clone(),
@@ -828,10 +843,11 @@ impl TuiApp {
                 
                 self.state.tasks.insert(task_id, task_display);
                 self.state.task_order.push(task_id);
+                self.state.active_running_tasks.insert(task_id); // Mark as actively running
                 
-                if self.state.active_task_id.is_none() {
-                    self.state.active_task_id = Some(task_id);
-                }
+                // Automatically select new task and scroll to bottom
+                self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
+                self.state.active_task_id = Some(task_id);
                 
                 if let Some(task) = self.state.tasks.get(&task_id) {
                     self.save_task(task_id, task);
@@ -840,8 +856,6 @@ impl TuiApp {
             
             UiEvent::TaskProgress { task_id, progress } => {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
-                    task.output_lines.push(format!("  {} - {}", progress.stage, progress.message));
-                    task.output_area.insert_str(format!("\n  {} - {}", progress.stage, progress.message));
                     task.progress = Some(progress.clone());
                 }
             }
@@ -849,18 +863,25 @@ impl TuiApp {
             UiEvent::TaskOutput { task_id, output } => {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.output_lines.push(output.clone());
-                    task.output_area.insert_str(format!("\n{output}"));
+                    // Add newline only if there's already content
+                    if !task.output_area.lines()[0].is_empty() {
+                        task.output_area.insert_str("\n");
+                    }
+                    task.output_area.insert_str(&output);
                 }
             }
             
             UiEvent::TaskCompleted { task_id, result } => {
+                self.state.active_running_tasks.remove(&task_id); // No longer running
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.status = TaskStatus::Completed;
                     task.end_time = Some(Instant::now());
                     
-                    let duration_secs = result.duration_ms as f64 / 1000.0;
-                    task.output_area.insert_str(format!("\nMerlin: {}", result.response.text));
-                    task.output_area.insert_str(format!("\n✓ Completed ({:.2}s)", duration_secs));
+                    // Add newline only if there's already content
+                    if !task.output_area.lines()[0].is_empty() {
+                        task.output_area.insert_str("\n");
+                    }
+                    task.output_area.insert_str(&result.response.text);
                 }
                 
                 if let Some(task) = self.state.tasks.get(&task_id) {
@@ -875,10 +896,15 @@ impl TuiApp {
             }
             
             UiEvent::TaskFailed { task_id, error } => {
+                self.state.active_running_tasks.remove(&task_id); // No longer running
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.status = TaskStatus::Failed;
                     task.end_time = Some(Instant::now());
-                    task.output_area.insert_str(format!("\n✗ Failed: {error}"));
+                    // Add newline only if there's already content
+                    if !task.output_area.lines()[0].is_empty() {
+                        task.output_area.insert_str("\n");
+                    }
+                    task.output_area.insert_str(&format!("Error: {error}"));
                 }
                 
                 if let Some(task) = self.state.tasks.get(&task_id) {
@@ -927,28 +953,56 @@ impl TuiApp {
                 self.state.tasks.get(task_id).map(|task| (idx, task_id, task))
             })
             .map(|(idx, task_id, task)| {
-                let status_icon = match task.status {
-                    TaskStatus::Running => "▶",
-                    TaskStatus::Completed => "✓",
-                    TaskStatus::Failed => "✗",
-                };
-                
+                // Check if task is stuck (running for > 5 minutes) or orphaned (not in active set)
                 let elapsed = task.end_time
                     .unwrap_or_else(Instant::now)
                     .duration_since(task.start_time)
                     .as_secs_f64();
                 
+                let is_orphaned = task.status == TaskStatus::Running && !self.state.active_running_tasks.contains(task_id);
+                let is_stuck = task.status == TaskStatus::Running && elapsed > 300.0;
+                let is_failed = is_orphaned || is_stuck;
+                
+                let status_icon = if is_failed {
+                    "✗"
+                } else {
+                    match task.status {
+                        TaskStatus::Running => "▶",
+                        TaskStatus::Completed => "✓",
+                        TaskStatus::Failed => "✗",
+                    }
+                };
+                
                 let indent = if task.parent_id.is_some() { "  " } else { "" };
                 let selected = if idx == self.state.selected_task_index { "► " } else { "" };
                 
-                let mut text = format!(
-                    "{}{}{} {} ({:.0}s)",
-                    indent,
-                    selected,
-                    status_icon,
-                    task.description,
-                    elapsed
-                );
+                // Truncate description if too long
+                let max_desc_len = 50;
+                let description = if task.description.len() > max_desc_len {
+                    format!("{}...", &task.description[..max_desc_len])
+                } else {
+                    task.description.clone()
+                };
+                
+                let mut text = if is_failed {
+                    // No timer for failed/orphaned tasks
+                    format!(
+                        "{}{}{} {}",
+                        indent,
+                        selected,
+                        status_icon,
+                        description
+                    )
+                } else {
+                    format!(
+                        "{}{}{} {} ({:.0}s)",
+                        indent,
+                        selected,
+                        status_icon,
+                        description,
+                        elapsed
+                    )
+                };
                 
                 if let Some(progress) = &task.progress {
                     text.push_str(&format!("\n    └─ {}: {}", progress.stage, progress.message));
@@ -959,10 +1013,15 @@ impl TuiApp {
                     }
                 }
                 
-                let mut style = match task.status {
-                    TaskStatus::Completed => Style::default().fg(self.theme.success()),
-                    TaskStatus::Failed => Style::default().fg(self.theme.error()),
-                    TaskStatus::Running => Style::default().fg(self.theme.text()).add_modifier(Modifier::BOLD),
+                let mut style = if is_failed {
+                    // Grey out failed/stuck/orphaned tasks
+                    Style::default().fg(Color::DarkGray)
+                } else {
+                    match task.status {
+                        TaskStatus::Completed => Style::default().fg(self.theme.success()),
+                        TaskStatus::Failed => Style::default().fg(self.theme.error()),
+                        TaskStatus::Running => Style::default().fg(self.theme.text()).add_modifier(Modifier::BOLD),
+                    }
                 };
                 
                 if idx == self.state.selected_task_index && self.focused_pane == FocusedPane::Tasks {
@@ -979,7 +1038,7 @@ impl TuiApp {
                     task.output_area.set_block(
                         Block::default()
                             .borders(Borders::ALL)
-                            .title(format!("─── Task Output: {} ", task.description))
+                            .title("─── Task Output ")
                             .border_style(Style::default().fg(self.theme.focused_border()))
                             .padding(ratatui::widgets::Padding::horizontal(1))
                     );
@@ -989,7 +1048,7 @@ impl TuiApp {
                     task.output_area.set_block(
                         Block::default()
                             .borders(Borders::ALL)
-                            .title(format!("─── Task Output: {} ", task.description))
+                            .title("─── Task Output ")
                             .border_style(Style::default().fg(self.theme.unfocused_border()))
                             .padding(ratatui::widgets::Padding::horizontal(1))
                     );
@@ -1103,7 +1162,30 @@ impl TuiApp {
                 Style::default().fg(self.theme.unfocused_border())
             };
             
-            let list = List::new(task_items)
+            // Calculate scroll offset to keep selected item visible
+            let list_height = right_chunks[0].height.saturating_sub(2) as usize; // Subtract borders
+            let total_items = task_items.len();
+            
+            let scroll_offset = if total_items > list_height {
+                if self.state.selected_task_index < list_height / 2 {
+                    0
+                } else if self.state.selected_task_index >= total_items.saturating_sub(list_height / 2) {
+                    total_items.saturating_sub(list_height)
+                } else {
+                    self.state.selected_task_index.saturating_sub(list_height / 2)
+                }
+            } else {
+                0
+            };
+            
+            // Take only visible items
+            let visible_items: Vec<ListItem> = task_items
+                .into_iter()
+                .skip(scroll_offset)
+                .take(list_height)
+                .collect();
+            
+            let list = List::new(visible_items)
                 .block(Block::default()
                     .borders(Borders::ALL)
                     .title(list_title)

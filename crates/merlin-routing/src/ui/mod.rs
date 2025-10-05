@@ -265,6 +265,8 @@ impl TuiApp {
                 .borders(Borders::ALL)
                 .title("Input")
         );
+        // Disable cursor line highlighting (no underline)
+        input_area.set_cursor_line_style(Style::default());
         
         let mut output_area = TextArea::default();
         output_area.set_block(Block::default().borders(Borders::ALL).title("Output (Read-Only)"));
@@ -639,28 +641,35 @@ impl TuiApp {
             paragraphs.push(current_para);
         }
         
-        // Calculate cursor position in original text
-        let mut cursor_pos = 0;
+        // Calculate cursor position within its paragraph
         let mut cursor_paragraph = 0;
         let mut pos_in_paragraph = 0;
-        let mut current_pos = 0;
+        let mut line_count = 0;
         
         for (para_idx, para) in paragraphs.iter().enumerate() {
-            for (line_idx, line) in para.iter().enumerate() {
-                if current_pos == cursor_row {
-                    cursor_paragraph = para_idx;
-                    pos_in_paragraph = cursor_pos + cursor_col;
-                    break;
+            let para_line_count = if para.len() == 1 && para[0].is_empty() {
+                1
+            } else {
+                para.len()
+            };
+            
+            // Check if cursor is in this paragraph
+            if cursor_row < line_count + para_line_count {
+                cursor_paragraph = para_idx;
+                
+                // Calculate position within this paragraph
+                let line_in_para = cursor_row - line_count;
+                for i in 0..line_in_para {
+                    pos_in_paragraph += para[i].len();
+                    if i > 0 {
+                        pos_in_paragraph += 1; // Space between lines in paragraph
+                    }
                 }
-                cursor_pos += line.len();
-                if line_idx < para.len() - 1 || para_idx < paragraphs.len() - 1 {
-                    cursor_pos += 1; // Space or newline
-                }
-                current_pos += 1;
-            }
-            if current_pos > cursor_row {
+                pos_in_paragraph += cursor_col;
                 break;
             }
+            
+            line_count += para_line_count;
         }
         
         // Wrap each paragraph independently
@@ -741,42 +750,62 @@ impl TuiApp {
             return vec![String::new()];
         }
         
+        // Check if text ends with space - textwrap strips trailing spaces
+        let ends_with_space = text.ends_with(' ');
+        
         // Use textwrap with break_words option to handle long words
         let options = Options::new(max_width)
             .break_words(true)
             .word_separator(textwrap::WordSeparator::AsciiSpace);
         
-        textwrap::wrap(text, options)
+        let mut wrapped: Vec<String> = textwrap::wrap(text, options)
             .into_iter()
             .map(|cow| cow.into_owned())
-            .collect()
+            .collect();
+        
+        // If original text ended with space, preserve it on the last line
+        if ends_with_space && !wrapped.is_empty() {
+            if let Some(last) = wrapped.last_mut() {
+                last.push(' ');
+            }
+        }
+        
+        wrapped
     }
     
     fn find_cursor_position(&self, lines: &[String], cursor_pos: usize) -> (usize, usize) {
-        let mut pos = 0;
+        if lines.is_empty() {
+            return (0, 0);
+        }
+        
+        // Reconstruct the original text to match how we joined it
+        let reconstructed = lines.join(" ");
+        
+        // Clamp cursor_pos to valid range
+        let cursor_pos = cursor_pos.min(reconstructed.len());
+        
+        // Walk through the wrapped lines and find where cursor_pos falls
+        let mut char_count = 0;
         for (row, line) in lines.iter().enumerate() {
-            let line_end = pos + line.len();
+            let line_len = line.len();
             
-            // Check if cursor is within this line (not including the space after)
-            if cursor_pos < line_end || (cursor_pos == line_end && row == lines.len() - 1) {
-                let col = cursor_pos.saturating_sub(pos).min(line.len());
+            // Check if cursor is within this line
+            if cursor_pos <= char_count + line_len {
+                let col = (cursor_pos - char_count).min(line_len);
                 return (row, col);
             }
             
-            // If cursor is at the space right after this line, it belongs to this line
-            if cursor_pos == line_end && row < lines.len() - 1 {
-                return (row, line.len());
+            // Move past this line and the space after it
+            char_count += line_len;
+            if row < lines.len() - 1 {
+                char_count += 1; // Space between lines
             }
-            
-            pos = line_end + 1; // +1 for space between lines
         }
         
-        // Cursor at end
-        if let Some(last_line) = lines.last() {
-            (lines.len().saturating_sub(1), last_line.len())
-        } else {
-            (0, 0)
-        }
+        // Cursor at end of last line
+        let last_row = lines.len() - 1;
+        let last_col = lines[last_row].len();
+        (last_row, last_col)
     }
     
     fn handle_event(&mut self, event: UiEvent) {

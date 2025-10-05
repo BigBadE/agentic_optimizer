@@ -465,18 +465,31 @@ impl TuiApp {
         if event::poll(Duration::from_millis(50))
             .map_err(|e| crate::RoutingError::Other(e.to_string()))? 
         {
-            let event = event::read()
-                .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
+            // Collect all buffered input events (for paste support)
+            let mut events = Vec::new();
+            events.push(event::read()
+                .map_err(|e| crate::RoutingError::Other(e.to_string()))?);
             
-            if let Event::Key(key) = &event {
+            // Poll for more events with zero timeout
+            while event::poll(Duration::from_millis(0))
+                .map_err(|e| crate::RoutingError::Other(e.to_string()))? 
+            {
+                events.push(event::read()
+                    .map_err(|e| crate::RoutingError::Other(e.to_string()))?);
+            }
+            
+            // Process all events
+            let mut should_quit = false;
+            for event in events {
+                if let Event::Key(key) = &event {
                 match key.kind {
                     crossterm::event::KeyEventKind::Press | crossterm::event::KeyEventKind::Repeat => {},
-                    _ => return Ok(false),
+                    _ => continue,
                 }
                 
                 match key.code {
-                    KeyCode::Char('q') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => return Ok(true),
-                    KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => return Ok(true),
+                    KeyCode::Char('q') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => should_quit = true,
+                    KeyCode::Char('c') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => should_quit = true,
                     // Ctrl+P for theme (P for Palette)
                     KeyCode::Char('p') if key.modifiers.contains(crossterm::event::KeyModifiers::CONTROL) => {
                         self.theme = self.theme.next();
@@ -518,8 +531,7 @@ impl TuiApp {
                             FocusedPane::Input => {
                                 // Only auto-wrap on text changes, not cursor movement
                                 let should_wrap = matches!(key.code,
-                                    KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete | 
-                                    KeyCode::Enter
+                                    KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete
                                 );
                                 
                                 self.input_area.input(event);
@@ -546,10 +558,14 @@ impl TuiApp {
                         }
                     }
                 }
-                
-                self.render()
-                    .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
+                }
             }
+            
+            // Render once after processing all events
+            self.render()
+                .map_err(|e| crate::RoutingError::Other(e.to_string()))?;
+            
+            return Ok(should_quit);
         }
         
         Ok(false)
@@ -563,183 +579,153 @@ impl TuiApp {
     }
     
     fn auto_wrap_input(&mut self) {
-        // Calculate available width more accurately
+        // Calculate available width
         let terminal_width = self.terminal.size().map(|s| s.width).unwrap_or(80);
         let input_width = (terminal_width as f32 * 0.7) as usize;
-        // Account for: borders (2) + padding (2)
         let max_line_width = input_width.saturating_sub(4);
         
-        let (cursor_row, cursor_col) = self.input_area.cursor();
+        // Get current state
         let lines = self.input_area.lines().to_vec();
+        let (cursor_row, cursor_col) = self.input_area.cursor();
         
-        if cursor_row >= lines.len() {
+        // Don't wrap if only one line and it fits
+        if lines.len() == 1 && lines[0].len() <= max_line_width {
             return;
         }
         
-        // Try to unwrap with next line (merge current + next)
-        if cursor_row + 1 < lines.len() {
-            let current_line = &lines[cursor_row];
-            let next_line = &lines[cursor_row + 1];
-            
-            // Check if merging would fit (+1 for space, +1 for potential next char)
-            let combined_len = current_line.len() + 1 + next_line.len();
-            if combined_len < max_line_width {
-                let combined = if current_line.is_empty() {
-                    next_line.to_string()
-                } else if next_line.is_empty() {
-                    current_line.to_string()
-                } else {
-                    format!("{} {}", current_line, next_line)
-                };
-                
-                // Save cursor position
-                let saved_col = cursor_col;
-                
-                // Replace lines
-                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-                self.input_area.delete_line_by_end();
-                self.input_area.insert_str(&combined);
-                self.input_area.move_cursor(tui_textarea::CursorMove::Down);
-                self.input_area.delete_line_by_head();
-                self.input_area.delete_line_by_end();
-                
-                // Restore cursor
-                self.input_area.move_cursor(tui_textarea::CursorMove::Up);
-                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-                for _ in 0..saved_col.min(combined.len()) {
-                    self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
-                }
-                return;
+        // Get the full text by joining lines (they're all part of the same input)
+        // Since we only have one logical paragraph, join with spaces
+        let full_text = lines.join(" ");
+        
+        // Calculate cursor position in the full text
+        let mut cursor_pos = 0;
+        for (i, line) in lines.iter().enumerate() {
+            if i < cursor_row {
+                cursor_pos += line.len() + 1; // +1 for the space we added in join
+            } else if i == cursor_row {
+                cursor_pos += cursor_col;
+                break;
             }
         }
         
-        // Try to pull from previous line (when current line is short)
-        if cursor_row > 0 {
-            let prev_line = &lines[cursor_row - 1];
-            let current_line = &lines[cursor_row];
-            
-            // If previous line has content and current is short, try to pull last word
-            if !prev_line.is_empty() && current_line.len() < max_line_width / 2 {
-                // Find last word in previous line
-                if let Some(last_space_pos) = prev_line.rfind(' ') {
-                    let prev_first = &prev_line[..last_space_pos];
-                    let prev_last_word = &prev_line[last_space_pos..].trim_start();
-                    
-                    // Check if pulling would fit
-                    let new_current_len = prev_last_word.len() + 1 + current_line.len();
-                    if new_current_len < max_line_width {
-                        let new_current = if current_line.is_empty() {
-                            prev_last_word.to_string()
-                        } else {
-                            format!("{} {}", prev_last_word, current_line)
-                        };
-                        
-                        let saved_col = cursor_col;
-                        
-                        // Update previous line
-                        self.input_area.move_cursor(tui_textarea::CursorMove::Up);
-                        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-                        self.input_area.delete_line_by_end();
-                        self.input_area.insert_str(prev_first);
-                        
-                        // Update current line
-                        self.input_area.move_cursor(tui_textarea::CursorMove::Down);
-                        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-                        self.input_area.delete_line_by_end();
-                        self.input_area.insert_str(&new_current);
-                        
-                        // Restore cursor (adjusted for pulled word)
-                        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-                        let new_col = saved_col + prev_last_word.len() + 1;
-                        for _ in 0..new_col.min(new_current.len()) {
-                            self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
-                        }
-                        return;
-                    }
-                }
-            }
-        }
+        // Re-wrap everything from scratch
+        let new_lines = self.wrap_text(&full_text, max_line_width);
         
-        // Check if current line needs wrapping
-        let current_line = &lines[cursor_row];
-        if current_line.len() <= max_line_width {
+        // If nothing changed, don't update
+        if new_lines == lines {
             return;
         }
         
-        // Check if next line exists and would be affected
-        let has_next_line = cursor_row + 1 < lines.len();
+        // Find new cursor position
+        let (new_row, new_col) = self.find_cursor_position(&new_lines, cursor_pos);
         
-        // Find wrap position (last space before limit)
-        let wrap_pos = current_line[..max_line_width]
-            .rfind(' ')
-            .unwrap_or(max_line_width.saturating_sub(1));
-        
-        // Split line
-        let first_part = current_line[..wrap_pos].to_string();
-        let second_part = current_line[wrap_pos..].trim_start().to_string();
-        
-        // Save cursor column
-        let saved_col = cursor_col;
-        
-        // If there's a next line, we need to merge the wrapped part with it
-        if has_next_line {
-            let next_line = &lines[cursor_row + 1];
-            let second_part_len = second_part.len();
-            let merged_second = if second_part.is_empty() {
-                next_line.to_string()
-            } else if next_line.is_empty() {
-                second_part.clone()
-            } else {
-                format!("{} {}", second_part, next_line)
-            };
-            
-            // Replace current line with first part
-            self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+        // Clear all existing content
+        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+        for _ in 0..lines.len() {
+            self.input_area.move_cursor(tui_textarea::CursorMove::End);
             self.input_area.delete_line_by_end();
-            self.input_area.insert_str(&first_part);
-            
-            // Replace next line with merged second part
+            if self.input_area.cursor().0 > 0 {
+                self.input_area.move_cursor(tui_textarea::CursorMove::Up);
+                self.input_area.move_cursor(tui_textarea::CursorMove::End);
+                self.input_area.delete_char();
+            }
+        }
+        
+        // Insert all new content
+        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+        self.input_area.delete_line_by_end();
+        for (i, line) in new_lines.iter().enumerate() {
+            if i > 0 {
+                self.input_area.insert_newline();
+            }
+            self.input_area.insert_str(line);
+        }
+        
+        // Restore cursor position
+        self.input_area.move_cursor(tui_textarea::CursorMove::Head);
+        for _ in 0..new_row {
             self.input_area.move_cursor(tui_textarea::CursorMove::Down);
-            self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-            self.input_area.delete_line_by_end();
-            self.input_area.insert_str(&merged_second);
-            
-            // Position cursor
-            if saved_col <= first_part.len() {
-                self.input_area.move_cursor(tui_textarea::CursorMove::Up);
-                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-                for _ in 0..saved_col.min(first_part.len()) {
-                    self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
+        }
+        for _ in 0..new_col {
+            self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
+        }
+    }
+    
+    fn wrap_text(&self, text: &str, max_width: usize) -> Vec<String> {
+        if text.is_empty() {
+            return vec![String::new()];
+        }
+        
+        let mut lines = Vec::new();
+        let mut current_line = String::new();
+        let mut chars_iter = text.chars().peekable();
+        let mut current_word = String::new();
+        
+        while let Some(ch) = chars_iter.next() {
+            if ch.is_whitespace() {
+                // Flush current word
+                if !current_word.is_empty() {
+                    if current_line.is_empty() {
+                        current_line = current_word.clone();
+                    } else if current_line.len() + 1 + current_word.len() <= max_width {
+                        current_line.push(' ');
+                        current_line.push_str(&current_word);
+                    } else {
+                        lines.push(current_line);
+                        current_line = current_word.clone();
+                    }
+                    current_word.clear();
+                }
+                
+                // Add space if we're building a line and next char isn't whitespace
+                if !current_line.is_empty() && chars_iter.peek().map(|c| !c.is_whitespace()).unwrap_or(false) {
+                    // Space will be added when next word is appended
                 }
             } else {
-                let new_col = saved_col.saturating_sub(wrap_pos).saturating_sub(current_line[wrap_pos..].len() - second_part_len);
-                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-                for _ in 0..new_col.min(merged_second.len()) {
-                    self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
-                }
+                current_word.push(ch);
             }
+        }
+        
+        // Flush final word
+        if !current_word.is_empty() {
+            if current_line.is_empty() {
+                current_line = current_word;
+            } else if current_line.len() + 1 + current_word.len() <= max_width {
+                current_line.push(' ');
+                current_line.push_str(&current_word);
+            } else {
+                lines.push(current_line);
+                current_line = current_word;
+            }
+        }
+        
+        if !current_line.is_empty() {
+            lines.push(current_line);
+        }
+        
+        if lines.is_empty() {
+            lines.push(String::new());
+        }
+        
+        lines
+    }
+    
+    fn find_cursor_position(&self, lines: &[String], cursor_pos: usize) -> (usize, usize) {
+        let mut pos = 0;
+        for (row, line) in lines.iter().enumerate() {
+            // Check if cursor is within this line
+            if cursor_pos <= pos + line.len() {
+                let col = cursor_pos.saturating_sub(pos).min(line.len());
+                return (row, col);
+            }
+            pos += line.len() + 1; // +1 for space between lines
+        }
+        
+        // Cursor at end
+        if let Some(last_line) = lines.last() {
+            (lines.len().saturating_sub(1), last_line.len())
         } else {
-            // No next line, create new one
-            self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-            self.input_area.delete_line_by_end();
-            self.input_area.insert_str(&first_part);
-            self.input_area.insert_newline();
-            self.input_area.insert_str(&second_part);
-            
-            // Position cursor
-            if saved_col <= first_part.len() {
-                self.input_area.move_cursor(tui_textarea::CursorMove::Up);
-                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-                for _ in 0..saved_col.min(first_part.len()) {
-                    self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
-                }
-            } else {
-                let new_col = saved_col.saturating_sub(wrap_pos).saturating_sub(current_line[wrap_pos..].len() - second_part.len());
-                self.input_area.move_cursor(tui_textarea::CursorMove::Head);
-                for _ in 0..new_col.min(second_part.len()) {
-                    self.input_area.move_cursor(tui_textarea::CursorMove::Forward);
-                }
-            }
+            (0, 0)
         }
     }
     

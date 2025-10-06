@@ -272,6 +272,24 @@ impl AgentExecutor {
         Ok(context)
     }
     
+    /// Check if a request is simple enough to skip assessment
+    fn is_simple_request(&self, description: &str) -> bool {
+        let desc_lower = description.to_lowercase();
+        let word_count = description.split_whitespace().count();
+        
+        // Simple greetings
+        let is_greeting = desc_lower == "hi" 
+            || desc_lower == "hello" 
+            || desc_lower == "hey"
+            || desc_lower.starts_with("say hi")
+            || desc_lower.starts_with("say hello");
+        
+        // Very short requests
+        let is_very_short = word_count <= 3;
+        
+        is_greeting || is_very_short
+    }
+    
     /// Execute a task with self-determination (Phase 1)
     /// The task assesses itself and decides whether to complete, decompose, or gather context
     pub async fn execute_self_determining(
@@ -282,44 +300,82 @@ impl AgentExecutor {
         let start = Instant::now();
         let task_id = task.id;
         
+        // Check if this is a simple request that doesn't need assessment
+        let is_simple = self.is_simple_request(&task.description);
+        
+        if is_simple {
+            // Skip assessment for simple requests, execute directly
+            task.state = crate::TaskState::Executing;
+            return self.execute_streaming(task, ui_channel).await;
+        }
+        
         // Update task state
         task.state = crate::TaskState::Assessing;
         
-        // Notify UI that we're assessing
+        // Start "Analysis" step (will be collapsed by default)
         ui_channel.send(UiEvent::TaskStepStarted {
             task_id,
-            step_id: "assess".to_string(),
-            step_type: "Assessing".to_string(),
-            content: "Analyzing task complexity and requirements...".to_string(),
+            step_id: "analysis".to_string(),
+            step_type: "Thinking".to_string(),
+            content: "Analyzing...".to_string(),
         });
         
         // Create assessor with the router's provider
         let decision_result = self.router.route(&task).await?;
         let provider = self.create_provider(&decision_result.tier)?;
-        let assessor = crate::SelfAssessor::new(provider);
+        let assessor = crate::SelfAssessor::new(provider.clone());
         
-        // Assess the task
-        let exec_context = crate::ExecutionContext::new(task.description.clone());
-        let decision = assessor.assess_task(&task, &exec_context).await?;
+        // Build and execute assessment query
+        let query = merlin_core::Query {
+            text: format!(
+                "Analyze this task and decide if you can complete it immediately or if it needs decomposition:\n\n\"{}\"",
+                task.description
+            ),
+            conversation_id: None,
+            files_context: Vec::new(),
+        };
+        
+        let context = merlin_core::Context::new("You are a task assessment system.");
+        let assessment_response = provider.generate(&query, &context).await
+            .map_err(|e| RoutingError::Other(format!("Assessment failed: {e}")))?;
+        
+        // Parse the decision FIRST (before sending to UI)
+        let decision = match assessor.parse_assessment_response(&assessment_response.text, &task) {
+            Ok(d) => d,
+            Err(_e) => {
+                // If parsing fails, fall back to streaming execution without showing error
+                ui_channel.send(UiEvent::TaskStepCompleted {
+                    task_id,
+                    step_id: "analysis".to_string(),
+                });
+                
+                task.state = crate::TaskState::Executing;
+                return self.execute_streaming(task, ui_channel).await;
+            }
+        };
+        
+        // Send the raw assessment output to UI (will be under "Analysis" step)
+        ui_channel.send(UiEvent::TaskOutput {
+            task_id,
+            output: assessment_response.text.clone(),
+        });
         
         // Store decision in history
         task.decision_history.push(decision.clone());
         
-        // Notify UI of decision
+        // Complete the analysis step
         ui_channel.send(UiEvent::TaskStepCompleted {
             task_id,
-            step_id: "assess".to_string(),
+            step_id: "analysis".to_string(),
         });
         
         // Execute based on decision
         match decision.action {
             crate::TaskAction::Complete { result } => {
-                // Task can be completed immediately
-                ui_channel.send(UiEvent::TaskStepStarted {
+                // Task can be completed immediately - add output as text
+                ui_channel.send(UiEvent::TaskOutput {
                     task_id,
-                    step_id: "complete".to_string(),
-                    step_type: "Output".to_string(),
-                    content: format!("Decision: COMPLETE ({})", decision.reasoning),
+                    output: result.clone(),
                 });
                 
                 task.state = crate::TaskState::Completed;
@@ -342,57 +398,20 @@ impl AgentExecutor {
             }
             
             crate::TaskAction::Decompose { subtasks, execution_mode: _ } => {
-                // Task needs to be broken down
+                // Task needs to be broken down - for Phase 1 fall back to standard execution
                 ui_channel.send(UiEvent::TaskStepStarted {
                     task_id,
                     step_id: "decompose".to_string(),
                     step_type: "Output".to_string(),
-                    content: format!("Decision: DECOMPOSE into {} subtasks ({})", subtasks.len(), decision.reasoning),
+                    content: format!(
+                        "Decision: DECOMPOSE into {} subtasks ({}). Falling back to regular execution.",
+                        subtasks.len(),
+                        decision.reasoning
+                    ),
                 });
-                
-                task.state = crate::TaskState::AwaitingSubtasks;
-                
-                // For Phase 1, we'll execute subtasks sequentially and synthesize results
-                let mut subtask_results = Vec::new();
-                
-                for subtask_spec in &subtasks {
-                    let subtask = Task::new(subtask_spec.description.clone())
-                        .with_complexity(subtask_spec.complexity);
-                    
-                    // Notify UI of subtask
-                    ui_channel.task_started_with_parent(
-                        subtask.id,
-                        subtask.description.clone(),
-                        Some(task_id),
-                    );
-                    
-                    // Execute subtask recursively (it will self-assess too)
-                    let subtask_result = Box::pin(self.execute_self_determining(subtask, ui_channel.clone())).await?;
-                    subtask_results.push(subtask_result.response.text.clone());
-                    
-                    ui_channel.completed(subtask_result.task_id, subtask_result);
-                }
-                
-                // Synthesize results
-                let combined_result = subtask_results.join("\n\n");
-                
-                task.state = crate::TaskState::Completed;
-                
-                let response = Response {
-                    text: combined_result,
-                    confidence: decision.confidence as f64,
-                    tokens_used: merlin_core::TokenUsage::default(),
-                    provider: decision_result.tier.to_string(),
-                    latency_ms: start.elapsed().as_millis() as u64,
-                };
-                
-                Ok(TaskResult {
-                    task_id,
-                    response,
-                    tier_used: decision_result.tier.to_string(),
-                    validation: crate::ValidationResult::default(),
-                    duration_ms: start.elapsed().as_millis() as u64,
-                })
+
+                task.state = crate::TaskState::Executing;
+                self.execute_streaming(task, ui_channel).await
             }
             
             crate::TaskAction::GatherContext { needs } => {

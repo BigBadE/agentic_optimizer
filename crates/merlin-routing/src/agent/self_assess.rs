@@ -41,63 +41,28 @@ impl SelfAssessor {
         self.parse_decision(&response.text, task)
     }
 
-    fn build_assessment_prompt(&self, task: &Task, context: &ExecutionContext) -> String {
-        let context_summary = if context.files_read.is_empty() {
-            "No files read yet".to_string()
-        } else {
-            format!("Files read: {}", context.files_read.len())
-        };
-
+    fn build_assessment_prompt(&self, task: &Task, _context: &ExecutionContext) -> String {
         format!(
-            r#"You are assessing whether you can complete this task or if it needs to be broken down.
+            r#"Task: "{}"
 
-Task: "{}"
-Complexity estimate: {:?}
-Context: {}
+You must respond with ONLY valid JSON. No explanations, no markdown, just JSON.
 
-Analyze this task and decide ONE of the following:
+For simple requests like greetings, respond:
+{{"action": "COMPLETE", "reasoning": "Simple greeting", "confidence": 0.95, "details": {{"result": "Hi! How can I help you today?"}}}}
 
-1. COMPLETE - You can solve this immediately (use for simple greetings, basic questions, straightforward requests)
-   Example: "say hi", "hello", "what time is it"
+For complex tasks, respond:
+{{"action": "DECOMPOSE", "reasoning": "Needs multiple steps", "confidence": 0.9, "details": {{"subtasks": [{{"description": "Step 1", "complexity": "Simple"}}], "execution_mode": "Sequential"}}}}
 
-2. DECOMPOSE - This needs to be broken into subtasks (use for complex work requiring multiple steps)
-   Example: "refactor the module", "implement feature X with tests"
-
-3. GATHER - You need more information first (use when you need to read files, understand context)
-   Example: "fix the bug" (need to see code first)
-
-Guidelines:
-- If the request is 5 words or less and conversational, choose COMPLETE
-- If it's a greeting or simple question, choose COMPLETE
-- If it requires code changes across multiple files, choose DECOMPOSE
-- If you need to understand existing code first, choose GATHER
-
-Respond ONLY with valid JSON in this exact format:
-{{
-  "action": "COMPLETE" | "DECOMPOSE" | "GATHER",
-  "reasoning": "brief explanation of your choice",
-  "confidence": 0.0-1.0,
-  "details": {{
-    // For COMPLETE:
-    "result": "your response text"
-    
-    // For DECOMPOSE:
-    "subtasks": [
-      {{"description": "task 1", "complexity": "Simple"}},
-      {{"description": "task 2", "complexity": "Medium"}}
-    ],
-    "execution_mode": "Sequential" | "Parallel"
-    
-    // For GATHER:
-    "needs": ["file path 1", "file path 2"]
-  }}
-}}
-
-JSON Response:"#,
-            task.description, task.complexity, context_summary
+JSON:"#,
+            task.description
         )
     }
 
+    /// Parse an assessment response into a decision (public for executor)
+    pub fn parse_assessment_response(&self, response_text: &str, task: &Task) -> Result<TaskDecision> {
+        self.parse_decision(response_text, task)
+    }
+    
     fn parse_decision(&self, response_text: &str, task: &Task) -> Result<TaskDecision> {
         // Try to extract JSON from the response
         let json_str = if let Some(start) = response_text.find('{') {
@@ -110,6 +75,7 @@ JSON Response:"#,
             response_text
         };
 
+        // Try to parse JSON, but don't use fallback - let caller handle errors
         let parsed: AssessmentResponse = serde_json::from_str(json_str).map_err(|e| {
             RoutingError::Other(format!(
                 "Failed to parse assessment response: {e}\nResponse: {response_text}"

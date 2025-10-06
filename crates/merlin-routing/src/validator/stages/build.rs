@@ -101,7 +101,6 @@ impl ValidationStage for BuildValidationStage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::path::PathBuf;
 
     #[tokio::test]
     async fn test_build_validation_skip_no_files() {

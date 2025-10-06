@@ -41,7 +41,7 @@ impl TaskAnalyzer for LocalTaskAnalyzer {
     async fn analyze(&self, request: &str) -> Result<TaskAnalysis> {
         let intent = self.intent_extractor.extract(request);
         
-        let complexity = self.complexity_estimator.estimate(&intent, request);
+        let _complexity = self.complexity_estimator.estimate(&intent, request);
         
         let mut tasks = self.task_decomposer.decompose(&intent, request);
         

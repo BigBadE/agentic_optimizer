@@ -535,16 +535,16 @@ async fn run_tui_interactive(
                             message: format!("Generated {} task(s)", analysis.tasks.len()),
                         });
                         
-                        for task in &analysis.tasks {
-                            ui_channel_clone.task_started_with_parent(task.id, task.description.clone(), parent_task_id);
-                            // Send the prompt as the first output
-                            let first_line = task.description.lines().next().unwrap_or(&task.description);
-                            ui_channel_clone.output(task.id, first_line.to_string());
-                        }
-                        
-                        match orchestrator_clone.execute_tasks(analysis.tasks).await {
-                            Ok(results) => {
-                                for result in &results {
+                        // Execute tasks with streaming
+                        for task in analysis.tasks {
+                            let task_id = task.id;
+                            let task_desc = task.description.clone();
+                            
+                            ui_channel_clone.task_started_with_parent(task_id, task_desc.clone(), parent_task_id);
+                            
+                            // Execute with streaming (AgentExecutor will handle all output)
+                            match orchestrator_clone.execute_task_streaming(task, ui_channel_clone.clone()).await {
+                                Ok(result) => {
                                     ui_channel_clone.completed(result.task_id, result.clone());
                                     
                                     writeln!(log_clone, "Response: {}", result.response.text).ok();
@@ -565,13 +565,14 @@ async fn run_tui_interactive(
                                         });
                                     }
                                 }
-                            }
-                            Err(error) => {
-                                writeln!(log_clone, "Error: {error}").ok();
-                                ui_channel_clone.send(UiEvent::SystemMessage {
-                                    level: MessageLevel::Error,
-                                    message: format!("Error: {error}"),
-                                });
+                                Err(error) => {
+                                    writeln!(log_clone, "Error: {error}").ok();
+                                    ui_channel_clone.send(UiEvent::SystemMessage {
+                                        level: MessageLevel::Error,
+                                        message: format!("Error: {error}"),
+                                    });
+                                    ui_channel_clone.failed(task_id, error.to_string());
+                                }
                             }
                         }
                     }

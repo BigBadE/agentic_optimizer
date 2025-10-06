@@ -1,27 +1,21 @@
 [package]
 name = "merlin-local"
-version = "0.1.0"
-edition = "2021"
+version.workspace = true
+edition.workspace = true
 
 [dependencies]
-# Core dependencies
-merlin-core = { path = "../merlin-core" }
-
-# Async runtime
-tokio = { version = "1.41", features = ["full"] }
-async-trait = "0.1"
-
-# HTTP client
-reqwest = { version = "0.12", features = ["json"] }
-
-# Serialization
-serde = { version = "1.0", features = ["derive"] }
-serde_json = "1.0"
-
-# Error handling
-thiserror = "2.0"
-anyhow = "1.0"
+merlin-core.workspace = true
+tokio.workspace = true
+async-trait.workspace = true
+reqwest.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+thiserror.workspace = true
+anyhow.workspace = true
 
 [dev-dependencies]
-tokio-test = "0.4"
+tokio-test.workspace = true
+
+[lints]
+workspace = true
 

@@ -7,6 +7,7 @@ use crate::{Task, TaskId};
 #[derive(Debug, Clone)]
 pub struct TaskGraph {
     graph: DiGraph<Task, ()>,
+    #[allow(dead_code)]
     node_map: HashMap<TaskId, NodeIndex>,
 }
 

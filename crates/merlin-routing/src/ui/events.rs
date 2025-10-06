@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use crate::{TaskId, TaskResult};
 
 /// UI event that tasks send to update display
@@ -28,6 +29,36 @@ pub enum UiEvent {
     SystemMessage {
         level: MessageLevel,
         message: String,
+    },
+    // New streaming events
+    TaskStepStarted {
+        task_id: TaskId,
+        step_id: String,
+        step_type: String,
+        content: String,
+    },
+    TaskStepCompleted {
+        task_id: TaskId,
+        step_id: String,
+    },
+    ToolCallStarted {
+        task_id: TaskId,
+        tool: String,
+        args: Value,
+    },
+    ToolCallCompleted {
+        task_id: TaskId,
+        tool: String,
+        result: Value,
+    },
+    ThinkingUpdate {
+        task_id: TaskId,
+        content: String,
+    },
+    SubtaskSpawned {
+        parent_id: TaskId,
+        child_id: TaskId,
+        description: String,
     },
 }
 

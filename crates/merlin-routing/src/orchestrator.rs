@@ -1,9 +1,10 @@
 use std::sync::Arc;
 use std::env;
 use crate::{
-    ConflictAwareTaskGraph, ExecutorPool, FileLockManager, LocalTaskAnalyzer, ModelRouter, ModelTier,
-    Result, RoutingConfig, StrategyRouter, Task, TaskAnalysis, TaskAnalyzer, TaskResult,
-    ValidationPipeline, Validator, WorkspaceState,
+    AgentExecutor, ConflictAwareTaskGraph, ExecutorPool, FileLockManager, ListFilesTool,
+    LocalTaskAnalyzer, ModelRouter, ModelTier, ReadFileTool, Result, RoutingConfig, RunCommandTool,
+    StrategyRouter, Task, TaskAnalysis, TaskAnalyzer, TaskResult, ToolRegistry, UiChannel,
+    ValidationPipeline, Validator, WorkspaceState, WriteFileTool,
 };
 use merlin_core::{Context, ModelProvider, Query};
 
@@ -15,6 +16,7 @@ pub struct RoutingOrchestrator {
     router: Arc<dyn ModelRouter>,
     validator: Arc<dyn Validator>,
     workspace: Arc<WorkspaceState>,
+    #[allow(dead_code)]
     lock_manager: Arc<FileLockManager>,
 }
 
@@ -68,7 +70,33 @@ impl RoutingOrchestrator {
         self.analyzer.analyze(request).await
     }
     
-    /// Execute a single task with routing and validation
+    /// Execute a task with streaming and tool support
+    pub async fn execute_task_streaming(
+        &self,
+        task: Task,
+        ui_channel: UiChannel,
+    ) -> Result<TaskResult> {
+        // Create tool registry with workspace tools
+        let tool_registry = Arc::new(
+            ToolRegistry::new()
+                .with_tool(Arc::new(ReadFileTool::new(self.config.workspace.root_path.clone())))
+                .with_tool(Arc::new(WriteFileTool::new(self.config.workspace.root_path.clone())))
+                .with_tool(Arc::new(ListFilesTool::new(self.config.workspace.root_path.clone())))
+                .with_tool(Arc::new(RunCommandTool::new(self.config.workspace.root_path.clone())))
+        );
+        
+        // Create agent executor
+        let mut executor = AgentExecutor::new(
+            self.router.clone(),
+            self.validator.clone(),
+            tool_registry,
+        );
+        
+        // Execute with streaming
+        executor.execute_streaming(task, ui_channel).await
+    }
+    
+    /// Execute a single task with routing and validation (legacy method)
     pub async fn execute_task(&self, task: Task) -> Result<TaskResult> {
         let start = std::time::Instant::now();
         let decision = self.router.route(&task).await?;

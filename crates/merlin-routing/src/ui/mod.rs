@@ -213,6 +213,7 @@ struct UiState {
     active_running_tasks: std::collections::HashSet<TaskId>,
     collapsed_tasks: std::collections::HashSet<TaskId>,
     pending_delete_task_id: Option<TaskId>,
+    #[allow(dead_code)]
     emoji_mode: EmojiMode,
 }
 
@@ -837,21 +838,20 @@ impl TuiApp {
             return (0, 0);
         }
         
-        let mut graphemes_seen = 0;
+        let mut chars_seen = 0;
         for (row, line) in lines.iter().enumerate() {
-            // Count graphemes in this line, not bytes
-            let line_grapheme_count = line.graphemes(true).count();
+            let line_len = line.len();
             
-            if graphemes_seen + line_grapheme_count >= cursor_pos {
-                let col = cursor_pos - graphemes_seen;
+            if chars_seen + line_len >= cursor_pos {
+                let col = cursor_pos - chars_seen;
                 return (row, col);
             }
             
-            graphemes_seen += line_grapheme_count + 1; // +1 for newline
+            chars_seen += line_len + 1; // +1 for space
         }
         
         let last_row = lines.len() - 1;
-        let last_col = lines[last_row].graphemes(true).count();
+        let last_col = lines[last_row].len();
         (last_row, last_col)
     }
     
@@ -898,18 +898,13 @@ impl TuiApp {
         let input_width = (terminal_width as f32 * 0.7) as usize;
         let max_line_width = input_width.saturating_sub(4);
         
-        let emoji_mode = self.state.emoji_mode;
-        
         // Get current state
         let lines = self.input_area.lines().to_vec();
         let (cursor_row, cursor_col) = self.input_area.cursor();
         
-        // Don't wrap if only one line and it fits (using grapheme-aware width)
-        if lines.len() == 1 {
-            let line_width = calculate_width(&lines[0], emoji_mode);
-            if line_width <= max_line_width {
-                return;
-            }
+        // Don't wrap if only one line and it fits
+        if lines.len() == 1 && lines[0].len() <= max_line_width {
+            return;
         }
         
         // Split into paragraphs (separated by empty lines OR manual newlines)
@@ -988,16 +983,28 @@ impl TuiApp {
                 // Join lines with spaces - they're either from previous wrapping or separate content
                 let para_text = para.join(" ");
                 
-                // Only wrap if needed - preserve single short lines as-is (using grapheme-aware width)
-                let wrapped = if para.len() == 1 {
-                    let line_width = calculate_width(&para[0], emoji_mode);
-                    if line_width < max_line_width {
-                        vec![para[0].clone()]
-                    } else {
-                        wrap_text(&para_text, max_line_width, emoji_mode)
-                    }
+                // Only wrap if needed - preserve single short lines as-is
+                let wrapped = if para.len() == 1 && para[0].len() < max_line_width {
+                    vec![para[0].clone()]
                 } else {
-                    wrap_text(&para_text, max_line_width, emoji_mode)
+                    // Use textwrap for proper word wrapping
+                    let ends_with_space = para_text.ends_with(' ');
+                    let options = textwrap::Options::new(max_line_width)
+                        .break_words(true)
+                        .word_separator(textwrap::WordSeparator::AsciiSpace);
+                    
+                    let mut wrapped_lines: Vec<String> = textwrap::wrap(&para_text, options)
+                        .into_iter()
+                        .map(|cow| cow.into_owned())
+                        .collect();
+                    
+                    if ends_with_space && !wrapped_lines.is_empty() {
+                        if let Some(last) = wrapped_lines.last_mut() {
+                            last.push(' ');
+                        }
+                    }
+                    
+                    wrapped_lines
                 };
                 
                 // Find cursor in this paragraph

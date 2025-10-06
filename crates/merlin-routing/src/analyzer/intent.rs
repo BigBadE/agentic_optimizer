@@ -35,12 +35,12 @@ pub enum Scope {
 pub struct IntentExtractor;
 
 impl IntentExtractor {
-    #[must_use] 
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
     
-    #[must_use] 
+    #[must_use]
     pub fn extract(&self, request: &str) -> Intent {
         let request_lower = request.to_lowercase();
         

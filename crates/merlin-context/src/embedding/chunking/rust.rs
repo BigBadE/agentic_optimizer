@@ -1,5 +1,6 @@
 //! Rust code chunking - prioritizes innermost items (functions over impls).
 
+use std::mem;
 use super::{FileChunk, estimate_tokens, MIN_CHUNK_TOKENS, MAX_CHUNK_TOKENS};
 
 /// Chunk Rust code - prioritizes innermost items (functions over impls)
@@ -18,11 +19,11 @@ pub fn chunk_rust(file_path: String, content: &str) -> Vec<FileChunk> {
             
             // Build string using buffer to avoid allocations
             buffer.clear();
-            for line_idx in start_idx..=end_idx {
+            for (line_idx, line) in lines.iter().enumerate().take(end_idx + 1).skip(start_idx) {
                 if line_idx > start_idx {
                     buffer.push('\n');
                 }
-                buffer.push_str(lines[line_idx]);
+                buffer.push_str(line);
             }
             
             let tokens = estimate_tokens(&buffer);
@@ -43,9 +44,9 @@ pub fn chunk_rust(file_path: String, content: &str) -> Vec<FileChunk> {
                 let sub_chunks = force_split_large_chunk(&file_path, &lines, start_idx, end_idx, &chunk_id);
                 if !sub_chunks.is_empty() {
                     // Verify all sub-chunks are within limits
-                    let all_valid = sub_chunks.iter().all(|c| {
-                        let t = estimate_tokens(&c.content);
-                        t <= MAX_CHUNK_TOKENS
+                    let all_valid = sub_chunks.iter().all(|chunk| {
+                        let token_count = estimate_tokens(&chunk.content);
+                        token_count <= MAX_CHUNK_TOKENS
                     });
                     
                     if all_valid {
@@ -56,7 +57,7 @@ pub fn chunk_rust(file_path: String, content: &str) -> Vec<FileChunk> {
                 }
                 
                 // If we can't split it properly, skip it (too large and no good split points)
-                eprintln!("Warning: Skipping large chunk {} ({} tokens) - no good split points", chunk_id, tokens);
+                tracing::warn!("Skipping large chunk {chunk_id} ({tokens} tokens) - no good split points");
                 i = end_line + 1;
                 continue;
             }
@@ -65,7 +66,7 @@ pub fn chunk_rust(file_path: String, content: &str) -> Vec<FileChunk> {
             if !buffer.trim().is_empty() && tokens >= MIN_CHUNK_TOKENS {
                 chunks.push(FileChunk::new(
                     file_path.clone(),
-                    std::mem::take(&mut buffer),
+                    mem::take(&mut buffer),
                     chunk_id,
                     i + 1,
                     end_line + 1,
@@ -83,7 +84,7 @@ pub fn chunk_rust(file_path: String, content: &str) -> Vec<FileChunk> {
     if chunks.is_empty() {
         chunks.push(FileChunk::new(
             file_path,
-            content.to_string(),
+            content.to_owned(),
             String::from("file"),
             1,
             lines.len(),
@@ -159,19 +160,19 @@ fn chunk_impl_into_functions(file_path: &str, lines: &[&str], start_idx: usize, 
             
             // Build string using buffer
             buffer.clear();
-            for line_idx in fn_start..=fn_end {
+            for (line_idx, line) in lines.iter().enumerate().take(fn_end + 1).skip(fn_start) {
                 if line_idx > fn_start {
                     buffer.push('\n');
                 }
-                buffer.push_str(lines[line_idx]);
+                buffer.push_str(line);
             }
-            
+
             let tokens = estimate_tokens(&buffer);
-            
+
             if tokens >= MIN_CHUNK_TOKENS {
                 chunks.push(FileChunk::new(
-                    file_path.to_string(),
-                    std::mem::take(&mut buffer),
+                    file_path.to_owned(),
+                    mem::take(&mut buffer),
                     fn_id,
                     fn_start + 1,
                     fn_end + 1,
@@ -212,50 +213,49 @@ fn force_split_large_chunk(file_path: &str, lines: &[&str], start_idx: usize, en
         }
         
         // Force split if we're over MAX and have a recent empty line
-        if tokens > MAX_CHUNK_TOKENS {
-            if let Some((empty_idx, empty_tokens)) = last_empty_line {
-                if empty_tokens >= MIN_CHUNK_TOKENS {
-                    // Build split content from original lines
-                    let mut split_content = String::new();
-                    for idx in chunk_start..=empty_idx {
-                        if idx > chunk_start {
-                            split_content.push('\n');
-                        }
-                        split_content.push_str(lines[idx]);
-                    }
-                    
-                    chunks.push(FileChunk::new(
-                        file_path.to_string(),
-                        split_content,
-                        format!("{} (part {})", base_id, part_num),
-                        chunk_start + 1,
-                        empty_idx + 1,
-                    ));
-                    
-                    // Rebuild buffer with remaining content
-                    buffer.clear();
-                    line_count = 0;
-                    for idx in (empty_idx + 1)..=line_idx {
-                        if line_count > 0 {
-                            buffer.push('\n');
-                        }
-                        buffer.push_str(lines[idx]);
-                        line_count += 1;
-                    }
-                    
-                    part_num += 1;
-                    chunk_start = empty_idx + 1;
-                    last_empty_line = None;
+        if tokens > MAX_CHUNK_TOKENS
+            && let Some((empty_idx, empty_tokens)) = last_empty_line
+            && empty_tokens >= MIN_CHUNK_TOKENS
+        {
+            // Build split content from original lines
+            let mut split_content = String::new();
+            for (idx, line) in lines.iter().enumerate().take(empty_idx + 1).skip(chunk_start) {
+                if idx > chunk_start {
+                    split_content.push('\n');
                 }
+                split_content.push_str(line);
             }
+
+            chunks.push(FileChunk::new(
+                file_path.to_owned(),
+                split_content,
+                format!("{base_id} (part {part_num})"),
+                chunk_start + 1,
+                empty_idx + 1,
+            ));
+
+            // Rebuild buffer with remaining content
+            buffer.clear();
+            line_count = 0;
+            for line in lines.iter().take(line_idx + 1).skip(empty_idx + 1) {
+                if line_count > 0 {
+                    buffer.push('\n');
+                }
+                buffer.push_str(line);
+                line_count += 1;
+            }
+
+            part_num += 1;
+            chunk_start = empty_idx + 1;
+            last_empty_line = None;
         }
         
         // Also split on empty lines when we have enough content
-        if lines[line_idx].trim().is_empty() && tokens >= MIN_CHUNK_TOKENS && tokens <= MAX_CHUNK_TOKENS {
+        if lines[line_idx].trim().is_empty() && (MIN_CHUNK_TOKENS..=MAX_CHUNK_TOKENS).contains(&tokens) {
             chunks.push(FileChunk::new(
-                file_path.to_string(),
-                std::mem::take(&mut buffer),
-                format!("{} (part {})", base_id, part_num),
+                file_path.to_owned(),
+                mem::take(&mut buffer),
+                format!("{base_id} (part {part_num})"),
                 chunk_start + 1,
                 line_idx + 1,
             ));
@@ -265,25 +265,23 @@ fn force_split_large_chunk(file_path: &str, lines: &[&str], start_idx: usize, en
             last_empty_line = None;
         }
     }
-    
+
     // Add remaining if meets minimum
     if line_count > 0 {
         let tokens = estimate_tokens(&buffer);
         if tokens >= MIN_CHUNK_TOKENS {
             chunks.push(FileChunk::new(
-                file_path.to_string(),
+                file_path.to_owned(),
                 buffer,
-                format!("{} (part {})", base_id, part_num),
+                format!("{base_id} (part {part_num})"),
                 chunk_start + 1,
                 end_idx + 1,
             ));
-        } else if !chunks.is_empty() {
+        } else if !chunks.is_empty() && let Some(last_chunk) = chunks.last_mut() {
             // Merge small remainder with last chunk if possible
-            if let Some(last_chunk) = chunks.last_mut() {
-                last_chunk.content.push('\n');
-                last_chunk.content.push_str(&buffer);
-                last_chunk.end_line = end_idx + 1;
-            }
+            last_chunk.content.push('\n');
+            last_chunk.content.push_str(&buffer);
+            last_chunk.end_line = end_idx + 1;
         }
     }
     

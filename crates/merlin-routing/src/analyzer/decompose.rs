@@ -5,12 +5,12 @@ use super::intent::{Action, Intent};
 pub struct TaskDecomposer;
 
 impl TaskDecomposer {
-    #[must_use] 
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
     
-    #[must_use] 
+    #[must_use]
     pub fn decompose(&self, intent: &Intent, request: &str) -> Vec<Task> {
         match &intent.action {
             Action::Refactor => self.decompose_refactor(intent, request),

@@ -1,6 +1,5 @@
 use serde_json::Value;
 use std::collections::HashSet;
-use std::time::Instant;
 
 /// A node in the output tree
 #[derive(Clone, Debug)]
@@ -9,23 +8,15 @@ pub enum OutputNode {
         id: String,
         step_type: StepType,
         content: String,
-        #[allow(dead_code)]
-        timestamp: Instant,
         children: Vec<OutputNode>,
     },
     ToolCall {
         id: String,
         tool_name: String,
-        #[allow(dead_code)]
-        args: Value,
-        #[allow(dead_code)]
-        timestamp: Instant,
         result: Option<ToolResult>,
     },
     Text {
         content: String,
-        #[allow(dead_code)]
-        level: usize,
     },
 }
 
@@ -33,8 +24,6 @@ pub enum OutputNode {
 pub struct ToolResult {
     pub success: bool,
     pub content: String,
-    #[allow(dead_code)]
-    pub timestamp: Instant,
 }
 
 #[derive(Clone, Debug, PartialEq, Eq)]
@@ -62,7 +51,7 @@ pub struct OutputTree {
     root: Vec<OutputNode>,
     selected_index: usize,
     collapsed_nodes: HashSet<String>,
-    pub current_step_stack: Vec<String>, // Track nested steps
+    current_step_stack: Vec<String>, // Track nested steps
 }
 
 impl OutputTree {
@@ -81,7 +70,6 @@ impl OutputTree {
             id: step_id.clone(),
             step_type,
             content,
-            timestamp: Instant::now(),
             children: Vec::new(),
         };
         
@@ -114,13 +102,11 @@ impl OutputTree {
     }
     
     /// Add a tool call
-    pub fn add_tool_call(&mut self, tool_name: String, args: Value) {
+    pub fn add_tool_call(&mut self, tool_name: String, _args: Value) {
         let id = format!("tool_{}", self.root.len());
         let node = OutputNode::ToolCall {
             id,
             tool_name,
-            args,
-            timestamp: Instant::now(),
             result: None,
         };
         
@@ -149,7 +135,6 @@ impl OutputTree {
         let tool_result = ToolResult {
             success,
             content,
-            timestamp: Instant::now(),
         };
         
         // Find the most recent tool call with this name
@@ -162,8 +147,7 @@ impl OutputTree {
     
     /// Add plain text output
     pub fn add_text(&mut self, content: String) {
-        let level = self.current_step_stack.len();
-        let node = OutputNode::Text { content, level };
+        let node = OutputNode::Text { content };
         
         if let Some(parent_id) = self.current_step_stack.last().cloned() {
             if let Some(parent) = self.find_node_mut(&parent_id) {
@@ -187,11 +171,11 @@ impl OutputTree {
         result
     }
     
-    fn flatten_node<'a>(
-        &'a self,
-        node: &'a OutputNode,
+    fn flatten_node<'node>(
+        &'node self,
+        node: &'node OutputNode,
         depth: usize,
-        result: &mut Vec<(OutputNodeRef<'a>, usize)>,
+        result: &mut Vec<(OutputNodeRef<'node>, usize)>,
         parent_states: &[bool],
     ) {
         let node_ref = OutputNodeRef {
@@ -226,14 +210,14 @@ impl OutputTree {
         }
     }
     
-    fn get_children<'a>(&self, node: &'a OutputNode) -> Option<&'a Vec<OutputNode>> {
+    fn get_children<'node>(&self, node: &'node OutputNode) -> Option<&'node Vec<OutputNode>> {
         match node {
             OutputNode::Step { children, .. } => Some(children),
             _ => None,
         }
     }
     
-    fn get_node_id<'a>(&self, node: &'a OutputNode) -> Option<&'a str> {
+    fn get_node_id<'node>(&self, node: &'node OutputNode) -> Option<&'node str> {
         match node {
             OutputNode::Step { id, .. } => Some(id),
             OutputNode::ToolCall { id, .. } => Some(id),
@@ -250,7 +234,7 @@ impl OutputTree {
         None
     }
     
-    fn find_node_recursive<'a>(node: &'a mut OutputNode, target_id: &str) -> Option<&'a mut OutputNode> {
+    fn find_node_recursive<'node>(node: &'node mut OutputNode, target_id: &str) -> Option<&'node mut OutputNode> {
         if let Some(id) = match node {
             OutputNode::Step { id, .. } => Some(id.as_str()),
             OutputNode::ToolCall { id, .. } => Some(id.as_str()),
@@ -281,7 +265,7 @@ impl OutputTree {
         None
     }
     
-    fn find_tool_call_recursive<'a>(node: &'a mut OutputNode, tool_name: &str) -> Option<&'a mut OutputNode> {
+    fn find_tool_call_recursive<'node>(node: &'node mut OutputNode, tool_name: &str) -> Option<&'node mut OutputNode> {
         if let OutputNode::ToolCall { tool_name: name, result, .. } = node {
             if name == tool_name && result.is_none() {
                 return Some(node);
@@ -368,12 +352,7 @@ impl OutputTree {
     pub fn selected_index(&self) -> usize {
         self.selected_index
     }
-    
-    #[allow(dead_code)]
-    pub fn is_empty(&self) -> bool {
-        self.root.is_empty()
-    }
-    
+
     /// Get all text content as a flat string (for saving)
     pub fn to_text(&self) -> String {
         let mut lines = Vec::new();
@@ -406,8 +385,8 @@ impl Default for OutputTree {
 }
 
 /// Reference to a node with rendering context
-pub struct OutputNodeRef<'a> {
-    pub node: &'a OutputNode,
+pub struct OutputNodeRef<'node> {
+    pub node: &'node OutputNode,
     pub is_last: bool,
     pub parent_states: Vec<bool>,
 }

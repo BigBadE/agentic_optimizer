@@ -18,15 +18,16 @@ impl RunCommandTool {
             workspace_root,
             // Default whitelist of safe commands
             allowed_commands: vec![
-                "cargo".to_string(),
-                "git".to_string(),
-                "rustc".to_string(),
-                "rustfmt".to_string(),
-                "clippy".to_string(),
+                "cargo".to_owned(),
+                "git".to_owned(),
+                "rustc".to_owned(),
+                "rustfmt".to_owned(),
+                "clippy".to_owned(),
             ],
         }
     }
     
+    #[must_use]
     pub fn with_allowed_commands(mut self, commands: Vec<String>) -> Self {
         self.allowed_commands = commands;
         self
@@ -59,12 +60,12 @@ impl Tool for RunCommandTool {
     async fn execute(&self, args: Value) -> Result<Value> {
         let command_str = args.get("command")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| RoutingError::Other("Missing 'command' argument".to_string()))?;
+            .ok_or_else(|| RoutingError::Other("Missing 'command' argument".to_owned()))?;
         
         // Parse command into parts
         let parts: Vec<&str> = command_str.split_whitespace().collect();
         if parts.is_empty() {
-            return Err(RoutingError::Other("Empty command".to_string()));
+            return Err(RoutingError::Other("Empty command".to_owned()));
         }
         
         let program = parts[0];
@@ -140,7 +141,7 @@ mod tests {
         
         // Use a command that exists on all platforms
         let tool = RunCommandTool::new(temp_dir.path().to_path_buf())
-            .with_allowed_commands(vec!["cargo".to_string()]);
+            .with_allowed_commands(vec!["cargo".to_owned()]);
         
         let result = tool.execute(json!({ "command": "cargo --version" })).await.unwrap();
         

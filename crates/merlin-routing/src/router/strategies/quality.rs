@@ -6,8 +6,8 @@ use super::super::strategy::RoutingStrategy;
 pub struct QualityCriticalStrategy;
 
 impl QualityCriticalStrategy {
-    #[must_use] 
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 }
@@ -27,13 +27,13 @@ impl RoutingStrategy for QualityCriticalStrategy {
     async fn select_tier(&self, task: &Task) -> Result<ModelTier> {
         if task.priority == Priority::Critical {
             Ok(ModelTier::Premium {
-                provider: "anthropic".to_string(),
-                model_name: "claude-3.5-sonnet".to_string(),
+                provider: "anthropic".to_owned(),
+                model_name: "claude-3.5-sonnet".to_owned(),
             })
         } else {
             Ok(ModelTier::Premium {
-                provider: "openrouter".to_string(),
-                model_name: "anthropic/claude-3-haiku".to_string(),
+                provider: "openrouter".to_owned(),
+                model_name: "anthropic/claude-3-haiku".to_owned(),
             })
         }
     }
@@ -55,7 +55,7 @@ mod tests {
     async fn test_quality_critical_routing() {
         let strategy = QualityCriticalStrategy::new();
         
-        let critical_task = Task::new("Critical task".to_string())
+        let critical_task = Task::new("Critical task".to_owned())
             .with_priority(Priority::Critical);
         
         assert!(strategy.applies_to(&critical_task));
@@ -73,7 +73,7 @@ mod tests {
     async fn test_high_priority_routing() {
         let strategy = QualityCriticalStrategy::new();
         
-        let high_task = Task::new("High priority task".to_string())
+        let high_task = Task::new("High priority task".to_owned())
             .with_priority(Priority::High);
         
         assert!(strategy.applies_to(&high_task));
@@ -85,7 +85,7 @@ mod tests {
     async fn test_low_priority_not_applicable() {
         let strategy = QualityCriticalStrategy::new();
         
-        let low_task = Task::new("Low priority task".to_string())
+        let low_task = Task::new("Low priority task".to_owned())
             .with_priority(Priority::Low);
         
         assert!(!strategy.applies_to(&low_task));

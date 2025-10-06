@@ -8,16 +8,24 @@ use serde_json::json;
 
 use merlin_core::{Context, Error, ModelProvider, Query, Response, Result, TokenUsage};
 
+/// `OpenRouter` API endpoint URL.
 const OPENROUTER_API_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
+/// Default model for `OpenRouter`.
 const DEFAULT_MODEL: &str = "anthropic/claude-sonnet-4-20250514";
 
+/// Provider implementation for `OpenRouter` API.
 pub struct OpenRouterProvider {
+    /// HTTP client for API requests.
     client: Client,
+    /// `OpenRouter` API key.
     api_key: String,
+    /// Model name to use.
     model: String,
 }
 
 impl OpenRouterProvider {
+    /// Creates a new `OpenRouterProvider` with the given API key.
+    ///
     /// # Errors
     /// Returns an error if the provided API key is empty.
     pub fn new(api_key: String) -> Result<Self> {
@@ -32,6 +40,8 @@ impl OpenRouterProvider {
         })
     }
 
+    /// Creates a new `OpenRouterProvider` from environment variables.
+    ///
     /// # Errors
     /// Returns an error if the env var is missing.
     pub fn from_env() -> Result<Self> {
@@ -40,6 +50,8 @@ impl OpenRouterProvider {
         Self::new(api_key)
     }
 
+    /// Creates a new `OpenRouterProvider` from config or environment.
+    ///
     /// # Errors
     /// Returns an error if the API key is not provided.
     pub fn from_config_or_env(config_key: Option<String>) -> Result<Self> {
@@ -49,6 +61,7 @@ impl OpenRouterProvider {
         Self::new(api_key)
     }
 
+    /// Sets the model to use for generation.
     #[must_use]
     pub fn with_model(mut self, model: String) -> Self {
         self.model = model;

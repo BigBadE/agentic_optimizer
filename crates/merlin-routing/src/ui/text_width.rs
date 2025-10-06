@@ -115,36 +115,6 @@ pub fn strip_emojis(text: &str, fallback: &str) -> String {
         .collect()
 }
 
-/// Replace emojis with text representations
-#[allow(dead_code)]
-pub fn replace_emojis_with_text(text: &str) -> String {
-    text.graphemes(true)
-        .map(|grapheme| {
-            if is_emoji_grapheme(grapheme) {
-                emoji_to_text(grapheme)
-            } else {
-                grapheme.to_string()
-            }
-        })
-        .collect()
-}
-
-/// Convert emoji to text representation (simplified)
-#[allow(dead_code)]
-fn emoji_to_text(emoji: &str) -> String {
-    // Map common emojis to text
-    match emoji {
-        "💭" => ":thought:".to_string(),
-        "🔧" => ":tool:".to_string(),
-        "📝" => ":memo:".to_string(),
-        "✓" | "✅" => ":check:".to_string(),
-        "✗" | "❌" => ":cross:".to_string(),
-        "⚠" | "⚠️" => ":warning:".to_string(),
-        "ℹ" | "ℹ️" => ":info:".to_string(),
-        _ => ":emoji:".to_string(),
-    }
-}
-
 /// Wrap text to fit within a maximum width, respecting grapheme boundaries
 pub fn wrap_text(text: &str, max_width: usize, mode: EmojiMode) -> Vec<String> {
     let mut lines = Vec::new();

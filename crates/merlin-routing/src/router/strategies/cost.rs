@@ -8,7 +8,7 @@ pub struct CostOptimizationStrategy {
 }
 
 impl CostOptimizationStrategy {
-    #[must_use] 
+    #[must_use]
     pub fn new(max_tokens_for_local: usize) -> Self {
         Self {
             max_tokens_for_local,
@@ -31,16 +31,16 @@ impl RoutingStrategy for CostOptimizationStrategy {
     async fn select_tier(&self, task: &Task) -> Result<ModelTier> {
         if task.context_needs.estimated_tokens <= self.max_tokens_for_local {
             Ok(ModelTier::Local {
-                model_name: "qwen2.5-coder:7b".to_string(),
+                model_name: "qwen2.5-coder:7b".to_owned(),
             })
         } else if task.context_needs.estimated_tokens <= 8000 {
             Ok(ModelTier::Groq {
-                model_name: "llama-3.1-70b-versatile".to_string(),
+                model_name: "llama-3.1-70b-versatile".to_owned(),
             })
         } else {
             Ok(ModelTier::Premium {
-                provider: "openrouter".to_string(),
-                model_name: "deepseek/deepseek-coder".to_string(),
+                provider: "openrouter".to_owned(),
+                model_name: "deepseek/deepseek-coder".to_owned(),
             })
         }
     }
@@ -63,17 +63,17 @@ mod tests {
     async fn test_cost_optimization() {
         let strategy = CostOptimizationStrategy::new(4000);
         
-        let small_task = Task::new("Small task".to_string())
+        let small_task = Task::new("Small task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(2000));
         let tier = strategy.select_tier(&small_task).await.unwrap();
         assert!(matches!(tier, ModelTier::Local { .. }));
         
-        let medium_task = Task::new("Medium task".to_string())
+        let medium_task = Task::new("Medium task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(6000));
         let tier = strategy.select_tier(&medium_task).await.unwrap();
         assert!(matches!(tier, ModelTier::Groq { .. }));
         
-        let large_task = Task::new("Large task".to_string())
+        let large_task = Task::new("Large task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(10000));
         let tier = strategy.select_tier(&large_task).await.unwrap();
         assert!(matches!(tier, ModelTier::Premium { .. }));
@@ -83,7 +83,7 @@ mod tests {
     async fn test_critical_tasks_not_applicable() {
         let strategy = CostOptimizationStrategy::new(4000);
         
-        let critical_task = Task::new("Critical task".to_string())
+        let critical_task = Task::new("Critical task".to_owned())
             .with_priority(Priority::Critical);
         
         assert!(!strategy.applies_to(&critical_task));

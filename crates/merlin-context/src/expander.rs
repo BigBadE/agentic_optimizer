@@ -12,23 +12,23 @@ use merlin_languages::LanguageProvider;
 use crate::{fs_utils::is_source_file, query::{ContextPlan, ExpansionStrategy}};
 
 /// Expands context by following code relationships
-#[allow(dead_code)]
-pub struct ContextExpander<'a> {
+#[allow(dead_code, reason = "Used for future context expansion functionality")]
+pub struct ContextExpander<'expander> {
     /// Optional language backend for semantic analysis
-    backend: Option<&'a Box<dyn LanguageProvider>>,
+    backend: Option<&'expander Box<dyn LanguageProvider>>,
     /// Project root directory
-    project_root: &'a Path,
+    project_root: &'expander Path,
     /// Maximum file size to include
     max_file_size: usize,
 }
 
-#[allow(dead_code)]
-impl<'a> ContextExpander<'a> {
+#[allow(dead_code, reason = "Used for future context expansion functionality")]
+impl<'expander> ContextExpander<'expander> {
     /// Create a new context expander
     #[must_use]
     pub const fn new(
-        backend: Option<&'a Box<dyn LanguageProvider>>,
-        project_root: &'a Path,
+        backend: Option<&'expander Box<dyn LanguageProvider>>,
+        project_root: &'expander Path,
         max_file_size: usize,
     ) -> Self {
         Self {

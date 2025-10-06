@@ -281,7 +281,7 @@ impl Renderer {
         let available_width = width.saturating_sub(4) as usize;
 
         if visible_nodes.is_empty() {
-            return "No output yet...".to_string();
+            return "No output yet...".to_owned();
         }
 
         visible_nodes
@@ -419,17 +419,17 @@ impl Renderer {
         }
 
         if task_manager.is_collapsed(task_id) {
-            " [+]".to_string()
+            " [+]".to_owned()
         } else {
-            " [-]".to_string()
+            " [-]".to_owned()
         }
     }
 
     fn get_selection_marker(&self, idx: usize, state: &UiState) -> String {
         if state.active_task_id.is_some() && state.selected_task_index == idx {
-            "► ".to_string()
+            "► ".to_owned()
         } else {
-            "  ".to_string()
+            "  ".to_owned()
         }
     }
 

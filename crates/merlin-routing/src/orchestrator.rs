@@ -1,7 +1,7 @@
 use std::sync::Arc;
 use std::env;
 use crate::{
-    AgentExecutor, ConflictAwareTaskGraph, ExecutorPool, FileLockManager, ListFilesTool,
+    AgentExecutor, ConflictAwareTaskGraph, ExecutorPool, ListFilesTool,
     LocalTaskAnalyzer, ModelRouter, ModelTier, ReadFileTool, Result, RoutingConfig, RunCommandTool,
     StrategyRouter, Task, TaskAnalysis, TaskAnalyzer, TaskResult, ToolRegistry, UiChannel,
     ValidationPipeline, Validator, WorkspaceState, WriteFileTool,
@@ -16,50 +16,48 @@ pub struct RoutingOrchestrator {
     router: Arc<dyn ModelRouter>,
     validator: Arc<dyn Validator>,
     workspace: Arc<WorkspaceState>,
-    #[allow(dead_code)]
-    lock_manager: Arc<FileLockManager>,
 }
 
 impl RoutingOrchestrator {
-    #[must_use] 
+    #[must_use]
     pub fn new(config: RoutingConfig) -> Self {
-        let lock_manager = FileLockManager::new();
-        
         let analyzer = Arc::new(LocalTaskAnalyzer::new()
             .with_max_parallel(config.execution.max_concurrent_tasks));
-        
+
         let router = Arc::new(StrategyRouter::with_default_strategies()
             .with_tier_config(
                 config.tiers.local_enabled,
                 config.tiers.groq_enabled,
                 config.tiers.premium_enabled
             ));
-        
+
         let validator = Arc::new(ValidationPipeline::with_default_stages()
             .with_early_exit(config.validation.early_exit));
-        
+
         let workspace = WorkspaceState::new(config.workspace.root_path.clone());
-        
+
         Self {
             config,
             analyzer,
             router,
             validator,
             workspace,
-            lock_manager,
         }
     }
     
+    #[must_use]
     pub fn with_analyzer(mut self, analyzer: Arc<dyn TaskAnalyzer>) -> Self {
         self.analyzer = analyzer;
         self
     }
     
+    #[must_use]
     pub fn with_router(mut self, router: Arc<dyn ModelRouter>) -> Self {
         self.router = router;
         self
     }
     
+    #[must_use]
     pub fn with_validator(mut self, validator: Arc<dyn Validator>) -> Self {
         self.validator = validator;
         self
@@ -183,14 +181,14 @@ impl RoutingOrchestrator {
                 match provider_name.as_str() {
                     "openrouter" => {
                         let api_key = env::var("OPENROUTER_API_KEY")
-                            .map_err(|_| crate::RoutingError::Other("OPENROUTER_API_KEY not set".to_string()))?;
+                            .map_err(|_| crate::RoutingError::Other("OPENROUTER_API_KEY not set".to_owned()))?;
                         let provider = merlin_providers::OpenRouterProvider::new(api_key)?
                             .with_model(model_name.clone());
                         Ok(Arc::new(provider))
                     }
                     "anthropic" => {
                         let api_key = env::var("ANTHROPIC_API_KEY")
-                            .map_err(|_| crate::RoutingError::Other("ANTHROPIC_API_KEY not set".to_string()))?;
+                            .map_err(|_| crate::RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
                         // Note: AnthropicProvider uses a fixed model, ignoring model_name for now
                         let provider = merlin_providers::AnthropicProvider::new(api_key)?;
                         Ok(Arc::new(provider))
@@ -312,12 +310,12 @@ impl RoutingOrchestrator {
         self.execute_tasks(analysis.tasks).await
     }
     
-    #[must_use] 
-    pub fn config(&self) -> &RoutingConfig {
+    #[must_use]
+    pub const fn config(&self) -> &RoutingConfig {
         &self.config
     }
     
-    #[must_use] 
+    #[must_use]
     pub fn workspace(&self) -> Arc<WorkspaceState> {
         self.workspace.clone()
     }

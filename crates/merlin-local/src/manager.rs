@@ -9,11 +9,11 @@ pub struct OllamaManager {
 }
 
 impl OllamaManager {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self {
             client: Client::new(),
-            base_url: "http://localhost:11434".to_string(),
+            base_url: "http://localhost:11434".to_owned(),
         }
     }
     
@@ -33,24 +33,36 @@ impl OllamaManager {
     }
     
     /// List installed models
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if Ollama is not available or if the response cannot be parsed
     pub async fn list_models(&self) -> Result<Vec<OllamaModel>> {
         let response = self.client
             .get(format!("{}/api/tags", self.base_url))
             .send()
             .await
-            .map_err(|e| LocalError::OllamaUnavailable(e.to_string()))?;
+            .map_err(|err| LocalError::OllamaUnavailable(err.to_string()))?;
         
         let list: OllamaListResponse = response.json().await?;
         Ok(list.models)
     }
     
     /// Check if a specific model is installed
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the model list cannot be retrieved
     pub async fn has_model(&self, model_name: &str) -> Result<bool> {
         let models = self.list_models().await?;
-        Ok(models.iter().any(|m| m.name.starts_with(model_name)))
+        Ok(models.iter().any(|model| model.name.starts_with(model_name)))
     }
-    
+
     /// Pull a model from Ollama registry
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the model cannot be pulled
     pub async fn pull_model(&self, model_name: &str) -> Result<()> {
         let response = self.client
             .post(format!("{}/api/pull", self.base_url))
@@ -73,6 +85,10 @@ impl OllamaManager {
     }
     
     /// Ensure a model is available, pulling if necessary
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the model cannot be verified or pulled
     pub async fn ensure_model(&self, model_name: &str) -> Result<()> {
         if !self.has_model(model_name).await? {
             self.pull_model(model_name).await?;
@@ -102,22 +118,22 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    async fn test_ollama_manager_creation() {
+    async fn ollama_manager_creation() {
         let manager = OllamaManager::new();
         assert_eq!(manager.base_url, "http://localhost:11434");
     }
-    
+
     #[tokio::test]
-    async fn test_custom_url() {
+    async fn custom_url() {
         let manager = OllamaManager::new()
-            .with_url("http://custom:8080".to_string());
+            .with_url("http://custom:8080".to_owned());
         assert_eq!(manager.base_url, "http://custom:8080");
     }
-    
+
     #[test]
-    fn test_recommended_models() {
+    fn recommended_models() {
         let models = OllamaManager::recommended_models();
         assert!(!models.is_empty());
-        assert!(models.iter().any(|m| m.name.contains("qwen")));
+        assert!(models.iter().any(|model| model.name.contains("qwen")));
     }
 }

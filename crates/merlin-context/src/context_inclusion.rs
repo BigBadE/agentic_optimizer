@@ -57,9 +57,8 @@ impl ContextManager {
         }
 
         self.token_count += file_tokens;
-        let result = true;
         self.files.push(file);
-        result
+        true
     }
 
     /// Add a file, truncating if necessary to fit within token limit
@@ -75,19 +74,17 @@ impl ContextManager {
         if file_tokens <= available_tokens {
             // Fits completely
             self.token_count += file_tokens;
-            self.files.push(file);
-            true
         } else {
             // Truncate to fit
             let chars_to_keep = (available_tokens * 4).min(file.content.len());
             file.content.truncate(chars_to_keep);
             file.content.push_str("\n... [truncated]");
-            
+
             let actual_tokens = Self::estimate_tokens(&file.content);
             self.token_count += actual_tokens;
-            self.files.push(file);
-            true
         }
+        self.files.push(file);
+        true
     }
 
     /// Get current token count

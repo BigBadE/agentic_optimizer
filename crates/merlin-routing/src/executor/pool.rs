@@ -46,14 +46,14 @@ impl ExecutorPool {
                 match provider_name.as_str() {
                     "openrouter" => {
                         let api_key = env::var("OPENROUTER_API_KEY")
-                            .map_err(|_| RoutingError::Other("OPENROUTER_API_KEY not set".to_string()))?;
+                            .map_err(|_| RoutingError::Other("OPENROUTER_API_KEY not set".to_owned()))?;
                         let provider = merlin_providers::OpenRouterProvider::new(api_key)?
                             .with_model(model_name.clone());
                         Ok(Arc::new(provider))
                     }
                     "anthropic" => {
                         let api_key = env::var("ANTHROPIC_API_KEY")
-                            .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_string()))?;
+                            .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
                         let provider = merlin_providers::AnthropicProvider::new(api_key)?;
                         Ok(Arc::new(provider))
                     }
@@ -200,11 +200,11 @@ mod tests {
         async fn route(&self, _task: &Task) -> Result<crate::RoutingDecision> {
             Ok(crate::RoutingDecision {
                 tier: crate::ModelTier::Local {
-                    model_name: "test".to_string(),
+                    model_name: "test".to_owned(),
                 },
                 estimated_cost: 0.0,
                 estimated_latency_ms: 0,
-                reasoning: "test".to_string(),
+                reasoning: "test".to_owned(),
             })
         }
         
@@ -239,8 +239,8 @@ mod tests {
         
         let executor = ExecutorPool::new(router, validator, 2, workspace);
         
-        let task_a = Task::new("Task A".to_string());
-        let task_b = Task::new("Task B".to_string());
+        let task_a = Task::new("Task A".to_owned());
+        let task_b = Task::new("Task B".to_owned());
         
         let graph = TaskGraph::from_tasks(vec![task_a, task_b]);
         let results = executor.execute_graph(graph).await.unwrap();

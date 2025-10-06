@@ -29,21 +29,21 @@ pub struct ValidationPipeline {
 }
 
 impl ValidationPipeline {
-    #[must_use] 
+    #[must_use]
     pub fn new(stages: Vec<Arc<dyn ValidationStage>>) -> Self {
         Self {
             stages,
             early_exit: true,
         }
     }
-    
-    #[must_use] 
+
+    #[must_use]
     pub fn with_early_exit(mut self, early_exit: bool) -> Self {
         self.early_exit = early_exit;
         self
     }
     
-    #[must_use] 
+    #[must_use]
     pub fn with_default_stages() -> Self {
         use super::stages::{SyntaxValidationStage, BuildValidationStage, TestValidationStage, LintValidationStage};
         
@@ -152,12 +152,12 @@ mod tests {
         ];
         
         let pipeline = ValidationPipeline::new(stages);
-        let task = Task::new("Test".to_string());
+        let task = Task::new("Test".to_owned());
         let response = merlin_core::Response {
-            text: "test".to_string(),
+            text: "test".to_owned(),
             confidence: 1.0,
             tokens_used: merlin_core::TokenUsage::default(),
-            provider: "test".to_string(),
+            provider: "test".to_owned(),
             latency_ms: 0,
         };
         
@@ -174,12 +174,12 @@ mod tests {
         ];
         
         let pipeline = ValidationPipeline::new(stages).with_early_exit(true);
-        let task = Task::new("Test".to_string());
+        let task = Task::new("Test".to_owned());
         let response = merlin_core::Response {
-            text: "test".to_string(),
+            text: "test".to_owned(),
             confidence: 1.0,
             tokens_used: merlin_core::TokenUsage::default(),
-            provider: "test".to_string(),
+            provider: "test".to_owned(),
             latency_ms: 0,
         };
         

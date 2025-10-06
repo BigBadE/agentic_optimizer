@@ -1,6 +1,9 @@
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use std::time::Duration;
+use std::collections::HashMap;
 use walkdir::WalkDir;
 use indicatif::{ProgressBar, ProgressStyle};
+use tokio::task::{spawn_blocking, JoinError};
 
 use merlin_core::{Context, FileContext, Query, Result};
 use merlin_languages::LanguageProvider;
@@ -8,8 +11,15 @@ use core::result::Result as CoreResult;
 
 use crate::fs_utils::is_source_file;
 use crate::query::{QueryAnalyzer, QueryIntent};
-use crate::embedding::VectorSearchManager;
-use crate::context_inclusion::{ContextManager, PrioritizedFile, FilePriority, MAX_CONTEXT_TOKENS};
+use crate::embedding::{VectorSearchManager, SearchResult};
+use crate::context_inclusion::{
+    ContextManager, PrioritizedFile, FilePriority, MAX_CONTEXT_TOKENS,
+    add_prioritized_files,
+};
+
+type BackendJoinResult = CoreResult<(Option<Box<dyn LanguageProvider>>, Result<()>), JoinError>;
+type VectorJoinResult = CoreResult<(VectorSearchManager, Result<()>), JoinError>;
+type ProcessSearchResultsReturn = (Vec<PrioritizedFile>, Vec<(PathBuf, f32, Option<f32>, Option<f32>)>);
 
 /// Default system prompt used when constructing the base context.
 const DEFAULT_SYSTEM_PROMPT: &str = "You are a helpful coding assistant. You help users understand and modify their codebase.\n\nWhen making changes:\n1. Be precise and accurate\n2. Explain your reasoning\n3. Provide complete, working code\n4. Follow the existing code style\n\nYou have access to the user's codebase context below.";
@@ -79,134 +89,12 @@ impl ContextBuilder {
 
         let mut files = if query.files_context.is_empty() {
             // Step 2: Initialize backend and vector search IN PARALLEL
-            let needs_backend_init = self.language_backend.is_some() && !self.language_backend_initialized;
-            let needs_vector_init = self.vector_manager.is_none();
-
-            if needs_backend_init || needs_vector_init {
-                eprintln!("⚙️  Initializing systems in parallel...");
-                
-                // Rust-analyzer initialization (CPU-bound, blocking)
-                // Take ownership temporarily to run in parallel
-                let backend_handle = if needs_backend_init {
-                    let mut backend = self.language_backend.take();
-                    let project_root = self.project_root.clone();
-                    
-                    Some(tokio::task::spawn_blocking(move || {
-                        eprintln!("  → Initializing rust-analyzer...");
-                        if let Some(ref mut b) = backend {
-                            tracing::info!("Initializing language backend...");
-                            let result = b.initialize(&project_root);
-                            (backend, result)
-                        } else {
-                            (backend, Ok(()))
-                        }
-                    }))
-                } else {
-                    None
-                };
-
-                // Vector search initialization (I/O-bound, async)
-                let vector_handle = if needs_vector_init {
-                    eprintln!("  → Building embedding index...");
-                    let mut manager = VectorSearchManager::new(self.project_root.clone());
-                    
-                    Some(tokio::spawn(async move {
-                        let result = manager.initialize().await;
-                        (manager, result)
-                    }))
-                } else {
-                    None
-                };
-
-                // Wait for BOTH tasks to complete simultaneously
-                match (backend_handle, vector_handle) {
-                    (Some(bh), Some(vh)) => {
-                        // Both tasks running - wait for both
-                        let (backend_result, vector_result) = tokio::join!(bh, vh);
-                        
-                        // Handle rust-analyzer result
-                        match backend_result {
-                            Ok((backend, Ok(()))) => {
-                                self.language_backend = backend;
-                                self.language_backend_initialized = true;
-                                eprintln!("  ✓ Rust-analyzer initialized");
-                                tracing::info!("Language backend initialized successfully");
-                            }
-                            Ok((backend, Err(e))) => {
-                                self.language_backend = backend;
-                                eprintln!("  ⚠️  Warning: Failed to initialize rust-analyzer: {}", e);
-                                eprintln!("     Falling back to basic file scanning");
-                                tracing::warn!("Failed to initialize language backend: {}", e);
-                            }
-                            Err(e) => {
-                                eprintln!("  ⚠️  Task join error: {}", e);
-                            }
-                        }
-                        
-                        // Handle vector search result
-                        match vector_result {
-                            Ok((manager, Ok(()))) => {
-                                self.vector_manager = Some(manager);
-                                eprintln!("  ✓ Embedding index ready");
-                            }
-                            Ok((_, Err(e))) => {
-                                eprintln!("  ⚠️  Warning: Failed to initialize vector search: {}", e);
-                                tracing::warn!("Failed to initialize vector search: {}", e);
-                            }
-                            Err(e) => {
-                                eprintln!("  ⚠️  Task join error: {}", e);
-                            }
-                        }
-                    }
-                    (Some(bh), None) => {
-                        // Only backend
-                        match bh.await {
-                            Ok((backend, Ok(()))) => {
-                                self.language_backend = backend;
-                                self.language_backend_initialized = true;
-                                eprintln!("  ✓ Rust-analyzer initialized");
-                                tracing::info!("Language backend initialized successfully");
-                            }
-                            Ok((backend, Err(e))) => {
-                                self.language_backend = backend;
-                                eprintln!("  ⚠️  Warning: Failed to initialize rust-analyzer: {}", e);
-                                eprintln!("     Falling back to basic file scanning");
-                                tracing::warn!("Failed to initialize language backend: {}", e);
-                            }
-                            Err(e) => {
-                                eprintln!("  ⚠️  Task join error: {}", e);
-                            }
-                        }
-                    }
-                    (None, Some(vh)) => {
-                        // Only vector search
-                        match vh.await {
-                            Ok((manager, Ok(()))) => {
-                                self.vector_manager = Some(manager);
-                                eprintln!("  ✓ Embedding index ready");
-                            }
-                            Ok((_, Err(e))) => {
-                                eprintln!("  ⚠️  Warning: Failed to initialize vector search: {}", e);
-                                tracing::warn!("Failed to initialize vector search: {}", e);
-                            }
-                            Err(e) => {
-                                eprintln!("  ⚠️  Task join error: {}", e);
-                            }
-                        }
-                    }
-                    (None, None) => {
-                        // Nothing to initialize
-                    }
-                }
-                
-                eprintln!("✓ All systems initialized");
-            }
+            self.initialize_systems_parallel().await?;
 
             // Step 3: Use subagent to generate context plan (backend is required)
             if self.language_backend.is_some() && self.language_backend_initialized {
                 let agent_files = self.use_subagent_for_context(&intent, &query.text).await?;
-                eprintln!("✓ Intelligent context fetching found {} files", agent_files.len());
-                tracing::info!("Subagent found {} files", agent_files.len());
+                tracing::info!("Intelligent context fetching found {} files", agent_files.len());
                 agent_files
             } else {
                 return Err(merlin_core::Error::Other(
@@ -222,9 +110,9 @@ impl ContextBuilder {
                 }
             }
             if collected.is_empty() {
-                let collected = self.collect_all_files();
-                tracing::info!("Collected {} files from project scan", collected.len());
-                collected
+                let all_files = self.collect_all_files();
+                tracing::info!("Collected {} files from project scan", all_files.len());
+                all_files
             } else {
                 collected
             }
@@ -243,204 +131,73 @@ impl ContextBuilder {
             return Err(merlin_core::Error::Other("Language backend not initialized".into()));
         }
 
-        let spinner = ProgressBar::new_spinner();
-        spinner.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.cyan} {msg}")
-                .unwrap_or_else(|_| ProgressStyle::default_spinner())
-        );
-        spinner.enable_steady_tick(std::time::Duration::from_millis(100));
-        
-        spinner.set_message("Running hybrid search (BM25 + Vector)...");
-        tracing::info!("Using hybrid BM25 + Vector search for context");
+        // Perform hybrid search
+        let semantic_matches = self.perform_hybrid_search(query_text).await?;
 
-        // Use hybrid search (BM25 + vector embeddings)
-        let semantic_matches = if let Some(manager) = &self.vector_manager {
-            match manager.search(query_text, 50).await {
-                Ok(results) => results,
-                Err(e) => {
-                    eprintln!("Warning: Hybrid search failed: {}", e);
-                    Vec::new()
-                }
-            }
-        } else {
-            Vec::new()
-        };
+        // Process search results into prioritized chunks
+        let (search_prioritized, file_scores) = Self::process_search_results(&semantic_matches);
 
-        if !semantic_matches.is_empty() {
-            eprintln!("--- Hybrid search found {} matches", semantic_matches.len());
-            for (i, result) in semantic_matches.iter().enumerate().take(10) {
-                eprintln!("  {}. {} (score: {:.3})", i + 1, result.file_path.display(), result.score);
-            }
-            if semantic_matches.len() > 10 {
-                eprintln!("  ... and {} more", semantic_matches.len() - 10);
-            }
-        } else {
-            eprintln!("--- Hybrid search: no results (store may be empty)");
-        }
-
-        spinner.finish_with_message("✓ Hybrid search complete");
-        
-        // Filter out low-quality small chunks before processing
-        let filtered_matches: Vec<_> = semantic_matches.iter()
-            .filter(|result| {
-                // Estimate chunk size from line range in path
-                if let Some(path_str) = result.file_path.to_str() {
-                    if let Some((_, range_part)) = path_str.rsplit_once(':') {
-                        if let Some((start_str, end_str)) = range_part.split_once('-') {
-                            if let (Ok(start), Ok(end)) = (start_str.parse::<usize>(), end_str.parse::<usize>()) {
-                                let line_count = end.saturating_sub(start);
-                                // Estimate ~10 tokens per line
-                                let estimated_tokens = line_count * 10;
-                                return Self::should_include_chunk(estimated_tokens, result.score);
-                            }
-                        }
-                    }
-                }
-                // If we can't parse, include it
-                true
-            })
-            .cloned()
-            .collect();
-        
-        eprintln!("  After quality filtering: {} chunks (removed {} low-quality)", 
-            filtered_matches.len(), 
-            semantic_matches.len() - filtered_matches.len());
-        
         // Use context manager to add hybrid search results
         let mut context_mgr = ContextManager::new(MAX_CONTEXT_TOKENS);
         
-        // Add hybrid search results with priority based on file type
-        // Merge overlapping chunks from the same file
-        use std::collections::HashMap;
-        
-        // Group chunks by file (using filtered matches)
-        let mut file_chunks: HashMap<PathBuf, Vec<(usize, usize, f32)>> = HashMap::new();
-        
-        for result in &filtered_matches {
-            // Parse chunk path: "file.rs:start-end"
-            if let Some(path_str) = result.file_path.to_str() {
-                if let Some((file_part, range_part)) = path_str.rsplit_once(':') {
-                    let path = PathBuf::from(file_part);
-                    if let Some((start_str, end_str)) = range_part.split_once('-') {
-                        if let (Ok(start), Ok(end)) = (start_str.parse::<usize>(), end_str.parse::<usize>()) {
-                            file_chunks.entry(path).or_insert_with(Vec::new).push((start, end, result.score));
-                        }
-                    }
-                }
-            }
-        }
-        
-        // Merge overlapping chunks for each file
-        let mut search_prioritized = Vec::new();
-        
-        for (file_path, mut chunks) in file_chunks {
-            // Sort chunks by start line
-            chunks.sort_by_key(|(start, _, _)| *start);
-            
-            // Merge overlapping chunks
-            let merged = self.merge_overlapping_chunks(chunks);
-            
-            // Extract merged chunks
-            let is_code = Self::is_code_file(&file_path);
-            for (start, end, score) in merged {
-                match self.extract_chunk_with_context(&file_path, start, end, is_code) {
-                    Ok(chunk_ctx) => {
-                        let priority = if is_code {
-                            FilePriority::High
-                        } else {
-                            FilePriority::Medium
-                        };
-                        
-                        search_prioritized.push(PrioritizedFile::with_score(
-                            chunk_ctx,
-                            priority,
-                            score,
-                        ));
-                    }
-                    Err(e) => {
-                        eprintln!("Warning: Failed to extract chunk from {}: {}", file_path.display(), e);
-                    }
-                }
-            }
-        }
-        
-        // Keep track of scores for display (total, bm25, vector)
-        let file_scores: Vec<(PathBuf, f32, Option<f32>, Option<f32>)> = filtered_matches.iter()
-            .filter_map(|result| {
-                if let Some(path_str) = result.file_path.to_str() {
-                    if let Some((file_part, _)) = path_str.rsplit_once(':') {
-                        Some((
-                            PathBuf::from(file_part),
-                            result.score,
-                            result.bm25_score,
-                            result.vector_score,
-                        ))
-                    } else {
-                        None
-                    }
-                } else {
-                    None
-                }
-            })
-            .collect();
-        
-        let added = crate::context_inclusion::add_prioritized_files(&mut context_mgr, search_prioritized);
-        eprintln!("  Added {} chunks from hybrid search ({} tokens used)", added, context_mgr.token_count());
-        
+        let added = add_prioritized_files(&mut context_mgr, search_prioritized);
+        tracing::info!("Added {} chunks from hybrid search ({} tokens used)", added, context_mgr.token_count());
+
         // Show relevant sections for prompt
-        eprintln!("\n=== RELEVANT SECTIONS FOR PROMPT ===");
-        eprintln!("Total: {} chunks ({} tokens)\n", context_mgr.file_count(), context_mgr.token_count());
+        tracing::info!("RELEVANT SECTIONS FOR PROMPT");
+        tracing::info!("Total: {} chunks ({} tokens)", context_mgr.file_count(), context_mgr.token_count());
         
         // List all chunks with their sections and scores
         for (i, file) in context_mgr.files().iter().enumerate() {
-            let tokens = crate::context_inclusion::ContextManager::estimate_tokens(&file.content);
-            
+            let tokens = ContextManager::estimate_tokens(&file.content);
+
             // Find the scores for this file
             let (total_score, bm25, vector) = file_scores.iter()
                 .find(|(path, _, _, _)| path == &file.path)
-                .map(|(_, total, bm25, vector)| (*total, *bm25, *vector))
-                .unwrap_or((0.0, None, None));
+                .map_or((0.0, None, None), |(_, total, bm25, vector)| (*total, *bm25, *vector));
             
             // Extract section info from content
-            let section_info = if let Some(first_line) = file.content.lines().next() {
-                if first_line.starts_with("--- Context: lines") {
-                    // Code file with context
-                    first_line.trim_start_matches("--- Context: lines ").trim_end_matches(" ---").to_string()
-                } else if first_line.starts_with("--- Lines") {
-                    // Text file without context
-                    first_line.trim_start_matches("--- Lines ").trim_end_matches(" ---").to_string()
-                } else if file.content.lines().count() < 100 {
-                    // Small content without markers is likely a chunk
-                    format!("chunk (~{} lines)", file.content.lines().count())
-                } else {
-                    "full file".to_string()
+            let section_info = file.content.lines().next().map_or_else(
+                || "chunk".to_owned(),
+                |first_line| {
+                    if first_line.starts_with("--- Context: lines") {
+                        // Code file with context
+                        first_line.trim_start_matches("--- Context: lines ").trim_end_matches(" ---").to_owned()
+                    } else if first_line.starts_with("--- Lines") {
+                        // Text file without context
+                        first_line.trim_start_matches("--- Lines ").trim_end_matches(" ---").to_owned()
+                    } else if file.content.lines().count() < 100 {
+                        // Small content without markers is likely a chunk
+                        format!("chunk (~{} lines)", file.content.lines().count())
+                    } else {
+                        "full file".to_owned()
+                    }
                 }
-            } else {
-                "chunk".to_string()
-            };
+            );
             
             // Format score display
             // Note: component scores are raw RRF contributions, total is normalized to 0-1
             let score_display = match (bm25, vector) {
-                (Some(b), Some(v)) => {
-                    let sum = b + v;
-                    format!("score: {:.3} (bm25: {:.3} + vec: {:.3} = {:.3})", total_score, b, v, sum)
+                (Some(bm25_score), Some(vec_score)) => {
+                    let sum = bm25_score + vec_score;
+                    format!("score: {total_score:.3} (bm25: {bm25_score:.3} + vec: {vec_score:.3} = {sum:.3})")
                 },
-                (Some(b), None) => format!("score: {:.3} (bm25: {:.3})", total_score, b),
-                (None, Some(v)) => format!("score: {:.3} (vec: {:.3})", total_score, v),
-                (None, None) => format!("score: {:.3}", total_score),
+                (Some(bm25_score), None) => format!("score: {total_score:.3} (bm25: {bm25_score:.3})"),
+                (None, Some(vec_score)) => format!("score: {total_score:.3} (vec: {vec_score:.3})"),
+                (None, None) => format!("score: {total_score:.3}"),
             };
-            
-            eprintln!("{}. {} [{}] ({}, {} tokens)", 
-                i + 1, 
-                file.path.display(), 
+
+
+            tracing::info!(
+                "{}. {} [{}] ({}, {} tokens)",
+                i + 1,
+                file.path.display(),
                 section_info,
                 score_display,
                 tokens
             );
         }
-        eprintln!("=====================================\n");
+        tracing::info!("=====================================");
         
         Ok(context_mgr.into_files())
     }
@@ -482,17 +239,17 @@ impl ContextBuilder {
     }
 
     /// Merge overlapping chunks considering context expansion
-    fn merge_overlapping_chunks(&self, chunks: Vec<(usize, usize, f32)>) -> Vec<(usize, usize, f32)> {
+    fn merge_overlapping_chunks(chunks: Vec<(usize, usize, f32)>) -> Vec<(usize, usize, f32)> {
+        const CONTEXT_LINES: usize = 50;
+
         if chunks.is_empty() {
             return Vec::new();
         }
-        
+
         let mut merged = Vec::new();
         let mut current_start = chunks[0].0;
         let mut current_end = chunks[0].1;
         let mut max_score = chunks[0].2;
-        
-        const CONTEXT_LINES: usize = 50;
         
         for (start, end, score) in chunks.into_iter().skip(1) {
             // Check if chunks overlap when considering context expansion
@@ -520,11 +277,11 @@ impl ContextBuilder {
     }
 
     /// Extract a chunk with surrounding context (only for code files)
-    fn extract_chunk_with_context(&self, file_path: &PathBuf, start_line: usize, end_line: usize, include_context: bool) -> Result<FileContext> {
+    fn extract_chunk_with_context(file_path: &PathBuf, start_line: usize, end_line: usize, include_context: bool) -> Result<FileContext> {
         use std::fs;
-        
+
         let content = fs::read_to_string(file_path)
-            .map_err(|e| merlin_core::Error::Other(format!("Failed to read file: {}", e)))?;
+            .map_err(|read_error| merlin_core::Error::Other(format!("Failed to read file: {read_error}")))?;
         
         let lines: Vec<&str> = content.lines().collect();
         
@@ -544,7 +301,7 @@ impl ContextBuilder {
         let chunk_lines: Vec<&str> = lines
             .iter()
             .enumerate()
-            .filter(|(i, _)| *i + 1 >= context_start && *i + 1 <= context_end)
+            .filter(|(i, _)| *i + 1 >= context_start && *i < context_end)
             .map(|(_, line)| *line)
             .collect();
         
@@ -552,18 +309,18 @@ impl ContextBuilder {
         
         // Create a marker to show the actual matched chunk (only if we added context)
         let marker = if include_context && (context_start < start_line || context_end > end_line) {
-            format!("\n\n--- Matched chunk: lines {}-{} ---\n", start_line, end_line)
+            format!("\n\n--- Matched chunk: lines {start_line}-{end_line} ---\n")
         } else {
             String::new()
         };
-        
+
         let final_content = if !marker.is_empty() {
-            format!("--- Context: lines {}-{} ---\n{}{}", context_start, context_end, chunk_content, marker)
+            format!("--- Context: lines {context_start}-{context_end} ---\n{chunk_content}{marker}")
         } else if include_context {
-            format!("--- Context: lines {}-{} ---\n{}", context_start, context_end, chunk_content)
+            format!("--- Context: lines {context_start}-{context_end} ---\n{chunk_content}")
         } else {
             // Text files without context - still show line range
-            format!("--- Lines {}-{} ---\n{}", context_start, context_end, chunk_content)
+            format!("--- Lines {context_start}-{context_end} ---\n{chunk_content}")
         };
         
         Ok(FileContext {
@@ -584,16 +341,14 @@ impl ContextBuilder {
     }
 
     /// Check if a file is a code file (not documentation/text)
-    fn is_code_file(path: &PathBuf) -> bool {
-        if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
-            matches!(ext, 
-                "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "java" | "c" | "cpp" | 
+    fn is_code_file(path: &Path) -> bool {
+        path.extension()
+            .and_then(|ext| ext.to_str())
+            .is_some_and(|ext| matches!(ext,
+                "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "java" | "c" | "cpp" |
                 "h" | "hpp" | "go" | "rb" | "php" | "cs" | "swift" | "kt" | "scala" |
                 "toml" | "yaml" | "yml" | "json" | "xml"
-            )
-        } else {
-            false
-        }
+            ))
     }
 
     /// Check if a directory entry should be ignored
@@ -616,22 +371,250 @@ impl ContextBuilder {
         false
     }
 
+    /// Handle backend initialization result
+    fn handle_backend_result(&mut self, backend_result: BackendJoinResult) {
+        if let Ok((backend, Ok(()))) = backend_result {
+            self.language_backend = backend;
+            self.language_backend_initialized = true;
+            tracing::info!("Rust-analyzer initialized");
+        } else if let Ok((backend, Err(backend_error))) = backend_result {
+            self.language_backend = backend;
+            tracing::warn!("Failed to initialize rust-analyzer: {backend_error}");
+            tracing::warn!("Falling back to basic file scanning");
+        } else if let Err(join_error) = backend_result {
+            tracing::error!("Backend task join error: {join_error}");
+        }
+    }
+
+    /// Handle vector search initialization result
+    fn handle_vector_result(&mut self, vector_result: VectorJoinResult) {
+        if let Ok((manager, Ok(()))) = vector_result {
+            self.vector_manager = Some(manager);
+            tracing::info!("Embedding index ready");
+        } else if let Ok((_, Err(vector_error))) = vector_result {
+            tracing::warn!("Failed to initialize vector search: {vector_error}");
+        } else if let Err(join_error) = vector_result {
+            tracing::error!("Vector search task join error: {join_error}");
+        }
+    }
+
+    /// Initializes systems (language backend and vector search) in parallel.
+    ///
+    /// # Errors
+    /// Returns an error if critical initialization fails.
+    async fn initialize_systems_parallel(&mut self) -> Result<()> {
+        let needs_backend_init = self.language_backend.is_some() && !self.language_backend_initialized;
+        let needs_vector_init = self.vector_manager.is_none();
+
+        if !needs_backend_init && !needs_vector_init {
+            return Ok(());
+        }
+
+        tracing::info!("Initializing systems in parallel...");
+
+        // Rust-analyzer initialization (CPU-bound, blocking)
+        let backend_handle = needs_backend_init.then(|| {
+            let mut backend = self.language_backend.take();
+            let project_root = self.project_root.clone();
+
+            spawn_blocking(move || {
+                tracing::info!("Initializing rust-analyzer...");
+                if let Some(ref mut backend_mut) = backend {
+                    tracing::info!("Initializing language backend...");
+                    let result = backend_mut.initialize(&project_root);
+                    (backend, result)
+                } else {
+                    (backend, Ok(()))
+                }
+            })
+        });
+
+        // Vector search initialization (I/O-bound, async)
+        let vector_handle = needs_vector_init.then(|| {
+            tracing::info!("Building embedding index...");
+            let mut manager = VectorSearchManager::new(self.project_root.clone());
+
+            tokio::spawn(async move {
+                let result = manager.initialize().await;
+                (manager, result)
+            })
+        });
+
+        // Wait for BOTH tasks to complete simultaneously
+        match (backend_handle, vector_handle) {
+            (Some(backend_hdl), Some(vector_hdl)) => {
+                let (backend_result, vector_result) = tokio::join!(backend_hdl, vector_hdl);
+                self.handle_backend_result(backend_result);
+                self.handle_vector_result(vector_result);
+            }
+            (Some(backend_hdl), None) => {
+                let backend_result = backend_hdl.await;
+                self.handle_backend_result(backend_result);
+            }
+            (None, Some(vector_hdl)) => {
+                let vector_result = vector_hdl.await;
+                self.handle_vector_result(vector_result);
+            }
+            (None, None) => {
+                // Nothing to initialize
+            }
+        }
+
+        tracing::info!("All systems initialized");
+        Ok(())
+    }
+
     /// Search for relevant context without building full context (for benchmarking)
     ///
     /// # Errors
     /// Returns an error if search initialization or execution fails.
-    pub async fn search_context(&mut self, query: &str) -> Result<Vec<crate::embedding::SearchResult>> {
+    ///
+    /// # Panics
+    /// This function will panic if the vector manager is None after initialization attempt.
+    pub async fn search_context(&mut self, query: &str) -> Result<Vec<SearchResult>> {
         if self.vector_manager.is_none() {
-            eprintln!("⚙️  Initializing vector search...");
+            tracing::info!("Initializing vector search...");
             let mut manager = VectorSearchManager::new(self.project_root.clone());
             manager.initialize().await?;
             self.vector_manager = Some(manager);
         }
 
-        let manager = self.vector_manager.as_ref().unwrap();
+        let Some(manager) = self.vector_manager.as_ref() else {
+            return Err(merlin_core::Error::Other("Vector manager should be initialized".into()));
+        };
         let results = manager.search(query, 50).await?;
 
         Ok(results)
+    }
+
+    /// Performs hybrid search (BM25 + vector) for relevant code chunks.
+    async fn perform_hybrid_search(&self, query_text: &str) -> Result<Vec<SearchResult>> {
+        let spinner = ProgressBar::new_spinner();
+        spinner.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.cyan} {msg}")
+                .unwrap_or_else(|_| ProgressStyle::default_spinner())
+        );
+        spinner.enable_steady_tick(Duration::from_millis(100));
+
+        spinner.set_message("Running hybrid search (BM25 + Vector)...");
+        tracing::info!("Using hybrid BM25 + Vector search for context");
+
+        let semantic_matches = if let Some(manager) = &self.vector_manager {
+            match manager.search(query_text, 50).await {
+                Ok(results) => results,
+                Err(search_error) => {
+                    tracing::warn!("Hybrid search failed: {search_error}");
+                    Vec::new()
+                }
+            }
+        } else {
+            Vec::new()
+        };
+
+        if semantic_matches.is_empty() {
+            tracing::info!("Hybrid search: no results (store may be empty)");
+        } else {
+            tracing::info!("Hybrid search found {} matches", semantic_matches.len());
+            for (idx, result) in semantic_matches.iter().enumerate().take(10) {
+                tracing::debug!("  {}. {} (score: {:.3})", idx + 1, result.file_path.display(), result.score);
+            }
+            if semantic_matches.len() > 10 {
+                tracing::debug!("  ... and {} more", semantic_matches.len() - 10);
+            }
+        }
+
+        spinner.finish_with_message("Hybrid search complete");
+        Ok(semantic_matches)
+    }
+
+    /// Processes search results into prioritized file chunks.
+    fn process_search_results(
+        semantic_matches: &[SearchResult]
+    ) -> ProcessSearchResultsReturn {
+        // Filter out low-quality small chunks
+        let filtered_matches: Vec<_> = semantic_matches.iter()
+            .filter(|result| {
+                if let Some(path_str) = result.file_path.to_str()
+                    && let Some((_, range_part)) = path_str.rsplit_once(':')
+                    && let Some((start_str, end_str)) = range_part.split_once('-')
+                    && let (Ok(start), Ok(end)) = (start_str.parse::<usize>(), end_str.parse::<usize>())
+                {
+                    let line_count = end.saturating_sub(start);
+                    let estimated_tokens = line_count * 10;
+                    return Self::should_include_chunk(estimated_tokens, result.score);
+                }
+                true
+            })
+            .collect();
+
+        tracing::info!(
+            "After quality filtering: {} chunks (removed {} low-quality)",
+            filtered_matches.len(),
+            semantic_matches.len() - filtered_matches.len()
+        );
+
+        // Group chunks by file
+        let mut file_chunks: HashMap<PathBuf, Vec<(usize, usize, f32)>> = HashMap::new();
+
+        for result in &filtered_matches {
+            if let Some(path_str) = result.file_path.to_str()
+                && let Some((file_part, range_part)) = path_str.rsplit_once(':')
+            {
+                let path = PathBuf::from(file_part);
+                if let Some((start_str, end_str)) = range_part.split_once('-')
+                    && let (Ok(start), Ok(end)) = (start_str.parse::<usize>(), end_str.parse::<usize>())
+                {
+                    file_chunks.entry(path).or_default().push((start, end, result.score));
+                }
+            }
+        }
+
+        // Merge overlapping chunks and extract
+        let mut search_prioritized = Vec::new();
+
+        for (file_path, mut chunks) in file_chunks {
+            chunks.sort_by_key(|(start, _, _)| *start);
+            let merged = Self::merge_overlapping_chunks(chunks);
+            let is_code = Self::is_code_file(&file_path);
+
+            for (start, end, score) in merged {
+                match Self::extract_chunk_with_context(&file_path, start, end, is_code) {
+                    Ok(chunk_ctx) => {
+                        let priority = if is_code {
+                            FilePriority::High
+                        } else {
+                            FilePriority::Medium
+                        };
+
+                        search_prioritized.push(PrioritizedFile::with_score(
+                            chunk_ctx,
+                            priority,
+                            score,
+                        ));
+                    }
+                    Err(extract_error) => {
+                        tracing::warn!("Failed to extract chunk from {}: {extract_error}", file_path.display());
+                    }
+                }
+            }
+        }
+
+        // Track scores for display
+        let file_scores: Vec<(PathBuf, f32, Option<f32>, Option<f32>)> = filtered_matches.iter()
+            .filter_map(|result| {
+                result.file_path.to_str()
+                    .and_then(|path_str| path_str.rsplit_once(':'))
+                    .map(|(file_part, _)| (
+                        PathBuf::from(file_part),
+                        result.score,
+                        result.bm25_score,
+                        result.vector_score,
+                    ))
+            })
+            .collect();
+
+        (search_prioritized, file_scores)
     }
 
 }

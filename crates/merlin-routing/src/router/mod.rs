@@ -22,26 +22,26 @@ pub enum ModelTier {
 
 impl ModelTier {
     /// Get next higher tier for escalation
-    #[must_use] 
+    #[must_use]
     pub fn escalate(&self) -> Option<Self> {
         match self {
             Self::Local { .. } => Some(Self::Groq {
-                model_name: "llama-3.1-70b-versatile".to_string(),
+                model_name: "llama-3.1-70b-versatile".to_owned(),
             }),
             Self::Groq { .. } => Some(Self::Premium {
-                provider: "openrouter".to_string(),
-                model_name: "deepseek/deepseek-coder".to_string(),
+                provider: "openrouter".to_owned(),
+                model_name: "deepseek/deepseek-coder".to_owned(),
             }),
             Self::Premium { model_name, .. } if model_name.contains("deepseek") => {
                 Some(Self::Premium {
-                    provider: "openrouter".to_string(),
-                    model_name: "anthropic/claude-3-haiku".to_string(),
+                    provider: "openrouter".to_owned(),
+                    model_name: "anthropic/claude-3-haiku".to_owned(),
                 })
             }
             Self::Premium { model_name, .. } if model_name.contains("haiku") => {
                 Some(Self::Premium {
-                    provider: "anthropic".to_string(),
-                    model_name: "claude-3.5-sonnet".to_string(),
+                    provider: "anthropic".to_owned(),
+                    model_name: "claude-3.5-sonnet".to_owned(),
                 })
             }
             _ => None,

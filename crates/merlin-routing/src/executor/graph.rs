@@ -1,4 +1,4 @@
-use petgraph::graph::{DiGraph, NodeIndex};
+use petgraph::graph::DiGraph;
 use petgraph::visit::EdgeRef;
 use std::collections::{HashMap, HashSet};
 use crate::{Task, TaskId};
@@ -7,12 +7,10 @@ use crate::{Task, TaskId};
 #[derive(Debug, Clone)]
 pub struct TaskGraph {
     graph: DiGraph<Task, ()>,
-    #[allow(dead_code)]
-    node_map: HashMap<TaskId, NodeIndex>,
 }
 
 impl TaskGraph {
-    #[must_use] 
+    #[must_use]
     pub fn from_tasks(tasks: Vec<Task>) -> Self {
         let mut graph = DiGraph::new();
         let mut node_map = HashMap::new();
@@ -31,11 +29,11 @@ impl TaskGraph {
             }
         }
         
-        Self { graph, node_map }
+        Self { graph }
     }
     
     /// Get tasks ready to execute (no pending dependencies)
-    #[must_use] 
+    #[must_use]
     pub fn ready_tasks(&self, completed: &HashSet<TaskId>) -> Vec<Task> {
         self.graph
             .node_indices()
@@ -63,25 +61,25 @@ impl TaskGraph {
     }
     
     /// Check if all tasks completed
-    #[must_use] 
+    #[must_use]
     pub fn is_complete(&self, completed: &HashSet<TaskId>) -> bool {
         self.graph.node_count() == completed.len()
     }
     
     /// Detect cycles (invalid graph)
-    #[must_use] 
+    #[must_use]
     pub fn has_cycles(&self) -> bool {
         petgraph::algo::is_cyclic_directed(&self.graph)
     }
     
     /// Get total task count
-    #[must_use] 
+    #[must_use]
     pub fn task_count(&self) -> usize {
         self.graph.node_count()
     }
     
     /// Get all tasks
-    #[must_use] 
+    #[must_use]
     pub fn tasks(&self) -> Vec<Task> {
         self.graph.node_weights().cloned().collect()
     }
@@ -94,8 +92,8 @@ mod tests {
 
     #[test]
     fn test_task_graph_ready_tasks() {
-        let task_a = Task::new("Task A".to_string());
-        let task_b = Task::new("Task B".to_string())
+        let task_a = Task::new("Task A".to_owned());
+        let task_b = Task::new("Task B".to_owned())
             .with_dependencies(vec![task_a.id]);
         
         let graph = TaskGraph::from_tasks(vec![task_a.clone(), task_b.clone()]);
@@ -113,8 +111,8 @@ mod tests {
     
     #[test]
     fn test_task_graph_cycle_detection() {
-        let task_a = Task::new("Task A".to_string());
-        let task_b = Task::new("Task B".to_string())
+        let task_a = Task::new("Task A".to_owned());
+        let task_b = Task::new("Task B".to_owned())
             .with_dependencies(vec![task_a.id]);
         
         let graph = TaskGraph::from_tasks(vec![task_a, task_b]);

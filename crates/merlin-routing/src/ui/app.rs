@@ -80,7 +80,7 @@ impl TuiApp {
 
     /// Loads tasks asynchronously
     pub async fn load_tasks_async(&mut self) {
-        if let Some(ref persistence) = self.persistence {
+        if let Some(persistence) = &self.persistence {
             if let Ok(tasks) = persistence.load_all_tasks().await {
                 for (task_id, task_display) in tasks {
                     self.task_manager.insert_task_for_load(task_id, task_display);
@@ -280,7 +280,7 @@ impl TuiApp {
         let new_theme = self.renderer.theme().next();
         self.renderer.set_theme(new_theme);
 
-        if let Some(ref persistence) = self.persistence {
+        if let Some(persistence) = &self.persistence {
             let dir = persistence.get_tasks_dir();
             drop(new_theme.save(&dir));
         }
@@ -568,7 +568,7 @@ impl TuiApp {
 
         let to_delete = self.task_manager.remove_task(task_id);
 
-        if let Some(ref persistence) = self.persistence {
+        if let Some(persistence) = &self.persistence {
             for id in &to_delete {
                 drop(persistence.delete_task_file(*id));
             }

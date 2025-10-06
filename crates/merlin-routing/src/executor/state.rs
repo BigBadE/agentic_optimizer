@@ -7,17 +7,14 @@ use crate::{FileChange, Result};
 /// Shared workspace state (synchronized)
 pub struct WorkspaceState {
     files: RwLock<HashMap<PathBuf, String>>,
-    #[allow(dead_code)]
-    metadata: RwLock<HashMap<String, serde_json::Value>>,
     root_path: PathBuf,
 }
 
 impl WorkspaceState {
-    #[must_use] 
+    #[must_use]
     pub fn new(root_path: PathBuf) -> Arc<Self> {
         Arc::new(Self {
             files: RwLock::new(HashMap::new()),
-            metadata: RwLock::new(HashMap::new()),
             root_path,
         })
     }
@@ -76,7 +73,7 @@ pub struct WorkspaceSnapshot {
 }
 
 impl WorkspaceSnapshot {
-    #[must_use] 
+    #[must_use]
     pub fn get(&self, path: &PathBuf) -> Option<String> {
         self.files.get(path).cloned()
     }
@@ -93,7 +90,7 @@ mod tests {
         workspace.apply_changes(&[
             FileChange::Create {
                 path: PathBuf::from("test.rs"),
-                content: "fn main() {}".to_string(),
+                content: "fn main() {}".to_owned(),
             }
         ]).await.unwrap();
         
@@ -104,7 +101,7 @@ mod tests {
         );
         
         assert_eq!(content1, content2);
-        assert_eq!(content1, Some("fn main() {}".to_string()));
+        assert_eq!(content1, Some("fn main() {}".to_owned()));
     }
     
     #[tokio::test]
@@ -114,7 +111,7 @@ mod tests {
         workspace.apply_changes(&[
             FileChange::Create {
                 path: PathBuf::from("test.rs"),
-                content: "fn main() {}".to_string(),
+                content: "fn main() {}".to_owned(),
             }
         ]).await.unwrap();
         
@@ -123,14 +120,14 @@ mod tests {
         workspace.apply_changes(&[
             FileChange::Modify {
                 path: PathBuf::from("test.rs"),
-                content: "fn main() { println!(\"changed\"); }".to_string(),
+                content: "fn main() { println!(\"changed\"); }".to_owned(),
             }
         ]).await.unwrap();
         
-        assert_eq!(snapshot.get(&PathBuf::from("test.rs")), Some("fn main() {}".to_string()));
+        assert_eq!(snapshot.get(&PathBuf::from("test.rs")), Some("fn main() {}".to_owned()));
         assert_eq!(
             workspace.read_file(&PathBuf::from("test.rs")).await,
-            Some("fn main() { println!(\"changed\"); }".to_string())
+            Some("fn main() { println!(\"changed\"); }".to_owned())
         );
     }
 }

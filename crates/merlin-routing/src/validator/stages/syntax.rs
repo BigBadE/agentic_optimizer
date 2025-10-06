@@ -8,14 +8,14 @@ pub struct SyntaxValidationStage {
 }
 
 impl SyntaxValidationStage {
-    #[must_use] 
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             min_score_threshold: 0.8,
         }
     }
     
-    #[must_use] 
+    #[must_use]
     pub fn with_threshold(mut self, threshold: f64) -> Self {
         self.min_score_threshold = threshold;
         self
@@ -63,7 +63,7 @@ impl SyntaxValidationStage {
         
         let passed = score >= self.min_score_threshold;
         let details = if issues.is_empty() {
-            "Syntax check passed".to_string()
+            "Syntax check passed".to_owned()
         } else {
             format!("Issues: {}", issues.join(", "))
         };
@@ -115,13 +115,13 @@ mod tests {
     async fn test_syntax_validation_pass() {
         let stage = SyntaxValidationStage::new();
         let response = merlin_core::Response {
-            text: "fn main() { println!(\"Hello\"); }".to_string(),
+            text: "fn main() { println!(\"Hello\"); }".to_owned(),
             confidence: 1.0,
             tokens_used: merlin_core::TokenUsage::default(),
-            provider: "test".to_string(),
+            provider: "test".to_owned(),
             latency_ms: 0,
         };
-        let task = Task::new("Test".to_string());
+        let task = Task::new("Test".to_owned());
         
         let result = stage.validate(&response, &task).await.unwrap();
         assert!(result.passed);
@@ -132,13 +132,13 @@ mod tests {
     async fn test_syntax_validation_fail() {
         let stage = SyntaxValidationStage::new();
         let response = merlin_core::Response {
-            text: "syntax error: unexpected token".to_string(),
+            text: "syntax error: unexpected token".to_owned(),
             confidence: 1.0,
             tokens_used: merlin_core::TokenUsage::default(),
-            provider: "test".to_string(),
+            provider: "test".to_owned(),
             latency_ms: 0,
         };
-        let task = Task::new("Test".to_string());
+        let task = Task::new("Test".to_owned());
         
         let result = stage.validate(&response, &task).await.unwrap();
         assert!(!result.passed);
@@ -149,13 +149,13 @@ mod tests {
     async fn test_mismatched_braces() {
         let stage = SyntaxValidationStage::new();
         let response = merlin_core::Response {
-            text: "fn main() { println!(\"Hello\");".to_string(),
+            text: "fn main() { println!(\"Hello\");".to_owned(),
             confidence: 1.0,
             tokens_used: merlin_core::TokenUsage::default(),
-            provider: "test".to_string(),
+            provider: "test".to_owned(),
             latency_ms: 0,
         };
-        let task = Task::new("Test".to_string());
+        let task = Task::new("Test".to_owned());
         
         let result = stage.validate(&response, &task).await.unwrap();
         assert!(!result.passed);

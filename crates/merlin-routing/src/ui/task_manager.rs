@@ -27,7 +27,6 @@ pub struct TaskDisplay {
 
 /// Task step information
 #[derive(Clone)]
-#[allow(dead_code)]
 pub struct TaskStepInfo {
     pub step_id: String,
     pub step_type: String,
@@ -131,20 +130,6 @@ impl TaskManager {
             .collect()
     }
 
-    /// Gets direct children of a task
-    #[allow(dead_code)]
-    pub fn get_children(&self, task_id: TaskId) -> Vec<TaskId> {
-        self.task_order
-            .iter()
-            .filter(|&&id| {
-                self.tasks
-                    .get(&id)
-                    .and_then(|t| t.parent_id)
-                    == Some(task_id)
-            })
-            .copied()
-            .collect()
-    }
 
     /// Checks if a task is a descendant of another
     pub fn is_descendant_of(&self, task_id: TaskId, ancestor_id: TaskId) -> bool {
@@ -202,12 +187,6 @@ impl TaskManager {
     /// Gets the task order
     pub fn task_order(&self) -> &[TaskId] {
         &self.task_order
-    }
-
-    /// Gets the number of tasks
-    #[allow(dead_code)]
-    pub fn len(&self) -> usize {
-        self.tasks.len()
     }
 
     /// Checks if task manager is empty

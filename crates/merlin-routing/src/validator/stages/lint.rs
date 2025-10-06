@@ -10,20 +10,21 @@ pub struct LintValidationStage {
 }
 
 impl LintValidationStage {
-    #[must_use] 
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             workspace: None,
             max_warnings: 10,
         }
     }
     
+    #[must_use]
     pub fn with_workspace(mut self, workspace: Arc<WorkspaceState>) -> Self {
         self.workspace = Some(workspace);
         self
     }
     
-    #[must_use] 
+    #[must_use]
     pub fn with_max_warnings(mut self, max_warnings: usize) -> Self {
         self.max_warnings = max_warnings;
         self
@@ -44,7 +45,7 @@ impl ValidationStage for LintValidationStage {
                 stage: StageType::Lint,
                 passed: true,
                 duration_ms: 0,
-                details: "Lint check skipped (no files modified)".to_string(),
+                details: "Lint check skipped (no files modified)".to_owned(),
                 score: 1.0,
             });
         }
@@ -54,7 +55,7 @@ impl ValidationStage for LintValidationStage {
                 stage: StageType::Lint,
                 passed: true,
                 duration_ms: 0,
-                details: "Lint check skipped (no workspace)".to_string(),
+                details: "Lint check skipped (no workspace)".to_owned(),
                 score: 1.0,
             });
         };
@@ -117,13 +118,13 @@ mod tests {
     async fn test_lint_validation_skip_no_files() {
         let stage = LintValidationStage::new();
         let response = merlin_core::Response {
-            text: "test".to_string(),
+            text: "test".to_owned(),
             confidence: 1.0,
             tokens_used: merlin_core::TokenUsage::default(),
-            provider: "test".to_string(),
+            provider: "test".to_owned(),
             latency_ms: 0,
         };
-        let task = Task::new("Test".to_string());
+        let task = Task::new("Test".to_owned());
         
         let result = stage.validate(&response, &task).await.unwrap();
         assert!(result.passed);
@@ -135,19 +136,19 @@ mod tests {
         let stage = LintValidationStage::new();
         
         let good_response = merlin_core::Response {
-            text: "Finished dev [unoptimized + debuginfo]".to_string(),
+            text: "Finished dev [unoptimized + debuginfo]".to_owned(),
             confidence: 1.0,
             tokens_used: merlin_core::TokenUsage::default(),
-            provider: "test".to_string(),
+            provider: "test".to_owned(),
             latency_ms: 0,
         };
         assert!(stage.quick_check(&good_response).await.unwrap());
         
         let bad_response = merlin_core::Response {
-            text: "warning: unused variable - clippy::unused_variable".to_string(),
+            text: "warning: unused variable - clippy::unused_variable".to_owned(),
             confidence: 1.0,
             tokens_used: merlin_core::TokenUsage::default(),
-            provider: "test".to_string(),
+            provider: "test".to_owned(),
             latency_ms: 0,
         };
         assert!(!stage.quick_check(&bad_response).await.unwrap());

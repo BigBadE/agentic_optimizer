@@ -5,12 +5,12 @@ use super::intent::{Action, Intent};
 pub struct ComplexityEstimator;
 
 impl ComplexityEstimator {
-    #[must_use] 
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
     
-    #[must_use] 
+    #[must_use]
     pub fn estimate(&self, intent: &Intent, request: &str) -> Complexity {
         let mut score = 0;
         
@@ -26,7 +26,7 @@ impl ComplexityEstimator {
         self.score_to_complexity(score)
     }
     
-    #[must_use] 
+    #[must_use]
     pub fn estimate_context_needs(&self, intent: &Intent, request: &str) -> ContextRequirements {
         let estimated_tokens = self.estimate_token_count(request);
         let required_files = self.extract_file_references(request);
@@ -38,7 +38,7 @@ impl ComplexityEstimator {
             .with_full_context(requires_full_context)
     }
     
-    fn score_action(&self, action: &Action) -> usize {
+    const fn score_action(&self, action: &Action) -> usize {
         match action {
             Action::Create | Action::Delete | Action::Document => 1,
             Action::Modify | Action::Fix | Action::Test => 2,
@@ -91,7 +91,7 @@ impl ComplexityEstimator {
         score.min(3)
     }
     
-    fn complexity_to_score(&self, complexity: Complexity) -> usize {
+    const fn complexity_to_score(&self, complexity: Complexity) -> usize {
         match complexity {
             Complexity::Trivial => 0,
             Complexity::Simple => 2,
@@ -99,8 +99,8 @@ impl ComplexityEstimator {
             Complexity::Complex => 8,
         }
     }
-    
-    fn score_to_complexity(&self, score: usize) -> Complexity {
+
+    const fn score_to_complexity(&self, score: usize) -> Complexity {
         match score {
             0..=2 => Complexity::Trivial,
             3..=5 => Complexity::Simple,

@@ -8,7 +8,7 @@ pub struct LongContextStrategy {
 }
 
 impl LongContextStrategy {
-    #[must_use] 
+    #[must_use]
     pub fn new(long_context_threshold: usize) -> Self {
         Self {
             long_context_threshold,
@@ -30,19 +30,19 @@ impl RoutingStrategy for LongContextStrategy {
     }
     
     async fn select_tier(&self, task: &Task) -> Result<ModelTier> {
-        if task.context_needs.estimated_tokens > 100000 {
+        if task.context_needs.estimated_tokens > 100_000 {
             Ok(ModelTier::Premium {
-                provider: "anthropic".to_string(),
-                model_name: "claude-3.5-sonnet".to_string(),
+                provider: "anthropic".to_owned(),
+                model_name: "claude-3.5-sonnet".to_owned(),
             })
         } else if task.context_needs.estimated_tokens > 32000 {
             Ok(ModelTier::Premium {
-                provider: "openrouter".to_string(),
-                model_name: "anthropic/claude-3-haiku".to_string(),
+                provider: "openrouter".to_owned(),
+                model_name: "anthropic/claude-3-haiku".to_owned(),
             })
         } else {
             Ok(ModelTier::Groq {
-                model_name: "llama-3.1-70b-versatile".to_string(),
+                model_name: "llama-3.1-70b-versatile".to_owned(),
             })
         }
     }
@@ -65,7 +65,7 @@ mod tests {
     async fn test_long_context_routing() {
         let strategy = LongContextStrategy::new(16000);
         
-        let huge_context = Task::new("Huge context task".to_string())
+        let huge_context = Task::new("Huge context task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(150000));
         
         assert!(strategy.applies_to(&huge_context));
@@ -82,7 +82,7 @@ mod tests {
     async fn test_medium_long_context() {
         let strategy = LongContextStrategy::new(16000);
         
-        let medium_context = Task::new("Medium context task".to_string())
+        let medium_context = Task::new("Medium context task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(50000));
         
         assert!(strategy.applies_to(&medium_context));
@@ -94,7 +94,7 @@ mod tests {
     async fn test_requires_full_context() {
         let strategy = LongContextStrategy::new(16000);
         
-        let full_context = Task::new("Full context task".to_string())
+        let full_context = Task::new("Full context task".to_owned())
             .with_context(
                 ContextRequirements::new()
                     .with_estimated_tokens(10000)

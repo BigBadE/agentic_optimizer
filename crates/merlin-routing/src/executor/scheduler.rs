@@ -10,7 +10,7 @@ pub struct ConflictAwareTaskGraph {
 }
 
 impl ConflictAwareTaskGraph {
-    #[must_use] 
+    #[must_use]
     pub fn from_tasks(tasks: Vec<Task>) -> Self {
         let mut file_access_map: HashMap<PathBuf, Vec<TaskId>> = HashMap::new();
         
@@ -32,7 +32,7 @@ impl ConflictAwareTaskGraph {
     }
     
     /// Get ready tasks that don't conflict with running tasks
-    #[must_use] 
+    #[must_use]
     pub fn ready_non_conflicting_tasks(
         &self,
         completed: &HashSet<TaskId>,
@@ -62,19 +62,19 @@ impl ConflictAwareTaskGraph {
     }
     
     /// Check if all tasks completed
-    #[must_use] 
+    #[must_use]
     pub fn is_complete(&self, completed: &HashSet<TaskId>) -> bool {
         self.graph.is_complete(completed)
     }
     
     /// Detect cycles
-    #[must_use] 
+    #[must_use]
     pub fn has_cycles(&self) -> bool {
         self.graph.has_cycles()
     }
     
     /// Get total task count
-    #[must_use] 
+    #[must_use]
     pub fn task_count(&self) -> usize {
         self.graph.task_count()
     }
@@ -89,13 +89,13 @@ mod tests {
     fn test_conflict_detection() {
         let file = PathBuf::from("test.rs");
         
-        let task_a = Task::new("Task A".to_string())
+        let task_a = Task::new("Task A".to_owned())
             .with_context(
                 ContextRequirements::new()
                     .with_files(vec![file.clone()])
             );
         
-        let task_b = Task::new("Task B".to_string())
+        let task_b = Task::new("Task B".to_owned())
             .with_context(
                 ContextRequirements::new()
                     .with_files(vec![file])
@@ -123,13 +123,13 @@ mod tests {
     
     #[test]
     fn test_no_conflict_different_files() {
-        let task_a = Task::new("Task A".to_string())
+        let task_a = Task::new("Task A".to_owned())
             .with_context(
                 ContextRequirements::new()
                     .with_files(vec![PathBuf::from("a.rs")])
             );
         
-        let task_b = Task::new("Task B".to_string())
+        let task_b = Task::new("Task B".to_owned())
             .with_context(
                 ContextRequirements::new()
                     .with_files(vec![PathBuf::from("b.rs")])

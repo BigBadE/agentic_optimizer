@@ -814,7 +814,9 @@ impl VectorSearchManager {
                         Err(_) => invalid.push(entry.path.clone()),
                     }
                 }
-                Err(_) => continue, // File doesn't exist anymore
+                Err(_) => {
+                    // File doesn't exist anymore
+                }
             }
         }
 

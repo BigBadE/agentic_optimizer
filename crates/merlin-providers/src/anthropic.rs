@@ -14,6 +14,7 @@ const MODEL: &str = "claude-sonnet-4-20250514";
 /// Anthropic API version header value.
 const API_VERSION: &str = "2023-06-01";
 
+/// Provider implementation for Anthropic's Claude API.
 pub struct AnthropicProvider {
     /// HTTP client used for requests.
     client: Client,

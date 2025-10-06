@@ -163,8 +163,8 @@ mod tests {
         let provider = Box::new(merlin_local::OllamaProvider::new("qwen2.5-coder:7b").unwrap());
         let assessor = SelfAssessor::new(provider);
 
-        let task = Task::new("say hi".to_string());
-        let context = ExecutionContext::new("say hi".to_string());
+        let task = Task::new("say hi".to_owned());
+        let context = ExecutionContext::new("say hi".to_owned());
 
         let prompt = assessor.build_assessment_prompt(&task, &context);
 

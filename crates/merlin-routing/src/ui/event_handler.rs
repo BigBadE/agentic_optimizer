@@ -8,18 +8,18 @@ use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo};
 use super::persistence::TaskPersistence;
 
 /// Handles UI events and updates task manager and state
-pub struct EventHandler<'a> {
-    task_manager: &'a mut TaskManager,
-    state: &'a mut UiState,
-    persistence: Option<&'a TaskPersistence>,
+pub struct EventHandler<'handler> {
+    task_manager: &'handler mut TaskManager,
+    state: &'handler mut UiState,
+    persistence: Option<&'handler TaskPersistence>,
 }
 
-impl<'a> EventHandler<'a> {
+impl<'handler> EventHandler<'handler> {
     /// Creates a new EventHandler
     pub fn new(
-        task_manager: &'a mut TaskManager,
-        state: &'a mut UiState,
-        persistence: Option<&'a TaskPersistence>,
+        task_manager: &'handler mut TaskManager,
+        state: &'handler mut UiState,
+        persistence: Option<&'handler TaskPersistence>,
     ) -> Self {
         Self {
             task_manager,

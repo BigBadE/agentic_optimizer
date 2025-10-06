@@ -11,36 +11,36 @@ pub struct ModelInfo {
 }
 
 impl ModelInfo {
-    #[must_use] 
+    #[must_use]
     pub fn qwen_coder_7b() -> Self {
         Self {
-            name: "qwen2.5-coder:7b".to_string(),
+            name: "qwen2.5-coder:7b".to_owned(),
             size_bytes: 4_400_000_000,
-            parameter_count: "7B".to_string(),
-            quantization: "Q4_0".to_string(),
-            family: "qwen".to_string(),
+            parameter_count: "7B".to_owned(),
+            quantization: "Q4_0".to_owned(),
+            family: "qwen".to_owned(),
         }
     }
-    
-    #[must_use] 
+
+    #[must_use]
     pub fn deepseek_coder_6_7b() -> Self {
         Self {
-            name: "deepseek-coder:6.7b".to_string(),
+            name: "deepseek-coder:6.7b".to_owned(),
             size_bytes: 3_800_000_000,
-            parameter_count: "6.7B".to_string(),
-            quantization: "Q4_0".to_string(),
-            family: "deepseek".to_string(),
+            parameter_count: "6.7B".to_owned(),
+            quantization: "Q4_0".to_owned(),
+            family: "deepseek".to_owned(),
         }
     }
-    
-    #[must_use] 
+
+    #[must_use]
     pub fn codellama_7b() -> Self {
         Self {
-            name: "codellama:7b".to_string(),
+            name: "codellama:7b".to_owned(),
             size_bytes: 3_800_000_000,
-            parameter_count: "7B".to_string(),
-            quantization: "Q4_0".to_string(),
-            family: "llama".to_string(),
+            parameter_count: "7B".to_owned(),
+            quantization: "Q4_0".to_owned(),
+            family: "llama".to_owned(),
         }
     }
 }

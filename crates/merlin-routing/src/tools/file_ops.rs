@@ -42,7 +42,7 @@ impl Tool for ReadFileTool {
     async fn execute(&self, args: Value) -> Result<Value> {
         let path = args.get("path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| RoutingError::Other("Missing 'path' argument".to_string()))?;
+            .ok_or_else(|| RoutingError::Other("Missing 'path' argument".to_owned()))?;
         
         let full_path = self.workspace_root.join(path);
         
@@ -53,7 +53,7 @@ impl Tool for ReadFileTool {
             .map_err(|e| RoutingError::Other(format!("Invalid workspace root: {}", e)))?;
         
         if !canonical_path.starts_with(&canonical_root) {
-            return Err(RoutingError::Other("Path outside workspace".to_string()));
+            return Err(RoutingError::Other("Path outside workspace".to_owned()));
         }
         
         let content = fs::read_to_string(&canonical_path).await
@@ -108,17 +108,17 @@ impl Tool for WriteFileTool {
     async fn execute(&self, args: Value) -> Result<Value> {
         let path = args.get("path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| RoutingError::Other("Missing 'path' argument".to_string()))?;
+            .ok_or_else(|| RoutingError::Other("Missing 'path' argument".to_owned()))?;
         
         let content = args.get("content")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| RoutingError::Other("Missing 'content' argument".to_string()))?;
+            .ok_or_else(|| RoutingError::Other("Missing 'content' argument".to_owned()))?;
         
         let full_path = self.workspace_root.join(path);
         
         // Security check: ensure path is within workspace
         let parent = full_path.parent()
-            .ok_or_else(|| RoutingError::Other("Invalid path".to_string()))?;
+            .ok_or_else(|| RoutingError::Other("Invalid path".to_owned()))?;
         
         // Create parent directories if they don't exist
         fs::create_dir_all(parent).await
@@ -131,7 +131,7 @@ impl Tool for WriteFileTool {
             .map_err(|e| RoutingError::Other(format!("Invalid parent path: {}", e)))?;
         
         if !canonical_parent.starts_with(&canonical_root) {
-            return Err(RoutingError::Other("Path outside workspace".to_string()));
+            return Err(RoutingError::Other("Path outside workspace".to_owned()));
         }
         
         fs::write(&full_path, content).await
@@ -182,7 +182,7 @@ impl Tool for ListFilesTool {
     async fn execute(&self, args: Value) -> Result<Value> {
         let path = args.get("path")
             .and_then(|v| v.as_str())
-            .ok_or_else(|| RoutingError::Other("Missing 'path' argument".to_string()))?;
+            .ok_or_else(|| RoutingError::Other("Missing 'path' argument".to_owned()))?;
         
         let full_path = if path.is_empty() {
             self.workspace_root.clone()
@@ -197,7 +197,7 @@ impl Tool for ListFilesTool {
             .map_err(|e| RoutingError::Other(format!("Invalid workspace root: {}", e)))?;
         
         if !canonical_path.starts_with(&canonical_root) {
-            return Err(RoutingError::Other("Path outside workspace".to_string()));
+            return Err(RoutingError::Other("Path outside workspace".to_owned()));
         }
         
         let mut entries = Vec::new();

@@ -6,8 +6,8 @@ use super::super::strategy::RoutingStrategy;
 pub struct ComplexityBasedStrategy;
 
 impl ComplexityBasedStrategy {
-    #[must_use] 
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self
     }
 }
@@ -27,14 +27,14 @@ impl RoutingStrategy for ComplexityBasedStrategy {
     async fn select_tier(&self, task: &Task) -> Result<ModelTier> {
         Ok(match task.complexity {
             Complexity::Trivial | Complexity::Simple => ModelTier::Local {
-                model_name: "qwen2.5-coder:7b".to_string(),
+                model_name: "qwen2.5-coder:7b".to_owned(),
             },
             Complexity::Medium => ModelTier::Groq {
-                model_name: "llama-3.1-70b-versatile".to_string(),
+                model_name: "llama-3.1-70b-versatile".to_owned(),
             },
             Complexity::Complex => ModelTier::Premium {
-                provider: "openrouter".to_string(),
-                model_name: "deepseek/deepseek-coder".to_string(),
+                provider: "openrouter".to_owned(),
+                model_name: "deepseek/deepseek-coder".to_owned(),
             },
         })
     }
@@ -56,17 +56,17 @@ mod tests {
     async fn test_complexity_routing() {
         let strategy = ComplexityBasedStrategy::new();
         
-        let simple_task = Task::new("Simple task".to_string())
+        let simple_task = Task::new("Simple task".to_owned())
             .with_complexity(Complexity::Simple);
         let tier = strategy.select_tier(&simple_task).await.unwrap();
         assert!(matches!(tier, ModelTier::Local { .. }));
         
-        let medium_task = Task::new("Medium task".to_string())
+        let medium_task = Task::new("Medium task".to_owned())
             .with_complexity(Complexity::Medium);
         let tier = strategy.select_tier(&medium_task).await.unwrap();
         assert!(matches!(tier, ModelTier::Groq { .. }));
         
-        let complex_task = Task::new("Complex task".to_string())
+        let complex_task = Task::new("Complex task".to_owned())
             .with_complexity(Complexity::Complex);
         let tier = strategy.select_tier(&complex_task).await.unwrap();
         assert!(matches!(tier, ModelTier::Premium { .. }));

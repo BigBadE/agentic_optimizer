@@ -11,7 +11,7 @@ pub struct RoutingConfig {
 }
 
 impl RoutingConfig {
-    #[must_use] 
+    #[must_use]
     pub fn default_config() -> Self {
         Self {
             tiers: TierConfig::default(),
@@ -44,9 +44,9 @@ impl Default for TierConfig {
     fn default() -> Self {
         Self {
             local_enabled: true,
-            local_model: "qwen2.5-coder:7b".to_string(),
+            local_model: "qwen2.5-coder:7b".to_owned(),
             groq_enabled: true,
-            groq_model: "llama-3.1-70b-versatile".to_string(),
+            groq_model: "llama-3.1-70b-versatile".to_owned(),
             premium_enabled: true,
             max_retries: 3,
             timeout_seconds: 300,

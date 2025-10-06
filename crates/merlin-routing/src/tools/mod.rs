@@ -32,6 +32,7 @@ impl ToolRegistry {
         }
     }
     
+    #[must_use]
     pub fn with_tool(mut self, tool: Arc<dyn Tool>) -> Self {
         Arc::make_mut(&mut self.tools).push(tool);
         self

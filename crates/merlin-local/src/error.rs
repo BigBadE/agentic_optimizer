@@ -1,6 +1,7 @@
+use core::result::Result as CoreResult;
 use thiserror::Error;
 
-pub type Result<T> = std::result::Result<T, LocalError>;
+pub type Result<T> = CoreResult<T, LocalError>;
 
 #[derive(Debug, Error)]
 pub enum LocalError {

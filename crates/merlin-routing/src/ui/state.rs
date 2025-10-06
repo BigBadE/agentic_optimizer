@@ -12,13 +12,11 @@ pub struct UiState {
     pub pending_delete_task_id: Option<TaskId>,
     pub loading_tasks: bool,
     pub conversation_history: Vec<ConversationEntry>,
-    #[allow(dead_code)]
     pub emoji_mode: EmojiMode,
 }
 
 /// Conversation entry
 #[derive(Clone)]
-#[allow(dead_code)]
 pub struct ConversationEntry {
     pub role: ConversationRole,
     pub text: String,

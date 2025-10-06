@@ -19,19 +19,19 @@ FIELD DEFINITIONS:
 
 STRATEGY SELECTION (choose ONE):
 1. **Focused**: Use when looking for specific symbols/functions
-   - Example: "Fix the build_context function" → Focused with symbols: ["build_context"]
+   - Example: "Fix the build_context function" \u{2192} Focused with symbols: ["build_context"]
    - Searches rust-analyzer index for symbol definitions and usages
 
 2. **Broad**: Use when exploring by file/directory names or keywords
-   - Example: "Show me the subagent code" → Broad with patterns: ["subagent"]
+   - Example: "Show me the subagent code" \u{2192} Broad with patterns: ["subagent"]
    - Matches file paths containing the patterns
 
 3. **EntryPointBased**: Use when starting from specific files and traversing imports
-   - Example: "Trace from main.rs" → EntryPointBased with entry_files: ["src/main.rs"]
+   - Example: "Trace from main.rs" \u{2192} EntryPointBased with entry_files: ["src/main.rs"]
    - Follows import chains from entry points
 
 4. **Semantic**: Use for conceptual searches without specific symbols/files
-   - Example: "Find authentication logic" → Semantic with query: "authentication logic"
+   - Example: "Find authentication logic" \u{2192} Semantic with query: "authentication logic"
    - Uses semantic search (currently limited)
 
 CRITICAL: Do NOT put file/directory names in the Focused strategy's symbols array. Use Broad strategy for file matching.
@@ -50,7 +50,7 @@ JSON SCHEMA:
     // OR "Semantic": { "query": "description", "top_k": 10 }
   },
   "reasoning": "Brief explanation"
-}"#.to_string()
+}"#.to_owned()
 }
 
 /// Generate a user prompt for the context planning agent

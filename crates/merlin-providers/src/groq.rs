@@ -5,17 +5,27 @@ use std::env;
 use std::time::Instant;
 use merlin_core::{Context, Error, ModelProvider, Query, Response, Result, TokenUsage};
 
+/// Groq API endpoint URL.
 const GROQ_API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
+/// Default model for Groq.
 const DEFAULT_MODEL: &str = "llama-3.1-70b-versatile";
 
-/// Groq API provider (free tier with rate limits)
+/// Groq API provider (free tier with rate limits).
 pub struct GroqProvider {
+    /// HTTP client for API requests.
     client: Client,
+    /// Groq API key.
     api_key: String,
+    /// Model name to use.
     model: String,
 }
 
 impl GroqProvider {
+    /// Creates a new `GroqProvider` from environment variables.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the `GROQ_API_KEY` environment variable is not set.
     pub fn new() -> Result<Self> {
         let api_key = env::var("GROQ_API_KEY")
             .map_err(|_| Error::Other("GROQ_API_KEY not set".to_owned()))?;
@@ -26,14 +36,16 @@ impl GroqProvider {
             model: DEFAULT_MODEL.to_owned(),
         })
     }
-    
-    #[must_use] 
+
+    /// Sets the model to use for generation.
+    #[must_use]
     pub fn with_model(mut self, model: String) -> Self {
         self.model = model;
         self
     }
-    
-    #[must_use] 
+
+    /// Sets the API key.
+    #[must_use]
     pub fn with_api_key(mut self, api_key: String) -> Self {
         self.api_key = api_key;
         self
@@ -101,10 +113,11 @@ impl ModelProvider for GroqProvider {
         if !context.files.is_empty() {
             user_content.push_str("\n\nContext files:\n");
             for file_ctx in &context.files {
-                user_content.push_str(&format!("\n--- {} ---\n{}\n", 
-                    file_ctx.path.display(), 
-                    file_ctx.content
-                ));
+                user_content.push_str("\n--- ");
+                user_content.push_str(&file_ctx.path.display().to_string());
+                user_content.push_str(" ---\n");
+                user_content.push_str(&file_ctx.content);
+                user_content.push('\n');
             }
         }
         
@@ -127,22 +140,22 @@ impl ModelProvider for GroqProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|e| Error::Other(format!("Groq API request failed: {e}")))?;
-        
+            .map_err(|err| Error::Other(format!("Groq API request failed: {err}")))?;
+
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_owned());
             return Err(Error::Other(format!("Groq API error {status}: {error_text}")));
         }
-        
+
         let groq_response: GroqResponse = response.json().await
-            .map_err(|e| Error::Other(format!("Failed to parse Groq response: {e}")))?;
+            .map_err(|err| Error::Other(format!("Failed to parse Groq response: {err}")))?;
         
         let latency_ms = start.elapsed().as_millis() as u64;
         
         let text = groq_response.choices
             .first()
-            .map(|c| c.message.content.clone())
+            .map(|choice| choice.message.content.clone())
             .ok_or_else(|| Error::Other("No response from Groq".to_owned()))?;
         
         let tokens_used = TokenUsage {
@@ -171,38 +184,39 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_groq_provider_with_api_key() {
+    fn groq_provider_with_api_key() {
         let provider = GroqProvider {
             client: Client::new(),
-            api_key: "test_key".to_string(),
-            model: DEFAULT_MODEL.to_string(),
+            api_key: "test_key".to_owned(),
+            model: DEFAULT_MODEL.to_owned(),
         };
-        
+
         assert_eq!(provider.name(), "Groq");
         assert_eq!(provider.model, DEFAULT_MODEL);
     }
-    
+
     #[tokio::test]
-    async fn test_groq_availability() {
+    async fn groq_availability() {
         let provider = GroqProvider {
             client: Client::new(),
-            api_key: "test_key".to_string(),
-            model: DEFAULT_MODEL.to_string(),
+            api_key: "test_key".to_owned(),
+            model: DEFAULT_MODEL.to_owned(),
         };
-        
+
         assert!(provider.is_available().await);
     }
-    
+
     #[test]
-    fn test_cost_estimation() {
+    fn cost_estimation() {
         let provider = GroqProvider {
             client: Client::new(),
-            api_key: "test_key".to_string(),
-            model: DEFAULT_MODEL.to_string(),
+            api_key: "test_key".to_owned(),
+            model: DEFAULT_MODEL.to_owned(),
         };
-        
+
         let context = Context::new("");
-        assert_eq!(provider.estimate_cost(&context), 0.0);
+        let cost = provider.estimate_cost(&context);
+        assert!(cost.abs() < f64::EPSILON);
     }
 }
 

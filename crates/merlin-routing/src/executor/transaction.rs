@@ -57,7 +57,7 @@ impl TaskWorkspace {
     }
     
     /// Read file (sees pending changes + base snapshot)
-    #[must_use] 
+    #[must_use]
     pub fn read_file(&self, path: &PathBuf) -> Option<String> {
         if let Some(state) = self.pending_changes.get(path) {
             return match state {
@@ -174,7 +174,7 @@ mod tests {
         workspace.apply_changes(&[
             FileChange::Create {
                 path: PathBuf::from("test.rs"),
-                content: "original".to_string(),
+                content: "original".to_owned(),
             }
         ]).await.unwrap();
         
@@ -185,16 +185,16 @@ mod tests {
             lock_manager,
         ).await.unwrap();
         
-        task_workspace.modify_file(PathBuf::from("test.rs"), "modified".to_string());
+        task_workspace.modify_file(PathBuf::from("test.rs"), "modified".to_owned());
         
         assert_eq!(
             task_workspace.read_file(&PathBuf::from("test.rs")),
-            Some("modified".to_string())
+            Some("modified".to_owned())
         );
         
         assert_eq!(
             workspace.read_file(&PathBuf::from("test.rs")).await,
-            Some("original".to_string())
+            Some("original".to_owned())
         );
     }
     
@@ -207,7 +207,7 @@ mod tests {
         workspace.apply_changes(&[
             FileChange::Create {
                 path: PathBuf::from("test.rs"),
-                content: "original".to_string(),
+                content: "original".to_owned(),
             }
         ]).await.unwrap();
         
@@ -218,13 +218,13 @@ mod tests {
             lock_manager,
         ).await.unwrap();
         
-        task_workspace.modify_file(PathBuf::from("test.rs"), "modified".to_string());
+        task_workspace.modify_file(PathBuf::from("test.rs"), "modified".to_owned());
         
         task_workspace.commit(workspace.clone()).await.unwrap();
         
         assert_eq!(
             workspace.read_file(&PathBuf::from("test.rs")).await,
-            Some("modified".to_string())
+            Some("modified".to_owned())
         );
     }
 }

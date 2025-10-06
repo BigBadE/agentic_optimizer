@@ -14,49 +14,49 @@ pub struct LocalModelProvider {
 }
 
 impl LocalModelProvider {
-    #[must_use] 
+    #[must_use]
     pub fn new(model_name: String) -> Self {
         Self {
             client: Client::new(),
-            base_url: "http://localhost:11434".to_string(),
+            base_url: "http://localhost:11434".to_owned(),
             model_name,
             manager: OllamaManager::new(),
         }
     }
-    
-    #[must_use] 
+
+    #[must_use]
     pub fn with_url(mut self, url: String) -> Self {
-        self.base_url = url.clone();
+        self.base_url.clone_from(&url);
         self.manager = self.manager.with_url(url);
         self
     }
-    
+
     async fn generate_completion(&self, prompt: &str, system: Option<&str>) -> Result<OllamaGenerateResponse> {
         let request = OllamaGenerateRequest {
             model: self.model_name.clone(),
-            prompt: prompt.to_string(),
+            prompt: prompt.to_owned(),
             system: system.map(String::from),
             temperature: Some(0.7),
             max_tokens: None,
             stream: false,
         };
-        
+
         let response = self.client
             .post(format!("{}/api/generate", self.base_url))
             .json(&request)
             .send()
             .await
-            .map_err(|e| merlin_core::Error::Other(format!("Ollama request failed: {e}")))?;
-        
+            .map_err(|err| merlin_core::Error::Other(format!("Ollama request failed: {err}")))?;
+
         if !response.status().is_success() {
             return Err(merlin_core::Error::Other(format!(
                 "Ollama returned error: {}",
                 response.status()
             )));
         }
-        
+
         let ollama_response: OllamaGenerateResponse = response.json().await
-            .map_err(|e| merlin_core::Error::Other(format!("Failed to parse Ollama response: {e}")))?;
+            .map_err(|err| merlin_core::Error::Other(format!("Failed to parse Ollama response: {err}")))?;
         
         Ok(ollama_response)
     }
@@ -82,10 +82,14 @@ impl ModelProvider for LocalModelProvider {
         if !context.files.is_empty() {
             prompt.push_str("\n\nContext files:\n");
             for file_ctx in &context.files {
-                prompt.push_str(&format!("\n--- {} ---\n{}\n", 
-                    file_ctx.path.display(), 
+                use std::fmt::Write as _;
+                if write!(prompt, "\n--- {} ---\n{}\n",
+                    file_ctx.path.display(),
                     file_ctx.content
-                ));
+                ).is_err() {
+                    // Writing to String should never fail, but handle it gracefully
+                    return Err(merlin_core::Error::Other("Failed to write context to prompt".to_owned()));
+                }
             }
         }
         
@@ -119,17 +123,18 @@ mod tests {
     use super::*;
 
     #[test]
-    fn test_local_provider_creation() {
-        let provider = LocalModelProvider::new("qwen2.5-coder:7b".to_string());
+    fn local_provider_creation() {
+        let provider = LocalModelProvider::new("qwen2.5-coder:7b".to_owned());
         assert_eq!(provider.name(), "Ollama");
         assert_eq!(provider.model_name, "qwen2.5-coder:7b");
     }
-    
+
     #[test]
-    fn test_cost_estimation() {
-        let provider = LocalModelProvider::new("qwen2.5-coder:7b".to_string());
+    fn cost_estimation() {
+        let provider = LocalModelProvider::new("qwen2.5-coder:7b".to_owned());
         let context = Context::new("");
-        assert_eq!(provider.estimate_cost(&context), 0.0);
+        let cost = provider.estimate_cost(&context);
+        assert!(cost.abs() < f64::EPSILON);
     }
 }
 

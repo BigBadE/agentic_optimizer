@@ -10,20 +10,21 @@ pub struct BuildValidationStage {
 }
 
 impl BuildValidationStage {
-    #[must_use] 
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {
             timeout_seconds: 60,
             workspace: None,
         }
     }
     
-    #[must_use] 
+    #[must_use]
     pub fn with_timeout(mut self, timeout_seconds: u64) -> Self {
         self.timeout_seconds = timeout_seconds;
         self
     }
     
+    #[must_use]
     pub fn with_workspace(mut self, workspace: Arc<WorkspaceState>) -> Self {
         self.workspace = Some(workspace);
         self
@@ -44,7 +45,7 @@ impl ValidationStage for BuildValidationStage {
                 stage: StageType::Build,
                 passed: true,
                 duration_ms: 0,
-                details: "Build check skipped (no files modified)".to_string(),
+                details: "Build check skipped (no files modified)".to_owned(),
                 score: 1.0,
             });
         }
@@ -54,7 +55,7 @@ impl ValidationStage for BuildValidationStage {
                 stage: StageType::Build,
                 passed: true,
                 duration_ms: 0,
-                details: "Build check skipped (no workspace)".to_string(),
+                details: "Build check skipped (no workspace)".to_owned(),
                 score: 1.0,
             });
         };
@@ -106,13 +107,13 @@ mod tests {
     async fn test_build_validation_skip_no_files() {
         let stage = BuildValidationStage::new();
         let response = merlin_core::Response {
-            text: "fn main() {}".to_string(),
+            text: "fn main() {}".to_owned(),
             confidence: 1.0,
             tokens_used: merlin_core::TokenUsage::default(),
-            provider: "test".to_string(),
+            provider: "test".to_owned(),
             latency_ms: 0,
         };
-        let task = Task::new("Test".to_string());
+        let task = Task::new("Test".to_owned());
         
         let result = stage.validate(&response, &task).await.unwrap();
         assert!(result.passed);
@@ -124,19 +125,19 @@ mod tests {
         let stage = BuildValidationStage::new();
         
         let good_response = merlin_core::Response {
-            text: "fn main() {}".to_string(),
+            text: "fn main() {}".to_owned(),
             confidence: 1.0,
             tokens_used: merlin_core::TokenUsage::default(),
-            provider: "test".to_string(),
+            provider: "test".to_owned(),
             latency_ms: 0,
         };
         assert!(stage.quick_check(&good_response).await.unwrap());
         
         let bad_response = merlin_core::Response {
-            text: "error[E0425]: cannot find value".to_string(),
+            text: "error[E0425]: cannot find value".to_owned(),
             confidence: 1.0,
             tokens_used: merlin_core::TokenUsage::default(),
-            provider: "test".to_string(),
+            provider: "test".to_owned(),
             latency_ms: 0,
         };
         assert!(!stage.quick_check(&bad_response).await.unwrap());

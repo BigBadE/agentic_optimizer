@@ -9,8 +9,8 @@ pub struct AvailabilityChecker {
 }
 
 impl AvailabilityChecker {
-    #[must_use] 
-    pub fn new() -> Self {
+    #[must_use]
+    pub const fn new() -> Self {
         Self {}
     }
     
@@ -41,7 +41,7 @@ pub struct StrategyRouter {
 }
 
 impl StrategyRouter {
-    #[must_use] 
+    #[must_use]
     pub fn new(strategies: Vec<Arc<dyn RoutingStrategy>>) -> Self {
         let mut sorted_strategies = strategies;
         sorted_strategies.sort_by_key(|s| std::cmp::Reverse(s.priority()));
@@ -54,8 +54,8 @@ impl StrategyRouter {
             premium_enabled: true,
         }
     }
-    
-    #[must_use] 
+
+    #[must_use]
     pub fn with_tier_config(mut self, local: bool, groq: bool, premium: bool) -> Self {
         self.local_enabled = local;
         self.groq_enabled = groq;
@@ -63,7 +63,7 @@ impl StrategyRouter {
         self
     }
     
-    #[must_use] 
+    #[must_use]
     pub fn with_default_strategies() -> Self {
         use super::strategies::{QualityCriticalStrategy, LongContextStrategy, CostOptimizationStrategy, ComplexityBasedStrategy};
         
@@ -85,11 +85,11 @@ impl StrategyRouter {
             ModelTier::Groq { .. } => 0.0,
             ModelTier::Premium { model_name, .. } => {
                 if model_name.contains("sonnet") {
-                    tokens * 0.000015
+                    tokens * 0.000_015
                 } else if model_name.contains("haiku") {
-                    tokens * 0.000001
+                    tokens * 0.000_001
                 } else if model_name.contains("deepseek") {
-                    tokens * 0.0000002
+                    tokens * 0.000_000_2
                 } else {
                     tokens * 0.00001
                 }
@@ -138,22 +138,22 @@ impl ModelRouter for StrategyRouter {
         if self.groq_enabled {
             return Ok(RoutingDecision {
                 tier: ModelTier::Groq {
-                    model_name: "llama-3.1-70b-versatile".to_string(),
+                    model_name: "llama-3.1-70b-versatile".to_owned(),
                 },
                 estimated_cost: 0.0,
                 estimated_latency_ms: 500,
-                reasoning: "Fallback to Groq (no other tiers available)".to_string(),
+                reasoning: "Fallback to Groq (no other tiers available)".to_owned(),
             });
         }
         
         if self.local_enabled {
             return Ok(RoutingDecision {
                 tier: ModelTier::Local {
-                    model_name: "qwen2.5-coder:7b".to_string(),
+                    model_name: "qwen2.5-coder:7b".to_owned(),
                 },
                 estimated_cost: 0.0,
                 estimated_latency_ms: 100,
-                reasoning: "Fallback to Local (no other tiers available)".to_string(),
+                reasoning: "Fallback to Local (no other tiers available)".to_owned(),
             });
         }
         
@@ -174,7 +174,7 @@ mod tests {
     async fn test_strategy_router_priority() {
         let router = StrategyRouter::with_default_strategies();
         
-        let critical_task = Task::new("Critical task".to_string())
+        let critical_task = Task::new("Critical task".to_owned())
             .with_priority(Priority::Critical)
             .with_complexity(Complexity::Simple);
         
@@ -193,7 +193,7 @@ mod tests {
     async fn test_long_context_strategy() {
         let router = StrategyRouter::with_default_strategies();
         
-        let long_context_task = Task::new("Long context task".to_string())
+        let long_context_task = Task::new("Long context task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(50000));
         
         let decision = router.route(&long_context_task).await.unwrap();
@@ -205,7 +205,7 @@ mod tests {
     async fn test_cost_optimization() {
         let router = StrategyRouter::with_default_strategies();
         
-        let cheap_task = Task::new("Cheap task".to_string())
+        let cheap_task = Task::new("Cheap task".to_owned())
             .with_priority(Priority::Low)
             .with_context(ContextRequirements::new().with_estimated_tokens(2000));
         
@@ -217,7 +217,7 @@ mod tests {
     async fn test_complexity_fallback() {
         let router = StrategyRouter::with_default_strategies();
         
-        let medium_task = Task::new("Medium task".to_string())
+        let medium_task = Task::new("Medium task".to_owned())
             .with_complexity(Complexity::Medium)
             .with_priority(Priority::Medium);
         

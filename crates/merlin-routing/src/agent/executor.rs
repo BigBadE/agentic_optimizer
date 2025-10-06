@@ -119,7 +119,7 @@ impl AgentExecutor {
                 ui_channel.send(UiEvent::TaskStepStarted {
                     task_id,
                     step_id: format!("{:?}", tool_step.id),
-                    step_type: "ToolCall".to_string(),
+                    step_type: "ToolCall".to_owned(),
                     content: tool_step.content.clone(),
                 });
                 
@@ -171,7 +171,7 @@ impl AgentExecutor {
     
     /// Extract tool calls from LLM response (simplified for Phase 2)
     /// In a real implementation, this would parse function calling format
-    fn extract_tool_calls(&self, _response: &Response) -> Vec<(String, Value)> {
+    const fn extract_tool_calls(&self, _response: &Response) -> Vec<(String, Value)> {
         // For Phase 2, we'll simulate tool calling by looking for markers in the text
         // Real implementation would use proper function calling API
         let tool_calls = Vec::new();
@@ -218,14 +218,14 @@ impl AgentExecutor {
                 match provider_name.as_str() {
                     "openrouter" => {
                         let api_key = std::env::var("OPENROUTER_API_KEY")
-                            .map_err(|_| RoutingError::Other("OPENROUTER_API_KEY not set".to_string()))?;
+                            .map_err(|_| RoutingError::Other("OPENROUTER_API_KEY not set".to_owned()))?;
                         let provider = merlin_providers::OpenRouterProvider::new(api_key)?
                             .with_model(model_name.clone());
                         Ok(Arc::new(provider))
                     }
                     "anthropic" => {
                         let api_key = std::env::var("ANTHROPIC_API_KEY")
-                            .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_string()))?;
+                            .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
                         let provider = merlin_providers::AnthropicProvider::new(api_key)?;
                         Ok(Arc::new(provider))
                     }
@@ -288,9 +288,9 @@ impl AgentExecutor {
         // Start "Analysis" step (will be collapsed by default)
         ui_channel.send(UiEvent::TaskStepStarted {
             task_id,
-            step_id: "analysis".to_string(),
-            step_type: "Thinking".to_string(),
-            content: "Analyzing...".to_string(),
+            step_id: "analysis".to_owned(),
+            step_type: "Thinking".to_owned(),
+            content: "Analyzing...".to_owned(),
         });
         
         // Create assessor with the router's provider
@@ -319,7 +319,7 @@ impl AgentExecutor {
                 // If parsing fails, fall back to streaming execution without showing error
                 ui_channel.send(UiEvent::TaskStepCompleted {
                     task_id,
-                    step_id: "analysis".to_string(),
+                    step_id: "analysis".to_owned(),
                 });
                 
                 task.state = crate::TaskState::Executing;
@@ -339,7 +339,7 @@ impl AgentExecutor {
         // Complete the analysis step
         ui_channel.send(UiEvent::TaskStepCompleted {
             task_id,
-            step_id: "analysis".to_string(),
+            step_id: "analysis".to_owned(),
         });
         
         // Execute based on decision
@@ -370,12 +370,12 @@ impl AgentExecutor {
                 })
             }
             
-            crate::TaskAction::Decompose { subtasks, execution_mode: _ } => {
+            crate::TaskAction::Decompose { subtasks, .. } => {
                 // Task needs to be broken down - for Phase 1 fall back to standard execution
                 ui_channel.send(UiEvent::TaskStepStarted {
                     task_id,
-                    step_id: "decompose".to_string(),
-                    step_type: "Output".to_string(),
+                    step_id: "decompose".to_owned(),
+                    step_type: "Output".to_owned(),
                     content: format!(
                         "Decision: DECOMPOSE into {} subtasks ({}). Falling back to regular execution.",
                         subtasks.len(),
@@ -391,8 +391,8 @@ impl AgentExecutor {
                 // Task needs more information - for Phase 1, fall back to regular execution
                 ui_channel.send(UiEvent::TaskStepStarted {
                     task_id,
-                    step_id: "gather".to_string(),
-                    step_type: "Output".to_string(),
+                    step_id: "gather".to_owned(),
+                    step_type: "Output".to_owned(),
                     content: format!("Decision: GATHER context - needs: {:?} ({})", needs, decision.reasoning),
                 });
                 

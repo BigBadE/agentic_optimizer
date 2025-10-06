@@ -11,7 +11,7 @@ pub struct FileLockManager {
 }
 
 impl FileLockManager {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Arc<Self> {
         Arc::new(Self {
             write_locks: RwLock::new(HashMap::new()),

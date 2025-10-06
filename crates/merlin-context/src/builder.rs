@@ -5,7 +5,7 @@ use walkdir::WalkDir;
 use indicatif::{ProgressBar, ProgressStyle};
 use tokio::task::{spawn_blocking, JoinError};
 
-use merlin_core::{Context, FileContext, Query, Result};
+use merlin_core::{Context, Error, FileContext, Query, Result};
 use merlin_languages::LanguageProvider;
 use core::result::Result as CoreResult;
 
@@ -97,7 +97,7 @@ impl ContextBuilder {
                 tracing::info!("Intelligent context fetching found {} files", agent_files.len());
                 agent_files
             } else {
-                return Err(merlin_core::Error::Other(
+                return Err(Error::Other(
                     "Language backend not initialized. This should not happen.".into()
                 ));
             }
@@ -128,7 +128,7 @@ impl ContextBuilder {
     async fn use_subagent_for_context(&self, _intent: &QueryIntent, query_text: &str) -> Result<Vec<FileContext>> {
         // Initialize the language backend if needed
         if !self.language_backend_initialized {
-            return Err(merlin_core::Error::Other("Language backend not initialized".into()));
+            return Err(Error::Other("Language backend not initialized".into()));
         }
 
         // Perform hybrid search
@@ -281,7 +281,7 @@ impl ContextBuilder {
         use std::fs;
 
         let content = fs::read_to_string(file_path)
-            .map_err(|read_error| merlin_core::Error::Other(format!("Failed to read file: {read_error}")))?;
+            .map_err(|read_error| Error::Other(format!("Failed to read file: {read_error}")))?;
         
         let lines: Vec<&str> = content.lines().collect();
         
@@ -480,7 +480,7 @@ impl ContextBuilder {
         }
 
         let Some(manager) = self.vector_manager.as_ref() else {
-            return Err(merlin_core::Error::Other("Vector manager should be initialized".into()));
+            return Err(Error::Other("Vector manager should be initialized".into()));
         };
         let results = manager.search(query, 50).await?;
 

@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use ra_ap_ide::Analysis;
 use ra_ap_syntax::{ast, AstNode as _, SyntaxKind};
 
-use merlin_core::{FileContext, Result};
+use merlin_core::{Error, FileContext, Result};
 use crate::RustBackend;
 
 /// Helper to compute related files and imports for a Rust source file.
@@ -54,13 +54,15 @@ impl<'analysis> ContextBuilder<'analysis> {
     /// # Errors
     /// Returns an error if rust-analyzer cannot parse the file.
     pub fn extract_imports(&self, file: &Path) -> Result<Vec<PathBuf>> {
-        let file_id = self.backend.get_file_id(file)
-            .ok_or_else(|| merlin_core::Error::FileNotFound(file.display().to_string()))?;
+        let file_id = self
+            .backend
+            .get_file_id(file)
+            .ok_or_else(|| Error::FileNotFound(file.display().to_string()))?;
 
         let parsed = self
             .analysis
             .parse(file_id)
-            .map_err(|error| merlin_core::Error::Other(error.to_string()))?;
+            .map_err(|error| Error::Other(error.to_string()))?;
 
         let syntax = parsed.syntax();
         let mut imports = Vec::new();
@@ -115,6 +117,7 @@ impl<'analysis> ContextBuilder<'analysis> {
     }
 
     /// Resolve a module path inside a crate starting from a base path.
+    #[allow(clippy::only_used_in_recursion)]
     fn resolve_crate_import(&self, parts: &[&str], base_path: &Path) -> Option<PathBuf> {
         if parts.is_empty() {
             return None;

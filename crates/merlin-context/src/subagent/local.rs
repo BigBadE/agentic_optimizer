@@ -1,8 +1,9 @@
 //! Local context agent using Ollama.
 
 use std::time::Instant;
-use ollama_rs::{Ollama, generation::chat::ChatMessage};
-use merlin_core::Result;
+
+use ollama_rs::{generation::chat::ChatMessage, Ollama};
+use merlin_core::{Error, Result};
 use crate::query::{QueryIntent, ContextPlan};
 use crate::models::{ModelConfig, TaskComplexity};
 use super::agent::ContextAgent;
@@ -49,7 +50,7 @@ impl LocalContextAgent {
         let response = ollama
             .send_chat_messages(request)
             .await
-            .map_err(|e| merlin_core::Error::Other(format!("Ollama request failed: {e}")))?;
+            .map_err(|e| Error::Other(format!("Ollama request failed: {e}")))?;
 
         // Get the message content from the response
         // response.message is a ChatMessage struct with a content field
@@ -79,7 +80,7 @@ impl LocalContextAgent {
             Err(first_err) => {
                 // Fallback: be lenient and normalize common schema mistakes
                 let mut value: Value = serde_json::from_str(json_str).map_err(|e| {
-                    merlin_core::Error::Other(format!(
+                    Error::Other(format!(
                         "Failed to parse context plan: {e}\nResponse: {json_str}"
                     ))
                 })?;
@@ -98,7 +99,7 @@ impl LocalContextAgent {
 
                 // Try deserializing again after normalization
                 serde_json::from_value::<ContextPlan>(value).map_err(|second_err| {
-                    merlin_core::Error::Other(format!(
+                    Error::Other(format!(
                         "Failed to parse context plan after normalization. First error: {first_err}. Second error: {second_err}\nResponse: {json_str}"
                     ))
                 })
@@ -161,14 +162,14 @@ impl ContextAgent for LocalContextAgent {
     fn generate_plan_sync(&self, _intent: &QueryIntent, _query_text: &str) -> Result<ContextPlan> {
         // This is a sync wrapper - should not be called from async context
         // For now, return an error suggesting to use the async version
-        Err(merlin_core::Error::Other(
+        Err(Error::Other(
             "generate_plan_sync called from async context. This is a bug.".into()
         ))
     }
 
     fn is_available_sync(&self) -> Result<bool> {
         // This is a sync wrapper - should not be called from async context
-        Err(merlin_core::Error::Other(
+        Err(Error::Other(
             "is_available_sync called from async context. This is a bug.".into()
         ))
     }

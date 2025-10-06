@@ -1,10 +1,14 @@
 use std::collections::HashSet;
 use std::sync::Arc;
+
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
-use crate::{ModelRouter, Result, RoutingError, Task, TaskResult, Validator};
+
+use merlin_core::{Context, FileContext, ModelProvider, Query, TokenUsage};
+
 use super::graph::TaskGraph;
 use super::state::WorkspaceState;
+use crate::{ModelRouter, Result, RoutingError, Task, TaskResult, Validator};
 
 /// Parallel task executor with concurrency limits
 pub struct ExecutorPool {
@@ -29,7 +33,7 @@ impl ExecutorPool {
         }
     }
     
-    fn create_provider_for_tier(tier: &crate::ModelTier) -> Result<Arc<dyn merlin_core::ModelProvider>> {
+    fn create_provider_for_tier(tier: &crate::ModelTier) -> Result<Arc<dyn ModelProvider>> {
         use std::env;
         
         match tier {
@@ -151,12 +155,12 @@ impl ExecutorPool {
             task.description
         );
         
-        let mut context = merlin_core::Context::new(&system_prompt);
+        let mut context = Context::new(&system_prompt);
         
         // Add files from workspace if specified
         for file_path in &task.context_needs.required_files {
             if let Some(content) = workspace.read_file(file_path).await {
-                context = context.with_files(vec![merlin_core::FileContext::new(
+                context = context.with_files(vec![FileContext::new(
                     file_path.clone(),
                     content,
                 )]);
@@ -164,7 +168,7 @@ impl ExecutorPool {
         }
         
         // Create query
-        let query = merlin_core::Query::new(task.description.clone());
+        let query = Query::new(task.description.clone());
         
         // Execute with provider
         let response = provider.generate(&query, &context).await
@@ -180,6 +184,7 @@ impl ExecutorPool {
             task_id: task.id,
             response,
             tier_used: routing_decision.tier.to_string(),
+            tokens_used: TokenUsage::default(),
             validation,
             duration_ms: start.elapsed().as_millis() as u64,
         })
@@ -189,9 +194,12 @@ impl ExecutorPool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Task, ValidationResult};
     use async_trait::async_trait;
     use std::path::PathBuf;
+
+    use merlin_core::Response;
+
+    use crate::{Task, ValidationResult};
 
     struct MockRouter;
     
@@ -219,13 +227,13 @@ mod tests {
     impl Validator for MockValidator {
         async fn validate(
             &self,
-            _response: &merlin_core::Response,
+            _response: &Response,
             _task: &Task,
         ) -> Result<ValidationResult> {
             Ok(ValidationResult::default())
         }
         
-        async fn quick_validate(&self, _response: &merlin_core::Response) -> Result<bool> {
+        async fn quick_validate(&self, _response: &Response) -> Result<bool> {
             Ok(true)
         }
     }

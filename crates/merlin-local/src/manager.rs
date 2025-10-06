@@ -4,7 +4,9 @@ use crate::models::{ModelInfo, OllamaListResponse, OllamaModel};
 
 /// Manages Ollama installation and models
 pub struct OllamaManager {
+    /// HTTP client used to interact with the Ollama service.
     client: Client,
+    /// Base URL pointing to the Ollama runtime.
     base_url: String,
 }
 

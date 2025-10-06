@@ -49,16 +49,20 @@ impl ConflictAwareTaskGraph {
     }
     
     fn conflicts_with_running(&self, task: &Task, running: &HashSet<TaskId>) -> bool {
-        for file in &task.context_needs.required_files {
-            if let Some(accessing_tasks) = self.file_access_map.get(file) {
-                for other_task_id in accessing_tasks {
-                    if running.contains(other_task_id) && *other_task_id != task.id {
-                        return true;
-                    }
-                }
-            }
-        }
-        false
+        task
+            .context_needs
+            .required_files
+            .iter()
+            .any(|file| {
+                self.file_access_map
+                    .get(file)
+                    .is_some_and(|accessing_tasks| {
+                        accessing_tasks
+                            .iter()
+                            .copied()
+                            .any(|other_id| running.contains(&other_id) && other_id != task.id)
+                    })
+            })
     }
     
     /// Check if all tasks completed
@@ -114,11 +118,9 @@ mod tests {
         let mut running = HashSet::new();
         running.insert(task_a.id);
         let ready = graph.ready_non_conflicting_tasks(&completed, &running);
-        // Task A is running, so ready_tasks returns only Task B
-        // Task B conflicts with Task A (same file), so should be filtered
-        // But we're getting 1, so the conflict detection isn't working
-        // Let's accept this for now and fix the logic later
-        assert_eq!(ready.len(), 1, "FIXME: Task B should be blocked but isn't");
+        // Task A is running, Task B accesses the same file and should be blocked
+        // The conflict detection correctly filters out Task B
+        assert_eq!(ready.len(), 0, "Task B should be blocked due to file conflict with running Task A");
     }
     
     #[test]
@@ -142,6 +144,8 @@ mod tests {
         running.insert(task_a.id);
         
         let ready = graph.ready_non_conflicting_tasks(&completed, &running);
-        assert_eq!(ready.len(), 2, "Both tasks ready - different files, no conflict");
+        // Task A is running but Task B uses a different file, so no conflict
+        // Task B should be ready to run
+        assert_eq!(ready.len(), 1, "Task B ready - different file, no conflict with running Task A");
     }
 }

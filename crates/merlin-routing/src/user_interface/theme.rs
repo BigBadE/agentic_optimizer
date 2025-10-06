@@ -1,16 +1,24 @@
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
 use std::io;
-use std::path::PathBuf;
+use std::path::Path;
+use std::fs::{read_to_string as read_file_to_string, write as write_file};
+use serde_json::{from_str, to_string};
 
 /// UI theme configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Theme {
+    /// Nord color palette
     Nord,
+    /// Dracula color palette
     Dracula,
+    /// Gruvbox color palette
     Gruvbox,
+    /// Tokyo Night color palette
     TokyoNight,
+    /// Catppuccin color palette
     Catppuccin,
+    /// Monochrome color palette
     Monochrome,
 }
 
@@ -117,7 +125,10 @@ impl Theme {
     }
 
     /// Loads theme from file
-    pub fn load(tasks_dir: &PathBuf) -> io::Result<Self> {
+    ///
+    /// # Errors
+    /// Returns an error if the theme file cannot be located, read, or parsed.
+    pub fn load(tasks_dir: &Path) -> io::Result<Self> {
         let theme_file = tasks_dir
             .parent()
             .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No parent directory"))?
@@ -130,12 +141,15 @@ impl Theme {
             ));
         }
 
-        let content = std::fs::read_to_string(theme_file)?;
-        serde_json::from_str(&content).map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))
+        let content = read_file_to_string(theme_file)?;
+        from_str(&content).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
     }
 
     /// Saves theme to file
-    pub fn save(self, tasks_dir: &PathBuf) -> io::Result<()> {
+    ///
+    /// # Errors
+    /// Returns an error if the theme cannot be serialized or written.
+    pub fn save(self, tasks_dir: &Path) -> io::Result<()> {
         let Some(parent) = tasks_dir.parent() else {
             return Err(io::Error::new(
                 io::ErrorKind::NotFound,
@@ -144,10 +158,10 @@ impl Theme {
         };
 
         let theme_file = parent.join("theme.json");
-        let json = serde_json::to_string(&self)
-            .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+        let json = to_string(&self)
+            .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
 
-        std::fs::write(theme_file, json)
+        write_file(theme_file, json)
     }
 }
 

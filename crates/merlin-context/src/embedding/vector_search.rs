@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use indicatif::{ProgressBar, ProgressStyle};
 use tokio::task::JoinSet;
 
-use merlin_core::Result;
+use merlin_core::{Error, Result};
 use crate::embedding::{EmbeddingClient, VectorStore, SearchResult, generate_preview, BM25Index};
 use crate::embedding::chunking::chunk_file;
 use crate::fs_utils::is_source_file;
@@ -820,10 +820,10 @@ impl VectorSearchManager {
     /// Load cache from disk
     fn load_cache(&self) -> Result<VectorCache> {
         let data = fs::read(&self.cache_path)
-            .map_err(|e| merlin_core::Error::Other(format!("Failed to read cache: {e}")))?;
+            .map_err(|e| Error::Other(format!("Failed to read cache: {e}")))?;
         
         bincode::deserialize(&data)
-            .map_err(|e| merlin_core::Error::Other(format!("Failed to deserialize cache: {e}")))
+            .map_err(|e| Error::Other(format!("Failed to deserialize cache: {e}")))
     }
 
     /// Save cache to disk
@@ -831,7 +831,7 @@ impl VectorSearchManager {
         // Create cache directory if needed
         if let Some(parent) = self.cache_path.parent() {
             fs::create_dir_all(parent)
-                .map_err(|e| merlin_core::Error::Other(format!("Failed to create cache dir: {e}")))?;
+                .map_err(|e| Error::Other(format!("Failed to create cache dir: {e}")))?;
         }
 
         // Build cache entries from store
@@ -865,10 +865,10 @@ impl VectorSearchManager {
         }
         
         let data = bincode::serialize(&cache)
-            .map_err(|e| merlin_core::Error::Other(format!("Failed to serialize cache: {e}")))?;
+            .map_err(|e| Error::Other(format!("Failed to serialize cache: {e}")))?;
         
         fs::write(&self.cache_path, data)
-            .map_err(|e| merlin_core::Error::Other(format!("Failed to write cache: {e}")))?;
+            .map_err(|e| Error::Other(format!("Failed to write cache: {e}")))?;
 
         Ok(())
     }

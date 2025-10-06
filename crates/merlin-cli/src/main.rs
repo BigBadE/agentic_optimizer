@@ -3,7 +3,7 @@ use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _
 use console::{style, Term};
 
 use merlin_context::ContextBuilder;
-use merlin_core::{ModelProvider as _, Query, TokenUsage};
+use merlin_core::{ModelProvider, Query, TokenUsage};
 use merlin_providers::OpenRouterProvider;
 use merlin_languages::{Language, create_backend};
 use merlin_agent::{Agent, AgentConfig, AgentRequest};
@@ -92,7 +92,7 @@ async fn handle_chat(
     if let Some(model_name) = model_to_use {
         provider = provider.with_model(model_name);
     }
-    let provider: std::sync::Arc<dyn merlin_core::ModelProvider> = std::sync::Arc::new(provider);
+    let provider: std::sync::Arc<dyn ModelProvider> = std::sync::Arc::new(provider);
 
     let backend = create_backend(Language::Rust)?;
 
@@ -479,7 +479,7 @@ async fn run_tui_interactive(
     // Main event loop - event-driven
     loop {
         // Tick the TUI (handles rendering and input)
-        let should_quit = tui_app.tick().await?;
+        let should_quit = tui_app.tick()?;
         if should_quit {
             break;
         }
@@ -560,8 +560,8 @@ async fn run_tui_interactive(
     Ok(())
 }
 
-#[allow(dead_code)]
 /// Handle the route command - use multi-model routing system
+#[allow(dead_code)]
 async fn handle_route(
     request: String,
     project: PathBuf,
@@ -685,8 +685,8 @@ async fn handle_route(
     Ok(())
 }
 
-#[allow(dead_code)]
 /// Handle route command with TUI mode
+#[allow(dead_code)]
 async fn handle_route_tui(
     request: String,
     project: PathBuf,
@@ -770,7 +770,7 @@ async fn handle_route_tui(
     let mut interval = tokio::time::interval(std::time::Duration::from_millis(16));
     loop {
         interval.tick().await;
-        let should_quit = tui_app.tick().await?;
+        let should_quit = tui_app.tick()?;
         if should_quit {
             break;
         }

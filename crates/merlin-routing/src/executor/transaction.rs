@@ -130,7 +130,7 @@ impl TaskWorkspace {
     }
     
     /// Abort changes (rollback)
-    pub async fn rollback(self) -> Result<()> {
+    pub fn rollback(self) -> Result<()> {
         Ok(())
     }
 }

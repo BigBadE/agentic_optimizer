@@ -8,7 +8,7 @@ pub mod router;
 pub mod streaming;
 pub mod tools;
 pub mod types;
-pub mod ui;
+pub mod user_interface;
 pub mod validator;
 
 pub use analyzer::{
@@ -38,7 +38,7 @@ pub use types::{
 pub use agent::{AgentExecutor, StepTracker, SelfAssessor};
 pub use streaming::{StepId, StepType, StreamingChannel, StreamingEvent, TaskStep};
 pub use tools::{ListFilesTool, ReadFileTool, RunCommandTool, Tool, ToolRegistry, WriteFileTool};
-pub use ui::{MessageLevel, TaskProgress, TuiApp, UiChannel, UiEvent};
+pub use user_interface::{MessageLevel, TaskProgress, TuiApp, UiChannel, UiEvent};
 pub use validator::{
     BuildValidationStage, LintValidationStage, SyntaxValidationStage, TestValidationStage,
     ValidationPipeline, ValidationStage as ValidationStageTrait, Validator,

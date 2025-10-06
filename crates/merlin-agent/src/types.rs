@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
+use merlin_core::TokenUsage;
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AgentRequest {
     pub query: String,
@@ -37,7 +39,7 @@ pub struct AgentResponse {
     pub content: String,
     pub confidence: f64,
     pub provider_used: String,
-    pub tokens_used: merlin_core::TokenUsage,
+    pub tokens_used: TokenUsage,
     pub latency_ms: u64,
     pub context_files_used: Vec<PathBuf>,
 }

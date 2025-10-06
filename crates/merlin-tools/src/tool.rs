@@ -2,6 +2,7 @@ use std::io::Error as IoError;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
+use serde_json::{Error as SerdeJsonError, Value};
 use thiserror::Error;
 
 #[derive(Debug, Error)]
@@ -16,21 +17,21 @@ pub enum ToolError {
     ExecutionFailed(String),
 
     #[error("Serialization error: {0}")]
-    Serialization(#[from] serde_json::Error),
+    Serialization(#[from] SerdeJsonError),
 }
 
 pub type ToolResult<T> = Result<T, ToolError>;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolInput {
-    pub params: serde_json::Value,
+    pub params: Value,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolOutput {
     pub success: bool,
     pub message: String,
-    pub data: Option<serde_json::Value>,
+    pub data: Option<Value>,
 }
 
 impl ToolOutput {
@@ -42,7 +43,7 @@ impl ToolOutput {
         }
     }
 
-    pub fn success_with_data<T: Into<String>>(message: T, data: serde_json::Value) -> Self {
+    pub fn success_with_data<T: Into<String>>(message: T, data: Value) -> Self {
         Self {
             success: true,
             message: message.into(),

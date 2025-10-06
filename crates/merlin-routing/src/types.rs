@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+
+use merlin_core::{Response, TokenUsage};
 use uuid::Uuid;
 
 /// Unique identifier for a task
@@ -29,7 +31,7 @@ pub struct Task {
     pub dependencies: Vec<TaskId>,
     pub context_needs: ContextRequirements,
     
-    // Self-determination fields
+    // Self-determinations fields
     #[serde(skip)]
     pub state: TaskState,
     #[serde(skip)]
@@ -157,8 +159,9 @@ impl Default for ExecutionStrategy {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TaskResult {
     pub task_id: TaskId,
-    pub response: merlin_core::Response,
+    pub response: Response,
     pub tier_used: String,
+    pub tokens_used: TokenUsage,
     pub validation: ValidationResult,
     pub duration_ms: u64,
 }

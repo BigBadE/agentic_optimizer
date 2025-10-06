@@ -8,8 +8,8 @@ mod symbol_search;
 mod context_builder;
 mod cache;
 
-pub use workspace::{WorkspaceLoader, LoadConfig};
 pub use cache::WorkspaceCache;
+pub use workspace::{LoadConfig, WorkspaceLoader};
 
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
@@ -18,8 +18,7 @@ use std::sync::{Arc, Mutex};
 use ra_ap_ide::{Analysis, AnalysisHost, FileId};
 use ra_ap_vfs::Vfs;
 
-use merlin_core::{FileContext, Result};
-
+use merlin_core::{Error, FileContext, Result};
 /// Information about a code symbol (function, struct, etc.)
 #[derive(Debug, Clone)]
 pub struct SymbolInfo {
@@ -150,11 +149,11 @@ impl RustBackend {
         let host = self
             .analysis_host
             .as_ref()
-            .ok_or_else(|| merlin_core::Error::Other("Workspace not initialized".into()))?;
+            .ok_or_else(|| Error::Other("Workspace not initialized".into()))?;
 
         let guard = host
             .lock()
-            .map_err(|error| merlin_core::Error::Other(format!("Failed to lock analysis host: {error}")))?;
+            .map_err(|error| Error::Other(format!("Failed to lock analysis host: {error}")))?;
 
         Ok(guard.analysis())
     }
@@ -239,12 +238,11 @@ impl RustBackend {
     }
 
     /// Build import graph for a set of files
-    ///
     /// Returns a map from file path to list of files it imports
     ///
     /// # Errors
     /// Returns an error if the workspace is not initialized
-    pub fn build_import_graph(&self, files: &[PathBuf]) -> Result<HashMap<PathBuf, Vec<PathBuf>>> {
+    pub fn build_import_graph(&self, files: &[PathBuf]) -> Result<ImportGraph> {
         let mut graph = HashMap::new();
         
         for file in files {
@@ -263,3 +261,5 @@ impl Default for RustBackend {
     }
 }
 
+/// A graph of import relationships between files
+type ImportGraph = HashMap<PathBuf, Vec<PathBuf>>;

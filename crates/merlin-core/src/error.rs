@@ -1,6 +1,8 @@
 use core::result::Result as CoreResult;
 use std::io::Error as IoError;
 
+use reqwest::Error as ReqwestError;
+use serde_json::Error as SerdeJsonError;
 use thiserror::Error;
 use toml::de::Error as TomlError;
 
@@ -12,10 +14,10 @@ pub enum Error {
     Io(#[from] IoError),
 
     #[error("HTTP request failed: {0}")]
-    Request(#[from] reqwest::Error),
+    Request(#[from] ReqwestError),
 
     #[error("JSON serialization error: {0}")]
-    Json(#[from] serde_json::Error),
+    Json(#[from] SerdeJsonError),
 
     #[error("TOML deserialization error: {0}")]
     Toml(#[from] TomlError),

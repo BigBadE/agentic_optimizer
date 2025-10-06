@@ -6,8 +6,8 @@ use std::path::Path;
 use ra_ap_ide::{Analysis, SymbolKind as RaSymbolKind};
 use ra_ap_ide_db::symbol_index::Query;
 
-use merlin_core::Result;
-use crate::{SearchQuery, SearchResult, SymbolInfo, SymbolKind, RustBackend};
+use merlin_core::{Error, FileContext, Result};
+use crate::{RustBackend, SearchQuery, SearchResult, SymbolInfo, SymbolKind};
 
 /// Helper type to perform symbol discovery and navigation queries.
 pub struct SymbolSearcher<'analysis> {
@@ -15,6 +15,76 @@ pub struct SymbolSearcher<'analysis> {
     analysis: &'analysis Analysis,
     /// The Rust backend for file/path resolution
     backend: &'analysis RustBackend,
+}
+
+impl<'analysis> SymbolSearcher<'analysis> {
+    fn collect_references(
+        &self,
+        symbol_name: &str,
+        definition: &SymbolInfo,
+        results: &mut Vec<SymbolInfo>,
+    ) -> Result<()> {
+        let Some(file_id) = self.backend.get_file_id(&definition.file_path) else {
+            return Ok(());
+        };
+
+        let line_index = match self.analysis.file_line_index(file_id) {
+            Ok(index) => index,
+            Err(_) => return Ok(()),
+        };
+
+        let Some(offset) = line_index.offset(ra_ap_ide::LineCol {
+            line: definition.line,
+            col: 0,
+        }) else {
+            return Ok(());
+        };
+
+        let position = ra_ap_ide::FilePosition { file_id, offset };
+
+        let Ok(Some(reference_sets)) = self.analysis.find_all_refs(position, None) else {
+            return Ok(());
+        };
+
+        for reference_set in reference_sets {
+            self.collect_references_for_set(symbol_name, definition, reference_set, results)?;
+        }
+
+        Ok(())
+    }
+
+    fn collect_references_for_set(
+        &self,
+        symbol_name: &str,
+        definition: &SymbolInfo,
+        reference_set: ra_ap_ide::ReferenceSearchResult,
+        results: &mut Vec<SymbolInfo>,
+    ) -> Result<()> {
+        for (ref_file_id, ranges) in &reference_set.references {
+            let Some(path) = self.backend.path_from_file_id(*ref_file_id) else {
+                continue;
+            };
+
+            let line_index = match self.analysis.file_line_index(*ref_file_id) {
+                Ok(index) => index,
+                Err(_) => continue,
+            };
+
+            for (text_range, _) in ranges {
+                let line = line_index.line_col(text_range.start()).line;
+
+                results.push(SymbolInfo {
+                    name: symbol_name.to_owned(),
+                    kind: definition.kind,
+                    file_path: path.clone(),
+                    line,
+                    documentation: None,
+                });
+            }
+        }
+
+        Ok(())
+    }
 }
 
 impl<'analysis> SymbolSearcher<'analysis> {
@@ -47,7 +117,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
             .iter()
             .filter_map(|symbol| {
                 read_to_string(&symbol.file_path).ok().map(|content| {
-                    merlin_core::FileContext::new(symbol.file_path.clone(), content)
+                    FileContext::new(symbol.file_path.clone(), content)
                 })
             })
             .collect();
@@ -63,13 +133,15 @@ impl<'analysis> SymbolSearcher<'analysis> {
     /// # Errors
     /// Returns an error if rust-analyzer queries fail.
     pub fn find_definition(&self, symbol_name: &str, file: &Path, line: u32) -> Result<Option<SymbolInfo>> {
-        let file_id = self.backend.get_file_id(file)
-            .ok_or_else(|| merlin_core::Error::FileNotFound(file.display().to_string()))?;
+        let file_id = self
+            .backend
+            .get_file_id(file)
+            .ok_or_else(|| Error::FileNotFound(file.display().to_string()))?;
 
         let line_index = self
             .analysis
             .file_line_index(file_id)
-            .map_err(|error| merlin_core::Error::Other(error.to_string()))?;
+            .map_err(|error| Error::Other(error.to_string()))?;
 
         let Some(offset) = line_index.offset(ra_ap_ide::LineCol { line: line.saturating_sub(1), col: 0 }) else {
             return Ok(None);
@@ -80,29 +152,37 @@ impl<'analysis> SymbolSearcher<'analysis> {
         let nav_targets = self
             .analysis
             .goto_definition(position)
-            .map_err(|error| merlin_core::Error::Other(error.to_string()))?;
+            .map_err(|error| Error::Other(error.to_string()))?;
 
-        if let Some(nav_info) = nav_targets {
-            for nav in nav_info.info {
-                if nav.name.to_string().contains(symbol_name)
-                    && let Some(path) = self.backend.path_from_file_id(nav.file_id)
-                {
-                    let kind = nav.kind.unwrap_or(RaSymbolKind::Module);
+        let Some(nav_info) = nav_targets else {
+            return Ok(None);
+        };
 
-                    return Ok(Some(SymbolInfo {
-                        name: nav.name.to_string(),
-                        kind: convert_symbol_kind(kind),
-                        file_path: path,
-                        line: nav.focus_range.map_or(0, |range| {
-                            self.analysis
-                                .file_line_index(nav.file_id)
-                                .ok()
-                                .map_or(0, |index| index.line_col(range.start()).line)
-                        }),
-                        documentation: nav.description,
-                    }));
-                }
+        for nav in nav_info.info {
+            if !nav.name.to_string().contains(symbol_name) {
+                continue;
             }
+
+            let Some(path) = self.backend.path_from_file_id(nav.file_id) else {
+                continue;
+            };
+
+            let line = nav.focus_range.map_or(0, |range| {
+                self.analysis
+                    .file_line_index(nav.file_id)
+                    .ok()
+                    .map_or(0, |index| index.line_col(range.start()).line)
+            });
+
+            let kind = nav.kind.unwrap_or(RaSymbolKind::Module);
+
+            return Ok(Some(SymbolInfo {
+                name: nav.name.to_string(),
+                kind: convert_symbol_kind(kind),
+                file_path: path,
+                line,
+                documentation: nav.description,
+            }));
         }
 
         Ok(None)
@@ -117,51 +197,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
         
         // For each definition, use rust-analyzer's find_all_refs to get usages
         for def in definitions {
-            let Some(file_id) = self.backend.get_file_id(&def.file_path) else {
-                continue;
-            };
-
-            // Get line index to convert line number to offset
-            let Ok(line_index) = self.analysis.file_line_index(file_id) else {
-                continue;
-            };
-
-            // Convert line to offset (approximate - use start of line)
-            let Some(offset) = line_index.offset(ra_ap_ide::LineCol { 
-                line: def.line, 
-                col: 0 
-            }) else {
-                continue;
-            };
-
-            let position = ra_ap_ide::FilePosition { file_id, offset };
-
-            // Use rust-analyzer's optimized reference search
-            if let Ok(Some(refs)) = self.analysis.find_all_refs(position, None) {
-                // refs is a Vec<ReferenceSearchResult>
-                for ref_result in refs {
-                    // Each ReferenceSearchResult has references: FileReferenceNode
-                    for (ref_file_id, ranges) in &ref_result.references {
-                        if let Some(path) = self.backend.path_from_file_id(*ref_file_id) {
-                            let Ok(ref_line_index) = self.analysis.file_line_index(*ref_file_id) else {
-                                continue;
-                            };
-                            
-                            for (text_range, _category) in ranges {
-                                let line = ref_line_index.line_col(text_range.start()).line;
-                                
-                                results.push(SymbolInfo {
-                                    name: symbol_name.to_owned(),
-                                    kind: def.kind,
-                                    file_path: path.clone(),
-                                    line,
-                                    documentation: None,
-                                });
-                            }
-                        }
-                    }
-                }
-            }
+            self.collect_references(symbol_name, &def, &mut results)?;
 
             if results.len() > 100 {
                 break;
@@ -176,8 +212,10 @@ impl<'analysis> SymbolSearcher<'analysis> {
     /// # Errors
     /// Returns an error if rust-analyzer fails to provide file structure.
     pub fn list_symbols_in_file(&self, file: &Path) -> Result<Vec<SymbolInfo>> {
-        let file_id = self.backend.get_file_id(file)
-            .ok_or_else(|| merlin_core::Error::FileNotFound(file.display().to_string()))?;
+        let file_id = self
+            .backend
+            .get_file_id(file)
+            .ok_or_else(|| Error::FileNotFound(file.display().to_string()))?;
 
         self.list_symbols_in_file_by_id(file_id)
     }
@@ -190,15 +228,15 @@ impl<'analysis> SymbolSearcher<'analysis> {
         let structure = self
             .analysis
             .file_structure(file_id)
-            .map_err(|error| merlin_core::Error::Other(error.to_string()))?;
+            .map_err(|error| Error::Other(error.to_string()))?;
 
         let path = self.backend.path_from_file_id(file_id)
-            .ok_or_else(|| merlin_core::Error::Other("File path not found".into()))?;
+            .ok_or_else(|| Error::Other("File path not found".into()))?;
 
         let line_index = self
             .analysis
             .file_line_index(file_id)
-            .map_err(|error| merlin_core::Error::Other(error.to_string()))?;
+            .map_err(|error| Error::Other(error.to_string()))?;
 
         Ok(structure
             .into_iter()
@@ -238,8 +276,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
         let symbols = self
             .analysis
             .symbol_search(query, 100)
-            .map_err(|error| merlin_core::Error::Other(error.to_string()))?;
-
+            .map_err(|error| Error::Other(error.to_string()))?;
         Ok(symbols
             .into_iter()
             .filter_map(|nav| {
@@ -285,7 +322,7 @@ fn convert_symbol_kind(kind: RaSymbolKind) -> SymbolKind {
 /// Convert rust-analyzer structure node kind to our public symbol kind.
 fn convert_structure_kind(kind: ra_ap_ide::StructureNodeKind) -> SymbolKind {
     match kind {
-        ra_ap_ide::StructureNodeKind::SymbolKind(sk) => convert_symbol_kind(sk),
+        ra_ap_ide::StructureNodeKind::SymbolKind(symbol_kind) => convert_symbol_kind(symbol_kind),
         ra_ap_ide::StructureNodeKind::Region => SymbolKind::Module,
     }
 }

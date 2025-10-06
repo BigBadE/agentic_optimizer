@@ -14,7 +14,7 @@ impl AvailabilityChecker {
         Self {}
     }
     
-    pub async fn check(&self, _tier: &ModelTier) -> bool {
+    pub fn check(&self, _tier: &ModelTier) -> bool {
         // For now, assume all tiers are available
         // In production, this would check:
         // - API key presence
@@ -161,7 +161,7 @@ impl ModelRouter for StrategyRouter {
     }
     
     async fn is_available(&self, tier: &ModelTier) -> bool {
-        self.availability_checker.check(tier).await
+        self.availability_checker.check(tier)
     }
 }
 

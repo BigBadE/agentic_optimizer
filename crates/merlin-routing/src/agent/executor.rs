@@ -3,12 +3,14 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::{
-    ModelRouter, Result, RoutingError, Task, TaskId, TaskResult, ToolRegistry, UiChannel,
+    ModelRouter, ModelTier, Result, RoutingError, Task, TaskAction, TaskId, TaskResult, TaskState, ToolRegistry, UiChannel,
     UiEvent, Validator, streaming::StepType,
 };
-use merlin_core::{Context, ModelProvider, Query, Response};
+use merlin_core::{Context, ModelProvider, Query, Response, TokenUsage};
+use merlin_providers;
+use std::env;
 
-use super::step::StepTracker;
+use super::{SelfAssessor, StepTracker};
 
 /// Agent executor that streams task execution with tool calling
 pub struct AgentExecutor {
@@ -52,7 +54,7 @@ impl AgentExecutor {
         let provider = self.create_provider(&decision.tier)?;
         
         // Step 3: Build context
-        let context = self.build_context(&task)?;
+        let context = Self::build_context(&task)?;
         
         // Step 4: Create query with tool descriptions
         let query = self.create_query_with_tools(&task);
@@ -79,6 +81,7 @@ impl AgentExecutor {
             task_id,
             response,
             tier_used: decision.tier.to_string(),
+            tokens_used: TokenUsage::default(),
             validation,
             duration_ms,
         })
@@ -205,28 +208,28 @@ impl AgentExecutor {
     }
     
     /// Create provider based on tier
-    fn create_provider(&self, tier: &crate::ModelTier) -> Result<Arc<dyn ModelProvider>> {
+    fn create_provider(&self, tier: &ModelTier) -> Result<Arc<dyn ModelProvider>> {
         match tier {
-            crate::ModelTier::Local { model_name } => {
+            ModelTier::Local { model_name } => {
                 Ok(Arc::new(merlin_local::LocalModelProvider::new(model_name.clone())))
             }
-            crate::ModelTier::Groq { model_name } => {
+            ModelTier::Groq { model_name } => {
                 let provider = merlin_providers::GroqProvider::new()
-                    .map_err(|e| RoutingError::Other(e.to_string()))?
+                    .map_err(|error| RoutingError::Other(error.to_string()))?
                     .with_model(model_name.clone());
                 Ok(Arc::new(provider))
             }
-            crate::ModelTier::Premium { provider: provider_name, model_name } => {
+            ModelTier::Premium { provider: provider_name, model_name } => {
                 match provider_name.as_str() {
                     "openrouter" => {
-                        let api_key = std::env::var("OPENROUTER_API_KEY")
+                        let api_key = env::var("OPENROUTER_API_KEY")
                             .map_err(|_| RoutingError::Other("OPENROUTER_API_KEY not set".to_owned()))?;
                         let provider = merlin_providers::OpenRouterProvider::new(api_key)?
                             .with_model(model_name.clone());
                         Ok(Arc::new(provider))
                     }
                     "anthropic" => {
-                        let api_key = std::env::var("ANTHROPIC_API_KEY")
+                        let api_key = env::var("ANTHROPIC_API_KEY")
                             .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
                         let provider = merlin_providers::AnthropicProvider::new(api_key)?;
                         Ok(Arc::new(provider))
@@ -238,7 +241,7 @@ impl AgentExecutor {
     }
     
     /// Build context from task requirements
-    fn build_context(&self, _task: &Task) -> Result<Context> {
+    fn build_context(_task: &Task) -> Result<Context> {
         let context = Context::new("You are a helpful coding assistant with access to tools.");
 
         // In a real implementation, would read required files and add to context
@@ -248,7 +251,7 @@ impl AgentExecutor {
     }
     
     /// Check if a request is simple enough to skip assessment
-    fn is_simple_request(&self, description: &str) -> bool {
+    fn is_simple_request(description: &str) -> bool {
         let desc_lower = description.to_lowercase();
         let word_count = description.split_whitespace().count();
         
@@ -267,6 +270,10 @@ impl AgentExecutor {
     
     /// Execute a task with self-determination (Phase 1)
     /// The task assesses itself and decides whether to complete, decompose, or gather context
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if routing, provider creation, execution, or validation fails
     pub async fn execute_self_determining(
         &mut self,
         mut task: Task,
@@ -276,16 +283,16 @@ impl AgentExecutor {
         let task_id = task.id;
         
         // Check if this is a simple request that doesn't need assessment
-        let is_simple = self.is_simple_request(&task.description);
+        let is_simple = Self::is_simple_request(&task.description);
         
         if is_simple {
             // Skip assessment for simple requests, execute directly
-            task.state = crate::TaskState::Executing;
+            task.state = TaskState::Executing;
             return self.execute_streaming(task, ui_channel).await;
         }
         
         // Update task state
-        task.state = crate::TaskState::Assessing;
+        task.state = TaskState::Assessing;
         
         // Start "Analysis" step (will be collapsed by default)
         ui_channel.send(UiEvent::TaskStepStarted {
@@ -298,25 +305,38 @@ impl AgentExecutor {
         // Create assessor with the router's provider
         let decision_result = self.router.route(&task).await?;
         let provider = self.create_provider(&decision_result.tier)?;
-        let assessor = crate::SelfAssessor::new(provider.clone());
+        let assessor = SelfAssessor::new(Arc::clone(&provider));
         
         // Build and execute assessment query
-        let query = merlin_core::Query {
-            text: format!(
-                "Analyze this task and decide if you can complete it immediately or if it needs decomposition:\n\n\"{}\"",
-                task.description
-            ),
-            conversation_id: None,
-            files_context: Vec::new(),
-        };
-        
-        let context = merlin_core::Context::new("You are a task assessment system.");
+        let query = Query::new(format!(
+            "Analyze this task and decide if you can complete it immediately or if it needs decomposition:\n\n\"{}\"",
+            task.description
+        ));
+
+        let context = Context::new("You are a task assessment system.");
         let assessment_response = provider.generate(&query, &context).await
-            .map_err(|e| RoutingError::Other(format!("Assessment failed: {e}")))?;
+            .map_err(|error| RoutingError::Other(format!("Assessment failed: {error}")))?;
         
         // Parse the decision FIRST (before sending to UI)
         let decision = match assessor.parse_assessment_response(&assessment_response.text, &task) {
-            Ok(d) => d,
+            Ok(decision) => {
+                // Send the raw assessment output to UI (will be under "Analysis" step)
+                ui_channel.send(UiEvent::TaskOutput {
+                    task_id,
+                    output: assessment_response.text.clone(),
+                });
+                
+                // Store decision in history
+                task.decision_history.push(decision.clone());
+                
+                // Complete the analysis step
+                ui_channel.send(UiEvent::TaskStepCompleted {
+                    task_id,
+                    step_id: "analysis".to_owned(),
+                });
+                
+                decision
+            }
             Err(_err) => {
                 // If parsing fails, fall back to streaming execution without showing error
                 ui_channel.send(UiEvent::TaskStepCompleted {
@@ -324,41 +344,26 @@ impl AgentExecutor {
                     step_id: "analysis".to_owned(),
                 });
                 
-                task.state = crate::TaskState::Executing;
+                task.state = TaskState::Executing;
                 return self.execute_streaming(task, ui_channel).await;
             }
         };
         
-        // Send the raw assessment output to UI (will be under "Analysis" step)
-        ui_channel.send(UiEvent::TaskOutput {
-            task_id,
-            output: assessment_response.text.clone(),
-        });
-        
-        // Store decision in history
-        task.decision_history.push(decision.clone());
-        
-        // Complete the analysis step
-        ui_channel.send(UiEvent::TaskStepCompleted {
-            task_id,
-            step_id: "analysis".to_owned(),
-        });
-        
         // Execute based on decision
         match decision.action {
-            crate::TaskAction::Complete { result } => {
+            TaskAction::Complete { result } => {
                 // Task can be completed immediately - add output as text
                 ui_channel.send(UiEvent::TaskOutput {
                     task_id,
                     output: result.clone(),
                 });
                 
-                task.state = crate::TaskState::Completed;
+                task.state = TaskState::Completed;
                 
                 let response = Response {
                     text: result,
                     confidence: f64::from(decision.confidence),
-                    tokens_used: merlin_core::TokenUsage::default(),
+                    tokens_used: TokenUsage::default(),
                     provider: decision_result.tier.to_string(),
                     latency_ms: start.elapsed().as_millis() as u64,
                 };
@@ -367,12 +372,13 @@ impl AgentExecutor {
                     task_id,
                     response,
                     tier_used: decision_result.tier.to_string(),
+                    tokens_used: TokenUsage::default(),
                     validation: crate::ValidationResult::default(),
                     duration_ms: start.elapsed().as_millis() as u64,
                 })
             }
             
-            crate::TaskAction::Decompose { subtasks, .. } => {
+            TaskAction::Decompose { subtasks, .. } => {
                 // Task needs to be broken down - for Phase 1 fall back to standard execution
                 ui_channel.send(UiEvent::TaskStepStarted {
                     task_id,
@@ -385,11 +391,11 @@ impl AgentExecutor {
                     ),
                 });
 
-                task.state = crate::TaskState::Executing;
+                task.state = TaskState::Executing;
                 self.execute_streaming(task, ui_channel).await
             }
             
-            crate::TaskAction::GatherContext { needs } => {
+            TaskAction::GatherContext { needs } => {
                 // Task needs more information - for Phase 1, fall back to regular execution
                 ui_channel.send(UiEvent::TaskStepStarted {
                     task_id,
@@ -399,7 +405,7 @@ impl AgentExecutor {
                 });
                 
                 // Fall back to regular streaming execution
-                task.state = crate::TaskState::Executing;
+                task.state = TaskState::Executing;
                 self.execute_streaming(task, ui_channel).await
             }
         }

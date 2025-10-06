@@ -47,7 +47,7 @@ impl<'handler> EventHandler<'handler> {
                 self.handle_task_completed(task_id, result);
             }
 
-            UiEvent::TaskFailed { task_id, error } => self.handle_task_failed(task_id, error),
+            UiEvent::TaskFailed { task_id, error } => self.handle_task_failed(task_id, &error),
 
             UiEvent::SystemMessage { level, message } => {
                 self.handle_system_message(level, message);
@@ -58,29 +58,26 @@ impl<'handler> EventHandler<'handler> {
                 step_id,
                 step_type,
                 content,
-            } => self.handle_task_step_started(task_id, step_id, step_type, content),
+            } => self.handle_task_step_started(task_id, step_id, &step_type, content),
 
             UiEvent::TaskStepCompleted { task_id, step_id } => {
-                self.handle_task_step_completed(task_id, step_id);
+                self.handle_task_step_completed(task_id, &step_id);
             }
 
             UiEvent::ToolCallStarted {
                 task_id,
                 tool,
                 args,
-            } => self.handle_tool_call_started(task_id, tool, args),
+            } => Self::handle_tool_call_started(task_id, tool, args),
 
             UiEvent::ToolCallCompleted {
                 task_id,
                 tool,
                 result,
-            } => self.handle_tool_call_completed(task_id, tool, result),
+            } => self.handle_tool_call_completed(task_id, &tool, result),
 
-            UiEvent::ThinkingUpdate { .. } => {
+            UiEvent::ThinkingUpdate { .. } | UiEvent::SubtaskSpawned { .. } => {
                 // Deprecated: handled by TaskStepStarted
-            }
-
-            UiEvent::SubtaskSpawned { .. } => {
                 // TODO: Phase 5 - Handle hierarchical tasks
             }
         }
@@ -155,7 +152,7 @@ impl<'handler> EventHandler<'handler> {
         });
     }
 
-    fn handle_task_failed(&mut self, task_id: TaskId, error: String) {
+    fn handle_task_failed(&mut self, task_id: TaskId, error: &str) {
         self.state.active_running_tasks.remove(&task_id);
 
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
@@ -197,44 +194,46 @@ impl<'handler> EventHandler<'handler> {
         &mut self,
         task_id: TaskId,
         step_id: String,
-        step_type: String,
+        step_type: &str,
         content: String,
     ) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             task.steps.push(TaskStepInfo {
                 step_id: step_id.clone(),
-                step_type: step_type.clone(),
+                step_type: step_type.to_string(),
                 content: content.clone(),
                 timestamp: Instant::now(),
             });
 
-            let step_type_enum = StepType::from_str(&step_type);
+            let step_type_enum = StepType::from_str(step_type);
             task.output_tree.add_step(step_id, step_type_enum, content);
         }
     }
 
-    fn handle_task_step_completed(&mut self, task_id: TaskId, step_id: String) {
+    fn handle_task_step_completed(&mut self, task_id: TaskId, step_id: &str) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
-            task.output_tree.complete_step(&step_id);
+            task.output_tree.complete_step(step_id);
         }
     }
 
-    fn handle_tool_call_started(&mut self, task_id: TaskId, tool: String, args: Value) {
-        if let Some(task) = self.task_manager.get_task_mut(task_id) {
-            task.output_tree.add_tool_call(tool, args);
-        }
+    fn handle_tool_call_started(_task_id: TaskId, _tool: String, _args: Value) {
     }
 
-    fn handle_tool_call_completed(&mut self, task_id: TaskId, tool: String, result: Value) {
+    fn handle_tool_call_completed(&mut self, task_id: TaskId, tool: &str, result: Value) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
-            task.output_tree.complete_tool_call(&tool, result);
+            task.output_tree.complete_tool_call(tool, result);
         }
     }
 
     fn select_task(&mut self, task_id: TaskId) {
-        if let Some(pos) = self.task_manager.task_order().iter().position(|&id| id == task_id) {
+        if let Some(pos) = self
+            .task_manager
+            .task_order()
+            .iter()
+            .position(|&id| id == task_id)
+        {
             self.state.selected_task_index = pos;
-            self.state.active_task_id = Some(task_id);
         }
+        self.state.active_task_id = Some(task_id);
     }
 }

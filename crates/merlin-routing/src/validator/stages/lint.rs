@@ -1,11 +1,16 @@
 use async_trait::async_trait;
-use crate::{IsolatedBuildEnv, Result, Task, ValidationStageType as StageType, WorkspaceState};
-use super::super::pipeline::{StageResult, ValidationStage};
 use std::sync::Arc;
+
+use merlin_core::Response;
+
+use super::super::pipeline::{StageResult, ValidationStage};
+use crate::{IsolatedBuildEnv, Result, Task, ValidationStageType as StageType, WorkspaceState};
 
 /// Lint validation using clippy
 pub struct LintValidationStage {
+    /// Optional workspace state used to run clippy in isolation
     workspace: Option<Arc<WorkspaceState>>,
+    /// Maximum number of warnings allowed before failing the stage
     max_warnings: usize,
 }
 
@@ -39,7 +44,7 @@ impl Default for LintValidationStage {
 
 #[async_trait]
 impl ValidationStage for LintValidationStage {
-    async fn validate(&self, _response: &merlin_core::Response, task: &Task) -> Result<StageResult> {
+    async fn validate(&self, _response: &Response, task: &Task) -> Result<StageResult> {
         if !task.requires_build_check() {
             return Ok(StageResult {
                 stage: StageType::Lint,
@@ -60,7 +65,7 @@ impl ValidationStage for LintValidationStage {
             });
         };
         
-        let build_env = IsolatedBuildEnv::new(workspace.as_ref()).await?;
+        let build_env = IsolatedBuildEnv::new(workspace.as_ref())?;
         
         let lint_result = build_env.run_clippy().await?;
         
@@ -83,7 +88,10 @@ impl ValidationStage for LintValidationStage {
                     warning_count, lint_result.duration_ms)
             }
         } else {
-            format!("Clippy found {} warnings (max: {})", warning_count, self.max_warnings)
+            format!(
+                "Clippy found {warning_count} warnings (max: {})",
+                self.max_warnings
+            )
         };
         
         Ok(StageResult {
@@ -95,7 +103,7 @@ impl ValidationStage for LintValidationStage {
         })
     }
     
-    async fn quick_check(&self, response: &merlin_core::Response) -> Result<bool> {
+    async fn quick_check(&self, response: &Response) -> Result<bool> {
         let has_lint_issues = response.text.contains("warning:")
             && (response.text.contains("clippy") || response.text.contains("lint"));
         Ok(!has_lint_issues)
@@ -113,14 +121,15 @@ impl ValidationStage for LintValidationStage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use merlin_core::TokenUsage;
 
     #[tokio::test]
     async fn test_lint_validation_skip_no_files() {
         let stage = LintValidationStage::new();
-        let response = merlin_core::Response {
+        let response = Response {
             text: "test".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };
@@ -135,19 +144,19 @@ mod tests {
     async fn test_quick_check() {
         let stage = LintValidationStage::new();
         
-        let good_response = merlin_core::Response {
+        let good_response = Response {
             text: "Finished dev [unoptimized + debuginfo]".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };
         assert!(stage.quick_check(&good_response).await.unwrap());
         
-        let bad_response = merlin_core::Response {
+        let bad_response = Response {
             text: "warning: unused variable - clippy::unused_variable".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };

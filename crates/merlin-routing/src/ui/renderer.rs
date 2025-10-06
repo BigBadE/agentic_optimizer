@@ -319,7 +319,7 @@ impl Renderer {
         let content = node_ref.node.get_content();
 
         let selector = if is_selected { "► " } else { "  " };
-        let line_prefix = format!("{}{}{} ", selector, prefix, icon);
+        let line_prefix = format!("{selector}{prefix}{icon} ");
         let prefix_width = line_prefix.len();
 
         let content_width = available_width.saturating_sub(prefix_width);
@@ -571,7 +571,7 @@ fn wrap_tree_content(
         .enumerate()
         .map(|(i, line)| {
             if i == 0 {
-                format!("{}{}", line_prefix, line)
+                format!("{line_prefix}{line}")
             } else {
                 format!("{}  {}", " ".repeat(prefix_width), line)
             }
@@ -678,13 +678,11 @@ fn format_task_text(
         || task.status == TaskStatus::Failed
     {
         format!(
-            "{}{}{} {}{}",
-            tree_prefix, selected, status_icon, description, collapse_indicator
+            "{tree_prefix}{selected}{status_icon} {description}{collapse_indicator}"
         )
     } else {
         format!(
-            "{}{}{} {} ({:.0}s){}",
-            tree_prefix, selected, status_icon, description, elapsed, collapse_indicator
+            "{tree_prefix}{selected}{status_icon} {description} ({elapsed:.0}s){collapse_indicator}"
         )
     };
 

@@ -2,28 +2,40 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tokio::fs;
+use serde_json::from_value;
+use tokio::fs::read_to_string;
 use tracing::debug;
 
 use crate::tool::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};
 
+/// Parameters describing which file contents should be shown to the user.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct ShowParams {
+    /// Path to the file that will be displayed.
     file_path: PathBuf,
     #[serde(default)]
+    /// First line (1-indexed) to include in the output.
     start_line: Option<usize>,
     #[serde(default)]
+    /// Last line (1-indexed) to include in the output.
     end_line: Option<usize>,
 }
 
+/// Tool that reads a file and returns selected lines with numbering.
 pub struct ShowTool;
 
 impl ShowTool {
-    #[must_use] 
-    pub const fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self
     }
 
+    /// Load the requested file segment and format it for display.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ToolError` if the path does not exist, the provided line range is invalid,
+    /// or reading the file fails.
     async fn show_file(&self, params: ShowParams) -> ToolResult<ToolOutput> {
         debug!("Showing file: {:?}", params.file_path);
 
@@ -34,7 +46,7 @@ impl ShowTool {
             )));
         }
 
-        let content = fs::read_to_string(&params.file_path).await?;
+        let content = read_to_string(&params.file_path).await?;
         let lines: Vec<&str> = content.lines().collect();
 
         let start = params.start_line.unwrap_or(1).saturating_sub(1);
@@ -87,7 +99,7 @@ impl Tool for ShowTool {
     }
 
     async fn execute(&self, input: ToolInput) -> ToolResult<ToolOutput> {
-        let params: ShowParams = serde_json::from_value(input.params)?;
+        let params: ShowParams = from_value(input.params)?;
         self.show_file(params).await
     }
 }

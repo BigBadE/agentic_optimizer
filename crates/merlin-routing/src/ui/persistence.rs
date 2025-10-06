@@ -1,5 +1,5 @@
 use std::collections::HashMap;
-use std::io::{self, Read, Write};
+use std::io::{self, Read as _, Write as _};
 use std::path::PathBuf;
 use std::time::{Instant, SystemTime};
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
@@ -26,7 +26,7 @@ pub struct TaskPersistence {
 }
 
 impl TaskPersistence {
-    /// Creates a new TaskPersistence instance
+    /// Creates a new `TaskPersistence` instance
     pub fn new(tasks_dir: PathBuf) -> Self {
         Self { tasks_dir }
     }
@@ -42,7 +42,7 @@ impl TaskPersistence {
 
         tokio::task::spawn_blocking(move || Self::load_tasks_sync(&dir))
             .await
-            .map_err(|e| io::Error::new(io::ErrorKind::Other, e))?
+            .map_err(io::Error::other)?
     }
 
     /// Saves a task to disk
@@ -96,11 +96,10 @@ impl TaskPersistence {
             let entry = entry?;
             let path = entry.path();
 
-            if is_compressed_task_file(&path) {
-                if let Some(task_display) = load_single_task(&path)? {
+            if is_compressed_task_file(&path)
+                && let Some(task_display) = load_single_task(&path)? {
                     tasks.insert(task_display.0, task_display.1);
                 }
-            }
         }
 
         Ok(tasks)
@@ -153,12 +152,12 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
     let now_system = SystemTime::now();
 
     let start_time = match now_system.duration_since(serializable.start_time) {
-        Ok(elapsed) => now_instant - elapsed,
+        Ok(elapsed) => now_instant.checked_sub(elapsed).unwrap(),
         Err(_) => now_instant, // If start_time is in future, use now
     };
 
     let end_time = serializable.end_time.and_then(|end_sys| {
-        now_system.duration_since(end_sys).ok().map(|elapsed| now_instant - elapsed)
+        now_system.duration_since(end_sys).ok().map(|elapsed| now_instant.checked_sub(elapsed).unwrap())
     });
 
     let task_display = TaskDisplay {
@@ -201,9 +200,9 @@ fn task_status_to_string(status: TaskStatus) -> &'static str {
     }
 }
 
-/// Extracts clean task ID string from TaskId debug format
+/// Extracts clean task ID string from `TaskId` debug format
 fn extract_task_id_string(task_id: TaskId) -> String {
-    let task_id_str = format!("{:?}", task_id);
+    let task_id_str = format!("{task_id:?}");
     task_id_str
         .strip_prefix("TaskId(")
         .and_then(|s| s.strip_suffix(")"))

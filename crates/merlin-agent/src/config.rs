@@ -32,19 +32,19 @@ impl AgentConfig {
     }
 
     #[must_use]
-    pub const fn with_max_context_tokens(mut self, tokens: usize) -> Self {
+    pub fn with_max_context_tokens(mut self, tokens: usize) -> Self {
         self.max_context_tokens = tokens;
         self
     }
 
     #[must_use]
-    pub const fn with_temperature(mut self, temperature: f64) -> Self {
+    pub fn with_temperature(mut self, temperature: f64) -> Self {
         self.temperature = temperature;
         self
     }
 
     #[must_use]
-    pub const fn with_top_k_context_files(mut self, top_k: usize) -> Self {
+    pub fn with_top_k_context_files(mut self, top_k: usize) -> Self {
         self.top_k_context_files = top_k;
         self
     }

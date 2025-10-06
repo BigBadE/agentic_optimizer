@@ -26,7 +26,7 @@ pub struct ContextExpander<'expander> {
 impl<'expander> ContextExpander<'expander> {
     /// Create a new context expander
     #[must_use]
-    pub const fn new(
+    pub fn new(
         backend: Option<&'expander Box<dyn LanguageProvider>>,
         project_root: &'expander Path,
         max_file_size: usize,
@@ -69,14 +69,14 @@ impl<'expander> ContextExpander<'expander> {
         // Step 2: Execute strategy-specific expansion
         match &plan.strategy {
             ExpansionStrategy::Focused { symbols } => {
-                spinner.set_message(format!("Searching for symbols: {:?}...", symbols));
+                spinner.set_message(format!("Searching for symbols: {symbols:?}..."));
                 let focused_files = self.expand_focused(symbols, &spinner)?;
                 eprintln!("  Found {} files with focused symbols", focused_files.len());
                 tracing::info!("Focused expansion found {} files", focused_files.len());
                 files.extend(focused_files);
             }
             ExpansionStrategy::Broad { patterns } => {
-                spinner.set_message(format!("Broad search with patterns: {:?}...", patterns));
+                spinner.set_message(format!("Broad search with patterns: {patterns:?}..."));
                 let broad_files = self.expand_broad(patterns)?;
                 eprintln!("  Found {} files with broad search", broad_files.len());
                 tracing::info!("Broad expansion found {} files", broad_files.len());
@@ -90,7 +90,7 @@ impl<'expander> ContextExpander<'expander> {
                 files.extend(entry_based);
             }
             ExpansionStrategy::Semantic { query, top_k } => {
-                spinner.set_message(format!("Semantic search: {}...", query));
+                spinner.set_message(format!("Semantic search: {query}..."));
                 let semantic_files = self.expand_semantic(query, *top_k)?;
                 eprintln!("  Found {} files with semantic search", semantic_files.len());
                 tracing::info!("Semantic expansion found {} files", semantic_files.len());
@@ -158,7 +158,7 @@ impl<'expander> ContextExpander<'expander> {
                     let path = entry.path();
                     
                     // Only process files
-                    if !entry.file_type().map_or(false, |ft| ft.is_file()) {
+                    if !entry.file_type().is_some_and(|ft| ft.is_file()) {
                         continue;
                     }
 
@@ -174,16 +174,14 @@ impl<'expander> ContextExpander<'expander> {
                         .replace('\\', "/")
                         .to_lowercase();
                     
-                    if patterns.iter().any(|pattern| rel_path.contains(&pattern.to_lowercase())) {
-                        if let Ok(metadata) = entry.metadata() {
-                            if metadata.len() <= self.max_file_size as u64 {
+                    if patterns.iter().any(|pattern| rel_path.contains(&pattern.to_lowercase()))
+                        && let Ok(metadata) = entry.metadata()
+                            && metadata.len() <= self.max_file_size as u64 {
                                 files.push(path.to_path_buf());
                             }
-                        }
-                    }
                 }
                 Err(e) => {
-                    eprintln!("Warning: Error walking directory: {}", e);
+                    eprintln!("Warning: Error walking directory: {e}");
                 }
             }
         }
@@ -199,17 +197,17 @@ impl<'expander> ContextExpander<'expander> {
             for symbol in symbols {
                 // Skip if this looks like a file path or keyword, not a symbol
                 if symbol.contains('/') || symbol.contains('\\') || symbol.contains('.') {
-                    eprintln!("  Skipping '{}' - looks like a path, not a symbol", symbol);
+                    eprintln!("  Skipping '{symbol}' - looks like a path, not a symbol");
                     continue;
                 }
                 
                 // Skip very generic terms that would match too much
                 if symbol.len() < 3 {
-                    eprintln!("  Skipping '{}' - too short for symbol search", symbol);
+                    eprintln!("  Skipping '{symbol}' - too short for symbol search");
                     continue;
                 }
                 
-                spinner.set_message(format!("Searching for symbol: {}...", symbol));
+                spinner.set_message(format!("Searching for symbol: {symbol}..."));
                 
                 // Search for the symbol
                 let search_query = merlin_languages::SearchQuery {
@@ -253,15 +251,14 @@ impl<'expander> ContextExpander<'expander> {
             files.insert(file.clone());
 
             // Get imports from this file
-            if let Some(backend) = self.backend {
-                if let Ok(imports) = backend.extract_imports(&file) {
+            if let Some(backend) = self.backend
+                && let Ok(imports) = backend.extract_imports(&file) {
                     for import in imports {
                         if !files.contains(&import) {
                             to_process.push((import, depth + 1));
                         }
                     }
                 }
-            }
         }
 
         Ok(files.into_iter().collect())
@@ -292,8 +289,8 @@ impl<'expander> ContextExpander<'expander> {
             let path_str = path.to_string_lossy();
 
             // Check if it's a test file
-            if path_str.contains("test") || path_str.contains("spec") {
-                if is_source_file(path) {
+            if (path_str.contains("test") || path_str.contains("spec"))
+                && is_source_file(path) {
                     // Check if it's related to any of our files
                     let file_name = path.file_stem()
                         .and_then(|s| s.to_str())
@@ -302,12 +299,11 @@ impl<'expander> ContextExpander<'expander> {
                     if files.iter().any(|f| {
                         f.file_stem()
                             .and_then(|s| s.to_str())
-                            .map_or(false, |stem| file_name.contains(stem))
+                            .is_some_and(|stem| file_name.contains(stem))
                     }) {
                         test_files.push(path.to_path_buf());
                     }
                 }
-            }
         }
 
         Ok(test_files)

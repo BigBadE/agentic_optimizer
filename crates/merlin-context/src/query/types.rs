@@ -150,14 +150,14 @@ impl ContextPlan {
 
     /// Set whether to include tests
     #[must_use]
-    pub const fn with_tests(mut self, include: bool) -> Self {
+    pub fn with_tests(mut self, include: bool) -> Self {
         self.include_tests = include;
         self
     }
 
     /// Set maximum depth
     #[must_use]
-    pub const fn with_max_depth(mut self, depth: usize) -> Self {
+    pub fn with_max_depth(mut self, depth: usize) -> Self {
         self.max_depth = depth;
         self
     }

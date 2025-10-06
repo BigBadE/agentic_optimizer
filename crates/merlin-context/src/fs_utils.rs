@@ -9,10 +9,9 @@ const SOURCE_EXTENSIONS: &[&str] = &[
 pub fn is_source_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())
-        .map(|ext| {
+        .is_some_and(|ext| {
             SOURCE_EXTENSIONS
                 .iter()
                 .any(|allowed| ext.eq_ignore_ascii_case(allowed))
         })
-        .unwrap_or(false)
 }

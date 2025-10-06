@@ -15,7 +15,7 @@ pub struct EventHandler<'handler> {
 }
 
 impl<'handler> EventHandler<'handler> {
-    /// Creates a new EventHandler
+    /// Creates a new `EventHandler`
     pub fn new(
         task_manager: &'handler mut TaskManager,
         state: &'handler mut UiState,
@@ -38,19 +38,19 @@ impl<'handler> EventHandler<'handler> {
             } => self.handle_task_started(task_id, description, parent_id),
 
             UiEvent::TaskProgress { task_id, progress } => {
-                self.handle_task_progress(task_id, progress)
+                self.handle_task_progress(task_id, progress);
             }
 
             UiEvent::TaskOutput { task_id, output } => self.handle_task_output(task_id, output),
 
             UiEvent::TaskCompleted { task_id, result } => {
-                self.handle_task_completed(task_id, result)
+                self.handle_task_completed(task_id, result);
             }
 
             UiEvent::TaskFailed { task_id, error } => self.handle_task_failed(task_id, error),
 
             UiEvent::SystemMessage { level, message } => {
-                self.handle_system_message(level, message)
+                self.handle_system_message(level, message);
             }
 
             UiEvent::TaskStepStarted {
@@ -61,7 +61,7 @@ impl<'handler> EventHandler<'handler> {
             } => self.handle_task_step_started(task_id, step_id, step_type, content),
 
             UiEvent::TaskStepCompleted { task_id, step_id } => {
-                self.handle_task_step_completed(task_id, step_id)
+                self.handle_task_step_completed(task_id, step_id);
             }
 
             UiEvent::ToolCallStarted {
@@ -143,11 +143,10 @@ impl<'handler> EventHandler<'handler> {
             task.end_time = Some(Instant::now());
         }
 
-        if let Some(persistence) = self.persistence {
-            if let Some(task) = self.task_manager.get_task(task_id) {
+        if let Some(persistence) = self.persistence
+            && let Some(task) = self.task_manager.get_task(task_id) {
                 drop(persistence.save_task(task_id, task));
             }
-        }
 
         self.state.conversation_history.push(ConversationEntry {
             role: ConversationRole::Assistant,
@@ -167,11 +166,10 @@ impl<'handler> EventHandler<'handler> {
             task.output_tree.add_text(error_msg);
         }
 
-        if let Some(persistence) = self.persistence {
-            if let Some(task) = self.task_manager.get_task(task_id) {
+        if let Some(persistence) = self.persistence
+            && let Some(task) = self.task_manager.get_task(task_id) {
                 drop(persistence.save_task(task_id, task));
             }
-        }
     }
 
     fn handle_system_message(&mut self, level: MessageLevel, message: String) {
@@ -183,11 +181,10 @@ impl<'handler> EventHandler<'handler> {
         };
 
         // Send to active task
-        if let Some(task_id) = self.state.active_task_id {
-            if let Some(task) = self.task_manager.get_task_mut(task_id) {
+        if let Some(task_id) = self.state.active_task_id
+            && let Some(task) = self.task_manager.get_task_mut(task_id) {
                 task.output_tree.add_text(format!("{prefix} {message}"));
             }
-        }
 
         self.state.conversation_history.push(ConversationEntry {
             role: ConversationRole::System,

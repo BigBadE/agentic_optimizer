@@ -29,23 +29,21 @@ impl FileLockManager {
         let read_locks = self.read_locks.read().await;
         
         for file in files {
-            if let Some(&holder) = write_locks.get(file) {
-                if holder != task_id {
+            if let Some(&holder) = write_locks.get(file)
+                && holder != task_id {
                     return Err(RoutingError::FileLockedByTask {
                         file: file.clone(),
                         holder,
                     });
                 }
-            }
             
-            if let Some(readers) = read_locks.get(file) {
-                if !readers.is_empty() && !readers.contains(&task_id) {
+            if let Some(readers) = read_locks.get(file)
+                && !readers.is_empty() && !readers.contains(&task_id) {
                     return Err(RoutingError::FileHasActiveReaders {
                         file: file.clone(),
                         readers: readers.len(),
                     });
                 }
-            }
         }
         
         for file in files {
@@ -69,14 +67,13 @@ impl FileLockManager {
         let mut read_locks = self.read_locks.write().await;
         
         for file in files {
-            if let Some(&holder) = write_locks.get(file) {
-                if holder != task_id {
+            if let Some(&holder) = write_locks.get(file)
+                && holder != task_id {
                     return Err(RoutingError::FileLockedByTask {
                         file: file.clone(),
                         holder,
                     });
                 }
-            }
         }
         
         for file in files {
@@ -96,11 +93,10 @@ impl FileLockManager {
     async fn release_write_locks(&self, task_id: TaskId, files: &[PathBuf]) {
         let mut write_locks = self.write_locks.write().await;
         for file in files {
-            if let Some(&holder) = write_locks.get(file) {
-                if holder == task_id {
+            if let Some(&holder) = write_locks.get(file)
+                && holder == task_id {
                     write_locks.remove(file);
                 }
-            }
         }
     }
     

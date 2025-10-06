@@ -20,7 +20,7 @@ pub struct SymbolSearcher<'analysis> {
 impl<'analysis> SymbolSearcher<'analysis> {
     /// Create a new `SymbolSearcher` bound to an analysis snapshot.
     #[must_use]
-    pub const fn new(analysis: &'analysis Analysis, backend: &'analysis RustBackend) -> Self {
+    pub fn new(analysis: &'analysis Analysis, backend: &'analysis RustBackend) -> Self {
         Self { analysis, backend }
     }
 
@@ -267,7 +267,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
 }
 
 /// Convert rust-analyzer symbol kind to our public symbol kind.
-const fn convert_symbol_kind(kind: RaSymbolKind) -> SymbolKind {
+fn convert_symbol_kind(kind: RaSymbolKind) -> SymbolKind {
     match kind {
         RaSymbolKind::Function => SymbolKind::Function,
         RaSymbolKind::Struct => SymbolKind::Struct,
@@ -283,7 +283,7 @@ const fn convert_symbol_kind(kind: RaSymbolKind) -> SymbolKind {
 }
 
 /// Convert rust-analyzer structure node kind to our public symbol kind.
-const fn convert_structure_kind(kind: ra_ap_ide::StructureNodeKind) -> SymbolKind {
+fn convert_structure_kind(kind: ra_ap_ide::StructureNodeKind) -> SymbolKind {
     match kind {
         ra_ap_ide::StructureNodeKind::SymbolKind(sk) => convert_symbol_kind(sk),
         ra_ap_ide::StructureNodeKind::Region => SymbolKind::Module,

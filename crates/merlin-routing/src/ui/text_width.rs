@@ -1,4 +1,4 @@
-use unicode_segmentation::UnicodeSegmentation;
+use unicode_segmentation::UnicodeSegmentation as _;
 use unicode_width::UnicodeWidthStr;
 
 /// Configuration for text width calculation
@@ -19,6 +19,7 @@ impl Default for EmojiMode {
 }
 
 /// Calculate the display width of a string, handling emojis and grapheme clusters correctly
+#[must_use] 
 pub fn calculate_width(text: &str, mode: EmojiMode) -> usize {
     text.graphemes(true)
         .map(|grapheme| grapheme_width(grapheme, mode))
@@ -49,7 +50,7 @@ fn grapheme_width(grapheme: &str, mode: EmojiMode) -> usize {
 
 /// Check if a grapheme is an emoji
 fn is_emoji_grapheme(grapheme: &str) -> bool {
-    grapheme.chars().any(|c| is_emoji_char(c))
+    grapheme.chars().any(is_emoji_char)
 }
 
 /// Check if a character is an emoji
@@ -84,6 +85,7 @@ fn is_zwj_sequence(grapheme: &str) -> bool {
 }
 
 /// Truncate text to fit within a maximum width, respecting grapheme boundaries
+#[must_use] 
 pub fn truncate_to_width(text: &str, max_width: usize, mode: EmojiMode) -> String {
     let mut result = String::new();
     let mut current_width = 0;
@@ -103,6 +105,7 @@ pub fn truncate_to_width(text: &str, max_width: usize, mode: EmojiMode) -> Strin
 }
 
 /// Strip emojis from text, replacing with safe fallback
+#[must_use] 
 pub fn strip_emojis(text: &str, fallback: &str) -> String {
     text.graphemes(true)
         .map(|grapheme| {
@@ -116,6 +119,7 @@ pub fn strip_emojis(text: &str, fallback: &str) -> String {
 }
 
 /// Wrap text to fit within a maximum width, respecting grapheme boundaries
+#[must_use] 
 pub fn wrap_text(text: &str, max_width: usize, mode: EmojiMode) -> Vec<String> {
     let mut lines = Vec::new();
     let mut current_line = String::new();

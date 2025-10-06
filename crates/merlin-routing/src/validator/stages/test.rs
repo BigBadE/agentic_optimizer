@@ -12,7 +12,7 @@ pub struct TestValidationStage {
 
 impl TestValidationStage {
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             timeout_seconds: 300,
             workspace: None,

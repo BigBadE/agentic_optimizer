@@ -21,13 +21,14 @@ pub const OPTIMAL_MAX_TOKENS: usize = 500; // ~125 lines
 pub const MAX_CHUNK_TOKENS: usize = 800;   // ~200 lines
 
 /// Estimate tokens from text (rough: ~4 chars per token)
+#[must_use] 
 pub fn estimate_tokens(text: &str) -> usize {
     let chars = text.len();
     let words = text.split_whitespace().count();
     // Average of character-based and word-based estimates
     let char_estimate = chars / 4;
     let word_estimate = (words * 10) / 13;
-    (char_estimate + word_estimate) / 2
+    usize::midpoint(char_estimate, word_estimate)
 }
 
 /// A chunk of a file with metadata
@@ -72,6 +73,7 @@ impl FileChunk {
 }
 
 /// Chunk a file based on its extension
+#[must_use] 
 pub fn chunk_file(file_path: &Path, content: &str) -> Vec<FileChunk> {
     let path_str = file_path.display().to_string();
     

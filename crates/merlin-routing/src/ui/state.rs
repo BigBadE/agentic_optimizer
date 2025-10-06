@@ -15,12 +15,36 @@ pub struct UiState {
     pub emoji_mode: EmojiMode,
 }
 
+impl UiState {
+    /// Access `emoji_mode`
+    pub fn emoji_mode(&self) -> &EmojiMode {
+        &self.emoji_mode
+    }
+}
+
 /// Conversation entry
 #[derive(Clone)]
 pub struct ConversationEntry {
     pub role: ConversationRole,
     pub text: String,
     pub timestamp: Instant,
+}
+
+impl ConversationEntry {
+    /// Access role
+    pub fn role(&self) -> ConversationRole {
+        self.role
+    }
+
+    /// Access text
+    pub fn text(&self) -> &str {
+        &self.text
+    }
+
+    /// Access timestamp
+    pub fn timestamp(&self) -> Instant {
+        self.timestamp
+    }
 }
 
 /// Conversation role

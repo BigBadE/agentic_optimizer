@@ -11,7 +11,7 @@ pub struct BuildValidationStage {
 
 impl BuildValidationStage {
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             timeout_seconds: 60,
             workspace: None,

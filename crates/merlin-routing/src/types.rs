@@ -231,7 +231,7 @@ pub enum FileChange {
 
 impl FileChange {
     #[must_use]
-    pub const fn path(&self) -> &PathBuf {
+    pub fn path(&self) -> &PathBuf {
         match self {
             Self::Create { path, .. } | Self::Modify { path, .. } | Self::Delete { path } => path,
         }

@@ -2,28 +2,41 @@ use std::path::PathBuf;
 
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use tokio::fs;
+use serde_json::from_value;
+use tokio::fs::{read_to_string, write};
 use tracing::{debug, info};
 
 use crate::tool::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};
 
+/// Parameters controlling how a file edit should be performed.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct EditParams {
+    /// Path to the file that will be modified.
     file_path: PathBuf,
+    /// Text in the file that should be replaced.
     old_string: String,
+    /// Replacement text that will be written to the file.
     new_string: String,
     #[serde(default)]
+    /// When `true`, all occurrences of `old_string` are replaced. Otherwise exactly one replacement is made.
     replace_all: bool,
 }
 
+/// Tool that performs search-and-replace edits within files.
 pub struct EditTool;
 
 impl EditTool {
-    #[must_use] 
-    pub const fn new() -> Self {
+    #[must_use]
+    pub fn new() -> Self {
         Self
     }
 
+    /// Apply the provided edit parameters to the target file.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ToolError` when the file does not exist, the replacement parameters are invalid,
+    /// reading or writing the file fails, or when asynchronous I/O encounters an error.
     async fn perform_edit(&self, params: EditParams) -> ToolResult<ToolOutput> {
         debug!("Editing file: {:?}", params.file_path);
 
@@ -34,7 +47,7 @@ impl EditTool {
             )));
         }
 
-        let content = fs::read_to_string(&params.file_path).await?;
+        let content = read_to_string(&params.file_path).await?;
 
         if params.old_string == params.new_string {
             return Err(ToolError::InvalidInput(
@@ -60,7 +73,7 @@ impl EditTool {
             content.replacen(&params.old_string, &params.new_string, 1)
         };
 
-        fs::write(&params.file_path, new_content).await?;
+        write(&params.file_path, new_content).await?;
 
         info!("Successfully edited file: {}", params.file_path.display());
         Ok(ToolOutput::success(format!(
@@ -89,7 +102,7 @@ impl Tool for EditTool {
     }
 
     async fn execute(&self, input: ToolInput) -> ToolResult<ToolOutput> {
-        let params: EditParams = serde_json::from_value(input.params)?;
+        let params: EditParams = from_value(input.params)?;
         self.perform_edit(params).await
     }
 }

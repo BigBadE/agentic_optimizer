@@ -13,6 +13,7 @@ pub struct RunCommandTool {
 }
 
 impl RunCommandTool {
+    #[must_use] 
     pub fn new(workspace_root: PathBuf) -> Self {
         Self {
             workspace_root,
@@ -36,11 +37,11 @@ impl RunCommandTool {
 
 #[async_trait]
 impl Tool for RunCommandTool {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "run_command"
     }
     
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Execute a shell command in the workspace directory. Only whitelisted commands are allowed."
     }
     
@@ -87,7 +88,7 @@ impl Tool for RunCommandTool {
             .stderr(Stdio::piped())
             .output()
             .await
-            .map_err(|e| RoutingError::Other(format!("Failed to execute command: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Failed to execute command: {e}")))?;
         
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();

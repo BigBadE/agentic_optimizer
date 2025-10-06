@@ -1,8 +1,10 @@
 //! Markdown chunking by headers with token-based limits.
 
+use std::mem::take;
 use super::{FileChunk, estimate_tokens, MIN_CHUNK_TOKENS, OPTIMAL_MIN_TOKENS};
 
 /// Chunk Markdown by headers with token-based limits
+#[must_use] 
 pub fn chunk_markdown(file_path: String, content: &str) -> Vec<FileChunk> {
     let lines: Vec<&str> = content.lines().collect();
     let mut chunks = Vec::new();
@@ -16,7 +18,7 @@ pub fn chunk_markdown(file_path: String, content: &str) -> Vec<FileChunk> {
         
         // Detect headers
         if trimmed.starts_with('#') {
-            let header_level = trimmed.chars().take_while(|&c| c == '#').count();
+            let header_level = trimmed.chars().take_while(|ch| *ch == '#').count();
             let header_text = trimmed.trim_start_matches('#').trim();
             
             // Check if current chunk meets minimum
@@ -27,7 +29,7 @@ pub fn chunk_markdown(file_path: String, content: &str) -> Vec<FileChunk> {
                 if !buffer.trim().is_empty() {
                     chunks.push(FileChunk::new(
                         file_path.clone(),
-                        std::mem::take(&mut buffer),
+                        take(&mut buffer),
                         current_header.clone(),
                         current_chunk_start + 1,
                         i,
@@ -53,7 +55,7 @@ pub fn chunk_markdown(file_path: String, content: &str) -> Vec<FileChunk> {
             if !buffer.trim().is_empty() {
                 chunks.push(FileChunk::new(
                     file_path.clone(),
-                    std::mem::take(&mut buffer),
+                    take(&mut buffer),
                     current_header.clone(),
                     current_chunk_start + 1,
                     i + 1,
@@ -94,7 +96,7 @@ pub fn chunk_markdown(file_path: String, content: &str) -> Vec<FileChunk> {
     if chunks.is_empty() {
         chunks.push(FileChunk::new(
             file_path,
-            content.to_string(),
+            content.to_owned(),
             String::from("document"),
             1,
             lines.len(),

@@ -7,6 +7,7 @@ pub struct StepTracker {
 }
 
 impl StepTracker {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             steps: HashMap::new(),
@@ -16,10 +17,11 @@ impl StepTracker {
     pub fn add_step(&mut self, step: TaskStep) {
         self.steps
             .entry(step.task_id)
-            .or_insert_with(Vec::new)
+            .or_default()
             .push(step);
     }
     
+    #[must_use] 
     pub fn get_steps(&self, task_id: &TaskId) -> Option<&Vec<TaskStep>> {
         self.steps.get(task_id)
     }

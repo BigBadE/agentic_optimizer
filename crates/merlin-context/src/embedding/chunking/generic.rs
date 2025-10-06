@@ -3,6 +3,7 @@
 use super::{FileChunk, estimate_tokens, MIN_CHUNK_TOKENS, OPTIMAL_MIN_TOKENS, MAX_CHUNK_TOKENS};
 
 /// Generic code chunking with token-based limits
+#[must_use] 
 pub fn chunk_generic_code(file_path: String, content: &str) -> Vec<FileChunk> {
     let lines: Vec<&str> = content.lines().collect();
     let mut chunks = Vec::new();
@@ -26,7 +27,7 @@ pub fn chunk_generic_code(file_path: String, content: &str) -> Vec<FileChunk> {
                 chunks.push(FileChunk::new(
                     file_path.clone(),
                     std::mem::take(&mut buffer),
-                    format!("block {}", chunk_num),
+                    format!("block {chunk_num}"),
                     current_chunk_start + 1,
                     i + 1,
                 ));
@@ -42,17 +43,16 @@ pub fn chunk_generic_code(file_path: String, content: &str) -> Vec<FileChunk> {
     // Add remaining - only if meets minimum OR if we have no chunks yet
     if line_count > 0 {
         let tokens = estimate_tokens(&buffer);
-        if !buffer.trim().is_empty() {
-            if tokens >= MIN_CHUNK_TOKENS || chunks.is_empty() {
+        if !buffer.trim().is_empty()
+            && (tokens >= MIN_CHUNK_TOKENS || chunks.is_empty()) {
                 chunks.push(FileChunk::new(
                     file_path.clone(),
                     buffer,
-                    format!("block {}", chunk_num),
+                    format!("block {chunk_num}"),
                     current_chunk_start + 1,
                     lines.len(),
                 ));
             }
-        }
     }
     
     if chunks.is_empty() {

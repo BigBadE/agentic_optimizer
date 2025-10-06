@@ -44,7 +44,7 @@ pub struct TokenUsage {
 
 impl TokenUsage {
     #[must_use] 
-    pub const fn total(&self) -> u64 {
+    pub fn total(&self) -> u64 {
         self.input + self.output + self.cache_read + self.cache_write
     }
 }
@@ -105,7 +105,7 @@ impl FileContext {
     }
 
     #[must_use] 
-    pub const fn new(path: PathBuf, content: String) -> Self {
+    pub fn new(path: PathBuf, content: String) -> Self {
         Self { path, content }
     }
 }

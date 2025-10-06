@@ -77,7 +77,7 @@ pub enum RoutingError {
 
 impl RoutingError {
     #[must_use]
-    pub const fn is_retryable(&self) -> bool {
+    pub fn is_retryable(&self) -> bool {
         matches!(
             self,
             Self::ProviderUnavailable(_) | Self::RateLimitExceeded(_) | Self::Timeout(_)
@@ -85,7 +85,7 @@ impl RoutingError {
     }
 
     #[must_use]
-    pub const fn can_escalate(&self) -> bool {
+    pub fn can_escalate(&self) -> bool {
         matches!(self, Self::MaxRetriesExceeded { .. })
     }
 }

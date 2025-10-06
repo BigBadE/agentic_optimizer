@@ -1,5 +1,5 @@
 use petgraph::graph::DiGraph;
-use petgraph::visit::EdgeRef;
+use petgraph::visit::EdgeRef as _;
 use std::collections::{HashMap, HashSet};
 use crate::{Task, TaskId};
 
@@ -51,11 +51,7 @@ impl TaskGraph {
                         completed.contains(&dep_task.id)
                     });
                 
-                if deps_satisfied {
-                    Some(task.clone())
-                } else {
-                    None
-                }
+                deps_satisfied.then(|| task.clone())
             })
             .collect()
     }

@@ -11,6 +11,7 @@ pub struct ReadFileTool {
 }
 
 impl ReadFileTool {
+    #[must_use] 
     pub fn new(workspace_root: PathBuf) -> Self {
         Self { workspace_root }
     }
@@ -18,11 +19,11 @@ impl ReadFileTool {
 
 #[async_trait]
 impl Tool for ReadFileTool {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "read_file"
     }
     
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Read the contents of a file from the workspace"
     }
     
@@ -48,16 +49,16 @@ impl Tool for ReadFileTool {
         
         // Security check: ensure path is within workspace
         let canonical_path = full_path.canonicalize()
-            .map_err(|e| RoutingError::Other(format!("Invalid path: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Invalid path: {e}")))?;
         let canonical_root = self.workspace_root.canonicalize()
-            .map_err(|e| RoutingError::Other(format!("Invalid workspace root: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Invalid workspace root: {e}")))?;
         
         if !canonical_path.starts_with(&canonical_root) {
             return Err(RoutingError::Other("Path outside workspace".to_owned()));
         }
         
         let content = fs::read_to_string(&canonical_path).await
-            .map_err(|e| RoutingError::Other(format!("Failed to read file: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Failed to read file: {e}")))?;
         
         Ok(json!({
             "content": content,
@@ -73,6 +74,7 @@ pub struct WriteFileTool {
 }
 
 impl WriteFileTool {
+    #[must_use] 
     pub fn new(workspace_root: PathBuf) -> Self {
         Self { workspace_root }
     }
@@ -80,11 +82,11 @@ impl WriteFileTool {
 
 #[async_trait]
 impl Tool for WriteFileTool {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "write_file"
     }
     
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "Write content to a file in the workspace, creating it if it doesn't exist"
     }
     
@@ -122,20 +124,20 @@ impl Tool for WriteFileTool {
         
         // Create parent directories if they don't exist
         fs::create_dir_all(parent).await
-            .map_err(|e| RoutingError::Other(format!("Failed to create directories: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Failed to create directories: {e}")))?;
         
         // Check if path would be within workspace after creation
         let canonical_root = self.workspace_root.canonicalize()
-            .map_err(|e| RoutingError::Other(format!("Invalid workspace root: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Invalid workspace root: {e}")))?;
         let canonical_parent = parent.canonicalize()
-            .map_err(|e| RoutingError::Other(format!("Invalid parent path: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Invalid parent path: {e}")))?;
         
         if !canonical_parent.starts_with(&canonical_root) {
             return Err(RoutingError::Other("Path outside workspace".to_owned()));
         }
         
         fs::write(&full_path, content).await
-            .map_err(|e| RoutingError::Other(format!("Failed to write file: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Failed to write file: {e}")))?;
         
         Ok(json!({
             "path": path,
@@ -151,6 +153,7 @@ pub struct ListFilesTool {
 }
 
 impl ListFilesTool {
+    #[must_use] 
     pub fn new(workspace_root: PathBuf) -> Self {
         Self { workspace_root }
     }
@@ -158,11 +161,11 @@ impl ListFilesTool {
 
 #[async_trait]
 impl Tool for ListFilesTool {
-    fn name(&self) -> &str {
+    fn name(&self) -> &'static str {
         "list_files"
     }
     
-    fn description(&self) -> &str {
+    fn description(&self) -> &'static str {
         "List files and directories in a given path"
     }
     
@@ -192,9 +195,9 @@ impl Tool for ListFilesTool {
         
         // Security check: ensure path is within workspace
         let canonical_path = full_path.canonicalize()
-            .map_err(|e| RoutingError::Other(format!("Invalid path: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Invalid path: {e}")))?;
         let canonical_root = self.workspace_root.canonicalize()
-            .map_err(|e| RoutingError::Other(format!("Invalid workspace root: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Invalid workspace root: {e}")))?;
         
         if !canonical_path.starts_with(&canonical_root) {
             return Err(RoutingError::Other("Path outside workspace".to_owned()));
@@ -202,13 +205,13 @@ impl Tool for ListFilesTool {
         
         let mut entries = Vec::new();
         let mut read_dir = fs::read_dir(&canonical_path).await
-            .map_err(|e| RoutingError::Other(format!("Failed to read directory: {}", e)))?;
+            .map_err(|e| RoutingError::Other(format!("Failed to read directory: {e}")))?;
         
         while let Some(entry) = read_dir.next_entry().await
-            .map_err(|e| RoutingError::Other(format!("Failed to read entry: {}", e)))? {
+            .map_err(|e| RoutingError::Other(format!("Failed to read entry: {e}")))? {
             
             let metadata = entry.metadata().await
-                .map_err(|e| RoutingError::Other(format!("Failed to read metadata: {}", e)))?;
+                .map_err(|e| RoutingError::Other(format!("Failed to read metadata: {e}")))?;
             
             let name = entry.file_name().to_string_lossy().to_string();
             let is_dir = metadata.is_dir();

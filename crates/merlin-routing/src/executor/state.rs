@@ -45,7 +45,7 @@ impl WorkspaceState {
     }
     
     /// Get workspace root path
-    pub const fn root_path(&self) -> &PathBuf {
+    pub fn root_path(&self) -> &PathBuf {
         &self.root_path
     }
     

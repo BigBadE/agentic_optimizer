@@ -12,6 +12,7 @@ pub use channel::StreamingChannel;
 pub struct StepId(uuid::Uuid);
 
 impl StepId {
+    #[must_use] 
     pub fn new() -> Self {
         Self(uuid::Uuid::new_v4())
     }
@@ -35,6 +36,7 @@ pub struct TaskStep {
 }
 
 impl TaskStep {
+    #[must_use] 
     pub fn new(task_id: TaskId, step_type: StepType, content: String) -> Self {
         Self {
             id: StepId::new(),

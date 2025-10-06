@@ -75,11 +75,10 @@ impl OutputTree {
         
         if let Some(parent_id) = self.current_step_stack.last().cloned() {
             // Add as child to current parent
-            if let Some(parent) = self.find_node_mut(&parent_id) {
-                if let OutputNode::Step { children, .. } = parent {
+            if let Some(parent) = self.find_node_mut(&parent_id)
+                && let OutputNode::Step { children, .. } = parent {
                     children.push(node);
                 }
-            }
         } else {
             // Add to root
             self.root.push(node);
@@ -91,7 +90,7 @@ impl OutputTree {
     
     /// Complete a step (pop from stack and auto-collapse if it's "analysis")
     pub fn complete_step(&mut self, step_id: &str) {
-        if self.current_step_stack.last().map(|s| s.as_str()) == Some(step_id) {
+        if self.current_step_stack.last().map(std::string::String::as_str) == Some(step_id) {
             self.current_step_stack.pop();
         }
         
@@ -111,11 +110,10 @@ impl OutputTree {
         };
         
         if let Some(parent_id) = self.current_step_stack.last().cloned() {
-            if let Some(parent) = self.find_node_mut(&parent_id) {
-                if let OutputNode::Step { children, .. } = parent {
+            if let Some(parent) = self.find_node_mut(&parent_id)
+                && let OutputNode::Step { children, .. } = parent {
                     children.push(node);
                 }
-            }
         } else {
             self.root.push(node);
         }
@@ -124,7 +122,7 @@ impl OutputTree {
     /// Complete a tool call with result
     pub fn complete_tool_call(&mut self, tool_name: &str, result: Value) {
         let success = result.get("success")
-            .and_then(|v| v.as_bool())
+            .and_then(serde_json::Value::as_bool)
             .unwrap_or(true);
         
         let content = result.get("content")
@@ -138,11 +136,10 @@ impl OutputTree {
         };
         
         // Find the most recent tool call with this name
-        if let Some(node) = self.find_tool_call_mut(tool_name) {
-            if let OutputNode::ToolCall { result: r, .. } = node {
+        if let Some(node) = self.find_tool_call_mut(tool_name)
+            && let OutputNode::ToolCall { result: r, .. } = node {
                 *r = Some(tool_result);
             }
-        }
     }
     
     /// Add plain text output
@@ -150,11 +147,10 @@ impl OutputTree {
         let node = OutputNode::Text { content };
         
         if let Some(parent_id) = self.current_step_stack.last().cloned() {
-            if let Some(parent) = self.find_node_mut(&parent_id) {
-                if let OutputNode::Step { children, .. } = parent {
+            if let Some(parent) = self.find_node_mut(&parent_id)
+                && let OutputNode::Step { children, .. } = parent {
                     children.push(node);
                 }
-            }
         } else {
             self.root.push(node);
         }
@@ -185,8 +181,8 @@ impl OutputTree {
         };
         result.push((node_ref, depth));
         
-        if !self.is_collapsed(node) {
-            if let Some(children) = self.get_children(node) {
+        if !self.is_collapsed(node)
+            && let Some(children) = self.get_children(node) {
                 let child_count = children.len();
                 let mut new_parent_states = parent_states.to_vec();
                 new_parent_states.push(false);
@@ -199,7 +195,6 @@ impl OutputTree {
                     self.flatten_node(child, depth + 1, result, &new_parent_states);
                 }
             }
-        }
     }
     
     pub fn is_collapsed(&self, node: &OutputNode) -> bool {
@@ -239,11 +234,10 @@ impl OutputTree {
             OutputNode::Step { id, .. } => Some(id.as_str()),
             OutputNode::ToolCall { id, .. } => Some(id.as_str()),
             OutputNode::Text { .. } => None,
-        } {
-            if id == target_id {
+        }
+            && id == target_id {
                 return Some(node);
             }
-        }
         
         if let OutputNode::Step { children, .. } = node {
             for child in children {
@@ -266,11 +260,10 @@ impl OutputTree {
     }
     
     fn find_tool_call_recursive<'node>(node: &'node mut OutputNode, tool_name: &str) -> Option<&'node mut OutputNode> {
-        if let OutputNode::ToolCall { tool_name: name, result, .. } = node {
-            if name == tool_name && result.is_none() {
+        if let OutputNode::ToolCall { tool_name: name, result, .. } = node
+            && name == tool_name && result.is_none() {
                 return Some(node);
             }
-        }
         
         if let OutputNode::Step { children, .. } = node {
             for child in children.iter_mut().rev() {
@@ -317,28 +310,26 @@ impl OutputTree {
     
     pub fn expand_selected(&mut self) {
         let visible = self.flatten_visible_nodes();
-        if let Some((node_ref, _)) = visible.get(self.selected_index) {
-            if let Some(id) = self.get_node_id(node_ref.node) {
+        if let Some((node_ref, _)) = visible.get(self.selected_index)
+            && let Some(id) = self.get_node_id(node_ref.node) {
                 let id_owned = id.to_string();
                 self.collapsed_nodes.remove(&id_owned);
             }
-        }
     }
     
     pub fn collapse_selected(&mut self) {
         let visible = self.flatten_visible_nodes();
-        if let Some((node_ref, _)) = visible.get(self.selected_index) {
-            if let Some(id) = self.get_node_id(node_ref.node) {
+        if let Some((node_ref, _)) = visible.get(self.selected_index)
+            && let Some(id) = self.get_node_id(node_ref.node) {
                 let id_owned = id.to_string();
                 self.collapsed_nodes.insert(id_owned);
             }
-        }
     }
     
     pub fn toggle_selected(&mut self) {
         let visible = self.flatten_visible_nodes();
-        if let Some((node_ref, _)) = visible.get(self.selected_index) {
-            if let Some(id) = self.get_node_id(node_ref.node) {
+        if let Some((node_ref, _)) = visible.get(self.selected_index)
+            && let Some(id) = self.get_node_id(node_ref.node) {
                 let id_owned = id.to_string();
                 if self.collapsed_nodes.contains(&id_owned) {
                     self.collapsed_nodes.remove(&id_owned);
@@ -346,7 +337,6 @@ impl OutputTree {
                     self.collapsed_nodes.insert(id_owned);
                 }
             }
-        }
     }
     
     pub fn selected_index(&self) -> usize {
@@ -368,7 +358,7 @@ impl OutputTree {
         let indent = "  ".repeat(depth);
         let icon = node.get_icon(false);
         let content = node.get_content();
-        lines.push(format!("{}{} {}", indent, icon, content));
+        lines.push(format!("{indent}{icon} {content}"));
         
         if let Some(children) = self.get_children(node) {
             for child in children {
@@ -394,40 +384,38 @@ pub struct OutputNodeRef<'node> {
 impl OutputNode {
     pub fn get_icon(&self, is_collapsed: bool) -> &'static str {
         match self {
-            OutputNode::Step { step_type, children, .. } => {
-                if !children.is_empty() {
-                    if is_collapsed { "[+]" } else { "[-]" }
-                } else {
+            Self::Step { step_type, children, .. } => {
+                if children.is_empty() {
                     match step_type {
                         StepType::Thinking => "[*]",
                         StepType::ToolCall => "[T]",
                         StepType::Output => "[>]",
                         StepType::Subtask => "[S]",
                     }
-                }
+                } else if is_collapsed { "[+]" } else { "[-]" }
             }
-            OutputNode::ToolCall { result, .. } => {
+            Self::ToolCall { result, .. } => {
                 match result {
                     Some(r) if r.success => "[+]",
                     Some(_) => "[X]",
                     None => "[T]",
                 }
             }
-            OutputNode::Text { .. } => "  ",
+            Self::Text { .. } => "  ",
         }
     }
     
     pub fn get_content(&self) -> String {
         match self {
-            OutputNode::Step { content, .. } => content.clone(),
-            OutputNode::ToolCall { tool_name, result, .. } => {
+            Self::Step { content, .. } => content.clone(),
+            Self::ToolCall { tool_name, result, .. } => {
                 if let Some(r) = result {
                     format!("{}: {}", tool_name, r.content)
                 } else {
-                    format!("Calling tool: {}", tool_name)
+                    format!("Calling tool: {tool_name}")
                 }
             }
-            OutputNode::Text { content, .. } => content.clone(),
+            Self::Text { content, .. } => content.clone(),
         }
     }
 }

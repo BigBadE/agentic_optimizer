@@ -29,12 +29,12 @@ pub struct TuiApp {
 }
 
 impl TuiApp {
-    /// Creates a new TuiApp
+    /// Creates a new `TuiApp`
     pub fn new() -> crate::Result<(Self, super::UiChannel)> {
         Self::new_with_storage(None)
     }
 
-    /// Creates a new TuiApp with task storage
+    /// Creates a new `TuiApp` with task storage
     pub fn new_with_storage(
         tasks_dir: impl Into<Option<PathBuf>>,
     ) -> crate::Result<(Self, super::UiChannel)> {
@@ -183,12 +183,11 @@ impl TuiApp {
                 continue;
             }
 
-            if let Some(task) = self.task_manager.get_task(task_id) {
-                if task.parent_id == Some(parent_id) {
+            if let Some(task) = self.task_manager.get_task(task_id)
+                && task.parent_id == Some(parent_id) {
                     let output = task.output_tree.to_text();
                     context.push((task_id, task.description.clone(), output));
                 }
-            }
         }
 
         context
@@ -282,7 +281,7 @@ impl TuiApp {
 
         if let Some(persistence) = &self.persistence {
             let dir = persistence.get_tasks_dir();
-            drop(new_theme.save(&dir));
+            drop(new_theme.save(dir));
         }
     }
 
@@ -353,7 +352,7 @@ impl TuiApp {
 
         if should_wrap {
             let terminal_width = self.terminal.size().map(|s| s.width).unwrap_or(80);
-            let input_width = (terminal_width as f32 * 0.7) as usize;
+            let input_width = (f32::from(terminal_width) * 0.7) as usize;
             let max_line_width = input_width.saturating_sub(4);
             self.input_manager.auto_wrap(max_line_width);
         }
@@ -580,7 +579,7 @@ impl TuiApp {
 
         if was_active && !self.task_manager.is_empty() {
             self.select_task_after_deletion(deleted_pos);
-        } else if to_delete.contains(&self.state.active_task_id.unwrap_or(TaskId::new())) {
+        } else if to_delete.contains(&self.state.active_task_id.unwrap_or_default()) {
             self.state.active_task_id = None;
         }
 

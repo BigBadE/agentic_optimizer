@@ -17,7 +17,8 @@ pub enum Priority {
 
 impl Priority {
     /// Get weight for NDCG calculation
-    pub const fn weight(self) -> f32 {
+    #[must_use] 
+    pub fn weight(self) -> f32 {
         match self {
             Self::Critical => 1.0,
             Self::High => 0.8,
@@ -27,7 +28,8 @@ impl Priority {
     }
 
     /// Get expected rank range
-    pub const fn expected_rank(self) -> usize {
+    #[must_use] 
+    pub fn expected_rank(self) -> usize {
         match self {
             Self::Critical => 3,
             Self::High => 5,
@@ -100,6 +102,7 @@ pub struct BenchmarkResult {
 
 impl BenchmarkResult {
     /// Create result from test case and ranked files
+    #[must_use] 
     pub fn new(test_case: TestCase, ranked_files: Vec<RankedFile>) -> Self {
         let metrics = Self::calculate_metrics(&test_case, &ranked_files);
         
@@ -351,6 +354,7 @@ impl BenchmarkResult {
     
     /// Format result as human-readable text
     #[allow(clippy::str_to_string, reason = "formatting emojis as descriptive text")]
+    #[must_use] 
     pub fn format_report(&self) -> String {
         use std::fmt::Write as _;
         let mut report = String::new();

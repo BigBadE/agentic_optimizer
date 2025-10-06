@@ -22,7 +22,7 @@ impl Agent {
     }
 
     #[must_use]
-    pub const fn config(&self) -> &AgentConfig {
+    pub fn config(&self) -> &AgentConfig {
         &self.config
     }
 

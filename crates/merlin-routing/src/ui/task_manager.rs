@@ -34,6 +34,28 @@ pub struct TaskStepInfo {
     pub timestamp: Instant,
 }
 
+impl TaskStepInfo {
+    /// Access `step_id`
+    pub fn step_id(&self) -> &str {
+        &self.step_id
+    }
+
+    /// Access `step_type`
+    pub fn step_type(&self) -> &str {
+        &self.step_type
+    }
+
+    /// Access content
+    pub fn content(&self) -> &str {
+        &self.content
+    }
+
+    /// Access timestamp
+    pub fn timestamp(&self) -> Instant {
+        self.timestamp
+    }
+}
+
 /// Manages task storage, ordering, and hierarchy
 pub struct TaskManager {
     tasks: HashMap<TaskId, TaskDisplay>,
@@ -42,7 +64,7 @@ pub struct TaskManager {
 }
 
 impl TaskManager {
-    /// Creates a new TaskManager
+    /// Creates a new `TaskManager`
     pub fn new() -> Self {
         Self {
             tasks: HashMap::new(),
@@ -65,8 +87,8 @@ impl TaskManager {
         }
     }
 
-    /// Inserts a task into the HashMap only, without updating task_order
-    /// Used during bulk loading - call rebuild_order() after all tasks are inserted
+    /// Inserts a task into the `HashMap` only, without updating `task_order`
+    /// Used during bulk loading - call `rebuild_order()` after all tasks are inserted
     pub fn insert_task_for_load(&mut self, task_id: TaskId, task: TaskDisplay) {
         self.tasks.insert(task_id, task);
     }
@@ -260,12 +282,12 @@ impl TaskManager {
     fn is_root_task(&self, task_id: TaskId) -> bool {
         self.tasks
             .get(&task_id)
-            .map(|t| t.parent_id.is_none())
-            .unwrap_or(false)
+            .is_some_and(|t| t.parent_id.is_none())
     }
 
     fn get_parent_id(&self, task_id: TaskId) -> Option<TaskId> {
-        self.tasks.get(&task_id).and_then(|t| t.parent_id)
+        let t = self.tasks.get(&task_id)?;
+        t.parent_id
     }
 
     fn is_hidden_by_collapse(&self, task_id: TaskId) -> bool {

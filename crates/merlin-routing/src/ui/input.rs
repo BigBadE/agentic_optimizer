@@ -12,7 +12,7 @@ pub struct InputManager {
 }
 
 impl InputManager {
-    /// Creates a new InputManager with default styling
+    /// Creates a new `InputManager` with default styling
     pub fn new() -> Self {
         let mut input_area = TextArea::default();
         input_area.set_block(Block::default().borders(Borders::ALL).title("Input"));
@@ -243,14 +243,13 @@ fn wrap_paragraph(para: &[String], max_line_width: usize) -> Vec<String> {
 
     let mut wrapped_lines: Vec<String> = textwrap::wrap(&para_text, options)
         .into_iter()
-        .map(|cow| cow.into_owned())
+        .map(std::borrow::Cow::into_owned)
         .collect();
 
-    if ends_with_space && !wrapped_lines.is_empty() {
-        if let Some(last) = wrapped_lines.last_mut() {
+    if ends_with_space && !wrapped_lines.is_empty()
+        && let Some(last) = wrapped_lines.last_mut() {
             last.push(' ');
         }
-    }
 
     wrapped_lines
 }

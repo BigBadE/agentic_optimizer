@@ -1103,6 +1103,12 @@ impl TuiApp {
     fn handle_event(&mut self, event: UiEvent) {
         match event {
             UiEvent::TaskStarted { task_id, description, parent_id } => {
+                let mut output_tree = OutputTree::new();
+                
+                // Add initial status message
+                output_tree.add_text(format!("[i] Task started: {}", description));
+                output_tree.add_text("[...] Processing...".to_string());
+                
                 let task_display = TaskDisplay {
                     description: description.clone(),
                     status: TaskStatus::Running,
@@ -1111,7 +1117,7 @@ impl TuiApp {
                     start_time: Instant::now(),
                     end_time: None,
                     parent_id,
-                    output_tree: OutputTree::new(),
+                    output_tree,
                     steps: Vec::new(),
                 };
                 
@@ -1124,12 +1130,10 @@ impl TuiApp {
                     self.state.collapsed_tasks.remove(&parent_id);
                 }
                 
-                // Always select newly created tasks - simple and predictable
-                self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
-                self.state.active_task_id = Some(task_id);
-                
-                if let Some(task) = self.state.tasks.get(&task_id) {
-                    self.save_task(task_id, task);
+                // Auto-select this task if it's the first one or if we don't have an active task
+                if self.state.task_order.len() == 1 || self.state.active_task_id.is_none() {
+                    self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
+                    self.state.active_task_id = Some(task_id);
                 }
             }
             

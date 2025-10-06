@@ -96,6 +96,33 @@ impl RoutingOrchestrator {
         executor.execute_streaming(task, ui_channel).await
     }
     
+    /// Execute a task with self-determination (Phase 1)
+    /// The task will assess itself and decide whether to complete, decompose, or gather context
+    pub async fn execute_task_self_determining(
+        &self,
+        task: Task,
+        ui_channel: UiChannel,
+    ) -> Result<TaskResult> {
+        // Create tool registry with workspace tools
+        let tool_registry = Arc::new(
+            ToolRegistry::new()
+                .with_tool(Arc::new(ReadFileTool::new(self.config.workspace.root_path.clone())))
+                .with_tool(Arc::new(WriteFileTool::new(self.config.workspace.root_path.clone())))
+                .with_tool(Arc::new(ListFilesTool::new(self.config.workspace.root_path.clone())))
+                .with_tool(Arc::new(RunCommandTool::new(self.config.workspace.root_path.clone())))
+        );
+        
+        // Create agent executor
+        let mut executor = AgentExecutor::new(
+            self.router.clone(),
+            self.validator.clone(),
+            tool_registry,
+        );
+        
+        // Execute with self-determination
+        executor.execute_self_determining(task, ui_channel).await
+    }
+    
     /// Execute a single task with routing and validation (legacy method)
     pub async fn execute_task(&self, task: Task) -> Result<TaskResult> {
         let start = std::time::Instant::now();

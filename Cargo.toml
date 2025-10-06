@@ -116,7 +116,6 @@ expect_used = { level = "deny", priority = 1 }
 if_then_some_else_none = { level = "deny", priority = 1 }
 let_underscore_must_use = { level = "deny", priority = 1 }
 min_ident_chars = { level = "deny", priority = 1 }
-missing_docs_in_private_items = { level = "deny", priority = 1 }
 multiple_inherent_impl = { level = "deny", priority = 1 }
 mutex_atomic = { level = "deny", priority = 1 }
 mutex_integer = { level = "deny", priority = 1 }

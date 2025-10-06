@@ -2,6 +2,8 @@ use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
+use crate::{Error, Result};
+
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Query {
     pub text: String,
@@ -94,9 +96,9 @@ pub struct FileContext {
 impl FileContext {
     /// # Errors
     /// Returns an error if the file cannot be read
-    pub fn from_path(path: &PathBuf) -> crate::Result<Self> {
+    pub fn from_path(path: &PathBuf) -> Result<Self> {
         let content = read_to_string(path)
-            .map_err(|_| crate::Error::FileNotFound(path.display().to_string()))?;
+            .map_err(|_| Error::FileNotFound(path.display().to_string()))?;
 
         Ok(Self {
             path: path.clone(),

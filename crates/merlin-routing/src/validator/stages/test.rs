@@ -1,12 +1,18 @@
 use async_trait::async_trait;
-use crate::{IsolatedBuildEnv, Result, Task, ValidationStageType as StageType, WorkspaceState};
+
+use merlin_core::Response;
+
 use super::super::pipeline::{StageResult, ValidationStage};
+use crate::{IsolatedBuildEnv, Result, Task, ValidationStageType as StageType, WorkspaceState};
 use std::sync::Arc;
 
 /// Test validation using isolated cargo test
 pub struct TestValidationStage {
+    /// Maximum time to allow tests to run before timing out (seconds)
     timeout_seconds: u64,
+    /// Optional workspace state used to run tests in isolation
     workspace: Option<Arc<WorkspaceState>>,
+    /// Minimum pass rate required to consider the test stage passed (0.0-1.0)
     min_pass_rate: f64,
 }
 
@@ -47,7 +53,7 @@ impl Default for TestValidationStage {
 
 #[async_trait]
 impl ValidationStage for TestValidationStage {
-    async fn validate(&self, _response: &merlin_core::Response, task: &Task) -> Result<StageResult> {
+    async fn validate(&self, _response: &Response, task: &Task) -> Result<StageResult> {
         if !task.requires_build_check() {
             return Ok(StageResult {
                 stage: StageType::Test,
@@ -68,7 +74,7 @@ impl ValidationStage for TestValidationStage {
             });
         };
         
-        let build_env = IsolatedBuildEnv::new(workspace.as_ref()).await?;
+        let build_env = IsolatedBuildEnv::new(workspace.as_ref())?;
         
         let test_result = build_env.run_tests(self.timeout_seconds).await?;
         
@@ -99,7 +105,7 @@ impl ValidationStage for TestValidationStage {
         })
     }
     
-    async fn quick_check(&self, response: &merlin_core::Response) -> Result<bool> {
+    async fn quick_check(&self, response: &Response) -> Result<bool> {
         let has_test_failures = response.text.contains("test result: FAILED")
             || response.text.contains("assertion failed");
         Ok(!has_test_failures)
@@ -117,14 +123,15 @@ impl ValidationStage for TestValidationStage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use merlin_core::TokenUsage;
 
     #[tokio::test]
     async fn test_validation_skip_no_files() {
         let stage = TestValidationStage::new();
-        let response = merlin_core::Response {
+        let response = Response {
             text: "test".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };
@@ -139,19 +146,19 @@ mod tests {
     async fn test_quick_check() {
         let stage = TestValidationStage::new();
         
-        let good_response = merlin_core::Response {
+        let good_response = Response {
             text: "test result: ok. 5 passed".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };
         assert!(stage.quick_check(&good_response).await.unwrap());
         
-        let bad_response = merlin_core::Response {
+        let bad_response = Response {
             text: "test result: FAILED. 2 passed; 3 failed".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };

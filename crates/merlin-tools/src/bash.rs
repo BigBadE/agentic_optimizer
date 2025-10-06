@@ -3,7 +3,8 @@ use std::time::Duration;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use serde_json::from_value;
-use tokio::{process::Command, time::timeout};
+use tokio::process::Command;
+use tokio::time::timeout;
 use tracing::{debug, warn};
 
 use crate::tool::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};
@@ -62,17 +63,16 @@ impl BashTool {
             command.current_dir(working_dir);
         }
 
-        let timeout = Duration::from_secs(params.timeout_secs);
+        let timeout_duration = Duration::from_secs(params.timeout_secs);
 
-        let output = match timeout(timeout, command.output()).await {
-            Ok(result) => result?,
-            Err(_) => {
-                warn!("Command timed out after {} seconds", params.timeout_secs);
-                return Err(ToolError::ExecutionFailed(format!(
-                    "Command timed out after {} seconds",
-                    params.timeout_secs
-                )));
-            }
+        let output = if let Ok(result) = timeout(timeout_duration, command.output()).await {
+            result?
+        } else {
+            warn!("Command timed out after {} seconds", params.timeout_secs);
+            return Err(ToolError::ExecutionFailed(format!(
+                "Command timed out after {} seconds",
+                params.timeout_secs
+            )));
         };
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();

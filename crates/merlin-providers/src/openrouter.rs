@@ -69,33 +69,46 @@ impl OpenRouterProvider {
     }
 }
 
+/// Response payload returned by the `OpenRouter` API.
 #[derive(Deserialize)]
 struct OpenRouterResponse {
+    /// List of generated choices.
     choices: Vec<Choice>,
+    /// Optional token usage statistics returned by the service.
     usage: Option<Usage>,
 }
 
+/// Individual completion choice from `OpenRouter`.
 #[derive(Deserialize)]
 struct Choice {
+    /// Message payload representing the completion text.
     message: Message,
 }
 
+/// Message structure containing generated content.
 #[derive(Deserialize)]
 struct Message {
+    /// Text content produced by the model.
     content: String,
 }
 
+/// Token accounting information for a response.
 #[derive(Deserialize)]
 struct Usage {
+    /// Number of prompt tokens billed for the request.
     prompt_tokens: u64,
+    /// Number of completion tokens returned by the model.
     completion_tokens: u64,
     #[serde(default)]
+    /// Detailed prompt token usage, when available.
     prompt_tokens_details: Option<PromptTokensDetails>,
 }
 
+/// Detailed prompt token usage breakdown.
 #[derive(Deserialize)]
 struct PromptTokensDetails {
     #[serde(default)]
+    /// Count of cached tokens supplied via the API.
     cached_tokens: u64,
 }
 

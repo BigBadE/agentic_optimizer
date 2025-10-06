@@ -353,13 +353,11 @@ impl BenchmarkResult {
     }
     
     /// Format result as human-readable text
-    #[allow(clippy::str_to_string, reason = "formatting emojis as descriptive text")]
     #[must_use] 
     pub fn format_report(&self) -> String {
         use std::fmt::Write as _;
         let mut report = String::new();
 
-        #[allow(clippy::let_underscore_must_use, reason = "writing to String cannot fail")]
         {
             let _ = writeln!(report, "# Benchmark: {}\n", self.test_case.name);
             let _ = writeln!(report, "**Query**: \"{}\"\n", self.test_case.query);
@@ -433,7 +431,6 @@ pub fn load_test_case(path: &Path) -> Result<TestCase> {
 /// # Errors
 ///
 /// Returns an error if the directory cannot be read
-#[allow(clippy::print_stderr, reason = "diagnostic output for test case loading failures")]
 pub fn load_test_cases(dir: &Path) -> Result<Vec<(PathBuf, TestCase)>> {
     use std::fs;
     let mut test_cases = Vec::new();

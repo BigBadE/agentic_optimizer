@@ -1,9 +1,9 @@
 //! Workspace loading utilities using rust-analyzer's cargo loader.
 
-use std::path::{Path, PathBuf};
 use std::collections::HashMap;
 use std::fs;
-use std::time::Duration;
+use std::path::{Path, PathBuf};
+use std::time::{Duration, SystemTime};
 
 use anyhow::Context as _;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
@@ -12,7 +12,7 @@ use ra_ap_load_cargo::{LoadCargoConfig, load_workspace_at};
 use ra_ap_project_model::{CargoConfig, RustLibSource};
 use ra_ap_vfs::Vfs;
 
-use merlin_core::Result;
+use merlin_core::{Error, Result};
 use crate::cache::WorkspaceCache;
 
 /// Configuration for workspace loading
@@ -24,6 +24,16 @@ pub struct LoadConfig {
     pub show_progress: bool,
     /// Whether to use cached state if available
     pub use_cache: bool,
+}
+
+type FileMetadata = HashMap<PathBuf, SystemTime>;
+
+fn insert_file_metadata(path: &PathBuf, metadata_map: &mut FileMetadata) {
+    if let Ok(metadata) = fs::metadata(path) {
+        if let Ok(modified) = metadata.modified() {
+            metadata_map.insert(path.clone(), modified);
+        }
+    }
 }
 
 impl Default for LoadConfig {
@@ -47,7 +57,6 @@ pub struct WorkspaceLoader {
 impl WorkspaceLoader {
     /// Create a new workspace loader.
     #[must_use]
-    #[allow(dead_code, reason = "Unimplemented")]
     pub fn new(project_root: &Path) -> Self {
         Self {
             project_root: project_root.to_path_buf(),
@@ -79,15 +88,21 @@ impl WorkspaceLoader {
             pb
         });
 
-        if self.config.use_cache
-            && let Ok(cache) = WorkspaceCache::load(&self.project_root)
-            && cache.is_valid(&self.project_root).unwrap_or(false)
-        {
-            tracing::info!("Using cached rust-analyzer state ({} files)", cache.file_count);
-        }
-
-        if let Some(pb) = pb1 {
-            pb.finish_with_message("\x1b[32m\u{2713}\x1b[0m Cache checked");
+        if self.config.use_cache && {
+            if let Ok(cache) = WorkspaceCache::load(&self.project_root) {
+                if cache.is_valid(&self.project_root).unwrap_or(false) {
+                    tracing::info!("Using cached rust-analyzer state ({} files)", cache.file_count);
+                    true
+                } else {
+                    false
+                }
+            } else {
+                false
+            }
+        } {
+            if let Some(pb) = pb1 {
+                pb.finish_with_message("\x1b[32m\u{2713}\x1b[0m Cache checked");
+            }
         }
 
         let pb2 = multi.as_ref().map(|multi_progress| {
@@ -126,7 +141,7 @@ impl WorkspaceLoader {
             &progress,
         )
         .with_context(|| format!("Failed to load workspace at {}", self.project_root.display()))
-        .map_err(|error| merlin_core::Error::Other(error.to_string()))?;
+        .map_err(|error| Error::Other(error.to_string()))?;
 
         if let Some(pb) = pb2 {
             pb.finish_with_message("\x1b[32m\u{2713}\x1b[0m Rust-analyzer initialized");
@@ -141,21 +156,16 @@ impl WorkspaceLoader {
         });
 
         let host = AnalysisHost::with_database(db);
-        
+
         let mut file_id_map = HashMap::new();
-        let mut file_metadata = HashMap::new();
+        let mut file_metadata = FileMetadata::new();
         
         for (file_id, path) in vfs.iter() {
             if let Some(abs_path) = path.as_path() {
                 let path_buf: PathBuf = abs_path.to_path_buf().into();
                 if path_buf.to_string_lossy().ends_with(".rs") {
                     file_id_map.insert(path_buf.clone(), file_id);
-                    
-                    if let Ok(metadata) = fs::metadata(&path_buf)
-                        && let Ok(modified) = metadata.modified()
-                    {
-                        file_metadata.insert(path_buf, modified);
-                    }
+                    insert_file_metadata(&path_buf, &mut file_metadata);
                 }
             }
         }

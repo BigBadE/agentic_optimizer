@@ -143,7 +143,6 @@ impl AgentExecutor {
             prompt.push_str("\n\n# Available Tools\n\n");
             prompt.push_str("You have access to the following tools to help complete tasks:\n\n");
             
-            #[allow(clippy::let_underscore_must_use, reason = "Writing to String is infallible")]
             for (name, description) in tools {
                 use std::fmt::Write as _;
                 let _ = write!(prompt, "## {name}\n{description}\n\n");

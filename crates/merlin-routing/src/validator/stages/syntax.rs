@@ -1,9 +1,13 @@
 use async_trait::async_trait;
-use crate::{Result, Task, ValidationStageType as StageType};
+
+use merlin_core::Response;
+
 use super::super::pipeline::{StageResult, ValidationStage};
+use crate::{Result, Task, ValidationStageType as StageType};
 
 /// Syntax validation using heuristics and pattern matching
 pub struct SyntaxValidationStage {
+    /// Minimum score required to consider the syntax check as passed
     min_score_threshold: f64,
 }
 
@@ -21,6 +25,7 @@ impl SyntaxValidationStage {
         self
     }
     
+    /// Heuristically checks for syntax issues and returns (passed, score, details)
     fn check_syntax_errors(&self, text: &str) -> (bool, f64, String) {
         let mut score = 1.0;
         let mut issues = Vec::new();
@@ -80,7 +85,7 @@ impl Default for SyntaxValidationStage {
 
 #[async_trait]
 impl ValidationStage for SyntaxValidationStage {
-    async fn validate(&self, response: &merlin_core::Response, _task: &Task) -> Result<StageResult> {
+    async fn validate(&self, response: &Response, _task: &Task) -> Result<StageResult> {
         let (passed, score, details) = self.check_syntax_errors(&response.text);
         
         Ok(StageResult {
@@ -92,7 +97,7 @@ impl ValidationStage for SyntaxValidationStage {
         })
     }
     
-    async fn quick_check(&self, response: &merlin_core::Response) -> Result<bool> {
+    async fn quick_check(&self, response: &Response) -> Result<bool> {
         let has_errors = response.text.contains("syntax error")
             || response.text.contains("parse error");
         Ok(!has_errors)
@@ -110,14 +115,15 @@ impl ValidationStage for SyntaxValidationStage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use merlin_core::TokenUsage;
 
     #[tokio::test]
     async fn test_syntax_validation_pass() {
         let stage = SyntaxValidationStage::new();
-        let response = merlin_core::Response {
+        let response = Response {
             text: "fn main() { println!(\"Hello\"); }".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };
@@ -131,10 +137,10 @@ mod tests {
     #[tokio::test]
     async fn test_syntax_validation_fail() {
         let stage = SyntaxValidationStage::new();
-        let response = merlin_core::Response {
+        let response = Response {
             text: "syntax error: unexpected token".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };
@@ -148,10 +154,10 @@ mod tests {
     #[tokio::test]
     async fn test_mismatched_braces() {
         let stage = SyntaxValidationStage::new();
-        let response = merlin_core::Response {
+        let response = Response {
             text: "fn main() { println!(\"Hello\");".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };

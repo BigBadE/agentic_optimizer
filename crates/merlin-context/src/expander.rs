@@ -12,7 +12,7 @@ use merlin_languages::LanguageProvider;
 use crate::{fs_utils::is_source_file, query::{ContextPlan, ExpansionStrategy}};
 
 /// Expands context by following code relationships
-#[allow(dead_code, reason = "Used for future context expansion functionality")]
+#[allow(dead_code)]
 pub struct ContextExpander<'expander> {
     /// Optional language backend for semantic analysis
     backend: Option<&'expander Box<dyn LanguageProvider>>,
@@ -22,10 +22,10 @@ pub struct ContextExpander<'expander> {
     max_file_size: usize,
 }
 
-#[allow(dead_code, reason = "Used for future context expansion functionality")]
 impl<'expander> ContextExpander<'expander> {
     /// Create a new context expander
     #[must_use]
+    #[allow(dead_code)]
     pub fn new(
         backend: Option<&'expander Box<dyn LanguageProvider>>,
         project_root: &'expander Path,
@@ -42,6 +42,7 @@ impl<'expander> ContextExpander<'expander> {
     ///
     /// # Errors
     /// Returns an error if file operations or semantic analysis fails
+    #[allow(dead_code)]
     pub fn expand(&self, plan: &ContextPlan) -> Result<Vec<FileContext>> {
         let spinner = ProgressBar::new_spinner();
         spinner.set_style(
@@ -140,6 +141,7 @@ impl<'expander> ContextExpander<'expander> {
     }
 
     /// Find files matching any of the patterns
+    #[allow(dead_code)]
     fn find_files_by_patterns(&self, patterns: &[String]) -> Result<Vec<PathBuf>> {
         let mut files = Vec::new();
 
@@ -190,6 +192,7 @@ impl<'expander> ContextExpander<'expander> {
     }
 
     /// Expand focused on specific symbols
+    #[allow(dead_code)]
     fn expand_focused(&self, symbols: &[String], spinner: &ProgressBar) -> Result<Vec<PathBuf>> {
         let mut files = Vec::new();
 
@@ -232,11 +235,13 @@ impl<'expander> ContextExpander<'expander> {
     }
 
     /// Expand broadly across matching patterns
+    #[allow(dead_code)]
     fn expand_broad(&self, patterns: &[String]) -> Result<Vec<PathBuf>> {
         self.find_files_by_patterns(patterns)
     }
 
     /// Expand from entry points by traversing imports
+    #[allow(dead_code)]
     fn expand_from_entry_points(&self, entry_files: &[PathBuf], max_depth: usize) -> Result<Vec<PathBuf>> {
         let mut files = HashSet::new();
         let mut to_process: Vec<(PathBuf, usize)> = entry_files.iter()
@@ -265,6 +270,7 @@ impl<'expander> ContextExpander<'expander> {
     }
 
     /// Expand using semantic search
+    #[allow(dead_code)]
     fn expand_semantic(&self, _query: &str, _top_k: usize) -> Result<Vec<PathBuf>> {
         // TODO: Implement semantic search using embeddings
         // For now, return empty - this is a future enhancement
@@ -273,6 +279,7 @@ impl<'expander> ContextExpander<'expander> {
     }
 
     /// Find test files related to the given files
+    #[allow(dead_code)]
     fn find_test_files(&self, files: &HashSet<PathBuf>) -> Result<Vec<PathBuf>> {
         let mut test_files = Vec::new();
 
@@ -310,6 +317,7 @@ impl<'expander> ContextExpander<'expander> {
     }
 
     /// Check if a directory entry should be ignored
+    #[allow(dead_code)]
     fn is_ignored(entry: &walkdir::DirEntry) -> bool {
         const IGNORED_DIRS: &[&str] = &["target", "node_modules", "dist", "build", ".git", ".idea", ".vscode"];
         

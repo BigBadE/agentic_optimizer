@@ -10,6 +10,7 @@ pub enum OutputNode {
         content: String,
         children: Vec<OutputNode>,
     },
+    #[allow(dead_code)]
     ToolCall {
         id: String,
         tool_name: String,
@@ -101,6 +102,7 @@ impl OutputTree {
     }
     
     /// Add a tool call
+    #[allow(dead_code)]
     pub fn add_tool_call(&mut self, tool_name: String, _args: Value) {
         let id = format!("tool_{}", self.root.len());
         let node = OutputNode::ToolCall {

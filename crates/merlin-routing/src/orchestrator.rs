@@ -1,12 +1,14 @@
-use std::sync::Arc;
 use std::env;
+use std::sync::Arc;
+
+use merlin_core::{Context, FileContext, ModelProvider, Query, Response, TokenUsage};
+
 use crate::{
     AgentExecutor, ConflictAwareTaskGraph, ExecutorPool, ListFilesTool,
     LocalTaskAnalyzer, ModelRouter, ModelTier, ReadFileTool, Result, RoutingConfig, RunCommandTool,
     StrategyRouter, Task, TaskAnalysis, TaskAnalyzer, TaskResult, ToolRegistry, UiChannel,
     ValidationPipeline, Validator, WorkspaceState, WriteFileTool,
 };
-use merlin_core::{Context, ModelProvider, Query};
 
 /// High-level orchestrator that coordinates all routing components
 #[derive(Clone)]
@@ -43,6 +45,19 @@ impl RoutingOrchestrator {
             validator,
             workspace,
         }
+    }
+
+    async fn try_escalate(&self, tier: &ModelTier, query: &Query, context: &Context) -> Result<Option<Response>> {
+        let Some(higher_tier) = tier.escalate() else {
+            return Ok(None);
+        };
+
+        let escalated_provider = self.create_provider(&higher_tier)?;
+        let result = escalated_provider
+            .generate(query, context)
+            .await
+            .map_err(|error| crate::RoutingError::Other(error.to_string()))?;
+        Ok(Some(result))
     }
     
     #[must_use]
@@ -151,11 +166,12 @@ impl RoutingOrchestrator {
             task_id: task.id,
             response,
             tier_used: decision.tier.to_string(),
+            tokens_used: TokenUsage::default(),
             validation,
             duration_ms,
         })
     }
-    
+
     fn create_provider(&self, tier: &ModelTier) -> Result<Arc<dyn ModelProvider>> {
         match tier {
             ModelTier::Local { model_name } => {
@@ -219,7 +235,7 @@ impl RoutingOrchestrator {
         // Add files from workspace if specified
         for file_path in &task.context_needs.required_files {
             if let Some(content) = self.workspace.read_file(file_path).await {
-                context = context.with_files(vec![merlin_core::FileContext::new(
+                context = context.with_files(vec![FileContext::new(
                     file_path.clone(),
                     content,
                 )]);
@@ -236,7 +252,7 @@ impl RoutingOrchestrator {
         context: &Context,
         tier: &ModelTier,
         _task: Task,
-    ) -> Result<merlin_core::Response> {
+    ) -> Result<Response> {
         let mut attempts = 0;
         let max_retries = self.config.tiers.max_retries;
         
@@ -245,22 +261,19 @@ impl RoutingOrchestrator {
                 Ok(response) => return Ok(response),
                 Err(e) => {
                     attempts += 1;
-                    
-                    if attempts >= max_retries {
-                        // Try escalation
-                        if let Some(higher_tier) = tier.escalate() {
-                            let escalated_provider = self.create_provider(&higher_tier)?;
-                            return escalated_provider.generate(query, context).await
-                                .map_err(|e| crate::RoutingError::Other(e.to_string()));
-                        }
-                        
-                        return Err(crate::RoutingError::Other(format!(
-                            "Failed after {max_retries} retries: {e}"
-                        )));
+                    if attempts < max_retries {
+                        // Wait before retry and continue the loop
+                        tokio::time::sleep(std::time::Duration::from_millis(1000 * attempts as u64)).await;
+                        continue;
                     }
-                    
-                    // Wait before retry
-                    tokio::time::sleep(std::time::Duration::from_millis(1000 * attempts as u64)).await;
+
+                    if let Some(response) = self.try_escalate(tier, query, context).await? {
+                        return Ok(response);
+                    }
+
+                    return Err(crate::RoutingError::Other(format!(
+                        "Failed after {max_retries} retries: {e}"
+                    )));
                 }
             }
         }

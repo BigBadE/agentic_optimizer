@@ -1,11 +1,16 @@
 use async_trait::async_trait;
-use crate::{IsolatedBuildEnv, Result, Task, ValidationStageType as StageType, WorkspaceState};
-use super::super::pipeline::{StageResult, ValidationStage};
 use std::sync::Arc;
+
+use merlin_core::Response;
+
+use super::super::pipeline::{StageResult, ValidationStage};
+use crate::{IsolatedBuildEnv, Result, Task, ValidationStageType as StageType, WorkspaceState};
 
 /// Build validation using isolated cargo check
 pub struct BuildValidationStage {
+    /// Maximum time to allow the build to run before timing out (seconds)
     timeout_seconds: u64,
+    /// Optional workspace state used to run isolated builds
     workspace: Option<Arc<WorkspaceState>>,
 }
 
@@ -39,7 +44,7 @@ impl Default for BuildValidationStage {
 
 #[async_trait]
 impl ValidationStage for BuildValidationStage {
-    async fn validate(&self, _response: &merlin_core::Response, task: &Task) -> Result<StageResult> {
+    async fn validate(&self, _response: &Response, task: &Task) -> Result<StageResult> {
         if !task.requires_build_check() {
             return Ok(StageResult {
                 stage: StageType::Build,
@@ -60,7 +65,7 @@ impl ValidationStage for BuildValidationStage {
             });
         };
         
-        let build_env = IsolatedBuildEnv::new(workspace.as_ref()).await?;
+        let build_env = IsolatedBuildEnv::new(workspace.as_ref())?;
         
         let build_result = build_env.validate_build().await?;
         
@@ -83,7 +88,7 @@ impl ValidationStage for BuildValidationStage {
         })
     }
     
-    async fn quick_check(&self, response: &merlin_core::Response) -> Result<bool> {
+    async fn quick_check(&self, response: &Response) -> Result<bool> {
         let has_build_errors = response.text.contains("error[E")
             || response.text.contains("cannot find")
             || response.text.contains("mismatched types");
@@ -102,14 +107,15 @@ impl ValidationStage for BuildValidationStage {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use merlin_core::TokenUsage;
 
     #[tokio::test]
     async fn test_build_validation_skip_no_files() {
         let stage = BuildValidationStage::new();
-        let response = merlin_core::Response {
+        let response = Response {
             text: "fn main() {}".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };
@@ -124,22 +130,23 @@ mod tests {
     async fn test_quick_check() {
         let stage = BuildValidationStage::new();
         
-        let good_response = merlin_core::Response {
+        let good_response = Response {
             text: "fn main() {}".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };
         assert!(stage.quick_check(&good_response).await.unwrap());
         
-        let bad_response = merlin_core::Response {
+        let bad_response = Response {
             text: "error[E0425]: cannot find value".to_owned(),
             confidence: 1.0,
-            tokens_used: merlin_core::TokenUsage::default(),
+            tokens_used: TokenUsage::default(),
             provider: "test".to_owned(),
             latency_ms: 0,
         };
         assert!(!stage.quick_check(&bad_response).await.unwrap());
     }
 }
+

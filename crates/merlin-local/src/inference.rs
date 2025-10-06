@@ -1,15 +1,19 @@
 use async_trait::async_trait;
 use reqwest::Client;
 use std::time::Instant;
-use merlin_core::{Context, ModelProvider, Query, Response, Result, TokenUsage};
+use merlin_core::{Context, Error, ModelProvider, Query, Response, Result, TokenUsage};
 use crate::models::{OllamaGenerateRequest, OllamaGenerateResponse};
 use crate::OllamaManager;
 
-/// Local model provider using Ollama
+/// Local model provider using `Ollama`.
 pub struct LocalModelProvider {
+    /// HTTP client used to issue requests to the Ollama runtime.
     client: Client,
+    /// Base URL for the Ollama service.
     base_url: String,
+    /// Configured model name to request from Ollama.
     model_name: String,
+    /// Helper that manages Ollama models and availability.
     manager: OllamaManager,
 }
 
@@ -31,6 +35,12 @@ impl LocalModelProvider {
         self
     }
 
+    /// Send a completion request to the Ollama runtime.
+    ///
+    /// # Errors
+    ///
+    /// Returns an [`Error`] if the request fails, the service reports an error,
+    /// or the response payload cannot be parsed.
     async fn generate_completion(&self, prompt: &str, system: Option<&str>) -> Result<OllamaGenerateResponse> {
         let request = OllamaGenerateRequest {
             model: self.model_name.clone(),
@@ -46,17 +56,17 @@ impl LocalModelProvider {
             .json(&request)
             .send()
             .await
-            .map_err(|err| merlin_core::Error::Other(format!("Ollama request failed: {err}")))?;
+            .map_err(|err| Error::Other(format!("Ollama request failed: {err}")))?;
 
         if !response.status().is_success() {
-            return Err(merlin_core::Error::Other(format!(
+            return Err(Error::Other(format!(
                 "Ollama returned error: {}",
                 response.status()
             )));
         }
 
         let ollama_response: OllamaGenerateResponse = response.json().await
-            .map_err(|err| merlin_core::Error::Other(format!("Failed to parse Ollama response: {err}")))?;
+            .map_err(|err| Error::Other(format!("Failed to parse Ollama response: {err}")))?;
         
         Ok(ollama_response)
     }
@@ -88,7 +98,7 @@ impl ModelProvider for LocalModelProvider {
                     file_ctx.content
                 ).is_err() {
                     // Writing to String should never fail, but handle it gracefully
-                    return Err(merlin_core::Error::Other("Failed to write context to prompt".to_owned()));
+                    return Err(Error::Other("Failed to write context to prompt".to_owned()));
                 }
             }
         }

@@ -234,7 +234,6 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 }
 
 /// Generate a preview from file content (first few lines or summary)
-#[allow(dead_code, reason = "Used for future preview generation functionality")]
 #[must_use] 
 pub fn generate_preview(content: &str, max_chars: usize) -> String {
     let lines: Vec<&str> = content.lines().take(10).collect();

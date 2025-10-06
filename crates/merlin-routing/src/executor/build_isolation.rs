@@ -13,7 +13,7 @@ pub struct IsolatedBuildEnv {
 
 impl IsolatedBuildEnv {
     /// Create isolated build environment
-    pub async fn new(workspace: &WorkspaceState) -> Result<Self> {
+    pub fn new(workspace: &WorkspaceState) -> Result<Self> {
         let temp_dir = TempDir::new()
             .map_err(|e| RoutingError::Other(format!("Failed to create temp dir: {e}")))?;
         

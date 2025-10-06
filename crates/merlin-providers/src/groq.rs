@@ -52,39 +52,57 @@ impl GroqProvider {
     }
 }
 
+/// Request payload sent to the Groq chat completion API.
 #[derive(Debug, Serialize)]
 struct GroqRequest {
+    /// Model identifier provided by the Groq service.
     model: String,
+    /// Messages that form the conversation context for the request.
     messages: Vec<GroqMessage>,
+    /// Sampling temperature controlling response randomness.
     temperature: f32,
+    /// Maximum number of tokens allowed in the completion.
     max_tokens: usize,
 }
 
+/// Message delivered to the Groq API.
 #[derive(Debug, Serialize)]
 struct GroqMessage {
+    /// Role of the message author (for example `system` or `user`).
     role: String,
+    /// Textual content of the message.
     content: String,
 }
 
+/// Response payload returned by Groq.
 #[derive(Debug, Deserialize)]
 struct GroqResponse {
+    /// List of candidate completions.
     choices: Vec<GroqChoice>,
+    /// Token accounting information for the request.
     usage: GroqUsage,
 }
 
+/// A single completion choice returned by Groq.
 #[derive(Debug, Deserialize)]
 struct GroqChoice {
+    /// Message generated for the choice.
     message: GroqResponseMessage,
 }
 
+/// Response message containing the generated text.
 #[derive(Debug, Deserialize)]
 struct GroqResponseMessage {
+    /// Generated text content.
     content: String,
 }
 
+/// Token usage metrics for a Groq response.
 #[derive(Debug, Deserialize)]
 struct GroqUsage {
+    /// Number of tokens in the prompt portion of the request.
     prompt_tokens: usize,
+    /// Number of tokens produced in the completion.
     completion_tokens: usize,
 }
 

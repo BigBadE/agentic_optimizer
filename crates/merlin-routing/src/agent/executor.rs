@@ -89,21 +89,7 @@ impl AgentExecutor {
         context: &Context,
         ui_channel: &UiChannel,
     ) -> Result<Response> {
-        // Send thinking step
-        let thinking_step = self.step_tracker.create_step(
-            task_id,
-            StepType::Thinking,
-            "Analyzing task and planning approach...".to_string(),
-        );
-        
-        ui_channel.send(UiEvent::TaskStepStarted {
-            task_id,
-            step_id: format!("{:?}", thinking_step.id),
-            step_type: "Thinking".to_string(),
-            content: thinking_step.content.clone(),
-        });
-        
-        // Execute the query
+        // Execute the query directly without extra steps
         let mut response = provider.generate(query, context).await
             .map_err(|e| RoutingError::Other(format!("Provider error: {}", e)))?;
         
@@ -166,23 +152,10 @@ impl AgentExecutor {
             }
         }
         
-        // Send output step
-        let output_step = self.step_tracker.create_step(
+        // Send output directly as text (no wrapper step)
+        ui_channel.send(UiEvent::TaskOutput {
             task_id,
-            StepType::Output,
-            response.text.clone(),
-        );
-        
-        ui_channel.send(UiEvent::TaskStepStarted {
-            task_id,
-            step_id: format!("{:?}", output_step.id),
-            step_type: "Output".to_string(),
-            content: output_step.content.clone(),
-        });
-        
-        ui_channel.send(UiEvent::TaskStepCompleted {
-            task_id,
-            step_id: format!("{:?}", output_step.id),
+            output: response.text.clone(),
         });
         
         Ok(response)

@@ -337,22 +337,22 @@ impl TuiApp {
             }).await;
             
             if let Ok(Ok(tasks)) = loaded_tasks {
+                // 1. Insert all tasks into HashMap first
                 for (task_id, task_display) in tasks {
                     self.state.tasks.insert(task_id, task_display);
-                    self.state.task_order.push(task_id);
                 }
                 
-                // Wrap all loaded task outputs
+                // 2. Rebuild hierarchical order from parent relationships
+                self.rebuild_task_order();
+                
+                // 3. Wrap all loaded task outputs
                 let task_ids: Vec<TaskId> = self.state.task_order.clone();
                 for task_id in task_ids {
                     self.auto_wrap_output(task_id);
                 }
                 
-                // Set selected index but don't activate any task initially
-                if !self.state.task_order.is_empty() {
-                    self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
-                    // Don't set active_task_id - let user select a task manually
-                }
+                // Don't select any task initially - let user select manually or wait for new task
+                // active_task_id stays None, selected_task_index stays 0 (but won't render since no active_task_id)
             }
             
             self.state.loading_tasks = false;
@@ -706,13 +706,14 @@ impl TuiApp {
     }
     
     fn get_visible_tasks(&self) -> Vec<TaskId> {
+        // task_order already maintains hierarchical order, just filter out collapsed children
         let mut visible = Vec::new();
         
         for &task_id in &self.state.task_order {
             if let Some(task) = self.state.tasks.get(&task_id) {
                 // Check if any ancestor is collapsed
-                let mut current_parent = task.parent_id;
                 let mut is_hidden = false;
+                let mut current_parent = task.parent_id;
                 
                 while let Some(parent_id) = current_parent {
                     if self.state.collapsed_tasks.contains(&parent_id) {
@@ -731,13 +732,87 @@ impl TuiApp {
         visible
     }
     
+    fn is_descendant_of(&self, task_id: TaskId, ancestor_id: TaskId) -> bool {
+        let mut current_parent = self.state.tasks.get(&task_id).and_then(|t| t.parent_id);
+        
+        while let Some(parent_id) = current_parent {
+            if parent_id == ancestor_id {
+                return true;
+            }
+            current_parent = self.state.tasks.get(&parent_id).and_then(|t| t.parent_id);
+        }
+        
+        false
+    }
+    
+    /// Rebuild task_order from scratch based on parent relationships and start times
+    /// This ensures hierarchical order is maintained: parent followed by all its children
+    fn rebuild_task_order(&mut self) {
+        self.state.task_order.clear();
+        
+        // Get all tasks sorted by start_time
+        let mut all_tasks: Vec<(TaskId, Instant)> = self.state.tasks
+            .iter()
+            .map(|(&id, task)| (id, task.start_time))
+            .collect();
+        all_tasks.sort_by_key(|(_, time)| *time);
+        
+        // Add root tasks first, then recursively add their children
+        for (task_id, _) in &all_tasks {
+            let is_root = self.state.tasks.get(task_id)
+                .map(|t| t.parent_id.is_none())
+                .unwrap_or(false);
+            
+            if is_root && !self.state.task_order.contains(task_id) {
+                self.add_task_and_descendants(*task_id);
+            }
+        }
+        
+        // Handle orphaned tasks (parent doesn't exist) - add them at the end
+        for (task_id, _) in all_tasks {
+            if !self.state.task_order.contains(&task_id) {
+                self.state.task_order.push(task_id);
+            }
+        }
+    }
+    
+    /// Recursively add a task and all its descendants to task_order
+    fn add_task_and_descendants(&mut self, task_id: TaskId) {
+        self.state.task_order.push(task_id);
+        
+        // Find all direct children, sorted by start_time
+        let mut children: Vec<(TaskId, Instant)> = self.state.tasks
+            .iter()
+            .filter(|(_, task)| task.parent_id == Some(task_id))
+            .map(|(&id, task)| (id, task.start_time))
+            .collect();
+        children.sort_by_key(|(_, time)| *time);
+        
+        // Recursively add each child and its descendants
+        for (child_id, _) in children {
+            if !self.state.task_order.contains(&child_id) {
+                self.add_task_and_descendants(child_id);
+            }
+        }
+    }
+    
     fn navigate_tasks_up(&mut self) {
         let visible_tasks = self.get_visible_tasks();
         if visible_tasks.is_empty() {
             return;
         }
         
-        // If nothing selected, select the last visible task
+        // If no task is active, select the last visible task
+        if self.state.active_task_id.is_none() {
+            let last_task_id = *visible_tasks.last().unwrap();
+            if let Some(new_index) = self.state.task_order.iter().position(|&id| id == last_task_id) {
+                self.state.selected_task_index = new_index;
+                self.switch_to_selected_task();
+            }
+            return;
+        }
+        
+        // If selected index is out of bounds, select the last visible task
         if self.state.selected_task_index >= self.state.task_order.len() {
             let last_task_id = *visible_tasks.last().unwrap();
             if let Some(new_index) = self.state.task_order.iter().position(|&id| id == last_task_id) {
@@ -763,6 +838,16 @@ impl TuiApp {
     fn navigate_tasks_down(&mut self) {
         let visible_tasks = self.get_visible_tasks();
         if visible_tasks.is_empty() {
+            return;
+        }
+        
+        // If no task is active, select the last visible task (same as up - start at end)
+        if self.state.active_task_id.is_none() {
+            let last_task_id = *visible_tasks.last().unwrap();
+            if let Some(new_index) = self.state.task_order.iter().position(|&id| id == last_task_id) {
+                self.state.selected_task_index = new_index;
+                self.switch_to_selected_task();
+            }
             return;
         }
         
@@ -879,56 +964,83 @@ impl TuiApp {
     }
     
     fn delete_task(&mut self, task_id: TaskId) {
-        // First, find and delete all children recursively
-        let children: Vec<TaskId> = self.state.task_order
-            .iter()
-            .filter(|id| {
-                self.state.tasks.get(id)
-                    .and_then(|t| t.parent_id)
-                    == Some(task_id)
-            })
-            .copied()
-            .collect();
+        // Remember if this was the active task and its position BEFORE any deletion
+        let was_active = self.state.active_task_id == Some(task_id);
+        let deleted_pos = self.state.task_order.iter().position(|&id| id == task_id);
         
-        // Recursively delete all children
-        for child_id in children {
-            self.delete_task(child_id);
+        // Collect all descendants (children, grandchildren, etc.) recursively
+        let mut to_delete = vec![task_id];
+        let mut i = 0;
+        while i < to_delete.len() {
+            let current = to_delete[i];
+            // Find direct children of current task
+            let children: Vec<TaskId> = self.state.task_order
+                .iter()
+                .filter(|id| {
+                    self.state.tasks.get(id)
+                        .and_then(|t| t.parent_id)
+                        == Some(current)
+                })
+                .copied()
+                .collect();
+            to_delete.extend(children);
+            i += 1;
         }
         
-        // Now delete this task
-        // Remove from tasks map
-        self.state.tasks.remove(&task_id);
-        
-        // Remove from task order
-        if let Some(pos) = self.state.task_order.iter().position(|&id| id == task_id) {
-            self.state.task_order.remove(pos);
+        // Delete all tasks (remove from all collections)
+        for id in &to_delete {
+            // Remove from tasks map
+            self.state.tasks.remove(id);
             
-            // Adjust selected index if needed
-            if self.state.selected_task_index >= self.state.task_order.len() {
-                self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
+            // Remove from active running tasks
+            self.state.active_running_tasks.remove(id);
+            
+            // Remove from collapsed tasks
+            self.state.collapsed_tasks.remove(id);
+            
+            // Delete the saved task file
+            if let Some(ref tasks_dir) = self.tasks_dir {
+                let task_id_str = format!("{:?}", id);
+                let clean_id = task_id_str
+                    .strip_prefix("TaskId(")
+                    .and_then(|s| s.strip_suffix(")"))
+                    .unwrap_or(&task_id_str);
+                let task_file = tasks_dir.join(format!("{}.json.gz", clean_id));
+                drop(std::fs::remove_file(task_file));
             }
         }
         
-        // Remove from active running tasks
-        self.state.active_running_tasks.remove(&task_id);
+        // Remove all deleted tasks from task_order in one pass
+        self.state.task_order.retain(|id| !to_delete.contains(id));
         
-        // Remove from collapsed tasks
-        self.state.collapsed_tasks.remove(&task_id);
-        
-        // If this was the active task, clear it
-        if self.state.active_task_id == Some(task_id) {
-            self.state.active_task_id = None;
-        }
-        
-        // Delete the saved task file
-        if let Some(ref tasks_dir) = self.tasks_dir {
-            let task_id_str = format!("{:?}", task_id);
-            let clean_id = task_id_str
-                .strip_prefix("TaskId(")
-                .and_then(|s| s.strip_suffix(")"))
-                .unwrap_or(&task_id_str);
-            let task_file = tasks_dir.join(format!("{}.json.gz", clean_id));
-            drop(std::fs::remove_file(task_file));
+        // Handle selection after deletion
+        if was_active && !self.state.task_order.is_empty() {
+            if let Some(pos) = deleted_pos {
+                // Try to select the task at the same position (or the one above if at the end)
+                if pos < self.state.task_order.len() {
+                    // Select the task that took this position (task below)
+                    self.state.selected_task_index = pos;
+                } else {
+                    // We deleted the last task, select the new last task (task above)
+                    self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
+                }
+                // Set the new active task
+                if let Some(&new_task_id) = self.state.task_order.get(self.state.selected_task_index) {
+                    self.state.active_task_id = Some(new_task_id);
+                } else {
+                    self.state.active_task_id = None;
+                }
+            }
+        } else {
+            // Clear active_task_id if it was deleted
+            if to_delete.contains(&self.state.active_task_id.unwrap_or(TaskId::new())) {
+                self.state.active_task_id = None;
+            }
+            
+            // Adjust selected index if it's out of bounds
+            if self.state.selected_task_index >= self.state.task_order.len() && !self.state.task_order.is_empty() {
+                self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
+            }
         }
     }
     
@@ -1119,7 +1231,32 @@ impl TuiApp {
                 };
                 
                 self.state.tasks.insert(task_id, task_display);
-                self.state.task_order.push(task_id);
+                
+                // Insert task in correct hierarchical position
+                if let Some(parent_id) = parent_id {
+                    // Find parent's position and insert after parent and all its descendants
+                    if let Some(parent_pos) = self.state.task_order.iter().position(|&id| id == parent_id) {
+                        // Find the last descendant of the parent
+                        let mut insert_pos = parent_pos + 1;
+                        while insert_pos < self.state.task_order.len() {
+                            let current_id = self.state.task_order[insert_pos];
+                            // Check if this task is a descendant of parent
+                            if self.is_descendant_of(current_id, parent_id) {
+                                insert_pos += 1;
+                            } else {
+                                break;
+                            }
+                        }
+                        self.state.task_order.insert(insert_pos, task_id);
+                    } else {
+                        // Parent not found, append to end
+                        self.state.task_order.push(task_id);
+                    }
+                } else {
+                    // Root task, append to end
+                    self.state.task_order.push(task_id);
+                }
+                
                 self.state.active_running_tasks.insert(task_id);
                 
                 // If this task has a parent, ensure the parent is not collapsed
@@ -1127,9 +1264,9 @@ impl TuiApp {
                     self.state.collapsed_tasks.remove(&parent_id);
                 }
                 
-                // Auto-select this task if it's the first one or if we don't have an active task
-                if self.state.task_order.len() == 1 || self.state.active_task_id.is_none() {
-                    self.state.selected_task_index = self.state.task_order.len().saturating_sub(1);
+                // Always select the newly spawned task
+                if let Some(pos) = self.state.task_order.iter().position(|&id| id == task_id) {
+                    self.state.selected_task_index = pos;
                     self.state.active_task_id = Some(task_id);
                 }
             }
@@ -1311,7 +1448,14 @@ impl TuiApp {
                     ""
                 };
                 
-                let selected = if self.state.selected_task_index < self.state.task_order.len() && idx == self.state.selected_task_index { "► " } else { "" };
+                // Only show selection marker if a task is actually selected (active_task_id is set)
+                let selected = if self.state.active_task_id.is_some() 
+                    && self.state.selected_task_index < self.state.task_order.len() 
+                    && idx == self.state.selected_task_index { 
+                    "► " 
+                } else { 
+                    "  " 
+                };
                 
                 // Show only first line of description, truncate if too long
                 let first_line = task.description.lines().next().unwrap_or("");
@@ -1370,8 +1514,10 @@ impl TuiApp {
                     }
                 };
                 
-                // Always highlight selected task, brighter when Tasks pane is focused
-                if self.state.selected_task_index < self.state.task_order.len() && idx == self.state.selected_task_index {
+                // Highlight selected task only if active_task_id is set, brighter when Tasks pane is focused
+                if self.state.active_task_id.is_some() 
+                    && self.state.selected_task_index < self.state.task_order.len() 
+                    && idx == self.state.selected_task_index {
                     if self.focused_pane == FocusedPane::Tasks {
                         style = style.fg(self.theme.highlight()).add_modifier(Modifier::BOLD);
                     } else {
@@ -1552,7 +1698,10 @@ impl TuiApp {
             let total_items = task_items.len();
             
             let scroll_offset = if total_items > list_height {
-                if self.state.selected_task_index < list_height / 2 {
+                // If no task is selected, scroll to the end
+                if self.state.active_task_id.is_none() {
+                    total_items.saturating_sub(list_height)
+                } else if self.state.selected_task_index < list_height / 2 {
                     0
                 } else if self.state.selected_task_index >= total_items.saturating_sub(list_height / 2) {
                     total_items.saturating_sub(list_height)
@@ -1630,7 +1779,12 @@ impl TuiApp {
     }
     
     pub fn get_selected_task_id(&self) -> Option<TaskId> {
-        self.state.task_order.get(self.state.selected_task_index).copied()
+        // Only return a task ID if one is actually selected (active_task_id is set)
+        if self.state.active_task_id.is_some() {
+            self.state.task_order.get(self.state.selected_task_index).copied()
+        } else {
+            None
+        }
     }
     
     pub fn get_selected_task_parent(&self) -> Option<TaskId> {

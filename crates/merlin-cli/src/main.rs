@@ -490,18 +490,13 @@ async fn run_tui_interactive(
         if let Some(user_input) = tui_app.take_pending_input() {
             writeln!(log_file, "User: {user_input}")?;
             
-            ui_channel.send(UiEvent::SystemMessage {
-                level: MessageLevel::Info,
-                message: format!("Processing: {user_input}"),
-            });
-            
             let orchestrator_clone = orchestrator.clone();
             let ui_channel_clone = ui_channel.clone();
             let verbose_clone = verbose;
             let mut log_clone = log_file.try_clone()?;
-            // If selected task is a child, use its parent; otherwise use the selected task itself
-            let parent_task_id = tui_app.get_selected_task_parent()
-                .or_else(|| tui_app.get_selected_task_id());
+            
+            // Get selected task as parent for new task
+            let parent_task_id = tui_app.get_selected_task_id();
             
             // TODO: Context gathering should be handled by self-determination (GATHER action)
             // For now, disable automatic context injection to prevent infinite loops
@@ -515,8 +510,14 @@ async fn run_tui_interactive(
                 
                 writeln!(log_clone, "Created task: {}", user_input).ok();
                 
-                // Notify UI of task start (show clean user input, not context)
+                // Notify UI of task start (parent is the selected task, if any)
                 ui_channel_clone.task_started_with_parent(task_id, user_input.clone(), parent_task_id);
+                
+                // Add prompt header to output
+                ui_channel_clone.send(merlin_routing::UiEvent::TaskOutput {
+                    task_id,
+                    output: format!("Prompt: {}\n", user_input),
+                });
                 
                 // Execute with self-determination (task will assess itself)
                 match orchestrator_clone.execute_task_self_determining(task, ui_channel_clone.clone()).await {

@@ -62,7 +62,7 @@ pub struct OutputTree {
     root: Vec<OutputNode>,
     selected_index: usize,
     collapsed_nodes: HashSet<String>,
-    current_step_stack: Vec<String>, // Track nested steps
+    pub current_step_stack: Vec<String>, // Track nested steps
 }
 
 impl OutputTree {
@@ -101,10 +101,15 @@ impl OutputTree {
         self.current_step_stack.push(step_id);
     }
     
-    /// Complete a step (pop from stack)
+    /// Complete a step (pop from stack and auto-collapse if it's "analysis")
     pub fn complete_step(&mut self, step_id: &str) {
         if self.current_step_stack.last().map(|s| s.as_str()) == Some(step_id) {
             self.current_step_stack.pop();
+        }
+        
+        // Auto-collapse "analysis" steps when they complete
+        if step_id == "analysis" {
+            self.collapsed_nodes.insert(step_id.to_string());
         }
     }
     

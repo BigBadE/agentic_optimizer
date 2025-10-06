@@ -503,85 +503,51 @@ async fn run_tui_interactive(
             let parent_task_id = tui_app.get_selected_task_parent()
                 .or_else(|| tui_app.get_selected_task_id());
             
-            // Get thread context for conversation continuity
-            let thread_context = tui_app.get_thread_context();
-            let context_str = if !thread_context.is_empty() {
-                let mut ctx = String::from("\n\n=== Previous Conversation Context ===\n");
-                for (idx, (_task_id, description, output)) in thread_context.iter().enumerate() {
-                    ctx.push_str(&format!("\n[Task {}] {}\n", idx + 1, description));
-                    if !output.is_empty() {
-                        ctx.push_str(&format!("Output:\n{}\n", output));
-                    }
-                }
-                ctx.push_str("\n=== End Context ===\n\n");
-                ctx
-            } else {
-                String::new()
-            };
-            
-            let enhanced_input = if context_str.is_empty() {
-                user_input.clone()
-            } else {
-                format!("{}{}", context_str, user_input)
-            };
+            // TODO: Context gathering should be handled by self-determination (GATHER action)
+            // For now, disable automatic context injection to prevent infinite loops
             
             tokio::spawn(async move {
-                match orchestrator_clone.analyze_request(&enhanced_input).await {
-                    Ok(analysis) => {
-                        writeln!(log_clone, "Analysis: {} tasks", analysis.tasks.len()).ok();
+                // Create a single task from user input - let self-determination handle decomposition
+                use merlin_routing::Task;
+                // Use original user_input for task description, enhanced_input for execution
+                let task = Task::new(user_input.clone());
+                let task_id = task.id;
+                
+                writeln!(log_clone, "Created task: {}", user_input).ok();
+                
+                // Notify UI of task start (show clean user input, not context)
+                ui_channel_clone.task_started_with_parent(task_id, user_input.clone(), parent_task_id);
+                
+                // Execute with self-determination (task will assess itself)
+                match orchestrator_clone.execute_task_self_determining(task, ui_channel_clone.clone()).await {
+                    Ok(result) => {
+                        ui_channel_clone.completed(result.task_id, result.clone());
                         
-                        ui_channel_clone.send(UiEvent::SystemMessage {
-                            level: MessageLevel::Success,
-                            message: format!("Generated {} task(s)", analysis.tasks.len()),
-                        });
+                        writeln!(log_clone, "Response: {}", result.response.text).ok();
+                        writeln!(log_clone, "Tier: {} | Duration: {}ms | Tokens: {}",
+                            result.tier_used,
+                            result.duration_ms,
+                            result.response.tokens_used.total()
+                        ).ok();
                         
-                        // Execute tasks with streaming
-                        for task in analysis.tasks {
-                            let task_id = task.id;
-                            let task_desc = task.description.clone();
-                            
-                            ui_channel_clone.task_started_with_parent(task_id, task_desc.clone(), parent_task_id);
-                            
-                            // Execute with streaming (AgentExecutor will handle all output)
-                            match orchestrator_clone.execute_task_self_determining(task, ui_channel_clone.clone()).await {
-                                Ok(result) => {
-                                    ui_channel_clone.completed(result.task_id, result.clone());
-                                    
-                                    writeln!(log_clone, "Response: {}", result.response.text).ok();
-                                    writeln!(log_clone, "Tier: {} | Duration: {}ms | Tokens: {}",
-                                        result.tier_used,
-                                        result.duration_ms,
-                                        result.response.tokens_used.total()
-                                    ).ok();
-                                    
-                                    if verbose_clone {
-                                        ui_channel_clone.send(UiEvent::SystemMessage {
-                                            level: MessageLevel::Info,
-                                            message: format!("[Tier: {} | {}ms | {} tokens]",
-                                                result.tier_used,
-                                                result.duration_ms,
-                                                result.response.tokens_used.total()
-                                            ),
-                                        });
-                                    }
-                                }
-                                Err(error) => {
-                                    writeln!(log_clone, "Error: {error}").ok();
-                                    ui_channel_clone.send(UiEvent::SystemMessage {
-                                        level: MessageLevel::Error,
-                                        message: format!("Error: {error}"),
-                                    });
-                                    ui_channel_clone.failed(task_id, error.to_string());
-                                }
-                            }
+                        if verbose_clone {
+                            ui_channel_clone.send(UiEvent::SystemMessage {
+                                level: MessageLevel::Info,
+                                message: format!("[Tier: {} | {}ms | {} tokens]",
+                                    result.tier_used,
+                                    result.duration_ms,
+                                    result.response.tokens_used.total()
+                                ),
+                            });
                         }
                     }
                     Err(error) => {
-                        writeln!(log_clone, "Analysis error: {error}").ok();
+                        writeln!(log_clone, "Error: {error}").ok();
                         ui_channel_clone.send(UiEvent::SystemMessage {
                             level: MessageLevel::Error,
-                            message: format!("Analysis failed: {error}"),
+                            message: format!("Error: {error}"),
                         });
+                        ui_channel_clone.failed(task_id, error.to_string());
                     }
                 }
             });

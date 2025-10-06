@@ -1103,11 +1103,8 @@ impl TuiApp {
     fn handle_event(&mut self, event: UiEvent) {
         match event {
             UiEvent::TaskStarted { task_id, description, parent_id } => {
-                let mut output_tree = OutputTree::new();
-                
-                // Add initial status message
-                output_tree.add_text(format!("[i] Task started: {}", description));
-                output_tree.add_text("[...] Processing...".to_string());
+                // Start with clean tree - no initial messages
+                let output_tree = OutputTree::new();
                 
                 let task_display = TaskDisplay {
                     description: description.clone(),
@@ -1123,7 +1120,7 @@ impl TuiApp {
                 
                 self.state.tasks.insert(task_id, task_display);
                 self.state.task_order.push(task_id);
-                self.state.active_running_tasks.insert(task_id); // Mark as actively running
+                self.state.active_running_tasks.insert(task_id);
                 
                 // If this task has a parent, ensure the parent is not collapsed
                 if let Some(parent_id) = parent_id {
@@ -1146,6 +1143,7 @@ impl TuiApp {
             UiEvent::TaskOutput { task_id, output } => {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.output_lines.push(output.clone());
+                    // add_text handles nesting automatically based on current_step_stack
                     task.output_tree.add_text(output);
                 }
             }
@@ -1458,9 +1456,12 @@ impl TuiApp {
                     let visible_nodes = task.output_tree.flatten_visible_nodes();
                     let selected_idx = task.output_tree.selected_index();
                     
+                    // Calculate available width for content
+                    let available_width = left_chunks[0].width.saturating_sub(4); // Account for borders and padding
+                    
                     let tree_items: Vec<String> = visible_nodes.iter()
                         .enumerate()
-                        .map(|(idx, (node_ref, depth))| {
+                        .flat_map(|(idx, (node_ref, depth))| {
                             let is_selected = idx == selected_idx && self.focused_pane == FocusedPane::Output;
                             let prefix = output_tree::build_tree_prefix(*depth, node_ref.is_last, &node_ref.parent_states);
                             let is_collapsed = task.output_tree.is_collapsed(node_ref.node);
@@ -1468,7 +1469,26 @@ impl TuiApp {
                             let content = node_ref.node.get_content();
                             
                             let selector = if is_selected { "► " } else { "  " };
-                            format!("{}{}{} {}", selector, prefix, icon, content)
+                            let line_prefix = format!("{}{}{} ", selector, prefix, icon);
+                            let prefix_width = line_prefix.len();
+                            
+                            // Wrap content to fit available width
+                            let content_width = (available_width as usize).saturating_sub(prefix_width);
+                            if content_width < 20 {
+                                // Not enough space, just show as-is
+                                vec![format!("{}{}", line_prefix, content)]
+                            } else {
+                                // Wrap content
+                                let wrapped = textwrap::wrap(&content, content_width);
+                                wrapped.into_iter().enumerate().map(|(i, line)| {
+                                    if i == 0 {
+                                        format!("{}{}", line_prefix, line)
+                                    } else {
+                                        // Continuation lines get indented
+                                        format!("{}  {}", " ".repeat(prefix_width), line)
+                                    }
+                                }).collect::<Vec<_>>()
+                            }
                         })
                         .collect();
                     

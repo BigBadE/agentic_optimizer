@@ -17,14 +17,15 @@ use std::{
 use textwrap;
 use tokio::sync::mpsc;
 use tui_textarea::TextArea;
-use unicode_segmentation::UnicodeSegmentation;
 use crate::{TaskId, TaskResult};
 
 pub mod events;
 mod text_width;
+mod output_tree;
 
 pub use events::{MessageLevel, TaskProgress, UiEvent};
 pub use text_width::{EmojiMode, calculate_width, strip_emojis, truncate_to_width, wrap_text};
+use output_tree::{OutputTree, StepType};
 /// UI update channel - REQUIRED for all task execution
 #[derive(Clone)]
 pub struct UiChannel {
@@ -84,11 +85,10 @@ pub struct TuiApp {
     state: UiState,
     pending_input: Option<String>,
     input_area: TextArea<'static>,
-    output_area: TextArea<'static>,
     focused_pane: FocusedPane,
     tasks_dir: Option<std::path::PathBuf>,
     theme: Theme,
-    manual_newlines: std::collections::HashSet<usize>, // Track line indices with manual newlines after them
+    manual_newlines: std::collections::HashSet<usize>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -240,7 +240,7 @@ struct TaskDisplay {
     start_time: Instant,
     end_time: Option<Instant>,
     parent_id: Option<TaskId>,
-    output_area: TextArea<'static>,
+    output_tree: OutputTree,
     steps: Vec<TaskStepInfo>,
 }
 
@@ -295,11 +295,6 @@ impl TuiApp {
         // Disable cursor line highlighting (no underline)
         input_area.set_cursor_line_style(Style::default());
         
-        let mut output_area = TextArea::default();
-        output_area.set_block(Block::default().borders(Borders::ALL).title("Output (Read-Only)"));
-        // Disable cursor line highlighting (no underline)
-        output_area.set_cursor_line_style(Style::default());
-        
         let tasks_dir = tasks_dir.into();
         let mut state = UiState::default();
         
@@ -321,7 +316,6 @@ impl TuiApp {
             state,
             pending_input: None,
             input_area,
-            output_area,
             focused_pane: FocusedPane::Input,
             tasks_dir,
             theme,
@@ -386,10 +380,14 @@ impl TuiApp {
                     
                     if decoder.read_to_string(&mut json_str).is_ok() {
                         if let Ok(serializable) = serde_json::from_str::<SerializableTask>(&json_str) {
-                            let mut output_area = TextArea::default();
-                            output_area.set_block(Block::default().borders(Borders::ALL).title("Output"));
-                            output_area.set_cursor_line_style(Style::default());
-                            output_area.insert_str(&serializable.output_text);
+                            let mut output_tree = OutputTree::new();
+                            
+                            // Convert saved text to tree nodes
+                            for line in serializable.output_text.lines() {
+                                if !line.is_empty() {
+                                    output_tree.add_text(line.to_string());
+                                }
+                            }
                             
                             let status = match serializable.status.as_str() {
                                 "Running" => TaskStatus::Running,
@@ -406,7 +404,7 @@ impl TuiApp {
                                 start_time: Instant::now(),
                                 end_time: if serializable.end_time.is_some() { Some(Instant::now()) } else { None },
                                 parent_id: serializable.parent_id,
-                                output_area,
+                                output_tree,
                                 steps: Vec::new(),
                             };
                             
@@ -457,7 +455,7 @@ impl TuiApp {
                 id: task_id,
                 description: task.description.clone(),
                 status: status_str.to_string(),
-                output_text: task.output_area.lines().join("\n"),
+                output_text: task.output_tree.to_text(),
                 start_time: SystemTime::now(),
                 end_time: if task.end_time.is_some() { Some(SystemTime::now()) } else { None },
                 parent_id: task.parent_id,
@@ -641,15 +639,40 @@ impl TuiApp {
                                 }
                             }
                             FocusedPane::Output => {
-                                // Output is read-only, only allow scrolling
+                                // Tree navigation in output
                                 if let Some(task_id) = self.state.active_task_id {
                                     if let Some(task) = self.state.tasks.get_mut(&task_id) {
                                         match key.code {
-                                            KeyCode::Up | KeyCode::Down | KeyCode::Left | KeyCode::Right |
-                                            KeyCode::Home | KeyCode::End | KeyCode::PageUp | KeyCode::PageDown => {
-                                                task.output_area.input(event);
+                                            KeyCode::Up | KeyCode::Char('k') => {
+                                                task.output_tree.move_up();
                                             }
-                                            _ => {} // Ignore all other keys (read-only)
+                                            KeyCode::Down | KeyCode::Char('j') => {
+                                                task.output_tree.move_down();
+                                            }
+                                            KeyCode::Right | KeyCode::Char('l') => {
+                                                task.output_tree.expand_selected();
+                                            }
+                                            KeyCode::Left | KeyCode::Char('h') => {
+                                                task.output_tree.collapse_selected();
+                                            }
+                                            KeyCode::Char(' ') => {
+                                                task.output_tree.toggle_selected();
+                                            }
+                                            KeyCode::Home => {
+                                                task.output_tree.move_to_start();
+                                            }
+                                            KeyCode::End => {
+                                                task.output_tree.move_to_end();
+                                            }
+                                            KeyCode::PageUp => {
+                                                let page_size = 10;
+                                                task.output_tree.page_up(page_size);
+                                            }
+                                            KeyCode::PageDown => {
+                                                let page_size = 10;
+                                                task.output_tree.page_down(page_size);
+                                            }
+                                            _ => {}
                                         }
                                     }
                                 }
@@ -856,6 +879,23 @@ impl TuiApp {
     }
     
     fn delete_task(&mut self, task_id: TaskId) {
+        // First, find and delete all children recursively
+        let children: Vec<TaskId> = self.state.task_order
+            .iter()
+            .filter(|id| {
+                self.state.tasks.get(id)
+                    .and_then(|t| t.parent_id)
+                    == Some(task_id)
+            })
+            .copied()
+            .collect();
+        
+        // Recursively delete all children
+        for child_id in children {
+            self.delete_task(child_id);
+        }
+        
+        // Now delete this task
         // Remove from tasks map
         self.state.tasks.remove(&task_id);
         
@@ -1054,97 +1094,15 @@ impl TuiApp {
         self.input_area = new_input;
     }
     
-    fn auto_wrap_output(&mut self, task_id: TaskId) {
-        let terminal_width = self.terminal.size().map(|s| s.width).unwrap_or(80);
-        let output_width = (terminal_width as f32 * 0.7) as usize;
-        let max_line_width = output_width.saturating_sub(6).max(40);
-        
-        // Get data before mutable borrow
-        let (lines, cursor_row, cursor_col) = {
-            let task = match self.state.tasks.get(&task_id) {
-                Some(t) => t,
-                None => return,
-            };
-            (task.output_area.lines().to_vec(), task.output_area.cursor().0, task.output_area.cursor().1)
-        };
-        
-        // Calculate cursor position in original text using grapheme-aware counting
-        let mut cursor_pos = 0;
-        for (idx, line) in lines.iter().enumerate() {
-            if idx < cursor_row {
-                // Count graphemes, not bytes
-                cursor_pos += line.graphemes(true).count() + 1;
-            } else if idx == cursor_row {
-                // Count graphemes up to cursor column
-                cursor_pos += line.graphemes(true).take(cursor_col).count();
-                break;
-            }
-        }
-        
-        // Wrap all lines using word-aware wrapping
-        let mut wrapped_lines = Vec::new();
-        for line in &lines {
-            if line.is_empty() {
-                wrapped_lines.push(String::new());
-            } else if line.len() <= max_line_width {
-                wrapped_lines.push(line.clone());
-            } else {
-                // Use textwrap for proper word wrapping
-                let ends_with_space = line.ends_with(' ');
-                let options = textwrap::Options::new(max_line_width)
-                    .break_words(true)
-                    .word_separator(textwrap::WordSeparator::AsciiSpace);
-                
-                let mut wrapped: Vec<String> = textwrap::wrap(line, options)
-                    .into_iter()
-                    .map(|cow| cow.into_owned())
-                    .collect();
-                
-                if ends_with_space && !wrapped.is_empty() {
-                    if let Some(last) = wrapped.last_mut() {
-                        last.push(' ');
-                    }
-                }
-                
-                wrapped_lines.extend(wrapped);
-            }
-        }
-        
-        // Find new cursor position
-        let (new_row, new_col) = self.find_cursor_position(&wrapped_lines, cursor_pos);
-        
-        // Now get mutable borrow and update
-        let task = match self.state.tasks.get_mut(&task_id) {
-            Some(t) => t,
-            None => return,
-        };
-        
-        // Create new TextArea with wrapped content
-        let mut new_output = TextArea::new(wrapped_lines);
-        
-        // Copy styling
-        if let Some(block) = task.output_area.block() {
-            new_output.set_block(block.clone());
-        }
-        new_output.set_style(task.output_area.style());
-        new_output.set_cursor_style(task.output_area.cursor_style());
-        new_output.set_cursor_line_style(task.output_area.cursor_line_style());
-        
-        // Set cursor position
-        new_output.move_cursor(tui_textarea::CursorMove::Jump(new_row as u16, new_col as u16));
-        
-        task.output_area = new_output;
+    fn auto_wrap_output(&mut self, _task_id: TaskId) {
+        // No longer needed - output tree doesn't need wrapping
+        // Tree rendering handles layout automatically
     }
     
     
     fn handle_event(&mut self, event: UiEvent) {
         match event {
             UiEvent::TaskStarted { task_id, description, parent_id } => {
-                let mut output_area = TextArea::default();
-                output_area.set_block(Block::default().borders(Borders::ALL).title("Task Output"));
-                output_area.set_cursor_line_style(Style::default());
-                output_area.set_line_number_style(Style::default());
-                
                 let task_display = TaskDisplay {
                     description: description.clone(),
                     status: TaskStatus::Running,
@@ -1153,7 +1111,7 @@ impl TuiApp {
                     start_time: Instant::now(),
                     end_time: None,
                     parent_id,
-                    output_area,
+                    output_tree: OutputTree::new(),
                     steps: Vec::new(),
                 };
                 
@@ -1184,10 +1142,8 @@ impl TuiApp {
             UiEvent::TaskOutput { task_id, output } => {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
                     task.output_lines.push(output.clone());
-                    task.output_area.insert_str("\n");
-                    task.output_area.insert_str(&output);
+                    task.output_tree.add_text(output);
                 }
-                self.auto_wrap_output(task_id);
             }
             
             UiEvent::TaskCompleted { task_id, result } => {
@@ -1197,8 +1153,6 @@ impl TuiApp {
                     task.end_time = Some(Instant::now());
                     // Don't append text - already shown via TaskStepStarted(Output)
                 }
-                // Final wrap at completion
-                self.auto_wrap_output(task_id);
                 
                 if let Some(task) = self.state.tasks.get(&task_id) {
                     self.save_task(task_id, task);
@@ -1217,11 +1171,9 @@ impl TuiApp {
                     task.status = TaskStatus::Failed;
                     task.end_time = Some(Instant::now());
                     
-                    task.output_area.insert_str("\n");
                     let error_msg = format!("Error: {error}");
-                    task.output_area.insert_str(&error_msg);
+                    task.output_tree.add_text(error_msg);
                 }
-                self.auto_wrap_output(task_id);
                 
                 if let Some(task) = self.state.tasks.get(&task_id) {
                     self.save_task(task_id, task);
@@ -1239,9 +1191,8 @@ impl TuiApp {
                 // Send to active task only (this is a global message)
                 if let Some(task_id) = self.state.active_task_id {
                     if let Some(task) = self.state.tasks.get_mut(&task_id) {
-                        task.output_area.insert_str(&format!("\n{prefix} {message}"));
+                        task.output_tree.add_text(format!("{prefix} {message}"));
                     }
-                    self.auto_wrap_output(task_id);
                 }
                 
                 self.state.conversation_history.push(ConversationEntry {
@@ -1262,46 +1213,28 @@ impl TuiApp {
                         timestamp: Instant::now(),
                     });
                     
-                    // Display in output area with icon
-                    // Use simple ASCII icons to avoid emoji rendering issues
-                    let icon = match step_type.as_str() {
-                        "Thinking" => "[*]",
-                        "ToolCall" => "[T]",
-                        "Output" => "[>]",
-                        _ => "[.]",
-                    };
-                    task.output_area.insert_str(&format!("\n{} {}", icon, content));
+                    // Add to output tree
+                    let step_type_enum = StepType::from_str(&step_type);
+                    task.output_tree.add_step(step_id, step_type_enum, content);
                 }
-                self.auto_wrap_output(task_id);
             }
             
-            UiEvent::TaskStepCompleted { task_id: _, step_id: _ } => {
-                // Step completion is tracked, no UI update needed
-                // No auto_wrap_output - this event doesn't add content
-            }
-            
-            UiEvent::ToolCallStarted { task_id, tool, args: _ } => {
+            UiEvent::TaskStepCompleted { task_id, step_id } => {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
-                    task.output_area.insert_str(&format!("\n[T] Calling tool: {}", tool));
+                    task.output_tree.complete_step(&step_id);
                 }
-                self.auto_wrap_output(task_id);
+            }
+            
+            UiEvent::ToolCallStarted { task_id, tool, args } => {
+                if let Some(task) = self.state.tasks.get_mut(&task_id) {
+                    task.output_tree.add_tool_call(tool, args);
+                }
             }
             
             UiEvent::ToolCallCompleted { task_id, tool, result } => {
                 if let Some(task) = self.state.tasks.get_mut(&task_id) {
-                    // Format result nicely
-                    let result_str = if let Some(obj) = result.as_object() {
-                        if let Some(content) = obj.get("content") {
-                            format!("[+] Tool '{}' completed: {}", tool, content)
-                        } else {
-                            format!("[+] Tool '{}' completed", tool)
-                        }
-                    } else {
-                        format!("[+] Tool '{}' completed", tool)
-                    };
-                    task.output_area.insert_str(&format!("\n{}", result_str));
+                    task.output_tree.complete_tool_call(&tool, result);
                 }
-                self.auto_wrap_output(task_id);
             }
             
             UiEvent::ThinkingUpdate { task_id: _, content: _ } => {
@@ -1510,25 +1443,46 @@ impl TuiApp {
                     .alignment(ratatui::layout::Alignment::Center);
                 frame.render_widget(loading_text, left_chunks[0]);
             } else if let Some(task_id) = self.state.active_task_id {
-                if let Some(task) = self.state.tasks.get_mut(&task_id) {
-                    // Apply styling based on focus
-                    let (border_color, cursor_style) = if self.focused_pane == FocusedPane::Output {
-                        (self.theme.focused_border(), Style::default().add_modifier(Modifier::REVERSED))
+                if let Some(task) = self.state.tasks.get(&task_id) {
+                    // Render output tree
+                    let border_color = if self.focused_pane == FocusedPane::Output {
+                        self.theme.focused_border()
                     } else {
-                        (self.theme.unfocused_border(), Style::default())
+                        self.theme.unfocused_border()
                     };
                     
-                    task.output_area.set_block(
-                        Block::default()
+                    let visible_nodes = task.output_tree.flatten_visible_nodes();
+                    let selected_idx = task.output_tree.selected_index();
+                    
+                    let tree_items: Vec<String> = visible_nodes.iter()
+                        .enumerate()
+                        .map(|(idx, (node_ref, depth))| {
+                            let is_selected = idx == selected_idx && self.focused_pane == FocusedPane::Output;
+                            let prefix = output_tree::build_tree_prefix(*depth, node_ref.is_last, &node_ref.parent_states);
+                            let is_collapsed = task.output_tree.is_collapsed(node_ref.node);
+                            let icon = node_ref.node.get_icon(is_collapsed);
+                            let content = node_ref.node.get_content();
+                            
+                            let selector = if is_selected { "► " } else { "  " };
+                            format!("{}{}{} {}", selector, prefix, icon, content)
+                        })
+                        .collect();
+                    
+                    let tree_text = if tree_items.is_empty() {
+                        "No output yet...".to_string()
+                    } else {
+                        tree_items.join("\n")
+                    };
+                    
+                    let output_widget = Paragraph::new(tree_text)
+                        .style(Style::default().fg(self.theme.text()))
+                        .block(Block::default()
                             .borders(Borders::ALL)
                             .title("─── Task Output ")
                             .border_style(Style::default().fg(border_color))
-                            .padding(ratatui::widgets::Padding::horizontal(1))
-                    );
-                    task.output_area.set_style(Style::default().fg(self.theme.text()));
-                    task.output_area.set_cursor_style(cursor_style);
+                            .padding(ratatui::widgets::Padding::horizontal(1)));
                     
-                    frame.render_widget(&task.output_area, left_chunks[0]);
+                    frame.render_widget(output_widget, left_chunks[0]);
                 }
             } else {
                 // Show instructions when no task is active
@@ -1630,9 +1584,6 @@ impl TuiApp {
                 timestamp: Instant::now(),
             });
             
-            self.output_area.insert_str(format!("\nYou: {input}"));
-            self.output_area.move_cursor(tui_textarea::CursorMove::End);
-            
             self.pending_input = Some(input);
             self.input_area = TextArea::default();
             self.input_area.set_block(Block::default().borders(Borders::ALL).title("Input"));
@@ -1652,8 +1603,6 @@ impl TuiApp {
             text: text.clone(),
             timestamp: Instant::now(),
         });
-        
-        self.output_area.insert_str(format!("\n[+] Merlin: {text}"));
     }
     
     pub fn get_selected_task_id(&self) -> Option<TaskId> {
@@ -1675,7 +1624,7 @@ impl TuiApp {
         if let Some(parent_id) = parent_id {
             // Add parent task
             if let Some(parent_task) = self.state.tasks.get(&parent_id) {
-                let output = parent_task.output_area.lines().join("\n");
+                let output = parent_task.output_tree.to_text();
                 context.push((parent_id, parent_task.description.clone(), output));
             }
             
@@ -1687,7 +1636,7 @@ impl TuiApp {
                 
                 if let Some(task) = self.state.tasks.get(&task_id) {
                     if task.parent_id == Some(parent_id) {
-                        let output = task.output_area.lines().join("\n");
+                        let output = task.output_tree.to_text();
                         context.push((task_id, task.description.clone(), output));
                     }
                 }

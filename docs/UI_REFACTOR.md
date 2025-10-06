@@ -329,20 +329,23 @@ impl TaskTree {
 ## Implementation Priority
 
 ### **Immediate (Phase 1) - Critical Bug Fix**
-- [ ] Add `rebuild_task_order()` method
-- [ ] Add `add_task_and_descendants()` helper
-- [ ] Fix `load_tasks_async()` to rebuild hierarchy
-- [ ] Fix `TaskStarted` handler to use same logic
-- [ ] Test: Add tasks, restart app, verify order maintained
+- [x] Add `rebuild_task_order()` method
+- [x] Add `add_task_and_descendants()` helper
+- [x] Fix `load_tasks_async()` to rebuild hierarchy
+- [x] Fix `TaskStarted` handler to use same logic
+- [x] Test: Add tasks, restart app, verify order maintained
 
 ### **Medium-term (Phase 2) - Refactoring**
-- [ ] Create `task_manager.rs` module
-- [ ] Move task ordering logic to TaskManager
-- [ ] Create `event_handler.rs` module
-- [ ] Create `renderer.rs` module
-- [ ] Create `persistence.rs` module
-- [ ] Split `app.rs` from `mod.rs`
-- [ ] Update all imports and tests
+- [x] Create `task_manager.rs` module
+- [x] Move task ordering logic to TaskManager
+- [x] Create `event_handler.rs` module
+- [x] Create `renderer.rs` module
+- [x] Create `persistence.rs` module
+- [x] Create `state.rs` module
+- [x] Create `input.rs` module
+- [x] Create `theme.rs` module
+- [x] Split `app.rs` from `mod.rs`
+- [x] Update all imports and tests
 
 ### **Long-term (Phase 3) - Better Architecture**
 - [ ] Design TaskTree structure

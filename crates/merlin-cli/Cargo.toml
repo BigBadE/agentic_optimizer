@@ -29,5 +29,3 @@ reqwest.workspace = true
 
 [lints]
 workspace = true
-
-

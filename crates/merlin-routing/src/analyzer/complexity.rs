@@ -6,7 +6,7 @@ pub struct ComplexityEstimator;
 
 impl ComplexityEstimator {
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self
     }
     
@@ -38,7 +38,7 @@ impl ComplexityEstimator {
             .with_full_context(requires_full_context)
     }
     
-    const fn score_action(&self, action: &Action) -> usize {
+    fn score_action(&self, action: &Action) -> usize {
         match action {
             Action::Create | Action::Delete | Action::Document => 1,
             Action::Modify | Action::Fix | Action::Test => 2,
@@ -91,7 +91,7 @@ impl ComplexityEstimator {
         score.min(3)
     }
     
-    const fn complexity_to_score(&self, complexity: Complexity) -> usize {
+    fn complexity_to_score(&self, complexity: Complexity) -> usize {
         match complexity {
             Complexity::Trivial => 0,
             Complexity::Simple => 2,
@@ -100,7 +100,7 @@ impl ComplexityEstimator {
         }
     }
 
-    const fn score_to_complexity(&self, score: usize) -> Complexity {
+    fn score_to_complexity(&self, score: usize) -> Complexity {
         match score {
             0..=2 => Complexity::Trivial,
             3..=5 => Complexity::Simple,

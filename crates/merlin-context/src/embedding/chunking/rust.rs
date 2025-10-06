@@ -291,29 +291,42 @@ fn force_split_large_chunk(file_path: &str, lines: &[&str], start_idx: usize, en
 /// Extract identifier from Rust item declaration
 fn extract_rust_identifier(line: &str) -> String {
     let line = line.trim();
-    
+
     // Remove pub/async/const/unsafe modifiers
     let line = line
         .trim_start_matches("pub ")
         .trim_start_matches("async ")
         .trim_start_matches("const ")
         .trim_start_matches("unsafe ");
-    
-    // Extract based on keyword
-    if let Some(rest) = line.strip_prefix("fn ") {
-        format!("fn {}", rest.split(&['(', '<', ' '][..]).next().unwrap_or("unknown"))
-    } else if let Some(rest) = line.strip_prefix("struct ") {
-        format!("struct {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"))
-    } else if let Some(rest) = line.strip_prefix("enum ") {
-        format!("enum {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"))
-    } else if let Some(rest) = line.strip_prefix("trait ") {
-        format!("trait {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"))
-    } else if line.starts_with("impl ") || line.starts_with("impl<") {
-        let impl_part = line.split('{').next().unwrap_or(line).trim();
-        format!("impl {}", impl_part.strip_prefix("impl ").unwrap_or("").trim())
-    } else if let Some(rest) = line.strip_prefix("mod ") {
-        format!("mod {}", rest.split(&[' ', '{'][..]).next().unwrap_or("unknown"))
-    } else {
-        String::from("item")
-    }
+
+    // Extract based on keyword - using map_or_else to satisfy clippy
+    line.strip_prefix("fn ").map_or_else(
+        || {
+            line.strip_prefix("struct ").map_or_else(
+                || {
+                    line.strip_prefix("enum ").map_or_else(
+                        || {
+                            line.strip_prefix("trait ").map_or_else(
+                                || {
+                                    if line.starts_with("impl ") || line.starts_with("impl<") {
+                                        let impl_part = line.split('{').next().unwrap_or(line).trim();
+                                        format!("impl {}", impl_part.strip_prefix("impl ").unwrap_or("").trim())
+                                    } else {
+                                        line.strip_prefix("mod ").map_or_else(
+                                            || String::from("item"),
+                                            |rest| format!("mod {}", rest.split(&[' ', '{'][..]).next().unwrap_or("unknown"))
+                                        )
+                                    }
+                                },
+                                |rest| format!("trait {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"))
+                            )
+                        },
+                        |rest| format!("enum {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"))
+                    )
+                },
+                |rest| format!("struct {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"))
+            )
+        },
+        |rest| format!("fn {}", rest.split(&['(', '<', ' '][..]).next().unwrap_or("unknown"))
+    )
 }

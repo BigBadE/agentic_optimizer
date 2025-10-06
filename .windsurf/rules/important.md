@@ -4,4 +4,4 @@ description:
 globs: 
 ---
 
-Do NOT, EVER, use println or eprintln, because it will corrupt the UI,
+ALWAYS run Clippy before finishing, and fix all clippy errors. Do not finish your work with clippy errors remaining.

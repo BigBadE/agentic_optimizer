@@ -3,6 +3,7 @@
 use super::{FileChunk, estimate_tokens, MIN_CHUNK_TOKENS};
 
 /// Chunk config files by top-level sections with token limits
+#[must_use] 
 pub fn chunk_config(file_path: String, content: &str) -> Vec<FileChunk> {
     let lines: Vec<&str> = content.lines().collect();
     let mut chunks = Vec::new();
@@ -44,8 +45,8 @@ pub fn chunk_config(file_path: String, content: &str) -> Vec<FileChunk> {
     // Add remaining - only if meets minimum OR if we have no chunks yet
     if line_count > 0 {
         let tokens = estimate_tokens(&buffer);
-        if !buffer.trim().is_empty() {
-            if tokens >= MIN_CHUNK_TOKENS || chunks.is_empty() {
+        if !buffer.trim().is_empty()
+            && (tokens >= MIN_CHUNK_TOKENS || chunks.is_empty()) {
                 chunks.push(FileChunk::new(
                     file_path.clone(),
                     buffer,
@@ -54,7 +55,6 @@ pub fn chunk_config(file_path: String, content: &str) -> Vec<FileChunk> {
                     lines.len(),
                 ));
             }
-        }
     }
     
     if chunks.is_empty() {

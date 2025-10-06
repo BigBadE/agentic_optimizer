@@ -11,7 +11,7 @@ pub struct LintValidationStage {
 
 impl LintValidationStage {
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self {
             workspace: None,
             max_warnings: 10,

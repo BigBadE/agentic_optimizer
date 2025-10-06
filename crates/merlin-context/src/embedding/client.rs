@@ -60,6 +60,7 @@ impl VectorStore {
     }
 
     /// Search for similar files
+    #[must_use] 
     pub fn search(&self, query_embedding: &[f32], top_k: usize) -> Vec<SearchResult> {
         let mut scores: Vec<(PathBuf, f32)> = self
             .embeddings
@@ -141,7 +142,7 @@ impl EmbeddingClient {
             Ok(m) => m,
             Err(e) => {
                 return Err(merlin_core::Error::Other(
-                    format!("Failed to connect to Ollama: {}.\n\nPlease ensure Ollama is installed and running:\n  - Install from: https://ollama.ai\n  - Start with: ollama serve", e)
+                    format!("Failed to connect to Ollama: {e}.\n\nPlease ensure Ollama is installed and running:\n  - Install from: https://ollama.ai\n  - Start with: ollama serve")
                 ));
             }
         };
@@ -234,6 +235,7 @@ fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
 
 /// Generate a preview from file content (first few lines or summary)
 #[allow(dead_code, reason = "Used for future preview generation functionality")]
+#[must_use] 
 pub fn generate_preview(content: &str, max_chars: usize) -> String {
     let lines: Vec<&str> = content.lines().take(10).collect();
     let preview = lines.join("\n");
@@ -241,7 +243,7 @@ pub fn generate_preview(content: &str, max_chars: usize) -> String {
     if preview.chars().count() > max_chars {
         // Use char boundaries to avoid panics with multi-byte characters
         let truncated: String = preview.chars().take(max_chars).collect();
-        format!("{}...", truncated)
+        format!("{truncated}...")
     } else {
         preview
     }

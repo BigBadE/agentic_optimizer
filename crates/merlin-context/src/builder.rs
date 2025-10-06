@@ -46,7 +46,7 @@ pub struct ContextBuilder {
 impl ContextBuilder {
     /// Create a new builder with defaults.
     #[must_use]
-    pub const fn new(project_root: PathBuf) -> Self {
+    pub fn new(project_root: PathBuf) -> Self {
         Self {
             project_root,
             max_files: 50,
@@ -59,7 +59,7 @@ impl ContextBuilder {
 
     /// Override the maximum number of files included in context.
     #[must_use]
-    pub const fn with_max_files(mut self, max_files: usize) -> Self {
+    pub fn with_max_files(mut self, max_files: usize) -> Self {
         self.max_files = max_files;
         self
     }

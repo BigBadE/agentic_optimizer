@@ -33,6 +33,10 @@ impl AgentExecutor {
     }
     
     /// Execute a task with streaming updates
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if routing, provider creation, execution, or validation fails
     pub async fn execute_streaming(
         &mut self,
         task: Task,
@@ -48,7 +52,7 @@ impl AgentExecutor {
         let provider = self.create_provider(&decision.tier)?;
         
         // Step 3: Build context
-        let context = self.build_context(&task).await?;
+        let context = self.build_context(&task)?;
         
         // Step 4: Create query with tool descriptions
         let query = self.create_query_with_tools(&task);
@@ -91,7 +95,7 @@ impl AgentExecutor {
     ) -> Result<Response> {
         // Execute the query directly without extra steps
         let mut response = provider.generate(query, context).await
-            .map_err(|e| RoutingError::Other(format!("Provider error: {}", e)))?;
+            .map_err(|err| RoutingError::Other(format!("Provider error: {err}")))?;
         
         // Check if response contains tool calls (simulated for now)
         // In a real implementation, this would parse the LLM response for tool calls
@@ -113,7 +117,7 @@ impl AgentExecutor {
                         tool: tool_name.clone(),
                         args: args.clone(),
                     },
-                    format!("Calling tool: {}", tool_name),
+                    format!("Calling tool: {tool_name}"),
                 );
                 
                 ui_channel.send(UiEvent::TaskStepStarted {
@@ -139,7 +143,7 @@ impl AgentExecutor {
                         tool: tool_name.clone(),
                         result: result.clone(),
                     },
-                    format!("Tool result: {}", result),
+                    format!("Tool result: {result}"),
                 );
                 
                 ui_channel.send(UiEvent::TaskStepCompleted {
@@ -148,7 +152,8 @@ impl AgentExecutor {
                 });
                 
                 // Add tool result to response (in real implementation, would re-query LLM with results)
-                response.text.push_str(&format!("\n\nTool '{}' result: {}", tool_name, result));
+                use std::fmt::Write as _;
+                let _ = write!(response.text, "\n\nTool '{tool_name}' result: {result}");
             }
         }
         
@@ -164,22 +169,22 @@ impl AgentExecutor {
     /// Execute a tool by name
     async fn execute_tool(&self, tool_name: &str, args: Value) -> Result<Value> {
         let tool = self.tool_registry.get_tool(tool_name)
-            .ok_or_else(|| RoutingError::Other(format!("Tool not found: {}", tool_name)))?;
-        
+            .ok_or_else(|| RoutingError::Other(format!("Tool not found: {tool_name}")))?;
+
         tool.execute(args).await
     }
     
     /// Extract tool calls from LLM response (simplified for Phase 2)
     /// In a real implementation, this would parse function calling format
-    const fn extract_tool_calls(&self, _response: &Response) -> Vec<(String, Value)> {
+    fn extract_tool_calls(&self, _response: &Response) -> Vec<(String, Value)> {
         // For Phase 2, we'll simulate tool calling by looking for markers in the text
         // Real implementation would use proper function calling API
-        let tool_calls = Vec::new();
+        
         
         // Example: Look for patterns like "TOOL:read_file:path/to/file"
         // This is a placeholder - real implementation would use LLM's function calling
         
-        tool_calls
+        Vec::new()
     }
     
     /// Create query with tool descriptions
@@ -189,13 +194,10 @@ impl AgentExecutor {
         // Add tool descriptions to the prompt
         let tools = self.tool_registry.list_tools();
         if !tools.is_empty() {
+            use std::fmt::Write as _;
             prompt.push_str("\n\nAvailable tools:\n");
             for tool in tools {
-                prompt.push_str(&format!(
-                    "- {}: {}\n",
-                    tool.name(),
-                    tool.description()
-                ));
+                let _ = writeln!(prompt, "- {}: {}", tool.name(), tool.description());
             }
         }
         
@@ -229,19 +231,19 @@ impl AgentExecutor {
                         let provider = merlin_providers::AnthropicProvider::new(api_key)?;
                         Ok(Arc::new(provider))
                     }
-                    _ => Err(RoutingError::Other(format!("Unknown provider: {}", provider_name)))
+                    _ => Err(RoutingError::Other(format!("Unknown provider: {provider_name}")))
                 }
             }
         }
     }
     
     /// Build context from task requirements
-    async fn build_context(&self, _task: &Task) -> Result<Context> {
+    fn build_context(&self, _task: &Task) -> Result<Context> {
         let context = Context::new("You are a helpful coding assistant with access to tools.");
-        
+
         // In a real implementation, would read required files and add to context
         // For Phase 2, we'll use basic context
-        
+
         Ok(context)
     }
     
@@ -315,7 +317,7 @@ impl AgentExecutor {
         // Parse the decision FIRST (before sending to UI)
         let decision = match assessor.parse_assessment_response(&assessment_response.text, &task) {
             Ok(d) => d,
-            Err(_e) => {
+            Err(_err) => {
                 // If parsing fails, fall back to streaming execution without showing error
                 ui_channel.send(UiEvent::TaskStepCompleted {
                     task_id,
@@ -355,7 +357,7 @@ impl AgentExecutor {
                 
                 let response = Response {
                     text: result,
-                    confidence: decision.confidence as f64,
+                    confidence: f64::from(decision.confidence),
                     tokens_used: merlin_core::TokenUsage::default(),
                     provider: decision_result.tier.to_string(),
                     latency_ms: start.elapsed().as_millis() as u64,

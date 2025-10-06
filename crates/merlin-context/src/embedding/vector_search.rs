@@ -75,6 +75,7 @@ pub struct VectorSearchManager {
 
 impl VectorSearchManager {
     /// Create a new vector search manager
+    #[must_use] 
     pub fn new(project_root: PathBuf) -> Self {
         let cache_path = project_root.join("..merlin").join("embeddings.bin");
         
@@ -149,19 +150,19 @@ impl VectorSearchManager {
                 let invalid_count = invalid.len();
                 
                 if !new_files.is_empty() {
-                    eprintln!("  Found {} new files to embed", new_count);
-                    spinner.set_message(format!("Embedding {} new files...", new_count));
+                    eprintln!("  Found {new_count} new files to embed");
+                    spinner.set_message(format!("Embedding {new_count} new files..."));
                     self.embed_files(new_files, &spinner).await?;
                 }
 
                 if !invalid.is_empty() {
                     // Re-embed invalid files
-                    spinner.set_message(format!("Re-embedding {} modified files...", invalid_count));
+                    spinner.set_message(format!("Re-embedding {invalid_count} modified files..."));
                     self.embed_files(invalid, &spinner).await?;
                     
                     spinner.finish_with_message(format!("✓ Loaded cache + updated {} files", invalid_count + new_count));
                 } else if new_count > 0 {
-                    spinner.finish_with_message(format!("✓ Loaded cache + added {} new files", new_count));
+                    spinner.finish_with_message(format!("✓ Loaded cache + added {new_count} new files"));
                 } else {
                     spinner.finish_with_message(format!("✓ Loaded {} embeddings from cache", cache.embeddings.len()));
                 }
@@ -231,13 +232,12 @@ impl VectorSearchManager {
         combined.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
         
         // Re-normalize after boosting
-        if let Some(max_score) = combined.first().map(|r| r.score) {
-            if max_score > 0.0 {
+        if let Some(max_score) = combined.first().map(|r| r.score)
+            && max_score > 0.0 {
                 for result in &mut combined {
-                    result.score = result.score / max_score;
+                    result.score /= max_score;
                 }
             }
-        }
         
         eprintln!("  Combined {} results using RRF + import boost", combined.len());
         if !combined.is_empty() {
@@ -375,7 +375,7 @@ impl VectorSearchManager {
             .count();
         
         if keyword_count > 0 {
-            let density_boost = 1.0 + (keyword_count as f32 * 0.1);
+            let density_boost = (keyword_count as f32).mul_add(0.1, 1.0);
             alignment *= density_boost.min(1.5);  // Cap at 1.5x
         }
         
@@ -424,11 +424,10 @@ impl VectorSearchManager {
     /// Build import graph from Rust source files using rust-analyzer
     fn build_import_graph(&self, files: &[PathBuf]) -> HashMap<PathBuf, Vec<PathBuf>> {
         // Try to use rust-analyzer backend for accurate import resolution
-        if let Ok(backend) = self.try_get_rust_backend() {
-            if let Ok(graph) = backend.build_import_graph(files) {
+        if let Ok(backend) = self.try_get_rust_backend()
+            && let Ok(graph) = backend.build_import_graph(files) {
                 return graph;
             }
-        }
         
         // Fallback: return empty graph if rust-analyzer not available
         // This is acceptable since graph ranking is a bonus feature
@@ -457,7 +456,7 @@ impl VectorSearchManager {
         }
         
         // Boost files based on graph relationships
-        for result in results.iter_mut() {
+        for result in &mut *results {
             let mut graph_boost = 1.0;
             
             // Boost if many files import this (central/important)
@@ -565,7 +564,7 @@ impl VectorSearchManager {
         let mut paths: HashSet<PathBuf> = HashSet::new();
 
         let mut max_bm25 = 0.0f32;
-        for (path, score) in bm25_results.iter() {
+        for (path, score) in bm25_results {
             if *score > 0.0 {
                 bm25_scores.insert(path.clone(), *score);
                 if *score > max_bm25 {
@@ -632,30 +631,29 @@ impl VectorSearchManager {
                 let combined_score = (bm25_contribution + vector_contribution) * file_boost * query_alignment * pattern_boost * chunk_quality;
 
                 SearchResult {
-                    file_path: path.clone(),
+                    file_path: path,
                     score: combined_score,
                     preview,
-                    bm25_score: if bm25_contribution > 0.0 { Some(bm25_contribution) } else { None },
-                    vector_score: if vector_contribution > 0.0 { Some(vector_contribution) } else { None },
+                    bm25_score: (bm25_contribution > 0.0).then_some(bm25_contribution),
+                    vector_score: (vector_contribution > 0.0).then_some(vector_contribution),
                 }
             })
             .collect();
 
         combined.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
 
-        if let Some(max_score) = combined.first().map(|r| r.score) {
-            if max_score > 0.0 {
+        if let Some(max_score) = combined.first().map(|r| r.score)
+            && max_score > 0.0 {
                 for result in &mut combined {
-                    result.score = result.score / max_score;
+                    result.score /= max_score;
                     if let Some(b) = result.bm25_score.as_mut() {
-                        *b = *b / max_score;
+                        *b /= max_score;
                     }
                     if let Some(v) = result.vector_score.as_mut() {
-                        *v = *v / max_score;
+                        *v /= max_score;
                     }
                 }
             }
-        }
 
         combined.truncate(top_k);
 
@@ -679,7 +677,7 @@ impl VectorSearchManager {
         for entry in walker.filter_map(std::result::Result::ok) {
             let path = entry.path();
             
-            if entry.file_type().map_or(false, |ft| ft.is_file()) && is_source_file(path) {
+            if entry.file_type().is_some_and(|ft| ft.is_file()) && is_source_file(path) {
                 let normalized_path = if let Ok(relative) = path.strip_prefix(&self.project_root) {
                     relative.to_path_buf()
                 } else {
@@ -751,11 +749,10 @@ impl VectorSearchManager {
                             let absolute_path = self.project_root.join(relative_path);
                             
                             // Track file modification time
-                            if let Ok(metadata) = fs::metadata(&absolute_path) {
-                                if let Ok(modified) = metadata.modified() {
+                            if let Ok(metadata) = fs::metadata(&absolute_path)
+                                && let Ok(modified) = metadata.modified() {
                                     self.file_times.insert(relative_path.clone(), modified);
                                 }
-                            }
                             
                             for (path, chunk, embedding, preview) in chunk_results {
                                 let chunk_path = format!("{}:{}-{}", path.display(), chunk.start_line, chunk.end_line);
@@ -770,11 +767,11 @@ impl VectorSearchManager {
                             }
                             
                             processed_files += 1;
-                            spinner.set_message(format!("Embedding files... {}/{} ({} chunks)", processed_files, total_files, total_chunks));
+                            spinner.set_message(format!("Embedding files... {processed_files}/{total_files} ({total_chunks} chunks)"));
                         }
                     }
                     Err(e) => {
-                        eprintln!("    Task error: {}", e);
+                        eprintln!("    Task error: {e}");
                     }
                 }
             }
@@ -801,22 +798,19 @@ impl VectorSearchManager {
             }
 
             // Check if file was modified
-            match fs::metadata(&absolute_path) {
-                Ok(metadata) => {
-                    match metadata.modified() {
-                        Ok(modified) => {
-                            if modified > entry.modified {
-                                invalid.push(entry.path.clone());
-                            } else {
-                                valid.push(entry.clone());
-                            }
+            if let Ok(metadata) = fs::metadata(&absolute_path) {
+                match metadata.modified() {
+                    Ok(modified) => {
+                        if modified > entry.modified {
+                            invalid.push(entry.path.clone());
+                        } else {
+                            valid.push(entry.clone());
                         }
-                        Err(_) => invalid.push(entry.path.clone()),
                     }
+                    Err(_) => invalid.push(entry.path.clone()),
                 }
-                Err(_) => {
-                    // File doesn't exist anymore
-                }
+            } else {
+                // File doesn't exist anymore
             }
         }
 
@@ -846,9 +840,9 @@ impl VectorSearchManager {
         for entry in self.store.iter() {
             // Parse chunk path: "file_path:start-end"
             let path_str = entry.path.display().to_string();
-            if let Some((file_part, range_part)) = path_str.rsplit_once(':') {
-                if let Some((start_str, end_str)) = range_part.split_once('-') {
-                    if let (Ok(start), Ok(end)) = (start_str.parse(), end_str.parse()) {
+            if let Some((file_part, range_part)) = path_str.rsplit_once(':')
+                && let Some((start_str, end_str)) = range_part.split_once('-')
+                    && let (Ok(start), Ok(end)) = (start_str.parse(), end_str.parse()) {
                         let file_path = PathBuf::from(file_part);
                         let modified = self.file_times.get(&file_path)
                             .copied()
@@ -865,11 +859,9 @@ impl VectorSearchManager {
                         });
                         continue;
                     }
-                }
-            }
             
             // Fallback for non-chunked entries (shouldn't happen)
-            eprintln!("Warning: Could not parse chunk path: {}", path_str);
+            eprintln!("Warning: Could not parse chunk path: {path_str}");
         }
         
         let data = bincode::serialize(&cache)

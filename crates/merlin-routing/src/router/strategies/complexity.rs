@@ -7,7 +7,7 @@ pub struct ComplexityBasedStrategy;
 
 impl ComplexityBasedStrategy {
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self
     }
 }

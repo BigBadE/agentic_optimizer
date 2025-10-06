@@ -8,7 +8,7 @@ pub struct QueryAnalyzer;
 impl QueryAnalyzer {
     /// Create a new query analyzer
     #[must_use]
-    pub const fn new() -> Self {
+    pub fn new() -> Self {
         Self
     }
 
@@ -144,7 +144,7 @@ impl QueryAnalyzer {
             .split_whitespace()
             .filter(|word| {
                 // Check if word starts with uppercase or contains :: (Rust path)
-                let has_uppercase = word.chars().next().map_or(false, |c| c.is_uppercase());
+                let has_uppercase = word.chars().next().is_some_and(char::is_uppercase);
                 let has_path = word.contains("::");
                 (has_uppercase || has_path) && word.len() > 1  // Skip single chars like "I"
             })

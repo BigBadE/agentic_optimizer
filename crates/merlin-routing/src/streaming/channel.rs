@@ -8,6 +8,7 @@ pub struct StreamingChannel {
 }
 
 impl StreamingChannel {
+    #[must_use] 
     pub fn new() -> (Self, mpsc::UnboundedReceiver<StreamingEvent>) {
         let (sender, receiver) = mpsc::unbounded_channel();
         (Self { sender }, receiver)

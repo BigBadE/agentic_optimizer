@@ -311,7 +311,7 @@ impl RoutingOrchestrator {
     }
     
     #[must_use]
-    pub const fn config(&self) -> &RoutingConfig {
+    pub fn config(&self) -> &RoutingConfig {
         &self.config
     }
     

@@ -21,7 +21,7 @@ pub struct ContextBuilder<'analysis> {
 impl<'analysis> ContextBuilder<'analysis> {
     /// Create a new context builder bound to an analysis session and backend.
     #[must_use]
-    pub const fn new(analysis: &'analysis Analysis, backend: &'analysis RustBackend) -> Self {
+    pub fn new(analysis: &'analysis Analysis, backend: &'analysis RustBackend) -> Self {
         Self { analysis, backend }
     }
 

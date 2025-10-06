@@ -409,17 +409,15 @@ fn cleanup_old_tasks(merlin_dir: &std::path::Path) -> Result<()> {
     
     // Get all task files sorted by modification time
     let mut task_files: Vec<_> = fs::read_dir(&tasks_dir)?
-        .filter_map(|entry| entry.ok())
+        .filter_map(std::result::Result::ok)
         .filter(|entry| {
             entry.path().extension()
                 .and_then(|ext| ext.to_str())
-                .map(|ext| ext == "gz")
-                .unwrap_or(false)
+                .is_some_and(|ext| ext == "gz")
         })
         .filter_map(|entry| {
-            entry.metadata().ok().and_then(|meta| {
-                meta.modified().ok().map(|time| (entry.path(), time))
-            })
+            let meta = entry.metadata().ok()?;
+            meta.modified().ok().map(|time| (entry.path(), time))
         })
         .collect();
     
@@ -508,7 +506,7 @@ async fn run_tui_interactive(
                 let task = Task::new(user_input.clone());
                 let task_id = task.id;
                 
-                writeln!(log_clone, "Created task: {}", user_input).ok();
+                writeln!(log_clone, "Created task: {user_input}").ok();
                 
                 // Notify UI of task start (parent is the selected task, if any)
                 ui_channel_clone.task_started_with_parent(task_id, user_input.clone(), parent_task_id);
@@ -516,7 +514,7 @@ async fn run_tui_interactive(
                 // Add prompt header to output
                 ui_channel_clone.send(merlin_routing::UiEvent::TaskOutput {
                     task_id,
-                    output: format!("Prompt: {}\n", user_input),
+                    output: format!("Prompt: {user_input}\n"),
                 });
                 
                 // Execute with self-determination (task will assess itself)

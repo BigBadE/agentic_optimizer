@@ -26,6 +26,7 @@ pub struct ToolRegistry {
 }
 
 impl ToolRegistry {
+    #[must_use] 
     pub fn new() -> Self {
         Self {
             tools: Arc::new(Vec::new()),
@@ -38,12 +39,14 @@ impl ToolRegistry {
         self
     }
     
+    #[must_use] 
     pub fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
         self.tools.iter().find(|t| t.name() == name).cloned()
     }
     
+    #[must_use] 
     pub fn list_tools(&self) -> Vec<&dyn Tool> {
-        self.tools.iter().map(|t| t.as_ref()).collect()
+        self.tools.iter().map(std::convert::AsRef::as_ref).collect()
     }
 }
 

@@ -92,12 +92,13 @@ impl BM25Index {
 
         let num_docs = self.documents.len() as f32;
         for (term, df) in doc_freq {
-            let idf = ((num_docs - df as f32 + 0.5) / (df as f32 + 0.5) + 1.0).ln();
+            let idf = ((num_docs - df as f32 + 0.5) / (df as f32 + 0.5)).ln_1p();
             self.idf_cache.insert(term, idf);
         }
     }
 
     /// Search for documents matching the query
+    #[must_use] 
     pub fn search(&self, query: &str, top_k: usize) -> Vec<(PathBuf, f32)> {
         let query_terms = Self::tokenize(query);
         let mut scores: Vec<(PathBuf, f32)> = Vec::new();
@@ -131,7 +132,7 @@ impl BM25Index {
             
             // BM25 formula
             let numerator = tf * (K1 + 1.0);
-            let denominator = tf + K1 * (1.0 - B + B * doc_len_norm);
+            let denominator = K1.mul_add(B.mul_add(doc_len_norm, 1.0 - B), tf);
             
             score += idf * (numerator / denominator);
         }
@@ -168,11 +169,10 @@ impl BM25Index {
                 .filter(|c| c.is_alphanumeric() || *c == '_')
                 .collect();
 
-            if !clean.is_empty() && clean.len() > 2 && !stopwords.contains(clean.as_str()) {
-                if !has_special || clean != lower {
+            if !clean.is_empty() && clean.len() > 2 && !stopwords.contains(clean.as_str())
+                && (!has_special || clean != lower) {
                     terms.push(clean);
                 }
-            }
         }
 
         for window in words.windows(2) {
@@ -187,7 +187,7 @@ impl BM25Index {
                 && !stopwords.contains(clean0.as_str())
                 && !stopwords.contains(clean1.as_str())
             {
-                terms.push(format!("{}_{}", clean0, clean1));
+                terms.push(format!("{clean0}_{clean1}"));
             }
         }
 

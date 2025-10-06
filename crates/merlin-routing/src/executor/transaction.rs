@@ -154,7 +154,7 @@ pub struct FileConflict {
 
 fn hash_content(content: &Option<String>) -> u64 {
     use std::collections::hash_map::DefaultHasher;
-    use std::hash::{Hash, Hasher};
+    use std::hash::{Hash as _, Hasher as _};
     
     let mut hasher = DefaultHasher::new();
     content.hash(&mut hasher);

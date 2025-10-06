@@ -26,7 +26,7 @@ impl AgentRequest {
     }
 
     #[must_use]
-    pub const fn with_max_tokens(mut self, max_tokens: usize) -> Self {
+    pub fn with_max_tokens(mut self, max_tokens: usize) -> Self {
         self.max_tokens = Some(max_tokens);
         self
     }

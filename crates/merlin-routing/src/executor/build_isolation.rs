@@ -153,14 +153,12 @@ fn parse_test_count(output: &str, status: &str) -> usize {
         .lines()
         .find(|line| line.contains("test result:"))
         .and_then(|line| {
-            line.split_whitespace()
+            let (idx, _) = line.split_whitespace()
                 .enumerate()
-                .find(|(_, word)| *word == status)
-                .and_then(|(idx, _)| {
-                    line.split_whitespace()
-                        .nth(idx.saturating_sub(1))
-                        .and_then(|num| num.parse().ok())
-                })
+                .find(|(_, word)| *word == status)?;
+            line.split_whitespace()
+                                    .nth(idx.saturating_sub(1))
+                                    .and_then(|num| num.parse().ok())
         })
         .unwrap_or(0)
 }

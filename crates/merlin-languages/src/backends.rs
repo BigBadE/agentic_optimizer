@@ -102,7 +102,7 @@ impl LanguageProvider for RustBackendWrapper {
 }
 
 /// Convert rust-backend `SymbolKind` to provider `SymbolKind`
-const fn convert_symbol_kind(kind: rust_backend::SymbolKind) -> SymbolKind {
+fn convert_symbol_kind(kind: rust_backend::SymbolKind) -> SymbolKind {
     match kind {
         rust_backend::SymbolKind::Function => SymbolKind::Function,
         rust_backend::SymbolKind::Struct => SymbolKind::Struct,

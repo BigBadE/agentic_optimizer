@@ -44,7 +44,7 @@ pub enum Error {
 
 impl Error {
     #[must_use] 
-    pub const fn is_retryable(&self) -> bool {
+    pub fn is_retryable(&self) -> bool {
         matches!(
             self,
             Self::Request(_) | Self::Provider(_)

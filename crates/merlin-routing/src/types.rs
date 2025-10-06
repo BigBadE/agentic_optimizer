@@ -28,6 +28,12 @@ pub struct Task {
     pub priority: Priority,
     pub dependencies: Vec<TaskId>,
     pub context_needs: ContextRequirements,
+    
+    // Self-determination fields
+    #[serde(skip)]
+    pub state: TaskState,
+    #[serde(skip)]
+    pub decision_history: Vec<TaskDecision>,
 }
 
 impl Task {
@@ -40,6 +46,8 @@ impl Task {
             priority: Priority::Medium,
             dependencies: Vec::new(),
             context_needs: ContextRequirements::default(),
+            state: TaskState::Created,
+            decision_history: Vec::new(),
         }
     }
 
@@ -253,6 +261,61 @@ impl ExecutionContext {
             errors: Vec::new(),
         }
     }
+}
+
+/// Task lifecycle state
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum TaskState {
+    Created,
+    Assessing,
+    Executing,
+    AwaitingSubtasks,
+    Completed,
+    Failed,
+}
+
+impl Default for TaskState {
+    fn default() -> Self {
+        Self::Created
+    }
+}
+
+/// Decision made by a task during self-assessment
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct TaskDecision {
+    pub action: TaskAction,
+    pub reasoning: String,
+    pub confidence: f32,
+}
+
+/// Action a task can decide to take
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum TaskAction {
+    /// Complete the task immediately with this result
+    Complete { result: String },
+    
+    /// Decompose into subtasks
+    Decompose {
+        subtasks: Vec<SubtaskSpec>,
+        execution_mode: ExecutionMode,
+    },
+    
+    /// Need more information before proceeding
+    GatherContext { needs: Vec<String> },
+}
+
+/// Specification for a subtask to be spawned
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct SubtaskSpec {
+    pub description: String,
+    pub complexity: Complexity,
+}
+
+/// How to execute multiple subtasks
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+pub enum ExecutionMode {
+    Sequential,
+    Parallel,
 }
 
 /// Record of a command execution

@@ -543,7 +543,7 @@ async fn run_tui_interactive(
                             ui_channel_clone.task_started_with_parent(task_id, task_desc.clone(), parent_task_id);
                             
                             // Execute with streaming (AgentExecutor will handle all output)
-                            match orchestrator_clone.execute_task_streaming(task, ui_channel_clone.clone()).await {
+                            match orchestrator_clone.execute_task_self_determining(task, ui_channel_clone.clone()).await {
                                 Ok(result) => {
                                     ui_channel_clone.completed(result.task_id, result.clone());
                                     

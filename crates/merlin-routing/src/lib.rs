@@ -32,8 +32,10 @@ pub use types::{
     CommandExecution, Complexity, ContextRequirements, ExecutionContext, ExecutionStrategy,
     FileChange, Priority, Severity, StageResult, Task, TaskAnalysis, TaskId, TaskResult,
     ValidationError, ValidationResult, ValidationStage as ValidationStageType,
+    // Self-determination types
+    TaskState, TaskDecision, TaskAction, SubtaskSpec, ExecutionMode,
 };
-pub use agent::{AgentExecutor, StepTracker};
+pub use agent::{AgentExecutor, StepTracker, SelfAssessor};
 pub use streaming::{StepId, StepType, StreamingChannel, StreamingEvent, TaskStep};
 pub use tools::{ListFilesTool, ReadFileTool, RunCommandTool, Tool, ToolRegistry, WriteFileTool};
 pub use ui::{MessageLevel, TaskProgress, TuiApp, UiChannel, UiEvent};

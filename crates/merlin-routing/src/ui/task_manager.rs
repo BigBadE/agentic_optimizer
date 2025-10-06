@@ -66,6 +66,12 @@ impl TaskManager {
         }
     }
 
+    /// Inserts a task into the HashMap only, without updating task_order
+    /// Used during bulk loading - call rebuild_order() after all tasks are inserted
+    pub fn insert_task_for_load(&mut self, task_id: TaskId, task: TaskDisplay) {
+        self.tasks.insert(task_id, task);
+    }
+
     /// Removes a task and all its descendants, returns list of removed IDs
     pub fn remove_task(&mut self, task_id: TaskId) -> Vec<TaskId> {
         let to_delete = self.collect_descendants(task_id);

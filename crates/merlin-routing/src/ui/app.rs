@@ -83,7 +83,7 @@ impl TuiApp {
         if let Some(ref persistence) = self.persistence {
             if let Ok(tasks) = persistence.load_all_tasks().await {
                 for (task_id, task_display) in tasks {
-                    self.task_manager.add_task(task_id, task_display);
+                    self.task_manager.insert_task_for_load(task_id, task_display);
                 }
 
                 self.task_manager.rebuild_order();

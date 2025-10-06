@@ -22,4 +22,3 @@ tokio = { workspace = true, features = ["rt", "macros"] }
 
 [lints]
 workspace = true
-

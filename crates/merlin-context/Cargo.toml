@@ -6,7 +6,7 @@ edition.workspace = true
 [dependencies]
 merlin-core.workspace = true
 merlin-languages.workspace = true
-rust-backend = { path = "../merlin-languages/languages/rust-backend" }
+rust-backend.workspace = true
 walkdir.workspace = true
 tracing.workspace = true
 serde.workspace = true
@@ -16,10 +16,10 @@ tokio.workspace = true
 ollama-rs.workspace = true
 indicatif.workspace = true
 ignore.workspace = true
-bincode = "1.3"
-toml = "0.8"
-clap = { version = "4.5", features = ["derive"] }
-chrono = "0.4"
+bincode.workspace = true
+toml.workspace = true
+clap.workspace = true
+chrono.workspace = true
 
 [[bin]]
 name = "benchmark"

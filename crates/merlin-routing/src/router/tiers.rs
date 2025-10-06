@@ -109,6 +109,7 @@ impl StrategyRouter {
 #[async_trait]
 impl ModelRouter for StrategyRouter {
     async fn route(&self, task: &Task) -> Result<RoutingDecision> {
+        // Try each strategy in priority order
         for strategy in &self.strategies {
             if !strategy.applies_to(task) {
                 continue;
@@ -131,6 +132,29 @@ impl ModelRouter for StrategyRouter {
                     reasoning: format!("Selected by {} strategy", strategy.name()),
                 });
             }
+        }
+        
+        // Fallback: Try any enabled tier
+        if self.groq_enabled {
+            return Ok(RoutingDecision {
+                tier: ModelTier::Groq {
+                    model_name: "llama-3.1-70b-versatile".to_string(),
+                },
+                estimated_cost: 0.0,
+                estimated_latency_ms: 500,
+                reasoning: "Fallback to Groq (no other tiers available)".to_string(),
+            });
+        }
+        
+        if self.local_enabled {
+            return Ok(RoutingDecision {
+                tier: ModelTier::Local {
+                    model_name: "qwen2.5-coder:7b".to_string(),
+                },
+                estimated_cost: 0.0,
+                estimated_latency_ms: 100,
+                reasoning: "Fallback to Local (no other tiers available)".to_string(),
+            });
         }
         
         Err(RoutingError::NoAvailableTier)

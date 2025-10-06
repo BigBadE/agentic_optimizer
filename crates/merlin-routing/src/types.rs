@@ -230,3 +230,37 @@ impl FileChange {
     }
 }
 
+/// Execution context accumulated across tasks
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ExecutionContext {
+    pub original_request: String,
+    pub files_read: std::collections::HashMap<PathBuf, String>,
+    pub files_written: std::collections::HashMap<PathBuf, String>,
+    pub commands_run: Vec<CommandExecution>,
+    pub findings: Vec<String>,
+    pub errors: Vec<String>,
+}
+
+impl ExecutionContext {
+    #[must_use]
+    pub fn new(original_request: String) -> Self {
+        Self {
+            original_request,
+            files_read: std::collections::HashMap::new(),
+            files_written: std::collections::HashMap::new(),
+            commands_run: Vec::new(),
+            findings: Vec::new(),
+            errors: Vec::new(),
+        }
+    }
+}
+
+/// Record of a command execution
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CommandExecution {
+    pub command: String,
+    pub output: String,
+    pub exit_code: i32,
+    #[serde(skip, default = "std::time::Instant::now")]
+    pub timestamp: std::time::Instant,
+}

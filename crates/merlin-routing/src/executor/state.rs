@@ -7,6 +7,7 @@ use crate::{FileChange, Result};
 /// Shared workspace state (synchronized)
 pub struct WorkspaceState {
     files: RwLock<HashMap<PathBuf, String>>,
+    #[allow(dead_code)]
     metadata: RwLock<HashMap<String, serde_json::Value>>,
     root_path: PathBuf,
 }

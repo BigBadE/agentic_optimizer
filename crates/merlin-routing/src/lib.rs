@@ -1,9 +1,12 @@
+pub mod agent;
 pub mod analyzer;
 pub mod config;
 pub mod error;
 pub mod executor;
 pub mod orchestrator;
 pub mod router;
+pub mod streaming;
+pub mod tools;
 pub mod types;
 pub mod ui;
 pub mod validator;
@@ -26,10 +29,13 @@ pub use router::{
     StrategyRouter,
 };
 pub use types::{
-    Complexity, ContextRequirements, ExecutionStrategy, FileChange, Priority, Severity,
-    StageResult, Task, TaskAnalysis, TaskId, TaskResult, ValidationError, ValidationResult,
-    ValidationStage as ValidationStageType,
+    CommandExecution, Complexity, ContextRequirements, ExecutionContext, ExecutionStrategy,
+    FileChange, Priority, Severity, StageResult, Task, TaskAnalysis, TaskId, TaskResult,
+    ValidationError, ValidationResult, ValidationStage as ValidationStageType,
 };
+pub use agent::{AgentExecutor, StepTracker};
+pub use streaming::{StepId, StepType, StreamingChannel, StreamingEvent, TaskStep};
+pub use tools::{ListFilesTool, ReadFileTool, RunCommandTool, Tool, ToolRegistry, WriteFileTool};
 pub use ui::{MessageLevel, TaskProgress, TuiApp, UiChannel, UiEvent};
 pub use validator::{
     BuildValidationStage, LintValidationStage, SyntaxValidationStage, TestValidationStage,

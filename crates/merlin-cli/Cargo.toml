@@ -14,8 +14,8 @@ merlin-providers.workspace = true
 merlin-context.workspace = true
 merlin-languages.workspace = true
 merlin-agent.workspace = true
-merlin-routing = { path = "../merlin-routing" }
-merlin-local = { path = "../merlin-local" }
+merlin-routing.workspace = true
+merlin-local.workspace = true
 anyhow.workspace = true
 clap.workspace = true
 serde.workspace = true

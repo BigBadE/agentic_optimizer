@@ -361,7 +361,7 @@ impl TuiApp {
 
     /// Handles any other key events depending on the focused pane
     fn handle_other_key(&mut self, key: &KeyEvent) {
-        if self.focused_pane == FocusedPane::Tasks {
+        if self.focused_pane == FocusedPane::Tasks && key.code != KeyCode::Backspace {
             self.state.pending_delete_task_id = None;
         }
 

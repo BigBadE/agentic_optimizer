@@ -10,6 +10,10 @@ mod tests {
 
     #[async_trait]
     impl ModelProvider for MockProvider {
+        fn name(&self) -> &'static str { "mock" }
+
+        async fn is_available(&self) -> bool { true }
+
         async fn generate(&self, _query: &Query, _context: &Context) -> Result<Response> {
             Ok(Response {
                 text: "Mock response".to_owned(),
@@ -19,10 +23,6 @@ mod tests {
                 latency_ms: 0,
             })
         }
-
-        fn name(&self) -> &'static str { "mock" }
-
-        async fn is_available(&self) -> bool { true }
 
         fn estimate_cost(&self, _context: &Context) -> f64 { 0.0 }
     }

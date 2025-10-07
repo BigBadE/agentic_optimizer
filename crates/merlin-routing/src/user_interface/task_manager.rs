@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
 use crate::TaskId;
@@ -131,7 +132,7 @@ impl TaskManager {
             .iter()
             .map(|(&id, task)| (id, task.start_time))
             .collect();
-        all_tasks.sort_by_key(|(_, time)| *time);
+        all_tasks.sort_by_key(|(_, time)| Reverse(*time));
 
         // Add root tasks first, then recursively add their children
         for (task_id, _) in &all_tasks {
@@ -277,7 +278,7 @@ impl TaskManager {
             .filter(|(_, task)| task.parent_id == Some(task_id))
             .map(|(&id, task)| (id, task.start_time))
             .collect();
-        children.sort_by_key(|(_, time)| *time);
+        children.sort_by_key(|(_, time)| Reverse(*time));
 
         for (child_id, _) in children {
             if !self.task_order.contains(&child_id) {

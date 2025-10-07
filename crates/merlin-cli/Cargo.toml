@@ -27,5 +27,12 @@ console.workspace = true
 dialoguer.workspace = true
 reqwest.workspace = true
 
+[dev-dependencies]
+assert_cmd.workspace = true
+predicates.workspace = true
+tempfile.workspace = true
+insta.workspace = true
+serial_test.workspace = true
+
 [lints]
 workspace = true

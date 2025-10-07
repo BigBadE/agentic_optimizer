@@ -39,11 +39,12 @@ impl ConflictAwareTaskGraph {
         running: &HashSet<TaskId>,
     ) -> Vec<Task> {
         let base_ready = self.graph.ready_tasks(completed);
-        
+
         base_ready
             .into_iter()
             .filter(|task| {
-                !self.conflicts_with_running(task, running)
+                // Exclude tasks that are already running
+                !running.contains(&task.id) && !self.conflicts_with_running(task, running)
             })
             .collect()
     }

@@ -1,9 +1,10 @@
 //! Config file chunking by top-level sections with token limits.
 
+use std::mem::take;
 use super::{FileChunk, estimate_tokens, MIN_CHUNK_TOKENS};
 
 /// Chunk config files by top-level sections with token limits
-#[must_use] 
+#[must_use]
 pub fn chunk_config(file_path: String, content: &str) -> Vec<FileChunk> {
     let lines: Vec<&str> = content.lines().collect();
     let mut chunks = Vec::new();
@@ -11,8 +12,8 @@ pub fn chunk_config(file_path: String, content: &str) -> Vec<FileChunk> {
     let mut buffer = String::new();
     let mut current_section = String::from("root");
     let mut line_count = 0;
-    
-    for (i, line) in lines.iter().enumerate() {
+
+    for (index, line) in lines.iter().enumerate() {
         let trimmed = line.trim();
         
         // Detect section headers (e.g., [section] in TOML)
@@ -23,16 +24,16 @@ pub fn chunk_config(file_path: String, content: &str) -> Vec<FileChunk> {
                 if !buffer.trim().is_empty() {
                     chunks.push(FileChunk::new(
                         file_path.clone(),
-                        std::mem::take(&mut buffer),
+                        take(&mut buffer),
                         current_section.clone(),
                         current_chunk_start + 1,
-                        i,
+                        index,
                     ));
                 }
                 line_count = 0;
             }
             current_section = trimmed.to_string();
-            current_chunk_start = i;
+            current_chunk_start = index;
         }
         
         if line_count > 0 {

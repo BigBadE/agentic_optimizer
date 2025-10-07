@@ -3,7 +3,7 @@
 use std::fs::read_to_string;
 use std::path::Path;
 
-use ra_ap_ide::{Analysis, SymbolKind as RaSymbolKind};
+use ra_ap_ide::{Analysis, FileId, FilePosition, LineCol, ReferenceSearchResult, StructureNodeKind, SymbolKind as RaSymbolKind};
 use ra_ap_ide_db::symbol_index::Query;
 
 use merlin_core::{Error, FileContext, Result};
@@ -17,58 +17,52 @@ pub struct SymbolSearcher<'analysis> {
     backend: &'analysis RustBackend,
 }
 
-impl<'analysis> SymbolSearcher<'analysis> {
+impl SymbolSearcher<'_> {
+    /// Collect references to a symbol starting from its definition.
     fn collect_references(
         &self,
         symbol_name: &str,
         definition: &SymbolInfo,
         results: &mut Vec<SymbolInfo>,
-    ) -> Result<()> {
+    ) {
         let Some(file_id) = self.backend.get_file_id(&definition.file_path) else {
-            return Ok(());
+            return;
         };
 
-        let line_index = match self.analysis.file_line_index(file_id) {
-            Ok(index) => index,
-            Err(_) => return Ok(()),
-        };
+        let Ok(line_index) = self.analysis.file_line_index(file_id) else { return };
 
-        let Some(offset) = line_index.offset(ra_ap_ide::LineCol {
+        let Some(offset) = line_index.offset(LineCol {
             line: definition.line,
             col: 0,
         }) else {
-            return Ok(());
+            return;
         };
 
-        let position = ra_ap_ide::FilePosition { file_id, offset };
+        let position = FilePosition { file_id, offset };
 
         let Ok(Some(reference_sets)) = self.analysis.find_all_refs(position, None) else {
-            return Ok(());
+            return;
         };
 
         for reference_set in reference_sets {
-            self.collect_references_for_set(symbol_name, definition, reference_set, results)?;
+            self.collect_references_for_set(symbol_name, definition, &reference_set, results);
         }
-
-        Ok(())
     }
 
+    /// Collect references from a reference search result set.
     fn collect_references_for_set(
         &self,
         symbol_name: &str,
         definition: &SymbolInfo,
-        reference_set: ra_ap_ide::ReferenceSearchResult,
+        reference_set: &ReferenceSearchResult,
         results: &mut Vec<SymbolInfo>,
-    ) -> Result<()> {
+    ) {
         for (ref_file_id, ranges) in &reference_set.references {
             let Some(path) = self.backend.path_from_file_id(*ref_file_id) else {
                 continue;
             };
 
-            let line_index = match self.analysis.file_line_index(*ref_file_id) {
-                Ok(index) => index,
-                Err(_) => continue,
-            };
+            let Ok(line_index) = self.analysis.file_line_index(*ref_file_id) else { continue };
 
             for (text_range, _) in ranges {
                 let line = line_index.line_col(text_range.start()).line;
@@ -82,8 +76,6 @@ impl<'analysis> SymbolSearcher<'analysis> {
                 });
             }
         }
-
-        Ok(())
     }
 }
 
@@ -143,11 +135,11 @@ impl<'analysis> SymbolSearcher<'analysis> {
             .file_line_index(file_id)
             .map_err(|error| Error::Other(error.to_string()))?;
 
-        let Some(offset) = line_index.offset(ra_ap_ide::LineCol { line: line.saturating_sub(1), col: 0 }) else {
+        let Some(offset) = line_index.offset(LineCol { line: line.saturating_sub(1), col: 0 }) else {
             return Ok(None);
         };
 
-        let position = ra_ap_ide::FilePosition { file_id, offset };
+        let position = FilePosition { file_id, offset };
 
         let nav_targets = self
             .analysis
@@ -167,7 +159,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
                 continue;
             };
 
-            let line = nav.focus_range.map_or(0, |range| {
+            let def_line = nav.focus_range.map_or(0, |range| {
                 self.analysis
                     .file_line_index(nav.file_id)
                     .ok()
@@ -180,7 +172,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
                 name: nav.name.to_string(),
                 kind: convert_symbol_kind(kind),
                 file_path: path,
-                line,
+                line: def_line,
                 documentation: nav.description,
             }));
         }
@@ -189,6 +181,9 @@ impl<'analysis> SymbolSearcher<'analysis> {
     }
 
     /// Find references to a symbol by name using rust-analyzer's reference index.
+    ///
+    /// # Errors
+    /// Returns an error if rust-analyzer queries fail.
     pub fn find_references(&self, symbol_name: &str) -> Result<Vec<SymbolInfo>> {
         let mut results = Vec::new();
 
@@ -197,7 +192,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
         
         // For each definition, use rust-analyzer's find_all_refs to get usages
         for def in definitions {
-            self.collect_references(symbol_name, &def, &mut results)?;
+            self.collect_references(symbol_name, &def, &mut results);
 
             if results.len() > 100 {
                 break;
@@ -224,7 +219,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
     ///
     /// # Errors
     /// Returns an error if rust-analyzer queries fail.
-    fn list_symbols_in_file_by_id(&self, file_id: ra_ap_ide::FileId) -> Result<Vec<SymbolInfo>> {
+    fn list_symbols_in_file_by_id(&self, file_id: FileId) -> Result<Vec<SymbolInfo>> {
         let structure = self
             .analysis
             .file_structure(file_id)
@@ -255,6 +250,9 @@ impl<'analysis> SymbolSearcher<'analysis> {
     }
 
     /// Internal: list symbols for all known files (bounded size).
+    ///
+    /// # Errors
+    /// Returns an error if rust-analyzer queries fail.
     fn list_all_symbols(&self) -> Result<Vec<SymbolInfo>> {
         let mut symbols = Vec::new();
 
@@ -270,6 +268,9 @@ impl<'analysis> SymbolSearcher<'analysis> {
     }
 
     /// Internal: find symbols by name using the global index.
+    ///
+    /// # Errors
+    /// Returns an error if rust-analyzer queries fail.
     fn find_symbol_by_name(&self, name: &str) -> Result<Vec<SymbolInfo>> {
         let query = Query::new(name.to_owned());
         
@@ -320,10 +321,10 @@ fn convert_symbol_kind(kind: RaSymbolKind) -> SymbolKind {
 }
 
 /// Convert rust-analyzer structure node kind to our public symbol kind.
-fn convert_structure_kind(kind: ra_ap_ide::StructureNodeKind) -> SymbolKind {
+fn convert_structure_kind(kind: StructureNodeKind) -> SymbolKind {
     match kind {
-        ra_ap_ide::StructureNodeKind::SymbolKind(symbol_kind) => convert_symbol_kind(symbol_kind),
-        ra_ap_ide::StructureNodeKind::Region => SymbolKind::Module,
+        StructureNodeKind::SymbolKind(symbol_kind) => convert_symbol_kind(symbol_kind),
+        StructureNodeKind::Region => SymbolKind::Module,
     }
 }
 

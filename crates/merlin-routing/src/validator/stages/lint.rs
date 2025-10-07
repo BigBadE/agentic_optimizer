@@ -122,9 +122,15 @@ impl ValidationStage for LintValidationStage {
 mod tests {
     use super::*;
     use merlin_core::TokenUsage;
+    use crate::Result;
 
     #[tokio::test]
-    async fn test_lint_validation_skip_no_files() {
+    /// # Panics
+    /// Panics if stage result does not indicate skip when no files are modified.
+    ///
+    /// # Errors
+    /// Returns an error if validation returns an unexpected failure in the test harness.
+    async fn test_lint_validation_skip_no_files() -> Result<()> {
         let stage = LintValidationStage::new();
         let response = Response {
             text: "test".to_owned(),
@@ -135,13 +141,19 @@ mod tests {
         };
         let task = Task::new("Test".to_owned());
         
-        let result = stage.validate(&response, &task).await.unwrap();
+        let result = stage.validate(&response, &task).await?;
         assert!(result.passed);
         assert!(result.details.contains("skipped"));
+        Ok(())
     }
     
     #[tokio::test]
-    async fn test_quick_check() {
+    /// # Panics
+    /// Panics if `quick_check` logic does not match expected patterns.
+    ///
+    /// # Errors
+    /// Returns an error if `quick_check` returns an unexpected failure in the test harness.
+    async fn test_quick_check() -> Result<()> {
         let stage = LintValidationStage::new();
         
         let good_response = Response {
@@ -151,7 +163,7 @@ mod tests {
             provider: "test".to_owned(),
             latency_ms: 0,
         };
-        assert!(stage.quick_check(&good_response).await.unwrap());
+        assert!(stage.quick_check(&good_response).await?);
         
         let bad_response = Response {
             text: "warning: unused variable - clippy::unused_variable".to_owned(),
@@ -160,7 +172,8 @@ mod tests {
             provider: "test".to_owned(),
             latency_ms: 0,
         };
-        assert!(!stage.quick_check(&bad_response).await.unwrap());
+        assert!(!stage.quick_check(&bad_response).await?);
+        Ok(())
     }
 }
 

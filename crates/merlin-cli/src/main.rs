@@ -1,29 +1,49 @@
 use anyhow::Result;
-use tracing_subscriber::{layer::SubscriberExt as _, util::SubscriberInitExt as _};
 use console::{style, Term};
-
+use merlin_agent::{Agent, AgentConfig, AgentRequest, AgentExecutor};
 use merlin_context::ContextBuilder;
 use merlin_core::{ModelProvider, Query, TokenUsage};
+use merlin_languages::{create_backend, Language};
 use merlin_providers::OpenRouterProvider;
-use merlin_languages::{Language, create_backend};
-use merlin_agent::{Agent, AgentConfig, AgentRequest};
+use merlin_routing::{
+    MessageLevel, RoutingConfig, RoutingOrchestrator, TaskResult, TuiApp, UiChannel, UiEvent, Task,
+};
+use std::fs;
+use std::io::Write as _;
+use std::path::{Path, PathBuf};
+use std::result::Result as StdResult;
+use std::time::{Duration, SystemTime};
+use std::sync::Arc;
+use tokio::spawn;
+use tracing_subscriber::{
+    fmt,
+    layer::SubscriberExt as _,
+    util::SubscriberInitExt as _,
+    EnvFilter,
+    Registry,
+};
+use dialoguer::Input;
+use toml::to_string_pretty;
 
 mod cli;
 mod config;
 
 use clap::Parser as _;
-use cli::{Cli, Commands};
+use cli::{Cli, Commands, UiMode, Validation};
 use config::Config;
-use std::path::PathBuf;
+
+const MAX_TASKS: usize = 50;
 
 #[tokio::main]
+/// # Errors
+/// Returns an error if initialization or command handling fails.
+///
+/// # Panics
+/// May panic if tracing subscriber initialization fails unexpectedly.
 async fn main() -> Result<()> {
-    tracing_subscriber::registry()
-        .with(
-            tracing_subscriber::EnvFilter::try_from_default_env()
-                .unwrap_or_else(|_| "agentic_optimizer=info".into()),
-        )
-        .with(tracing_subscriber::fmt::layer())
+    Registry::default()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "agentic_optimizer=info".into()))
+        .with(fmt::layer())
         .init();
 
     let cli = Cli::parse();
@@ -56,47 +76,43 @@ async fn main() -> Result<()> {
         }
         None => {
             // No subcommand - start interactive agent session
-            handle_interactive_agent(
-                cli.project,
-                cli.no_validate,
-                cli.verbose,
-                cli.no_tui,
-                cli.local,
-            )
-            .await?;
+            let flags = InteractiveFlags {
+                validation: cli.validation,
+                ui: cli.ui,
+                local_only: cli.local,
+            };
+            handle_interactive_agent(cli.project, flags).await?;
         }
     }
-
     Ok(())
 }
 
+/// Run interactive chat session with a single provider-backed agent.
+///
+/// # Errors
+/// Returns an error if configuration loading, provider initialization, IO, or agent execution fails.
 async fn handle_chat(
     project: PathBuf,
     model: Option<String>,
 ) -> Result<()> {
     let term = Term::stdout();
     
-    term.write_line(&format!("{}", style("=== Agentic Optimizer - Interactive Chat ===").cyan().bold()))?;
-    term.write_line(&format!("{} {}", 
-        style("Project:").cyan(), 
-        style(project.display()).yellow()
-    ))?;
-    term.write_line("")?;
+    print_chat_header(&term, &project)?;
 
-    let config = Config::load_from_project(&project);
+    let cli_config = Config::load_from_project(&project);
 
     term.write_line(&format!("{}", style("Initializing agent...").cyan()))?;
     
-    let mut provider = OpenRouterProvider::from_config_or_env(config.providers.openrouter_key)?;
-    let model_to_use = model.or(config.providers.high_model.clone());
+    let mut provider = OpenRouterProvider::from_config_or_env(cli_config.providers.openrouter_key)?;
+    let model_to_use = model.or_else(|| cli_config.providers.high_model.clone());
     if let Some(model_name) = model_to_use {
         provider = provider.with_model(model_name);
     }
-    let provider: std::sync::Arc<dyn ModelProvider> = std::sync::Arc::new(provider);
+    let provider: Arc<dyn ModelProvider> = Arc::new(provider);
 
     let backend = create_backend(Language::Rust)?;
 
-    let config = AgentConfig::new()
+    let agent_config = AgentConfig::new()
         .with_system_prompt(
             "You are a helpful AI coding assistant. Analyze the provided code context and help the user with their requests. \
              Be concise but thorough. When making code changes, provide complete, working code."
@@ -104,7 +120,7 @@ async fn handle_chat(
         .with_max_context_tokens(100_000)
         .with_top_k_context_files(15);
 
-    let agent = Agent::with_config(provider, config);
+    let agent = Agent::with_config(provider, agent_config);
     let mut executor = agent.executor().with_language_backend(backend);
 
     term.write_line(&format!("{}", style("\u{2713} Agent ready!").green().bold()))?;
@@ -112,70 +128,13 @@ async fn handle_chat(
     term.write_line(&format!("{}", style("Type your message (or 'exit' to quit):").cyan()))?;
     term.write_line("")?;
 
-    loop {
-        term.write_line(&format!("{}", style("You:").green().bold()))?;
-        
-        let input = dialoguer::Input::<String>::new()
-            .with_prompt(">")
-            .interact_text()?;
-
-        let trimmed = input.trim();
-        if trimmed.is_empty() {
-            continue;
-        }
-
-        if trimmed.eq_ignore_ascii_case("exit") || trimmed.eq_ignore_ascii_case("quit") {
-            term.write_line(&format!("{}", style("Goodbye!").cyan()))?;
-            break;
-        }
-
-        term.write_line("")?;
-        term.write_line(&format!("{}", style("Agent:").blue().bold()))?;
-        
-        let request = AgentRequest::new(trimmed.to_owned(), project.clone());
-        
-        match executor.execute(request).await {
-            Ok(result) => {
-                term.write_line(&result.response.content)?;
-                term.write_line("")?;
-                
-                term.write_line(&format!("{}", style("---").dim()))?;
-                term.write_line(&format!("{} {} | {} {}ms | {} {} tokens", 
-                    style("Provider:").dim(),
-                    style(&result.response.provider_used).dim(),
-                    style("Latency:").dim(),
-                    style(result.metadata.total_time_ms).dim(),
-                    style("Tokens:").dim(),
-                    style(result.response.tokens_used.total()).dim()
-                ))?;
-                
-                if result.response.tokens_used.cache_read > 0 {
-                    term.write_line(&format!("{} {} tokens ({}% cache hit)", 
-                        style("Cache:").dim(),
-                        style(result.response.tokens_used.cache_read).dim(),
-                        style(format!("{:.1}", 
-                            (result.response.tokens_used.cache_read as f64 / 
-                             result.response.tokens_used.total() as f64) * 100.0
-                        )).dim()
-                    ))?;
-                }
-                
-                term.write_line(&format!("{}", style("---").dim()))?;
-                term.write_line("")?;
-            }
-            Err(error) => {
-                term.write_line(&format!("{} {}", 
-                    style("Error:").red().bold(),
-                    style(error.to_string()).red()
-                ))?;
-                term.write_line("")?;
-            }
-        }
-    }
-
-    Ok(())
+    chat_loop(&term, &mut executor, &project).await
 }
 
+/// Handle the query command by building context and sending to provider.
+///
+/// # Errors
+/// Returns an error if configuration loading, context building, or provider request fails.
 async fn handle_query(
     query_text: String,
     project: PathBuf,
@@ -234,6 +193,10 @@ async fn handle_query(
 }
 
 /// Handle the prompt command - show relevant files without sending to LLM.
+/// Handle the prompt command - show relevant files without sending to LLM.
+///
+/// # Errors
+/// Returns an error if context building or terminal IO fails.
 async fn handle_prompt(
     query_text: String,
     project: PathBuf,
@@ -263,12 +226,12 @@ async fn handle_prompt(
     // Build context and capture any errors/warnings
     let context = match builder.build_context(&query).await {
         Ok(ctx) => ctx,
-        Err(e) => {
+        Err(error) => {
             term.write_line(&format!("{} {}", 
                 style("Error:").red().bold(),
-                style(e.to_string()).red()
+                style(error.to_string()).red()
             ))?;
-            return Err(e.into());
+            return Err(error.into());
         }
     };
     
@@ -283,11 +246,14 @@ async fn handle_prompt(
 }
 
 /// Output current configuration. If `full` is true, prints full TOML.
+///
+/// # Errors
+/// Returns an error if serialization or logging fails.
 fn handle_config(full: bool) -> Result<()> {
     let config = Config::from_env();
 
     if full {
-        let toml = toml::to_string_pretty(&config)?;
+        let toml = to_string_pretty(&config)?;
         tracing::info!("{toml}");
     } else {
         tracing::info!("Configuration:");
@@ -314,33 +280,40 @@ fn handle_metrics(_daily: bool) {
     tracing::info!("This will be added in Phase 5 (Advanced Optimizations).");
 }
 /// Handle interactive agent session with multi-model routing
+/// Handle interactive agent session with multi-model routing
+///
+/// # Errors
+/// Returns an error if TUI or IO operations fail, or if the orchestrator returns an error.
+// Group the flags into a single struct to avoid excessive bool parameters
+struct InteractiveFlags {
+    validation: Validation,
+    ui: UiMode,
+    local_only: bool,
+}
+
 async fn handle_interactive_agent(
     project: PathBuf,
-    no_validate: bool,
-    verbose: bool,
-    no_tui: bool,
-    local_only: bool,
+    flags: InteractiveFlags,
 ) -> Result<()> {
     // Create routing configuration
-    let mut config = merlin_routing::RoutingConfig::default();
-    config.validation.enabled = !no_validate;
-    config.workspace.root_path = project.clone();
+    let mut config = RoutingConfig::default();
+    config.validation.enabled = !matches!(flags.validation, Validation::Disabled);
+    config.workspace.root_path.clone_from(&project);
     
-    if local_only {
+    if flags.local_only {
         config.tiers.groq_enabled = false;
         config.tiers.premium_enabled = false;
     }
 
-    let orchestrator = merlin_routing::RoutingOrchestrator::new(config);
+    let orchestrator = RoutingOrchestrator::new(config);
 
-    if no_tui {
+    if !matches!(flags.ui, UiMode::Tui) {
         // Plain console mode
-        use console::{style, Term};
         let term = Term::stdout();
 
         term.write_line(&format!("{}", style("=== Merlin - Interactive AI Coding Assistant ===").cyan().bold()))?;
         term.write_line(&format!("Project: {}", project.display()))?;
-        term.write_line(&format!("Mode: {}", if local_only { "Local Only" } else { "Multi-Model Routing" }))?;
+        term.write_line(&format!("Mode: {}", if flags.local_only { "Local Only" } else { "Multi-Model Routing" }))?;
         term.write_line("")?;
         term.write_line("\u{2713} Agent ready!")?;
         term.write_line("")?;
@@ -350,7 +323,7 @@ async fn handle_interactive_agent(
         loop {
             term.write_line("You:")?;
 
-            let input = dialoguer::Input::<String>::new()
+            let input = Input::<String>::new()
                 .with_prompt(">")
                 .interact_text()?;
 
@@ -367,23 +340,7 @@ async fn handle_interactive_agent(
             term.write_line("")?;
 
             match orchestrator.process_request(trimmed).await {
-                Ok(results) => {
-                    term.write_line("Merlin:")?;
-                    term.write_line("")?;
-
-                    for result in &results {
-                        term.write_line(&result.response.text)?;
-                        term.write_line("")?;
-
-                        if verbose {
-                            term.write_line(&format!("Tier: {} | Duration: {}ms | Tokens: {}",
-                                                     result.tier_used,
-                                                     result.duration_ms,
-                                                     result.response.tokens_used.total()
-                            ))?;
-                        }
-                    }
-                }
+                Ok(results) => print_results_plain(&term, &results, matches!(flags.ui, UiMode::PlainVerbose))?,
                 Err(error) => {
                     term.write_line(&format!("Error: {error}"))?;
                     term.write_line("")?;
@@ -392,15 +349,17 @@ async fn handle_interactive_agent(
         }
     } else {
         // TUI mode (DEFAULT) - fully self-contained
-        run_tui_interactive(orchestrator, project, local_only, verbose).await?;
+        run_tui_interactive(orchestrator, project, flags.local_only, matches!(flags.ui, UiMode::PlainVerbose)).await?;
     }
 
     Ok(())
 }
 
 /// Clean up old task files to prevent disk space waste
-fn cleanup_old_tasks(merlin_dir: &std::path::Path) -> Result<()> {
-    use std::fs;
+///
+/// # Errors
+/// Returns an error if the tasks directory cannot be read.
+fn cleanup_old_tasks(merlin_dir: &Path) -> Result<()> {
     
     let tasks_dir = merlin_dir.join("tasks");
     if !tasks_dir.exists() {
@@ -409,7 +368,7 @@ fn cleanup_old_tasks(merlin_dir: &std::path::Path) -> Result<()> {
     
     // Get all task files sorted by modification time
     let mut task_files: Vec<_> = fs::read_dir(&tasks_dir)?
-        .filter_map(std::result::Result::ok)
+        .filter_map(StdResult::ok)
         .filter(|entry| {
             entry.path().extension()
                 .and_then(|ext| ext.to_str())
@@ -422,28 +381,28 @@ fn cleanup_old_tasks(merlin_dir: &std::path::Path) -> Result<()> {
         .collect();
     
     // Sort by modification time (newest first)
-    task_files.sort_by(|a, b| b.1.cmp(&a.1));
+    task_files.sort_by(|left, right| right.1.cmp(&left.1));
     
     // Keep only the 50 most recent, delete the rest
-    const MAX_TASKS: usize = 50;
     for (path, _) in task_files.iter().skip(MAX_TASKS) {
-        drop(fs::remove_file(path));
+        if let Err(error) = fs::remove_file(path) {
+            tracing::warn!("failed to remove old task file {:?}: {}", path, error);
+        }
     }
     
     Ok(())
 }
 
 /// Run fully self-contained TUI interactive session
+///
+/// # Errors
+/// Returns an error if filesystem, TUI, or async operations fail.
 async fn run_tui_interactive(
-    orchestrator: merlin_routing::RoutingOrchestrator,
+    orchestrator: RoutingOrchestrator,
     project: PathBuf,
     local_only: bool,
     verbose: bool,
 ) -> Result<()> {
-    use merlin_routing::{TuiApp, UiEvent, MessageLevel};
-    use std::fs;
-    use std::io::Write as _;
-    
     // Create .merlin directory for logs and task storage
     let merlin_dir = project.join(".merlin");
     fs::create_dir_all(&merlin_dir)?;
@@ -456,9 +415,10 @@ async fn run_tui_interactive(
     let mut log_file = fs::OpenOptions::new()
         .create(true)
         .write(true)
+        .truncate(true)
         .open(&debug_log)?;
     
-    writeln!(log_file, "=== Session started at {:?} ===", std::time::SystemTime::now())?;
+    writeln!(log_file, "=== Session started at {:?} ===", SystemTime::now())?;
     writeln!(log_file, "Project: {}", project.display())?;
     writeln!(log_file, "Mode: {}", if local_only { "Local Only" } else { "Multi-Model" })?;
     
@@ -499,49 +459,45 @@ async fn run_tui_interactive(
             // TODO: Context gathering should be handled by self-determination (GATHER action)
             // For now, disable automatic context injection to prevent infinite loops
             
-            tokio::spawn(async move {
+            spawn(async move {
                 // Create a single task from user input - let self-determination handle decomposition
-                use merlin_routing::Task;
                 // Use original user_input for task description, enhanced_input for execution
                 let task = Task::new(user_input.clone());
                 let task_id = task.id;
                 
-                writeln!(log_clone, "Created task: {user_input}").ok();
+                if let Err(error) = writeln!(log_clone, "Created task: {user_input}") {
+                    let () = ui_channel_clone.send(UiEvent::SystemMessage {
+                        level: MessageLevel::Warning,
+                        message: format!("Failed to write to log: {error}"),
+                    });
+                }
                 
                 // Notify UI of task start (parent is the selected task, if any)
                 ui_channel_clone.task_started_with_parent(task_id, user_input.clone(), parent_task_id);
                 
                 // Add prompt header to output
-                ui_channel_clone.send(merlin_routing::UiEvent::TaskOutput {
+                ui_channel_clone.send(UiEvent::TaskOutput {
                     task_id,
                     output: format!("Prompt: {user_input}\n"),
                 });
                 
                 // Execute with self-determination (task will assess itself)
-                match orchestrator_clone.execute_task_self_determining(task, ui_channel_clone.clone()).await {
+                match orchestrator_clone.execute_task_streaming(task, ui_channel_clone.clone()).await {
                     Ok(result) => {
                         ui_channel_clone.completed(result.task_id, result.clone());
                         
-                        writeln!(log_clone, "Response: {}", result.response.text).ok();
-                        writeln!(log_clone, "Tier: {} | Duration: {}ms | Tokens: {}",
+                        try_write_log(&ui_channel_clone, &mut log_clone, &format!("Response: {}", result.response.text));
+                        try_write_log(&ui_channel_clone, &mut log_clone, &format!(
+                            "Tier: {} | Duration: {}ms | Tokens: {}",
                             result.tier_used,
                             result.duration_ms,
                             result.response.tokens_used.total()
-                        ).ok();
+                        ));
                         
-                        if verbose_clone {
-                            ui_channel_clone.send(UiEvent::SystemMessage {
-                                level: MessageLevel::Info,
-                                message: format!("[Tier: {} | {}ms | {} tokens]",
-                                    result.tier_used,
-                                    result.duration_ms,
-                                    result.response.tokens_used.total()
-                                ),
-                            });
-                        }
+                        maybe_send_verbose(&ui_channel_clone, &result, verbose_clone);
                     }
                     Err(error) => {
-                        writeln!(log_clone, "Error: {error}").ok();
+                        try_write_log(&ui_channel_clone, &mut log_clone, &format!("Error: {error}"));
                         ui_channel_clone.send(UiEvent::SystemMessage {
                             level: MessageLevel::Error,
                             message: format!("Error: {error}"),
@@ -560,229 +516,6 @@ async fn run_tui_interactive(
     Ok(())
 }
 
-/// Handle the route command - use multi-model routing system
-#[allow(dead_code)]
-async fn handle_route(
-    request: String,
-    project: PathBuf,
-    validate: bool,
-    verbose: bool,
-    no_tui: bool,
-) -> Result<()> {
-    // TUI is default, use plain mode only if --no-tui is specified
-    if !no_tui {
-        return handle_route_tui(request, project, validate).await;
-    }
-    
-    let term = Term::stdout();
-    
-    term.write_line(&format!("{}", style("=== Multi-Model Routing ===").cyan().bold()))?;
-    term.write_line(&format!("{} {}", 
-        style("Request:").cyan(), 
-        style(&request).yellow()
-    ))?;
-    term.write_line(&format!("{} {}", 
-        style("Project:").cyan(), 
-        style(project.display()).yellow()
-    ))?;
-    term.write_line("")?;
-
-    // Create routing configuration
-    let mut config = merlin_routing::RoutingConfig::default();
-    config.validation.enabled = validate;
-    config.workspace.root_path = project;
-    
-    if verbose {
-        term.write_line(&format!("{}", style("Configuration:").cyan()))?;
-        term.write_line(&format!("  Local enabled: {}", config.tiers.local_enabled))?;
-        term.write_line(&format!("  Groq enabled: {}", config.tiers.groq_enabled))?;
-        term.write_line(&format!("  Validation enabled: {}", config.validation.enabled))?;
-        term.write_line(&format!("  Max concurrent: {}", config.execution.max_concurrent_tasks))?;
-        term.write_line("")?;
-    }
-
-    // Create orchestrator
-    term.write_line(&format!("{}", style("Initializing orchestrator...").cyan()))?;
-    let orchestrator = merlin_routing::RoutingOrchestrator::new(config);
-    
-    // Analyze request
-    term.write_line(&format!("{}", style("Analyzing request...").cyan()))?;
-    let analysis = orchestrator.analyze_request(&request).await?;
-    
-    term.write_line(&format!("{} {}", 
-        style("\u{2713} Analysis complete:").green().bold(),
-        style(format!("{} task(s) generated", analysis.tasks.len())).yellow()
-    ))?;
-    term.write_line("")?;
-
-    if verbose {
-        term.write_line(&format!("{}", style("Tasks:").cyan()))?;
-        for (i, task) in analysis.tasks.iter().enumerate() {
-            term.write_line(&format!("  {}. {} (complexity: {:?}, priority: {:?})", 
-                i + 1, 
-                task.description, 
-                task.complexity,
-                task.priority
-            ))?;
-            if !task.dependencies.is_empty() {
-                term.write_line(&format!("     Dependencies: {} task(s)", task.dependencies.len()))?;
-            }
-        }
-        term.write_line("")?;
-        term.write_line(&format!("{} {:?}", 
-            style("Execution strategy:").cyan(),
-            analysis.execution_strategy
-        ))?;
-        term.write_line("")?;
-    }
-
-    // Execute tasks
-    term.write_line(&format!("{}", style("Executing tasks...").cyan()))?;
-    let start = std::time::Instant::now();
-    
-    let results = orchestrator.process_request(&request).await?;
-    
-    let duration = start.elapsed();
-    term.write_line(&format!("{} {} task(s) in {:.0}s",
-        style("\u{2713} Completed:").green().bold(),
-        style(results.len()).yellow(),
-        duration.as_secs_f64()
-    ))?;
-    term.write_line("")?;
-
-    // Show results
-    term.write_line(&format!("{}", style("Results:").cyan().bold()))?;
-    for (i, result) in results.iter().enumerate() {
-        term.write_line(&format!("  {}. Task {:?}", i + 1, result.task_id))?;
-        term.write_line(&format!("     Tier: {}", result.tier_used))?;
-        term.write_line(&format!("     Duration: {}ms", result.duration_ms))?;
-        term.write_line(&format!("     Tokens: {}", result.response.tokens_used.total()))?;
-        
-        if validate && verbose {
-            term.write_line(&format!("     Validation: {} (score: {:.2})", 
-                if result.validation.passed { "\u{2713} PASSED" } else { "\u{2717} FAILED" },
-                result.validation.score
-            ))?;
-        }
-        
-        if verbose {
-            term.write_line(&format!("     Response preview: {}", 
-                result.response.text.chars().take(100).collect::<String>()
-            ))?;
-        }
-        term.write_line("")?;
-    }
-
-    // Summary
-    let total_tokens: u64 = results.iter().map(|r| r.response.tokens_used.total()).sum();
-    let total_duration: u64 = results.iter().map(|r| r.duration_ms).sum();
-    
-    term.write_line(&format!("{}", style("Summary:").cyan().bold()))?;
-    term.write_line(&format!("  Total tokens: {total_tokens}"))?;
-    term.write_line(&format!("  Total duration: {total_duration}ms"))?;
-    term.write_line(&format!("  Average per task: {}ms", total_duration / results.len() as u64))?;
-
-    Ok(())
-}
-
-/// Handle route command with TUI mode
-#[allow(dead_code)]
-async fn handle_route_tui(
-    request: String,
-    project: PathBuf,
-    validate: bool,
-) -> Result<()> {
-    use merlin_routing::{TuiApp, UiEvent};
-    
-    // Create TUI app and get channel
-    let (mut tui_app, ui_channel) = TuiApp::new()?;
-    
-    // Create configuration
-    let mut config = merlin_routing::RoutingConfig::default();
-    config.validation.enabled = validate;
-    config.workspace.root_path = project.clone();
-    
-    // Create orchestrator
-    let orchestrator = merlin_routing::RoutingOrchestrator::new(config);
-    
-    // Spawn execution task
-    let exec_request = request.clone();
-    let exec_handle = tokio::spawn(async move {
-        // Send initial message
-        let () = ui_channel.send(UiEvent::SystemMessage {
-            level: merlin_routing::MessageLevel::Info,
-            message: format!("Analyzing request: {exec_request}"),
-        });
-        
-        // Analyze request
-        match orchestrator.analyze_request(&exec_request).await {
-            Ok(analysis) => {
-                let () = ui_channel.send(UiEvent::SystemMessage {
-                    level: merlin_routing::MessageLevel::Success,
-                    message: format!("Generated {} task(s)", analysis.tasks.len()),
-                });
-                
-                // Start tasks
-                for task in &analysis.tasks {
-                    let () = ui_channel.send(UiEvent::TaskStarted {
-                        task_id: task.id,
-                        parent_id: None,
-                        description: task.description.clone(),
-                    });
-                }
-                
-                // Execute tasks
-                match orchestrator.process_request(&exec_request).await {
-                    Ok(results) => {
-                        for result in results {
-                            let task_id = result.task_id;
-                            let () = ui_channel.send(UiEvent::TaskCompleted {
-                                task_id,
-                                result,
-                            });
-                        }
-                        
-                        let () = ui_channel.send(UiEvent::SystemMessage {
-                            level: merlin_routing::MessageLevel::Success,
-                            message: "All tasks completed successfully!".to_owned(),
-                        });
-                    }
-                    Err(e) => {
-                        let () = ui_channel.send(UiEvent::SystemMessage {
-                            level: merlin_routing::MessageLevel::Error,
-                            message: format!("Execution failed: {e}"),
-                        });
-                    }
-                }
-            }
-            Err(e) => {
-                let () = ui_channel.send(UiEvent::SystemMessage {
-                    level: merlin_routing::MessageLevel::Error,
-                    message: format!("Analysis failed: {e}"),
-                });
-            }
-        }
-    });
-    
-    // Run TUI with tick loop
-    tui_app.enable_raw_mode()?;
-    
-    let mut interval = tokio::time::interval(std::time::Duration::from_millis(16));
-    loop {
-        interval.tick().await;
-        let should_quit = tui_app.tick()?;
-        if should_quit {
-            break;
-        }
-    }
-    
-    tui_app.disable_raw_mode()?;
-    
-    // Wait for execution to complete
-    exec_handle.await?;
-    
-    Ok(())
-}
 
 /// Calculate estimated cost based on token usage.
 fn calculate_cost(usage: &TokenUsage) -> f64 {
@@ -799,3 +532,118 @@ fn calculate_cost(usage: &TokenUsage) -> f64 {
         )
 }
 
+/// Print results in plain console mode and optionally metrics when verbose is true.
+///
+/// # Errors
+/// Returns an error if terminal write fails.
+fn print_results_plain(term: &Term, results: &[TaskResult], verbose: bool) -> Result<()> {
+    term.write_line("Merlin:")?;
+    term.write_line("")?;
+
+    for result in results {
+        term.write_line(&result.response.text)?;
+        term.write_line("")?;
+
+        if verbose {
+            term.write_line(&format!(
+                "Tier: {} | Duration: {}ms | Tokens: {}",
+                result.tier_used,
+                result.duration_ms,
+                result.response.tokens_used.total()
+            ))?;
+        }
+    }
+    Ok(())
+}
+
+/// Write to the log file; if it fails, emit a UI warning.
+fn try_write_log(ui: &UiChannel, writer: &mut fs::File, message: &str) {
+    if let Err(error) = writeln!(writer, "{message}") {
+        let () = ui.send(UiEvent::SystemMessage {
+            level: MessageLevel::Warning,
+            message: format!("Failed to write to log: {error}"),
+        });
+    }
+}
+
+/// Print the chat header for interactive chat mode.
+///
+/// # Errors
+/// Returns an error if terminal write fails.
+fn print_chat_header(term: &Term, project: &Path) -> Result<()> {
+    term.write_line(&format!("{}", style("=== Agentic Optimizer - Interactive Chat ===").cyan().bold()))?;
+    term.write_line(&format!("{} {}", 
+        style("Project:").cyan(), 
+        style(project.display()).yellow()
+    ))?;
+    term.write_line("")?;
+    Ok(())
+}
+
+/// Chat interaction loop for interactive chat mode.
+///
+/// # Errors
+/// Returns an error if terminal IO or agent execution fails.
+async fn chat_loop(term: &Term, executor: &mut AgentExecutor, project: &Path) -> Result<()> {
+    loop {
+        term.write_line(&format!("{}", style("You:").green().bold()))?;
+        
+        let input = Input::<String>::new()
+            .with_prompt(">")
+            .interact_text()?;
+
+        let trimmed = input.trim();
+        if trimmed.is_empty() {
+            continue;
+        }
+
+        if trimmed.eq_ignore_ascii_case("exit") || trimmed.eq_ignore_ascii_case("quit") {
+            term.write_line(&format!("{}", style("Goodbye!").cyan()))?;
+            break;
+        }
+
+        term.write_line("")?;
+        term.write_line(&format!("{}", style("Agent:").blue().bold()))?;
+        
+        let request = AgentRequest::new(trimmed.to_owned(), project.to_path_buf());
+        
+        match executor.execute(request).await {
+            Ok(result) => {
+                term.write_line(&result.response.content)?;
+                term.write_line("")?;
+                
+                term.write_line(&format!("{}", style("---").dim()))?;
+                term.write_line(&format!("{} {} | {} {}ms | {} {} tokens", 
+                    style("Provider:").dim(),
+                    style(&result.response.provider_used).dim(),
+                    style("Latency:").dim(),
+                    style(result.metadata.total_time_ms).dim(),
+                    style("Tokens:").dim(),
+                    style(result.response.tokens_used.total()).dim()
+                ))?;
+                
+                if result.response.tokens_used.cache_read > 0 {
+                    term.write_line(&format!("{} {} tokens ({}% cache hit)", 
+                        style("Cache:").dim(),
+                        style(result.response.tokens_used.cache_read).dim(),
+                        style(format!("{:.1}", 
+                            (result.response.tokens_used.cache_read as f64 / 
+                             result.response.tokens_used.total() as f64) * 100.0
+                        )).dim()
+                    ))?;
+                }
+                
+                term.write_line(&format!("{}", style("---").dim()))?;
+                term.write_line("")?;
+            }
+            Err(error) => {
+                term.write_line(&format!("{} {}", 
+                    style("Error:").red().bold(),
+                    style(error.to_string()).red()
+                ))?;
+                term.write_line("")?;
+            }
+        }
+    }
+    Ok(())
+}

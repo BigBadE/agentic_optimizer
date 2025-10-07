@@ -5,6 +5,7 @@ pub mod tiers;
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
 use crate::{Result, Task};
+use std::fmt::{Display, Formatter, Result as FmtResult};
 
 pub use strategies::{
     ComplexityBasedStrategy, CostOptimizationStrategy, LongContextStrategy, QualityCriticalStrategy,
@@ -44,13 +45,13 @@ impl ModelTier {
                     model_name: "claude-3.5-sonnet".to_owned(),
                 })
             }
-            _ => None,
+            Self::Premium { .. } => None,
         }
     }
 }
 
-impl std::fmt::Display for ModelTier {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+impl Display for ModelTier {
+    fn fmt(&self, f: &mut Formatter<'_>) -> FmtResult {
         match self {
             Self::Local { model_name } => write!(f, "Local({model_name})"),
             Self::Groq { model_name } => write!(f, "Groq({model_name})"),

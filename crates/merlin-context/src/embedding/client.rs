@@ -2,8 +2,10 @@
 
 use std::path::PathBuf;
 use std::collections::HashMap;
+use std::cmp::Ordering;
+use std::env;
 use ollama_rs::Ollama;
-use merlin_core::Result;
+use merlin_core::{Result, Error};
 use crate::models::ModelConfig;
 
 /// A single embedding vector
@@ -60,7 +62,8 @@ impl VectorStore {
     }
 
     /// Search for similar files
-    #[must_use] 
+    #[must_use]
+    #[allow(clippy::min_ident_chars, reason = "Closure parameters in sorting")]
     pub fn search(&self, query_embedding: &[f32], top_k: usize) -> Vec<SearchResult> {
         let mut scores: Vec<(PathBuf, f32)> = self
             .embeddings
@@ -71,7 +74,7 @@ impl VectorStore {
             })
             .collect();
 
-        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
 
         scores
             .into_iter()
@@ -122,7 +125,7 @@ impl EmbeddingClient {
     /// Create a new embedding client
     #[must_use]
     pub fn new() -> Self {
-        let host = std::env::var("OLLAMA_HOST")
+        let host = env::var("OLLAMA_HOST")
             .unwrap_or_else(|_| "http://localhost:11434".to_string());
         
         let config = ModelConfig::from_env();
@@ -134,38 +137,42 @@ impl EmbeddingClient {
     }
 
     /// Ensure the embedding model is available
+    ///
+    /// # Errors
+    /// Returns an error if Ollama is not running or model pull fails
+    #[allow(clippy::print_stderr, reason = "User-facing installation feedback")]
     pub async fn ensure_model_available(&self) -> Result<()> {
         use std::process::Command;
-        
+
         // Check if Ollama is running by trying to list models
         let models = match self.ollama.list_local_models().await {
-            Ok(m) => m,
-            Err(e) => {
-                return Err(merlin_core::Error::Other(
-                    format!("Failed to connect to Ollama: {e}.\n\nPlease ensure Ollama is installed and running:\n  - Install from: https://ollama.ai\n  - Start with: ollama serve")
+            Ok(models) => models,
+            Err(error) => {
+                return Err(Error::Other(
+                    format!("Failed to connect to Ollama: {error}.\n\nPlease ensure Ollama is installed and running:\n  - Install from: https://ollama.ai\n  - Start with: ollama serve")
                 ));
             }
         };
 
         // Check if our embedding model is available
-        let model_available = models.iter().any(|m| m.name.contains(&self.model));
+        let model_available = models.iter().any(|model| model.name.contains(&self.model));
 
         if !model_available {
             eprintln!("⚙️  Embedding model '{}' not found", self.model);
             eprintln!("⬇️  Pulling model from Ollama (this may take a few minutes)...");
             eprintln!("    Running: ollama pull {}", self.model);
             eprintln!();
-            
+
             // Pull the model using Ollama CLI with inherited stdio for progress
             let status = Command::new("ollama")
                 .args(["pull", &self.model])
                 .status()
-                .map_err(|e| merlin_core::Error::Other(
-                    format!("Failed to run 'ollama pull {}': {}. Is Ollama installed?", self.model, e)
+                .map_err(|error| Error::Other(
+                    format!("Failed to run 'ollama pull {}': {}. Is Ollama installed?", self.model, error)
                 ))?;
 
             if !status.success() {
-                return Err(merlin_core::Error::Other(
+                return Err(Error::Other(
                     format!("Failed to pull model '{}'. Check Ollama is running.", self.model)
                 ));
             }
@@ -178,6 +185,9 @@ impl EmbeddingClient {
     }
 
     /// Generate embedding for text
+    ///
+    /// # Errors
+    /// Returns an error if embedding generation fails
     pub async fn embed(&self, text: &str) -> Result<Embedding> {
         use ollama_rs::generation::embeddings::request::GenerateEmbeddingsRequest;
 
@@ -187,24 +197,27 @@ impl EmbeddingClient {
             .ollama
             .generate_embeddings(request)
             .await
-            .map_err(|e| {
+            .map_err(|error| {
                 // Provide more detailed error message
-                let error_str = format!("{e:?}");
+                let error_str = format!("{error:?}");
                 if error_str.contains("model") && error_str.contains("not found") {
-                    merlin_core::Error::Other(
+                    Error::Other(
                         format!("Embedding model '{}' not found. Run: ollama pull {}", self.model, self.model)
                     )
                 } else {
-                    merlin_core::Error::Other(format!("Embedding generation failed: {e}"))
+                    Error::Other(format!("Embedding generation failed: {error}"))
                 }
             })?;
 
         // Ollama returns Vec<Vec<f32>>, we want the first embedding
         response.embeddings.into_iter().next()
-            .ok_or_else(|| merlin_core::Error::Other("No embeddings returned".into()))
+            .ok_or_else(|| Error::Other("No embeddings returned".into()))
     }
 
     /// Embed multiple texts in batch
+    ///
+    /// # Errors
+    /// Returns an error if any embedding generation fails
     pub async fn embed_batch(&self, texts: Vec<String>) -> Result<Vec<Embedding>> {
         let mut embeddings = Vec::new();
         
@@ -217,14 +230,14 @@ impl EmbeddingClient {
 }
 
 /// Calculate cosine similarity between two vectors
-fn cosine_similarity(a: &[f32], b: &[f32]) -> f32 {
-    if a.len() != b.len() {
+fn cosine_similarity(vector_a: &[f32], vector_b: &[f32]) -> f32 {
+    if vector_a.len() != vector_b.len() {
         return 0.0;
     }
 
-    let dot_product: f32 = a.iter().zip(b.iter()).map(|(x, y)| x * y).sum();
-    let magnitude_a: f32 = a.iter().map(|x| x * x).sum::<f32>().sqrt();
-    let magnitude_b: f32 = b.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let dot_product: f32 = vector_a.iter().zip(vector_b.iter()).map(|(x, y)| x * y).sum();
+    let magnitude_a = vector_a.iter().map(|x| x * x).sum::<f32>().sqrt();
+    let magnitude_b = vector_b.iter().map(|x| x * x).sum::<f32>().sqrt();
 
     if magnitude_a == 0.0 || magnitude_b == 0.0 {
         return 0.0;

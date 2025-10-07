@@ -1,5 +1,18 @@
-use clap::{Parser, Subcommand};
+use clap::{Parser, Subcommand, ValueEnum};
 use std::path::PathBuf;
+
+#[derive(ValueEnum, Clone, Copy, Debug)]
+pub enum Validation {
+    Enabled,
+    Disabled,
+}
+
+#[derive(ValueEnum, Clone, Copy, Debug)]
+pub enum UiMode {
+    Tui,
+    Plain,
+    PlainVerbose,
+}
 
 #[derive(Parser)]
 #[command(name = "merlin")]
@@ -13,17 +26,13 @@ pub struct Cli {
     #[arg(long, global = true)]
     pub local: bool,
 
-    /// Disable validation pipeline (enabled by default)
-    #[arg(long, global = true)]
-    pub no_validate: bool,
+    /// Validation mode (enabled/disabled)
+    #[arg(long, value_enum, default_value = "enabled", global = true)]
+    pub validation: Validation,
 
-    /// Show detailed routing decisions
-    #[arg(long, global = true)]
-    pub verbose: bool,
-
-    /// Disable TUI mode, use plain terminal output
-    #[arg(long, global = true)]
-    pub no_tui: bool,
+    /// UI mode (tui/plain/plain-verbose)
+    #[arg(long, value_enum, default_value = "tui", global = true)]
+    pub ui: UiMode,
 
     #[command(subcommand)]
     pub command: Option<Commands>,

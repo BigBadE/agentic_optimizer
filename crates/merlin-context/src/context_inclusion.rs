@@ -196,8 +196,8 @@ pub fn add_prioritized_files(
     });
 
     let mut added = 0;
-    for pf in files {
-        if manager.try_add_file(pf.file) {
+    for prioritized_file in files {
+        if manager.try_add_file(prioritized_file.file) {
             added += 1;
         } else {
             break; // Context is full

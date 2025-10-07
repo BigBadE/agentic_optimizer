@@ -17,11 +17,11 @@ impl QueryAnalyzer {
     pub fn analyze(&self, query: &str) -> QueryIntent {
         let query_lower = query.to_lowercase();
         
-        let action = self.detect_action(&query_lower);
-        let scope = self.detect_scope(&query_lower);
-        let complexity = self.estimate_complexity(&query_lower, &action, &scope);
-        let keywords = self.extract_keywords(&query_lower);
-        let entities = self.extract_entities(query);
+        let action = Self::detect_action(&query_lower);
+        let scope = Self::detect_scope(&query_lower);
+        let complexity = Self::estimate_complexity(&query_lower, action, scope);
+        let keywords = Self::extract_keywords(&query_lower);
+        let entities = Self::extract_entities(query);
         
         QueryIntent {
             action,
@@ -33,7 +33,7 @@ impl QueryAnalyzer {
     }
 
     /// Detect the action type from the query
-    fn detect_action(&self, query: &str) -> Action {
+    fn detect_action(query: &str) -> Action {
         const CREATE_KEYWORDS: &[&str] = &[
             "create", "add", "implement", "build", "make", "generate", "new"
         ];
@@ -53,17 +53,17 @@ impl QueryAnalyzer {
             "find", "search", "locate", "where"
         ];
 
-        if CREATE_KEYWORDS.iter().any(|kw| query.contains(kw)) {
+        if CREATE_KEYWORDS.iter().any(|keyword| query.contains(keyword)) {
             Action::Create
-        } else if DEBUG_KEYWORDS.iter().any(|kw| query.contains(kw)) {
+        } else if DEBUG_KEYWORDS.iter().any(|keyword| query.contains(keyword)) {
             Action::Debug
-        } else if REFACTOR_KEYWORDS.iter().any(|kw| query.contains(kw)) {
+        } else if REFACTOR_KEYWORDS.iter().any(|keyword| query.contains(keyword)) {
             Action::Refactor
-        } else if EXPLAIN_KEYWORDS.iter().any(|kw| query.contains(kw)) {
+        } else if EXPLAIN_KEYWORDS.iter().any(|keyword| query.contains(keyword)) {
             Action::Explain
-        } else if SEARCH_KEYWORDS.iter().any(|kw| query.contains(kw)) {
+        } else if SEARCH_KEYWORDS.iter().any(|keyword| query.contains(keyword)) {
             Action::Search
-        } else if MODIFY_KEYWORDS.iter().any(|kw| query.contains(kw)) {
+        } else if MODIFY_KEYWORDS.iter().any(|keyword| query.contains(keyword)) {
             Action::Modify
         } else {
             // Default to modify for ambiguous queries
@@ -72,7 +72,7 @@ impl QueryAnalyzer {
     }
 
     /// Detect the scope of the change
-    fn detect_scope(&self, query: &str) -> Scope {
+    fn detect_scope(query: &str) -> Scope {
         const CODEBASE_KEYWORDS: &[&str] = &[
             "all", "everywhere", "codebase", "project", "entire", "whole"
         ];
@@ -80,9 +80,9 @@ impl QueryAnalyzer {
             "module", "package", "folder", "directory", "related"
         ];
 
-        if CODEBASE_KEYWORDS.iter().any(|kw| query.contains(kw)) {
+        if CODEBASE_KEYWORDS.iter().any(|keyword| query.contains(keyword)) {
             Scope::Codebase
-        } else if MODULE_KEYWORDS.iter().any(|kw| query.contains(kw)) {
+        } else if MODULE_KEYWORDS.iter().any(|keyword| query.contains(keyword)) {
             Scope::Module
         } else {
             Scope::Focused
@@ -90,7 +90,7 @@ impl QueryAnalyzer {
     }
 
     /// Estimate query complexity
-    fn estimate_complexity(&self, query: &str, action: &Action, scope: &Scope) -> Complexity {
+    fn estimate_complexity(query: &str, action: Action, scope: Scope) -> Complexity {
         let word_count = query.split_whitespace().count();
         
         // Complex if codebase-wide
@@ -119,7 +119,7 @@ impl QueryAnalyzer {
     }
 
     /// Extract keywords from the query
-    fn extract_keywords(&self, query: &str) -> Vec<String> {
+    fn extract_keywords(query: &str) -> Vec<String> {
         const STOP_WORDS: &[&str] = &[
             "the", "a", "an", "and", "or", "but", "in", "on", "at", "to", "for",
             "of", "with", "by", "from", "as", "is", "was", "are", "were", "be",
@@ -133,13 +133,13 @@ impl QueryAnalyzer {
             .filter(|word| {
                 word.len() > 2 && !STOP_WORDS.contains(word)
             })
-            .map(|word| word.trim_matches(|c: char| !c.is_alphanumeric()).to_string())
+            .map(|word| word.trim_matches(|character: char| !character.is_alphanumeric()).to_string())
             .filter(|word| !word.is_empty())
             .collect()
     }
 
     /// Extract entities (capitalized words, likely types/functions)
-    fn extract_entities(&self, query: &str) -> Vec<String> {
+    fn extract_entities(query: &str) -> Vec<String> {
         query
             .split_whitespace()
             .filter(|word| {
@@ -150,7 +150,7 @@ impl QueryAnalyzer {
             })
             .map(|word| {
                 // Clean up punctuation from end
-                word.trim_end_matches(|c: char| !c.is_alphanumeric() && c != ':' && c != '_')
+                word.trim_end_matches(|character: char| !character.is_alphanumeric() && character != ':' && character != '_')
                     .to_string()
             })
             .filter(|word| !word.is_empty() && word.len() > 1)
@@ -169,6 +169,8 @@ mod tests {
     use super::*;
 
     #[test]
+    /// # Panics
+    /// Panics if create action is not detected.
     fn test_detect_create_action() {
         let analyzer = QueryAnalyzer::new();
         let intent = analyzer.analyze("Create a new authentication module");
@@ -176,6 +178,8 @@ mod tests {
     }
 
     #[test]
+    /// # Panics
+    /// Panics if debug action is not detected.
     fn test_detect_debug_action() {
         let analyzer = QueryAnalyzer::new();
         let intent = analyzer.analyze("Fix the bug in UserService");
@@ -183,6 +187,8 @@ mod tests {
     }
 
     #[test]
+    /// # Panics
+    /// Panics if expected keywords are not extracted.
     fn test_extract_keywords() {
         let analyzer = QueryAnalyzer::new();
         let intent = analyzer.analyze("Implement authentication for the user service");
@@ -192,6 +198,8 @@ mod tests {
     }
 
     #[test]
+    /// # Panics
+    /// Panics if expected entities are not extracted.
     fn test_extract_entities() {
         let analyzer = QueryAnalyzer::new();
         let intent = analyzer.analyze("Fix UserService::find_by_email method");
@@ -199,6 +207,8 @@ mod tests {
     }
 
     #[test]
+    /// # Panics
+    /// Panics if complexity estimation fails to categorize as expected.
     fn test_complexity_estimation() {
         let analyzer = QueryAnalyzer::new();
         

@@ -2,6 +2,7 @@ use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Instant;
 use crate::TaskId;
+use uuid::Uuid;
 
 pub mod channel;
 
@@ -9,12 +10,12 @@ pub use channel::StreamingChannel;
 
 /// Unique identifier for a step
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct StepId(uuid::Uuid);
+pub struct StepId(Uuid);
 
 impl StepId {
     #[must_use] 
     pub fn new() -> Self {
-        Self(uuid::Uuid::new_v4())
+        Self(Uuid::new_v4())
     }
 }
 

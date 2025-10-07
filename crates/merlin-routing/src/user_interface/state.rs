@@ -12,13 +12,13 @@ pub struct UiState {
     pub pending_delete_task_id: Option<TaskId>,
     pub loading_tasks: bool,
     pub conversation_history: Vec<ConversationEntry>,
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Field is part of public API for emoji mode configuration")]
     pub emoji_mode: EmojiMode,
 }
 
 impl UiState {
     /// Access `emoji_mode`
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn emoji_mode(&self) -> &EmojiMode {
         &self.emoji_mode
     }
@@ -27,29 +27,29 @@ impl UiState {
 /// Conversation entry
 #[derive(Clone)]
 pub struct ConversationEntry {
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Field is part of public API for conversation tracking")]
     pub role: ConversationRole,
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Field is part of public API for conversation tracking")]
     pub text: String,
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Field is part of public API for conversation tracking")]
     pub timestamp: Instant,
 }
 
 impl ConversationEntry {
     /// Access role
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn role(&self) -> ConversationRole {
         self.role
     }
 
     /// Access text
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn text(&self) -> &str {
         &self.text
     }
 
     /// Access timestamp
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn timestamp(&self) -> Instant {
         self.timestamp
     }

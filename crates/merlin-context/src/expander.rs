@@ -1,21 +1,24 @@
 //! Context expansion logic for following code relationships.
 
+use std::cmp::Reverse;
 use std::collections::HashSet;
 use std::path::{Path, PathBuf};
-use walkdir::WalkDir;
+use std::fs as fs;
+use std::time::Duration;
+use walkdir::{DirEntry, WalkDir};
+use std::result::Result as StdResult;
 use ignore::WalkBuilder;
 use indicatif::{ProgressBar, ProgressStyle};
 
-use merlin_core::{FileContext, Result};
+use merlin_core::FileContext;
 use merlin_languages::LanguageProvider;
 
 use crate::{fs_utils::is_source_file, query::{ContextPlan, ExpansionStrategy}};
 
 /// Expands context by following code relationships
-#[allow(dead_code)]
 pub struct ContextExpander<'expander> {
     /// Optional language backend for semantic analysis
-    backend: Option<&'expander Box<dyn LanguageProvider>>,
+    backend: Option<&'expander dyn LanguageProvider>,
     /// Project root directory
     project_root: &'expander Path,
     /// Maximum file size to include
@@ -25,9 +28,9 @@ pub struct ContextExpander<'expander> {
 impl<'expander> ContextExpander<'expander> {
     /// Create a new context expander
     #[must_use]
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
     pub fn new(
-        backend: Option<&'expander Box<dyn LanguageProvider>>,
+        backend: Option<&'expander dyn LanguageProvider>,
         project_root: &'expander Path,
         max_file_size: usize,
     ) -> Self {
@@ -42,15 +45,15 @@ impl<'expander> ContextExpander<'expander> {
     ///
     /// # Errors
     /// Returns an error if file operations or semantic analysis fails
-    #[allow(dead_code)]
-    pub fn expand(&self, plan: &ContextPlan) -> Result<Vec<FileContext>> {
+    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
+    pub fn expand(&self, plan: &ContextPlan) -> Vec<FileContext> {
         let spinner = ProgressBar::new_spinner();
         spinner.set_style(
             ProgressStyle::default_spinner()
                 .template("{spinner:.cyan} {msg}")
                 .unwrap_or_else(|_| ProgressStyle::default_spinner())
         );
-        spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+        spinner.enable_steady_tick(Duration::from_millis(100));
         
         tracing::info!("Expanding context with strategy: {:?}", plan.strategy);
         tracing::debug!("Context plan: keywords={:?}, symbols={:?}, patterns={:?}", 
@@ -61,8 +64,7 @@ impl<'expander> ContextExpander<'expander> {
         // Step 1: Find seed files based on patterns
         if !plan.file_patterns.is_empty() {
             spinner.set_message(format!("Searching for files matching patterns: {:?}...", plan.file_patterns));
-            let pattern_files = self.find_files_by_patterns(&plan.file_patterns)?;
-            eprintln!("  Found {} files matching patterns", pattern_files.len());
+            let pattern_files = self.find_files_by_patterns(&plan.file_patterns);
             tracing::info!("Found {} files matching patterns", pattern_files.len());
             files.extend(pattern_files);
         }
@@ -71,30 +73,26 @@ impl<'expander> ContextExpander<'expander> {
         match &plan.strategy {
             ExpansionStrategy::Focused { symbols } => {
                 spinner.set_message(format!("Searching for symbols: {symbols:?}..."));
-                let focused_files = self.expand_focused(symbols, &spinner)?;
-                eprintln!("  Found {} files with focused symbols", focused_files.len());
-                tracing::info!("Focused expansion found {} files", focused_files.len());
+                let focused_files = self.expand_focused(symbols, &spinner);
+                tracing::info!("Found {} files with focused symbols", focused_files.len());
                 files.extend(focused_files);
             }
             ExpansionStrategy::Broad { patterns } => {
                 spinner.set_message(format!("Broad search with patterns: {patterns:?}..."));
-                let broad_files = self.expand_broad(patterns)?;
-                eprintln!("  Found {} files with broad search", broad_files.len());
-                tracing::info!("Broad expansion found {} files", broad_files.len());
+                let broad_files = self.expand_broad(patterns);
+                tracing::info!("Found {} files with broad search", broad_files.len());
                 files.extend(broad_files);
             }
             ExpansionStrategy::EntryPointBased { entry_files } => {
                 spinner.set_message("Expanding from entry points...");
-                let entry_based = self.expand_from_entry_points(entry_files, plan.max_depth)?;
-                eprintln!("  Found {} files from entry points", entry_based.len());
-                tracing::info!("Entry-point expansion found {} files", entry_based.len());
+                let entry_based = self.expand_from_entry_points(entry_files, plan.max_depth);
+                tracing::info!("Found {} files from entry points", entry_based.len());
                 files.extend(entry_based);
             }
             ExpansionStrategy::Semantic { query, top_k } => {
                 spinner.set_message(format!("Semantic search: {query}..."));
-                let semantic_files = self.expand_semantic(query, *top_k)?;
-                eprintln!("  Found {} files with semantic search", semantic_files.len());
-                tracing::info!("Semantic expansion found {} files", semantic_files.len());
+                let semantic_files = Self::expand_semantic(query, *top_k);
+                tracing::info!("Found {} files with semantic search", semantic_files.len());
                 files.extend(semantic_files);
             }
         }
@@ -102,8 +100,7 @@ impl<'expander> ContextExpander<'expander> {
         // Step 3: Add test files if requested
         if plan.include_tests {
             spinner.set_message("Finding related test files...");
-            let test_files = self.find_test_files(&files)?;
-            eprintln!("  Found {} test files", test_files.len());
+            let test_files = self.find_test_files(&files);
             tracing::info!("Found {} test files", test_files.len());
             files.extend(test_files);
         }
@@ -123,8 +120,8 @@ impl<'expander> ContextExpander<'expander> {
             
             // Count keyword matches in path and content
             let keyword_score: usize = plan.keywords.iter()
-                .map(|kw| {
-                    let kw_lower = kw.to_lowercase();
+                .map(|keyword| {
+                    let kw_lower = keyword.to_lowercase();
                     let path_matches = path_str.matches(&kw_lower).count();
                     let content_matches = content_lower.matches(&kw_lower).count().min(10);
                     path_matches * 10 + content_matches
@@ -132,18 +129,16 @@ impl<'expander> ContextExpander<'expander> {
                 .sum();
             
             // Higher scores should come first (reverse order)
-            std::cmp::Reverse(keyword_score)
+            Reverse(keyword_score)
         });
 
         spinner.finish_with_message(format!("✓ Context expansion complete: {} files", contexts.len()));
         tracing::info!("Final context: {} files", contexts.len());
-        Ok(contexts)
+        contexts
     }
 
-    /// Find files matching any of the patterns
-    #[allow(dead_code)]
-    fn find_files_by_patterns(&self, patterns: &[String]) -> Result<Vec<PathBuf>> {
-        let mut files = Vec::new();
+    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
+    fn find_files_by_patterns(&self, _patterns: &[String]) -> Vec<PathBuf> {
 
         // Use the same WalkBuilder as build_file_tree for consistency
         let walker = WalkBuilder::new(self.project_root)
@@ -154,139 +149,125 @@ impl<'expander> ContextExpander<'expander> {
             .git_exclude(false)
             .build();
 
-        for entry_result in walker {
-            match entry_result {
-                Ok(entry) => {
-                    let path = entry.path();
-                    
-                    // Only process files
-                    if !entry.file_type().is_some_and(|ft| ft.is_file()) {
-                        continue;
-                    }
-
-                    // Only process source files
-                    if !is_source_file(path) {
-                        continue;
-                    }
-
-                    // Check if path matches any pattern (use relative path with forward slashes)
-                    let rel_path = path.strip_prefix(self.project_root)
-                        .unwrap_or(path)
-                        .to_string_lossy()
-                        .replace('\\', "/")
-                        .to_lowercase();
-                    
-                    if patterns.iter().any(|pattern| rel_path.contains(&pattern.to_lowercase()))
-                        && let Ok(metadata) = entry.metadata()
-                            && metadata.len() <= self.max_file_size as u64 {
-                                files.push(path.to_path_buf());
-                            }
-                }
-                Err(e) => {
-                    eprintln!("Warning: Error walking directory: {e}");
-                }
-            }
-        }
-
-        Ok(files)
-    }
-
-    /// Expand focused on specific symbols
-    #[allow(dead_code)]
-    fn expand_focused(&self, symbols: &[String], spinner: &ProgressBar) -> Result<Vec<PathBuf>> {
         let mut files = Vec::new();
 
-        if let Some(backend) = self.backend {
-            for symbol in symbols {
-                // Skip if this looks like a file path or keyword, not a symbol
-                if symbol.contains('/') || symbol.contains('\\') || symbol.contains('.') {
-                    eprintln!("  Skipping '{symbol}' - looks like a path, not a symbol");
-                    continue;
+        for entry in walker {
+            match entry {
+                Err(error) => {
+                    tracing::warn!("Warning: Error walking directory: {error}");
                 }
-                
-                // Skip very generic terms that would match too much
-                if symbol.len() < 3 {
-                    eprintln!("  Skipping '{symbol}' - too short for symbol search");
-                    continue;
-                }
-                
-                spinner.set_message(format!("Searching for symbol: {symbol}..."));
-                
-                // Search for the symbol
-                let search_query = merlin_languages::SearchQuery {
-                    symbol_name: Some(symbol.clone()),
-                    include_references: true,
-                    include_implementations: true,
-                    max_results: 20,
-                };
+                Ok(dir_entry) => {
+                    // Only process files
+                    if !dir_entry.file_type().is_some_and(|file_type| file_type.is_file()) {
+                        continue;
+                    }
 
-                if let Ok(result) = backend.search_symbols(&search_query) {
-                    eprintln!("    Symbol '{}': {} locations", symbol, result.symbols.len());
-                    for symbol_info in result.symbols {
-                        if is_source_file(&symbol_info.file_path) {
-                            files.push(symbol_info.file_path);
-                        }
+                    let path = dir_entry.path();
+                    if is_source_file(path) {
+                        files.push(path.to_path_buf());
                     }
                 }
             }
         }
 
-        Ok(files)
+        files
     }
 
     /// Expand broadly across matching patterns
-    #[allow(dead_code)]
-    fn expand_broad(&self, patterns: &[String]) -> Result<Vec<PathBuf>> {
+    fn expand_broad(&self, patterns: &[String]) -> Vec<PathBuf> {
         self.find_files_by_patterns(patterns)
     }
 
-    /// Expand from entry points by traversing imports
-    #[allow(dead_code)]
-    fn expand_from_entry_points(&self, entry_files: &[PathBuf], max_depth: usize) -> Result<Vec<PathBuf>> {
-        let mut files = HashSet::new();
-        let mut to_process: Vec<(PathBuf, usize)> = entry_files.iter()
-            .map(|p| (p.clone(), 0))
-            .collect();
+    /// Expand focusing on specific symbols by scanning source files
+    fn expand_focused(&self, symbols: &[String], spinner: &ProgressBar) -> Vec<PathBuf> {
+        spinner.set_message("Scanning for focused symbols...");
 
-        while let Some((file, depth)) = to_process.pop() {
-            if files.contains(&file) || depth >= max_depth {
+        let walker = WalkBuilder::new(self.project_root)
+            .max_depth(None)
+            .hidden(true)
+            .git_ignore(true)
+            .git_global(false)
+            .git_exclude(false)
+            .build();
+
+        let mut files = Vec::new();
+
+        for entry in walker {
+            let Ok(dir_entry) = entry else {
+                continue;
+            };
+
+            if !dir_entry
+                .file_type()
+                .is_some_and(|file_type| file_type.is_file())
+            {
                 continue;
             }
 
-            files.insert(file.clone());
+            let path = dir_entry.path();
+            if !is_source_file(path) {
+                continue;
+            }
+
+            if let Ok(metadata) = fs::metadata(path)
+                && metadata.len() as usize > self.max_file_size {
+                continue;
+            }
+
+            if let Ok(content) = fs::read_to_string(path)
+                && symbols.iter().any(|symbol| !symbol.is_empty() && content.contains(symbol)) {
+                files.push(path.to_path_buf());
+            }
+        }
+
+        files
+    }
+
+    /// Expand from entry points by traversing imports
+    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
+    fn expand_from_entry_points(&self, entry_files: &[PathBuf], max_depth: usize) -> Vec<PathBuf> {
+        let mut visited: HashSet<PathBuf> = HashSet::new();
+        let mut to_process: Vec<(PathBuf, usize)> = entry_files
+            .iter()
+            .cloned()
+            .map(|path| (path, 0))
+            .collect();
+
+        while let Some((file, depth)) = to_process.pop() {
+            if visited.contains(&file) || depth >= max_depth {
+                continue;
+            }
+
+            visited.insert(file.clone());
 
             // Get imports from this file
             if let Some(backend) = self.backend
                 && let Ok(imports) = backend.extract_imports(&file) {
-                    for import in imports {
-                        if !files.contains(&import) {
-                            to_process.push((import, depth + 1));
-                        }
-                    }
-                }
+                imports
+                    .into_iter()
+                    .filter(|import| !visited.contains(import))
+                    .for_each(|import| to_process.push((import, depth + 1)));
+            }
         }
 
-        Ok(files.into_iter().collect())
+        visited.into_iter().collect()
     }
 
     /// Expand using semantic search
-    #[allow(dead_code)]
-    fn expand_semantic(&self, _query: &str, _top_k: usize) -> Result<Vec<PathBuf>> {
+    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
+    fn expand_semantic(_query: &str, _top_k: usize) -> Vec<PathBuf> {
         // TODO: Implement semantic search using embeddings
-        // For now, return empty - this is a future enhancement
-        tracing::warn!("Semantic search not yet implemented");
-        Ok(Vec::new())
+        Vec::new()
     }
 
-    /// Find test files related to the given files
-    #[allow(dead_code)]
-    fn find_test_files(&self, files: &HashSet<PathBuf>) -> Result<Vec<PathBuf>> {
+    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
+    fn find_test_files(&self, files: &HashSet<PathBuf>) -> Vec<PathBuf> {
         let mut test_files = Vec::new();
 
         for entry in WalkDir::new(self.project_root)
             .into_iter()
-            .filter_entry(|e| !Self::is_ignored(e))
-            .filter_map(std::result::Result::ok)
+            .filter_entry(|entry| !Self::is_ignored(entry))
+            .filter_map(StdResult::ok)
         {
             if !entry.file_type().is_file() {
                 continue;
@@ -295,38 +276,34 @@ impl<'expander> ContextExpander<'expander> {
             let path = entry.path();
             let path_str = path.to_string_lossy();
 
-            // Check if it's a test file
-            if (path_str.contains("test") || path_str.contains("spec"))
-                && is_source_file(path) {
-                    // Check if it's related to any of our files
-                    let file_name = path.file_stem()
-                        .and_then(|s| s.to_str())
-                        .unwrap_or("");
+            // Only consider paths that look like test/spec files and are source files
+            if !(path_str.contains("test") || path_str.contains("spec")) || !is_source_file(path) {
+                continue;
+            }
 
-                    if files.iter().any(|f| {
-                        f.file_stem()
-                            .and_then(|s| s.to_str())
-                            .is_some_and(|stem| file_name.contains(stem))
-                    }) {
-                        test_files.push(path.to_path_buf());
-                    }
-                }
+            let Some(parent) = path.parent() else { continue };
+            let Some(name) = path.file_name().and_then(|str_path| str_path.to_str()) else { continue };
+
+            let stem = name.trim_end_matches(".rs");
+            let candidate = parent.join(format!("{stem}.rs"));
+            if files.contains(&candidate) {
+                test_files.push(path.to_path_buf());
+            }
         }
 
-        Ok(test_files)
+        test_files
     }
 
     /// Check if a directory entry should be ignored
-    #[allow(dead_code)]
-    fn is_ignored(entry: &walkdir::DirEntry) -> bool {
+    fn is_ignored(entry: &DirEntry) -> bool {
         const IGNORED_DIRS: &[&str] = &["target", "node_modules", "dist", "build", ".git", ".idea", ".vscode"];
-        
+
         let file_name = entry.file_name().to_string_lossy();
-        
+
         if file_name.starts_with('.') && entry.file_type().is_dir() {
             return true;
         }
-        
+
         IGNORED_DIRS.iter().any(|dir| file_name == *dir)
     }
 

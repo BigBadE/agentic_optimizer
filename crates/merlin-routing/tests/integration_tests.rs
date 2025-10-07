@@ -69,12 +69,19 @@ mod tests {
     use merlin_routing::*;
 
     #[tokio::test]
+    /// # Panics
+    ///
+    /// Panics if the analysis result is an error.
     async fn test_orchestrator_basic() {
         let config = RoutingConfig::default();
         let orchestrator = RoutingOrchestrator::new(config);
         
-        let analysis = orchestrator.analyze_request("Add a comment").await;
-        assert!(analysis.is_ok());
+        let analysis_result = orchestrator.analyze_request("Add a comment").await;
+        assert!(
+            analysis_result.is_ok(),
+            "analysis error: {:?}",
+            analysis_result.as_ref().err()
+        );
     }
     
     // TODO: Add comprehensive integration tests

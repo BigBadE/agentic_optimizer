@@ -1,8 +1,10 @@
 //! Benchmark system for evaluating context fetching quality.
 
 use std::collections::{HashMap, HashSet};
+use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use serde::{Deserialize, Serialize};
+use toml::from_str as toml_from_str;
 use merlin_core::Result;
 
 /// Priority level for expected files
@@ -353,27 +355,28 @@ impl BenchmarkResult {
     }
     
     /// Format result as human-readable text
-    #[must_use] 
+    #[must_use]
+    #[allow(clippy::too_many_lines, reason = "Report formatting requires detailed output")]
+    #[allow(clippy::expect_used, reason = "Writing to String should never fail")]
     pub fn format_report(&self) -> String {
-        use std::fmt::Write as _;
         let mut report = String::new();
 
         {
-            let _ = writeln!(report, "# Benchmark: {}\n", self.test_case.name);
-            let _ = writeln!(report, "**Query**: \"{}\"\n", self.test_case.query);
-            let _ = writeln!(report, "**Description**: {}\n", self.test_case.description);
+            writeln!(report, "# Benchmark: {}\n", self.test_case.name).expect("String write should not fail");
+            writeln!(report, "**Query**: \"{}\"\n", self.test_case.query).expect("String write should not fail");
+            writeln!(report, "**Description**: {}\n", self.test_case.description).expect("String write should not fail");
 
             report.push_str("## Metrics\n\n");
-            let _ = writeln!(report, "- **Precision@3**:  {:.1}%", self.metrics.precision_at_3 * 100.0);
-            let _ = writeln!(report, "- **Precision@5**:  {:.1}%", self.metrics.precision_at_5 * 100.0);
-            let _ = writeln!(report, "- **Precision@10**: {:.1}%", self.metrics.precision_at_10 * 100.0);
-            let _ = writeln!(report, "- **Recall@10**:    {:.1}%", self.metrics.recall_at_10 * 100.0);
-            let _ = writeln!(report, "- **Recall@20**:    {:.1}%", self.metrics.recall_at_20 * 100.0);
-            let _ = writeln!(report, "- **MRR**:          {:.3}", self.metrics.mrr);
-            let _ = writeln!(report, "- **NDCG@10**:      {:.3}", self.metrics.ndcg_at_10);
-            let _ = writeln!(report, "- **Exclusion**:    {:.1}%", self.metrics.exclusion_rate * 100.0);
-            let _ = writeln!(report, "- **Critical in Top-3**: {:.1}%", self.metrics.critical_in_top_3 * 100.0);
-            let _ = writeln!(report, "- **High in Top-5**:     {:.1}%\n", self.metrics.high_in_top_5 * 100.0);
+            writeln!(report, "- **Precision@3**:  {:.1}%", self.metrics.precision_at_3 * 100.0).expect("String write should not fail");
+            writeln!(report, "- **Precision@5**:  {:.1}%", self.metrics.precision_at_5 * 100.0).expect("String write should not fail");
+            writeln!(report, "- **Precision@10**: {:.1}%", self.metrics.precision_at_10 * 100.0).expect("String write should not fail");
+            writeln!(report, "- **Recall@10**:    {:.1}%", self.metrics.recall_at_10 * 100.0).expect("String write should not fail");
+            writeln!(report, "- **Recall@20**:    {:.1}%", self.metrics.recall_at_20 * 100.0).expect("String write should not fail");
+            writeln!(report, "- **MRR**:          {:.3}", self.metrics.mrr).expect("String write should not fail");
+            writeln!(report, "- **NDCG@10**:      {:.3}", self.metrics.ndcg_at_10).expect("String write should not fail");
+            writeln!(report, "- **Exclusion**:    {:.1}%", self.metrics.exclusion_rate * 100.0).expect("String write should not fail");
+            writeln!(report, "- **Critical in Top-3**: {:.1}%", self.metrics.critical_in_top_3 * 100.0).expect("String write should not fail");
+            writeln!(report, "- **High in Top-5**:     {:.1}%\n", self.metrics.high_in_top_5 * 100.0).expect("String write should not fail");
 
             report.push_str("## Top 10 Results\n\n");
             for (index, ranked_file) in self.ranked_files.iter().take(10).enumerate() {
@@ -393,19 +396,19 @@ impl BenchmarkResult {
                     "Cross mark (not expected)".to_string()
                 };
 
-                let _ = writeln!(report, "{}. {} {} (score: {:.3})", rank, path_str, status, ranked_file.score);
+                writeln!(report, "{}. {} {} (score: {:.3})", rank, path_str, status, ranked_file.score).expect("String write should not fail");
             }
 
             if !self.missing_expected.is_empty() {
                 report.push_str("\n## Missing Expected Files\n\n");
                 for expected in &self.missing_expected {
-                    let _ = writeln!(report, "- **{}** ({}): {}", expected.path,
+                    writeln!(report, "- **{}** ({}): {}", expected.path,
                         match expected.priority {
                             Priority::Critical => "Critical",
                             Priority::High => "High",
                             Priority::Medium => "Medium",
                             Priority::Low => "Low",
-                        }, expected.reason);
+                        }, expected.reason).expect("String write should not fail");
                 }
             }
         }
@@ -414,15 +417,18 @@ impl BenchmarkResult {
     }
 }
 
+/// Type alias for test case collection
+type TestCaseCollection = Vec<(PathBuf, TestCase)>;
+
 /// Load test case from TOML file
 ///
 /// # Errors
 ///
 /// Returns an error if the file cannot be read or parsed as TOML
 pub fn load_test_case(path: &Path) -> Result<TestCase> {
-    use std::fs;
-    let content = fs::read_to_string(path)?;
-    let test_case: TestCase = toml::from_str(&content)?;
+    use std::fs::read_to_string;
+    let content = read_to_string(path)?;
+    let test_case: TestCase = toml_from_str(&content)?;
     Ok(test_case)
 }
 
@@ -431,22 +437,21 @@ pub fn load_test_case(path: &Path) -> Result<TestCase> {
 /// # Errors
 ///
 /// Returns an error if the directory cannot be read
-pub fn load_test_cases(dir: &Path) -> Result<Vec<(PathBuf, TestCase)>> {
-    use std::fs;
+pub fn load_test_cases(dir: &Path) -> Result<TestCaseCollection> {
+    use std::fs::read_dir;
     let mut test_cases = Vec::new();
 
-    for entry in fs::read_dir(dir)? {
+    for entry in read_dir(dir)? {
         let entry = entry?;
         let path = entry.path();
 
         if path.extension().and_then(|ext| ext.to_str()) == Some("toml") {
             match load_test_case(&path) {
                 Ok(test_case) => test_cases.push((path, test_case)),
-                Err(error) => eprintln!("Warning: Failed to load {}: {}", path.display(), error),
+                Err(error) => tracing::warn!("Warning: Failed to load {}: {}", path.display(), error),
             }
         }
     }
 
     Ok(test_cases)
 }
-

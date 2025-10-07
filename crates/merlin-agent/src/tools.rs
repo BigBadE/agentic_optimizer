@@ -3,6 +3,7 @@ use std::sync::Arc;
 
 use merlin_tools::{BashTool, EditTool, ShowTool, Tool, ToolInput, ToolOutput};
 use tracing::info;
+use anyhow::Result;
 
 pub struct ToolRegistry {
     tools: HashMap<String, Arc<dyn Tool>>,
@@ -45,7 +46,7 @@ impl ToolRegistry {
     ///
     /// # Errors
     /// Returns an error if the tool is not found or execution fails
-    pub async fn execute(&self, tool_name: &str, input: ToolInput) -> anyhow::Result<ToolOutput> {
+    pub async fn execute(&self, tool_name: &str, input: ToolInput) -> Result<ToolOutput> {
         let tool = self
             .get(tool_name)
             .ok_or_else(|| anyhow::anyhow!("Tool not found: {tool_name}"))?;

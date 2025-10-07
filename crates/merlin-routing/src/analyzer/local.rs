@@ -52,7 +52,7 @@ impl TaskAnalyzer for LocalTaskAnalyzer {
         
         let execution_strategy = if tasks.len() == 1 {
             ExecutionStrategy::Sequential
-        } else if tasks.iter().all(|t| t.dependencies.is_empty()) {
+        } else if tasks.iter().all(|task| task.dependencies.is_empty()) {
             ExecutionStrategy::Parallel {
                 max_concurrent: self.max_parallel_tasks,
             }
@@ -77,24 +77,36 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    /// # Panics
+    /// Panics if analyze returns an error in the test harness.
     async fn test_simple_request() {
         let analyzer = LocalTaskAnalyzer::new();
-        let analysis = analyzer.analyze("Add a comment to main.rs").await.unwrap();
+        let analysis = match analyzer.analyze("Add a comment to main.rs").await {
+            Ok(analysis) => analysis,
+            Err(error) => panic!("analyze failed: {error}"),
+        };
         
         assert_eq!(analysis.tasks.len(), 1);
         assert!(matches!(analysis.execution_strategy, ExecutionStrategy::Sequential));
     }
     
     #[tokio::test]
+    /// # Panics
+    /// Panics if analyze returns an error in the test harness.
     async fn test_refactor_request() {
         let analyzer = LocalTaskAnalyzer::new();
-        let analysis = analyzer.analyze("Refactor the parser module").await.unwrap();
+        let analysis = match analyzer.analyze("Refactor the parser module").await {
+            Ok(analysis) => analysis,
+            Err(error) => panic!("analyze failed: {error}"),
+        };
         
         assert_eq!(analysis.tasks.len(), 3);
         assert!(matches!(analysis.execution_strategy, ExecutionStrategy::Pipeline));
     }
     
     #[tokio::test]
+    /// # Panics
+    /// Panics if complexity estimation produces unexpected categories.
     async fn test_complexity_estimation() {
         let analyzer = LocalTaskAnalyzer::new();
         
@@ -106,9 +118,14 @@ mod tests {
     }
     
     #[tokio::test]
+    /// # Panics
+    /// Panics if analyze returns an error in the test harness.
     async fn test_context_needs() {
         let analyzer = LocalTaskAnalyzer::new();
-        let analysis = analyzer.analyze("Modify test.rs and main.rs").await.unwrap();
+        let analysis = match analyzer.analyze("Modify test.rs and main.rs").await {
+            Ok(analysis) => analysis,
+            Err(error) => panic!("analyze failed: {error}"),
+        };
         
         assert!(!analysis.tasks.is_empty());
         let task = &analysis.tasks[0];

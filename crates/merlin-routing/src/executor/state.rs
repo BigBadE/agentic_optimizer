@@ -20,21 +20,24 @@ impl WorkspaceState {
     }
     
     /// Apply file changes atomically
+    ///
+    /// # Errors
+    /// Returns an error if acquiring the write lock fails.
     pub async fn apply_changes(&self, changes: &[FileChange]) -> Result<()> {
-        let mut files = self.files.write().await;
-        
-        for change in changes {
-            match change {
-                FileChange::Create { path, content } |
-                FileChange::Modify { path, content } => {
-                    files.insert(path.clone(), content.clone());
-                }
-                FileChange::Delete { path } => {
-                    files.remove(path);
+        {
+            let mut files = self.files.write().await;
+            for change in changes {
+                match change {
+                    FileChange::Create { path, content } |
+                    FileChange::Modify { path, content } => {
+                        files.insert(path.clone(), content.clone());
+                    }
+                    FileChange::Delete { path } => {
+                        files.remove(path);
+                    }
                 }
             }
         }
-        
         Ok(())
     }
     
@@ -50,6 +53,9 @@ impl WorkspaceState {
     }
     
     /// Create snapshot of specific files
+    ///
+    /// # Errors
+    /// Returns an error if acquiring the read lock fails.
     pub async fn snapshot(&self, files: &[PathBuf]) -> Result<WorkspaceSnapshot> {
         let file_map = self.files.read().await;
         let mut snapshot_files = HashMap::new();
@@ -84,15 +90,19 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    /// # Panics
+    /// Panics if workspace operations fail in the test harness.
     async fn test_workspace_concurrent_reads() {
         let workspace = WorkspaceState::new(PathBuf::from("/tmp"));
         
-        workspace.apply_changes(&[
+        if let Err(error) = workspace.apply_changes(&[
             FileChange::Create {
                 path: PathBuf::from("test.rs"),
                 content: "fn main() {}".to_owned(),
             }
-        ]).await.unwrap();
+        ]).await {
+            panic!("failed to apply initial change: {error}");
+        }
         
         let path = PathBuf::from("test.rs");
         let (content1, content2) = tokio::join!(
@@ -105,24 +115,33 @@ mod tests {
     }
     
     #[tokio::test]
+    /// # Panics
+    /// Panics if workspace operations fail in the test harness.
     async fn test_workspace_snapshot() {
         let workspace = WorkspaceState::new(PathBuf::from("/tmp"));
         
-        workspace.apply_changes(&[
+        if let Err(error) = workspace.apply_changes(&[
             FileChange::Create {
                 path: PathBuf::from("test.rs"),
                 content: "fn main() {}".to_owned(),
             }
-        ]).await.unwrap();
+        ]).await {
+            panic!("failed to apply initial change: {error}");
+        }
         
-        let snapshot = workspace.snapshot(&[PathBuf::from("test.rs")]).await.unwrap();
+        let snapshot = match workspace.snapshot(&[PathBuf::from("test.rs")]).await {
+            Ok(snapshot) => snapshot,
+            Err(error) => panic!("failed to create snapshot: {error}"),
+        };
         
-        workspace.apply_changes(&[
+        if let Err(error) = workspace.apply_changes(&[
             FileChange::Modify {
                 path: PathBuf::from("test.rs"),
                 content: "fn main() { println!(\"changed\"); }".to_owned(),
             }
-        ]).await.unwrap();
+        ]).await {
+            panic!("failed to modify file: {error}");
+        }
         
         assert_eq!(snapshot.get(&PathBuf::from("test.rs")), Some("fn main() {}".to_owned()));
         assert_eq!(

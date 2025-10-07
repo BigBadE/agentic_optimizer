@@ -1,13 +1,18 @@
-use std::env;
+use std::collections::HashSet;
+use std::env::var;
 use std::sync::Arc;
+use std::time::{Duration, Instant};
+use tokio::time::sleep;
 
 use merlin_core::{Context, FileContext, ModelProvider, Query, Response, TokenUsage};
+use merlin_local::LocalModelProvider;
+use merlin_providers::{AnthropicProvider, GroqProvider, OpenRouterProvider};
 
 use crate::{
     AgentExecutor, ConflictAwareTaskGraph, ExecutorPool, ListFilesTool,
     LocalTaskAnalyzer, ModelRouter, ModelTier, ReadFileTool, Result, RoutingConfig, RunCommandTool,
-    StrategyRouter, Task, TaskAnalysis, TaskAnalyzer, TaskResult, ToolRegistry, UiChannel,
-    ValidationPipeline, Validator, WorkspaceState, WriteFileTool,
+    StrategyRouter, Task, TaskAnalysis, TaskAnalyzer, TaskGraph, TaskResult, ToolRegistry, UiChannel,
+    ValidationPipeline, Validator, ValidationResult, WorkspaceState, WriteFileTool, RoutingError,
 };
 
 /// High-level orchestrator that coordinates all routing components
@@ -47,6 +52,10 @@ impl RoutingOrchestrator {
         }
     }
 
+    /// Attempt to escalate to a higher tier and generate a response
+    ///
+    /// # Errors
+    /// Returns an error if provider interaction fails
     async fn try_escalate(&self, tier: &ModelTier, query: &Query, context: &Context) -> Result<Option<Response>> {
         let Some(higher_tier) = tier.escalate() else {
             return Ok(None);
@@ -56,7 +65,7 @@ impl RoutingOrchestrator {
         let result = escalated_provider
             .generate(query, context)
             .await
-            .map_err(|error| crate::RoutingError::Other(error.to_string()))?;
+            .map_err(|error| RoutingError::Other(error.to_string()))?;
         Ok(Some(result))
     }
     
@@ -79,11 +88,17 @@ impl RoutingOrchestrator {
     }
     
     /// Analyze a user request and decompose into tasks
+    ///
+    /// # Errors
+    /// Returns an error if analysis fails
     pub async fn analyze_request(&self, request: &str) -> Result<TaskAnalysis> {
         self.analyzer.analyze(request).await
     }
     
     /// Execute a task with streaming and tool support
+    ///
+    /// # Errors
+    /// Returns an error if task execution or validation fails, or if a provider interaction returns an error
     pub async fn execute_task_streaming(
         &self,
         task: Task,
@@ -100,8 +115,8 @@ impl RoutingOrchestrator {
         
         // Create agent executor
         let mut executor = AgentExecutor::new(
-            self.router.clone(),
-            self.validator.clone(),
+            Arc::clone(&self.router),
+            Arc::clone(&self.validator),
             tool_registry,
         );
         
@@ -109,36 +124,12 @@ impl RoutingOrchestrator {
         executor.execute_streaming(task, ui_channel).await
     }
     
-    /// Execute a task with self-determination (Phase 1)
-    /// The task will assess itself and decide whether to complete, decompose, or gather context
-    pub async fn execute_task_self_determining(
-        &self,
-        task: Task,
-        ui_channel: UiChannel,
-    ) -> Result<TaskResult> {
-        // Create tool registry with workspace tools
-        let tool_registry = Arc::new(
-            ToolRegistry::new()
-                .with_tool(Arc::new(ReadFileTool::new(self.config.workspace.root_path.clone())))
-                .with_tool(Arc::new(WriteFileTool::new(self.config.workspace.root_path.clone())))
-                .with_tool(Arc::new(ListFilesTool::new(self.config.workspace.root_path.clone())))
-                .with_tool(Arc::new(RunCommandTool::new(self.config.workspace.root_path.clone())))
-        );
-        
-        // Create agent executor
-        let mut executor = AgentExecutor::new(
-            self.router.clone(),
-            self.validator.clone(),
-            tool_registry,
-        );
-        
-        // Execute with self-determination
-        executor.execute_self_determining(task, ui_channel).await
-    }
-    
     /// Execute a single task with routing and validation (legacy method)
+    ///
+    /// # Errors
+    /// Returns an error if routing, provider execution, or validation fails
     pub async fn execute_task(&self, task: Task) -> Result<TaskResult> {
-        let start = std::time::Instant::now();
+        let start = Instant::now();
         let decision = self.router.route(&task).await?;
         
         // Create provider based on tier
@@ -151,13 +142,15 @@ impl RoutingOrchestrator {
         let query = Query::new(task.description.clone());
         
         // Execute with retries and escalation
-        let response = self.execute_with_retry(&provider, &query, &context, &decision.tier, task.clone()).await?;
+        let response = self
+            .execute_with_retry(&provider, &query, &context, &decision.tier)
+            .await?;
         
         // Validate if enabled
         let validation = if self.config.validation.enabled {
             self.validator.validate(&response, &task).await?
         } else {
-            crate::ValidationResult::default()
+            ValidationResult::default()
         };
         
         let duration_ms = start.elapsed().as_millis() as u64;
@@ -172,49 +165,56 @@ impl RoutingOrchestrator {
         })
     }
 
+    /// Create a concrete provider for the selected `ModelTier`
+    ///
+    /// # Errors
+    /// Returns an error when the selected tier is disabled or required API keys are not configured
     fn create_provider(&self, tier: &ModelTier) -> Result<Arc<dyn ModelProvider>> {
         match tier {
             ModelTier::Local { model_name } => {
                 if !self.config.tiers.local_enabled {
-                    return Err(crate::RoutingError::NoAvailableTier);
+                    return Err(RoutingError::NoAvailableTier);
                 }
-                Ok(Arc::new(merlin_local::LocalModelProvider::new(model_name.clone())))
+                Ok(Arc::new(LocalModelProvider::new(model_name.clone())))
             }
             ModelTier::Groq { model_name } => {
                 if !self.config.tiers.groq_enabled {
-                    return Err(crate::RoutingError::NoAvailableTier);
+                    return Err(RoutingError::NoAvailableTier);
                 }
-                let provider = merlin_providers::GroqProvider::new()
-                    .map_err(|e| crate::RoutingError::Other(e.to_string()))?
+                let provider = GroqProvider::new()
+                    .map_err(|error| RoutingError::Other(error.to_string()))?
                     .with_model(model_name.clone());
                 Ok(Arc::new(provider))
             }
             ModelTier::Premium { provider: provider_name, model_name } => {
                 if !self.config.tiers.premium_enabled {
-                    return Err(crate::RoutingError::NoAvailableTier);
+                    return Err(RoutingError::NoAvailableTier);
                 }
-                
+
                 match provider_name.as_str() {
                     "openrouter" => {
-                        let api_key = env::var("OPENROUTER_API_KEY")
-                            .map_err(|_| crate::RoutingError::Other("OPENROUTER_API_KEY not set".to_owned()))?;
-                        let provider = merlin_providers::OpenRouterProvider::new(api_key)?
+                        let api_key = var("OPENROUTER_API_KEY")
+                            .map_err(|_| RoutingError::Other("OPENROUTER_API_KEY not set".to_owned()))?;
+                        let provider = OpenRouterProvider::new(api_key)?
                             .with_model(model_name.clone());
                         Ok(Arc::new(provider))
                     }
                     "anthropic" => {
-                        let api_key = env::var("ANTHROPIC_API_KEY")
-                            .map_err(|_| crate::RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
-                        // Note: AnthropicProvider uses a fixed model, ignoring model_name for now
-                        let provider = merlin_providers::AnthropicProvider::new(api_key)?;
+                        let api_key = var("ANTHROPIC_API_KEY")
+                            .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
+                        let provider = AnthropicProvider::new(api_key)?;
                         Ok(Arc::new(provider))
                     }
-                    _ => Err(crate::RoutingError::Other(format!("Unknown provider: {provider_name}")))
+                    _ => Err(RoutingError::Other(format!("Unknown provider: {provider_name}"))),
                 }
             }
         }
     }
-    
+
+    /// Build a `Context` for the given task
+    ///
+    /// # Errors
+    /// Returns an error if reading required files fails
     async fn build_context(&self, task: &Task) -> Result<Context> {
         let system_prompt = format!(
             "You are Merlin, an AI coding agent working directly in the user's codebase at '{}'.\n\n\
@@ -229,10 +229,9 @@ impl RoutingOrchestrator {
             self.workspace.root_path().display(),
             task.description
         );
-        
+
         let mut context = Context::new(&system_prompt);
-        
-        // Add files from workspace if specified
+
         for file_path in &task.context_needs.required_files {
             if let Some(content) = self.workspace.read_file(file_path).await {
                 context = context.with_files(vec![FileContext::new(
@@ -241,17 +240,20 @@ impl RoutingOrchestrator {
                 )]);
             }
         }
-        
+
         Ok(context)
     }
-    
-    async fn execute_with_retry(
+
+    /// Execute with retry and optional escalation on failure
+    ///
+    /// # Errors
+    /// Returns an error if retries are exhausted and escalation also fails
+    pub async fn execute_with_retry(
         &self,
         provider: &Arc<dyn ModelProvider>,
         query: &Query,
         context: &Context,
         tier: &ModelTier,
-        _task: Task,
     ) -> Result<Response> {
         let mut attempts = 0;
         let max_retries = self.config.tiers.max_retries;
@@ -259,11 +261,11 @@ impl RoutingOrchestrator {
         loop {
             match provider.generate(query, context).await {
                 Ok(response) => return Ok(response),
-                Err(e) => {
+                Err(error) => {
                     attempts += 1;
                     if attempts < max_retries {
                         // Wait before retry and continue the loop
-                        tokio::time::sleep(std::time::Duration::from_millis(1000 * attempts as u64)).await;
+                        sleep(Duration::from_millis(1000 * attempts as u64)).await;
                         continue;
                     }
 
@@ -271,8 +273,8 @@ impl RoutingOrchestrator {
                         return Ok(response);
                     }
 
-                    return Err(crate::RoutingError::Other(format!(
-                        "Failed after {max_retries} retries: {e}"
+                    return Err(RoutingError::Other(format!(
+                        "Failed after {max_retries} retries: {error}"
                     )));
                 }
             }
@@ -280,36 +282,39 @@ impl RoutingOrchestrator {
     }
     
     /// Execute multiple tasks with dependency management
+    ///
+    /// # Errors
+    /// Returns an error if conflict detection or task execution fails
     pub async fn execute_tasks(&self, tasks: Vec<Task>) -> Result<Vec<TaskResult>> {
         if self.config.execution.enable_conflict_detection {
-            let graph = ConflictAwareTaskGraph::from_tasks(tasks);
+            let graph = ConflictAwareTaskGraph::from_tasks(&tasks);
             
             if graph.has_cycles() {
-                return Err(crate::RoutingError::CyclicDependency);
+                return Err(RoutingError::CyclicDependency);
             }
             
             // TODO: Implement conflict-aware execution
             // For now, use basic executor
             let executor = ExecutorPool::new(
-                self.router.clone(),
-                self.validator.clone(),
+                Arc::clone(&self.router),
+                Arc::clone(&self.validator),
                 self.config.execution.max_concurrent_tasks,
-                self.workspace.clone(),
+                Arc::clone(&self.workspace),
             );
             
-            let basic_graph = crate::TaskGraph::from_tasks(
-                graph.ready_non_conflicting_tasks(&Default::default(), &Default::default())
+            let basic_graph = TaskGraph::from_tasks(
+                &graph.ready_non_conflicting_tasks(&HashSet::default(), &HashSet::default())
             );
             
             executor.execute_graph(basic_graph).await
         } else {
-            let graph = crate::TaskGraph::from_tasks(tasks);
+            let graph = TaskGraph::from_tasks(&tasks);
             
             let executor = ExecutorPool::new(
-                self.router.clone(),
-                self.validator.clone(),
+                Arc::clone(&self.router),
+                Arc::clone(&self.validator),
                 self.config.execution.max_concurrent_tasks,
-                self.workspace.clone(),
+                Arc::clone(&self.workspace),
             );
             
             executor.execute_graph(graph).await
@@ -317,6 +322,9 @@ impl RoutingOrchestrator {
     }
     
     /// Complete workflow: analyze request → execute tasks → return results
+    ///
+    /// # Errors
+    /// Returns an error if analysis or execution fails.
     pub async fn process_request(&self, request: &str) -> Result<Vec<TaskResult>> {
         let analysis = self.analyze_request(request).await?;
         
@@ -330,7 +338,7 @@ impl RoutingOrchestrator {
     
     #[must_use]
     pub fn workspace(&self) -> Arc<WorkspaceState> {
-        self.workspace.clone()
+        Arc::clone(&self.workspace)
     }
 }
 
@@ -339,6 +347,8 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    /// # Panics
+    /// Panics if default configuration does not have local tier enabled.
     async fn test_orchestrator_creation() {
         let config = RoutingConfig::default();
         let orchestrator = RoutingOrchestrator::new(config);
@@ -347,21 +357,31 @@ mod tests {
     }
     
     #[tokio::test]
+    /// # Panics
+    /// Panics if `analyze_request` returns an error in the test harness.
     async fn test_analyze_request() {
         let config = RoutingConfig::default();
         let orchestrator = RoutingOrchestrator::new(config);
         
-        let analysis = orchestrator.analyze_request("Add a comment to main.rs").await.unwrap();
+        let analysis = match orchestrator.analyze_request("Add a comment to main.rs").await {
+            Ok(analysis) => analysis,
+            Err(error) => panic!("analyze_request failed: {error}"),
+        };
         assert!(!analysis.tasks.is_empty());
     }
     
     #[tokio::test]
-    #[ignore] // Requires actual provider instances
+    #[ignore = "Requires actual provider instances"]
+    /// # Panics
+    /// Panics if `process_request` returns an error in the test harness.
     async fn test_process_simple_request() {
         let config = RoutingConfig::default();
         let orchestrator = RoutingOrchestrator::new(config);
         
-        let results = orchestrator.process_request("Add a comment").await.unwrap();
+        let results = match orchestrator.process_request("Add a comment").await {
+            Ok(results) => results,
+            Err(error) => panic!("process_request failed: {error}"),
+        };
         assert!(!results.is_empty());
     }
 }

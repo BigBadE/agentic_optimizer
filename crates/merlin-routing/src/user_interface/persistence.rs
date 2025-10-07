@@ -1,9 +1,12 @@
 use std::collections::HashMap;
+use std::fs::{self as filesystem, File};
 use std::io::{self, Read as _, Write as _};
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime};
 use flate2::{read::GzDecoder, write::GzEncoder, Compression};
 use serde::{Deserialize, Serialize};
+use serde_json::{from_str, to_string};
+use tokio::task;
 use crate::TaskId;
 use super::task_manager::{TaskDisplay, TaskStatus};
 use super::output_tree::OutputTree;
@@ -37,20 +40,28 @@ impl TaskPersistence {
     }
 
     /// Loads all tasks from disk
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the task directory cannot be read or task files cannot be deserialized
     pub async fn load_all_tasks(&self) -> io::Result<HashMap<TaskId, TaskDisplay>> {
         let dir = self.tasks_dir.clone();
 
-        tokio::task::spawn_blocking(move || Self::load_tasks_sync(&dir))
+        task::spawn_blocking(move || Self::load_tasks_sync(&dir))
             .await
             .map_err(io::Error::other)?
     }
 
     /// Saves a task to disk
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the task directory cannot be created or the task file cannot be written
     pub fn save_task(&self, task_id: TaskId, task: &TaskDisplay) -> io::Result<()> {
         let status_str = task_status_to_string(task.status);
 
         // Convert Instant to SystemTime by calculating elapsed time from task start
-        let now_instant = std::time::Instant::now();
+        let now_instant = Instant::now();
         let now_system = SystemTime::now();
         let elapsed = now_instant.duration_since(task.start_time);
         let start_time = now_system - elapsed;
@@ -77,14 +88,21 @@ impl TaskPersistence {
     }
 
     /// Deletes a task file from disk
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the task file cannot be removed
     pub fn delete_task_file(&self, task_id: TaskId) -> io::Result<()> {
         let filename = format!("{}.json.gz", extract_task_id_string(task_id));
         let task_file = self.tasks_dir.join(filename);
-        std::fs::remove_file(task_file)
+        filesystem::remove_file(task_file)
     }
 
     // Private helpers
-
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the task directory cannot be read or task files cannot be parsed
     fn load_tasks_sync(tasks_dir: &PathBuf) -> io::Result<HashMap<TaskId, TaskDisplay>> {
         let mut tasks = HashMap::new();
 
@@ -92,7 +110,7 @@ impl TaskPersistence {
             return Ok(tasks);
         }
 
-        for entry in std::fs::read_dir(tasks_dir)? {
+        for entry in filesystem::read_dir(tasks_dir)? {
             let entry = entry?;
             let path = entry.path();
 
@@ -107,24 +125,27 @@ impl TaskPersistence {
 }
 
 // Helper functions
-
 /// Checks if a path is a compressed task file
-fn is_compressed_task_file(path: &std::path::Path) -> bool {
-    path.extension().and_then(|s| s.to_str()) == Some("gz")
+fn is_compressed_task_file(path: &Path) -> bool {
+    path.extension().and_then(|ext| ext.to_str()) == Some("gz")
 }
 
+type LoadedTask = Option<(TaskId, TaskDisplay)>;
+
 /// Loads a single task from a file
+///
+/// # Errors
+/// Returns an error if the file cannot be opened, the gzip decoding fails, or
 fn load_single_task(
-    path: &std::path::Path,
-) -> io::Result<Option<(TaskId, TaskDisplay)>> {
-    let file = std::fs::File::open(path)?;
+    path: &Path,
+) -> io::Result<LoadedTask> {
+    let file = File::open(path)?;
     let mut decoder = GzDecoder::new(file);
     let mut json_str = String::new();
-
     decoder.read_to_string(&mut json_str)?;
 
-    let serializable: SerializableTask = serde_json::from_str(&json_str)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let serializable: SerializableTask = from_str(&json_str)
+        .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
 
     let task_display = deserialize_task(serializable);
     Ok(Some(task_display))
@@ -141,7 +162,6 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
     }
 
     let status = match serializable.status.as_str() {
-        "Running" => TaskStatus::Running,
         "Completed" => TaskStatus::Completed,
         "Failed" => TaskStatus::Failed,
         _ => TaskStatus::Running,
@@ -151,13 +171,15 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
     let now_instant = Instant::now();
     let now_system = SystemTime::now();
 
-    let start_time = match now_system.duration_since(serializable.start_time) {
-        Ok(elapsed) => now_instant.checked_sub(elapsed).unwrap(),
-        Err(_) => now_instant, // If start_time is in future, use now
-    };
+    let start_time = now_system
+        .duration_since(serializable.start_time)
+        .map_or(now_instant, |elapsed| now_instant.checked_sub(elapsed).unwrap_or(now_instant));
 
     let end_time = serializable.end_time.and_then(|end_sys| {
-        now_system.duration_since(end_sys).ok().map(|elapsed| now_instant.checked_sub(elapsed).unwrap())
+        let elapsed = now_system
+            .duration_since(end_sys)
+            .ok()?;
+        now_instant.checked_sub(elapsed)
     });
 
     let task_display = TaskDisplay {
@@ -176,14 +198,18 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
 }
 
 /// Writes a compressed task to disk
+///
+/// # Errors
+///
+/// Returns an error if the JSON serialization fails or the file cannot be written
 fn write_compressed_task(
-    path: &std::path::Path,
+    path: &Path,
     serializable: &SerializableTask,
 ) -> io::Result<()> {
-    let json = serde_json::to_string(serializable)
-        .map_err(|e| io::Error::new(io::ErrorKind::InvalidData, e))?;
+    let json = to_string(serializable)
+        .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
 
-    let file = std::fs::File::create(path)?;
+    let file = File::create(path)?;
     let mut encoder = GzEncoder::new(file, Compression::fast());
     encoder.write_all(json.as_bytes())?;
     encoder.finish()?;
@@ -201,11 +227,15 @@ fn task_status_to_string(status: TaskStatus) -> &'static str {
 }
 
 /// Extracts clean task ID string from `TaskId` debug format
+///
+/// # Panics
+///
+/// This function may panic if the `TaskId` format changes unexpectedly
 fn extract_task_id_string(task_id: TaskId) -> String {
     let task_id_str = format!("{task_id:?}");
     task_id_str
         .strip_prefix("TaskId(")
-        .and_then(|s| s.strip_suffix(")"))
+        .and_then(|stripped| stripped.strip_suffix(")"))
         .unwrap_or(&task_id_str)
         .to_string()
 }

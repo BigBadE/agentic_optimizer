@@ -4,79 +4,24 @@ use std::mem;
 use super::{FileChunk, estimate_tokens, MIN_CHUNK_TOKENS, MAX_CHUNK_TOKENS};
 
 /// Chunk Rust code - prioritizes innermost items (functions over impls)
+#[must_use]
 pub fn chunk_rust(file_path: String, content: &str) -> Vec<FileChunk> {
     let lines: Vec<&str> = content.lines().collect();
     let mut chunks = Vec::new();
-    let mut i = 0;
+    let mut index = 0;
     let mut buffer = String::new();
 
-    while i < lines.len() {
-        let trimmed = lines[i].trim();
-        
+    while index < lines.len() {
+        let trimmed = lines[index].trim();
+
         // Detect item starts
         if is_rust_item_start(trimmed) {
-            let (start_idx, end_idx, chunk_id, end_line) = extract_rust_item_indices(&lines, i);
-            
-            // Build string using buffer to avoid allocations
-            buffer.clear();
-            for (line_idx, line) in lines.iter().enumerate().take(end_idx + 1).skip(start_idx) {
-                if line_idx > start_idx {
-                    buffer.push('\n');
-                }
-                buffer.push_str(line);
-            }
-            
-            let tokens = estimate_tokens(&buffer);
-            
-            // If chunk is too large, try to split it
-            if tokens > MAX_CHUNK_TOKENS {
-                if chunk_id.starts_with("impl ") {
-                    // Try to break impl into functions
-                    let sub_chunks = chunk_impl_into_functions(&file_path, &lines, start_idx, end_idx, i);
-                    if !sub_chunks.is_empty() {
-                        chunks.extend(sub_chunks);
-                        i = end_line + 1;
-                        continue;
-                    }
-                }
-                
-                // Force split on empty lines
-                let sub_chunks = force_split_large_chunk(&file_path, &lines, start_idx, end_idx, &chunk_id);
-                if !sub_chunks.is_empty() {
-                    // Verify all sub-chunks are within limits
-                    let all_valid = sub_chunks.iter().all(|chunk| {
-                        let token_count = estimate_tokens(&chunk.content);
-                        token_count <= MAX_CHUNK_TOKENS
-                    });
-                    
-                    if all_valid {
-                        chunks.extend(sub_chunks);
-                        i = end_line + 1;
-                        continue;
-                    }
-                }
-                
-                // If we can't split it properly, skip it (too large and no good split points)
-                tracing::warn!("Skipping large chunk {chunk_id} ({tokens} tokens) - no good split points");
-                i = end_line + 1;
-                continue;
-            }
-            
-            // Only add if meets minimum token requirement
-            if !buffer.trim().is_empty() && tokens >= MIN_CHUNK_TOKENS {
-                chunks.push(FileChunk::new(
-                    file_path.clone(),
-                    mem::take(&mut buffer),
-                    chunk_id,
-                    i + 1,
-                    end_line + 1,
-                ));
-            }
-            // If below minimum, just skip it (will be part of surrounding context)
-            
-            i = end_line + 1;
+            let (start_idx, end_idx, chunk_id, end_line) = extract_rust_item_indices(&lines, index);
+            let refs = ItemRefs { file_path: &file_path, lines: &lines, chunk_id: &chunk_id };
+            let bounds = ItemBounds { start_idx, end_idx, end_line, current_line: index };
+            index = process_rust_item(&refs, &bounds, &mut buffer, &mut chunks);
         } else {
-            i += 1;
+            index += 1;
         }
     }
     
@@ -92,6 +37,97 @@ pub fn chunk_rust(file_path: String, content: &str) -> Vec<FileChunk> {
     }
     
     chunks
+}
+
+struct ItemBounds { start_idx: usize, end_idx: usize, end_line: usize, current_line: usize }
+
+struct ItemRefs<'life> { file_path: &'life str, lines: &'life[&'life str], chunk_id: &'life str }
+
+/// Process a single Rust item (function, struct, impl, etc.)
+fn process_rust_item(
+    refs: &ItemRefs,
+    bounds: &ItemBounds,
+    buffer: &mut String,
+    chunks: &mut Vec<FileChunk>,
+) -> usize {
+    let file_path = refs.file_path;
+    let lines = refs.lines;
+    let chunk_id = refs.chunk_id;
+    let start_idx = bounds.start_idx;
+    let end_idx = bounds.end_idx;
+    let end_line = bounds.end_line;
+    let current_line = bounds.current_line;
+    // Build string using buffer to avoid allocations
+    buffer.clear();
+    for (line_idx, line) in lines.iter().enumerate().take(end_idx + 1).skip(start_idx) {
+        if line_idx > start_idx {
+            buffer.push('\n');
+        }
+        buffer.push_str(line);
+    }
+
+    let tokens = estimate_tokens(buffer);
+
+    // If chunk is too large, try to split it
+    if tokens > MAX_CHUNK_TOKENS {
+        if let Some(sub_chunks) = try_split_large_item(&TrySplitCtx { file_path, lines, start_idx, end_idx, chunk_id, base_line: current_line }) {
+            chunks.extend(sub_chunks);
+            return end_line + 1;
+        }
+
+        // If we can't split it properly, skip it (too large and no good split points)
+        tracing::warn!("Skipping large chunk {chunk_id} ({tokens} tokens) - no good split points");
+        return end_line + 1;
+    }
+
+    // Only add if meets minimum token requirement
+    if !buffer.trim().is_empty() && tokens >= MIN_CHUNK_TOKENS {
+        chunks.push(FileChunk::new(
+            file_path.to_owned(),
+            mem::take(buffer),
+            chunk_id.to_owned(),
+            current_line + 1,
+            end_line + 1,
+        ));
+    }
+    // If below minimum, just skip it (will be part of surrounding context)
+
+    end_line + 1
+}
+
+/// Try to split a large item into smaller chunks
+struct TrySplitCtx<'life> { file_path: &'life str, lines: &'life[&'life str], start_idx: usize, end_idx: usize, chunk_id: &'life str, base_line: usize }
+
+fn try_split_large_item(ctx: &TrySplitCtx) -> Option<Vec<FileChunk>> {
+    let file_path = ctx.file_path;
+    let lines = ctx.lines;
+    let start_idx = ctx.start_idx;
+    let end_idx = ctx.end_idx;
+    let chunk_id = ctx.chunk_id;
+    let base_line = ctx.base_line;
+    if chunk_id.starts_with("impl ") {
+        // Try to break impl into functions
+        let sub_chunks = chunk_impl_into_functions(file_path, lines, start_idx, end_idx, base_line);
+        if !sub_chunks.is_empty() {
+            return Some(sub_chunks);
+        }
+    }
+
+    // Force split on empty lines
+    let sub_chunks = force_split_large_chunk(file_path, lines, start_idx, end_idx, chunk_id);
+    if !sub_chunks.is_empty() {
+        // Verify all sub-chunks are within limits
+        let all_valid = sub_chunks.iter().all(|chunk| {
+            let token_count = estimate_tokens(&chunk.content);
+            token_count <= MAX_CHUNK_TOKENS
+        });
+
+        if all_valid {
+            return Some(sub_chunks);
+        }
+    }
+
+    None
 }
 
 /// Check if line starts a Rust item
@@ -112,10 +148,10 @@ fn extract_rust_item_indices(lines: &[&str], start: usize) -> (usize, usize, Str
     let identifier = extract_rust_identifier(lines[start].trim());
     let mut brace_depth = 0;
     let mut found_opening_brace = false;
-    
+
     for (offset, line) in lines[start..].iter().enumerate() {
-        for ch in line.chars() {
-            match ch {
+        for character in line.chars() {
+            match character {
                 '{' => {
                     brace_depth += 1;
                     found_opening_brace = true;
@@ -144,19 +180,19 @@ fn extract_rust_item_indices(lines: &[&str], start: usize) -> (usize, usize, Str
 /// Break an impl block into individual function chunks
 fn chunk_impl_into_functions(file_path: &str, lines: &[&str], start_idx: usize, end_idx: usize, _base_line: usize) -> Vec<FileChunk> {
     let mut chunks = Vec::new();
-    let mut i = start_idx;
+    let mut index = start_idx;
     let mut buffer = String::new();
     
     // Skip the impl line itself
-    while i <= end_idx && !lines[i].trim().starts_with("fn ") && !lines[i].trim().starts_with("pub fn ") {
-        i += 1;
+    while index <= end_idx && !lines[index].trim().starts_with("fn ") && !lines[index].trim().starts_with("pub fn ") {
+        index += 1;
     }
     
-    while i <= end_idx {
-        let trimmed = lines[i].trim();
+    while index <= end_idx {
+        let trimmed = lines[index].trim();
         
         if trimmed.starts_with("pub fn ") || trimmed.starts_with("fn ") {
-            let (fn_start, fn_end, fn_id, _) = extract_rust_item_indices(lines, i);
+            let (fn_start, fn_end, fn_id, _) = extract_rust_item_indices(lines, index);
             
             // Build string using buffer
             buffer.clear();
@@ -180,9 +216,9 @@ fn chunk_impl_into_functions(file_path: &str, lines: &[&str], start_idx: usize, 
             }
             // Skip functions below minimum
             
-            i = fn_end + 1;
+            index = fn_end + 1;
         } else {
-            i += 1;
+            index += 1;
         }
     }
     
@@ -197,68 +233,32 @@ fn force_split_large_chunk(file_path: &str, lines: &[&str], start_idx: usize, en
     let mut line_count = 0;
     let mut part_num = 1;
     let mut last_empty_line = None;
-    
+
     for line_idx in start_idx..=end_idx {
         if line_count > 0 {
             buffer.push('\n');
         }
         buffer.push_str(lines[line_idx]);
         line_count += 1;
-        
+
         let tokens = estimate_tokens(&buffer);
-        
-        // Track empty lines as potential split points
+
         if lines[line_idx].trim().is_empty() {
             last_empty_line = Some((line_idx, tokens));
         }
-        
-        // Force split if we're over MAX and have a recent empty line
-        if tokens > MAX_CHUNK_TOKENS
-            && let Some((empty_idx, empty_tokens)) = last_empty_line
-            && empty_tokens >= MIN_CHUNK_TOKENS
-        {
-            // Build split content from original lines
-            let mut split_content = String::new();
-            for (idx, line) in lines.iter().enumerate().take(empty_idx + 1).skip(chunk_start) {
-                if idx > chunk_start {
-                    split_content.push('\n');
-                }
-                split_content.push_str(line);
-            }
 
-            chunks.push(FileChunk::new(
-                file_path.to_owned(),
-                split_content,
-                format!("{base_id} (part {part_num})"),
-                chunk_start + 1,
-                empty_idx + 1,
-            ));
-
-            // Rebuild buffer with remaining content
-            buffer.clear();
-            line_count = 0;
-            for line in lines.iter().take(line_idx + 1).skip(empty_idx + 1) {
-                if line_count > 0 {
-                    buffer.push('\n');
-                }
-                buffer.push_str(line);
-                line_count += 1;
-            }
-
+        if let Some(empty_idx) = should_force_split(tokens, last_empty_line) {
+            let meta = EmitMeta { file_path, base_id, part_num };
+            emit_chunk_from_range(&meta, lines, chunk_start, empty_idx, &mut chunks);
+            rebuild_buffer_after_split(lines, empty_idx, line_idx, &mut buffer, &mut line_count);
             part_num += 1;
             chunk_start = empty_idx + 1;
             last_empty_line = None;
         }
-        
-        // Also split on empty lines when we have enough content
-        if lines[line_idx].trim().is_empty() && (MIN_CHUNK_TOKENS..=MAX_CHUNK_TOKENS).contains(&tokens) {
-            chunks.push(FileChunk::new(
-                file_path.to_owned(),
-                mem::take(&mut buffer),
-                format!("{base_id} (part {part_num})"),
-                chunk_start + 1,
-                line_idx + 1,
-            ));
+
+        if should_emit_on_empty_line(lines[line_idx], tokens) {
+            let meta = EmitMeta { file_path, base_id, part_num };
+            emit_chunk(&meta, &mut buffer, chunk_start, line_idx, &mut chunks);
             part_num += 1;
             line_count = 0;
             chunk_start = line_idx + 1;
@@ -266,26 +266,84 @@ fn force_split_large_chunk(file_path: &str, lines: &[&str], start_idx: usize, en
         }
     }
 
-    // Add remaining if meets minimum
-    if line_count > 0 {
+    let meta = EmitMeta { file_path, base_id, part_num };
+    flush_remaining(&meta, buffer, chunk_start, end_idx, &mut chunks);
+
+    chunks
+}
+
+fn should_force_split(tokens: usize, last_empty: Option<(usize, usize)>) -> Option<usize> {
+    if let Some((empty_idx, empty_tokens)) = last_empty
+        && tokens > MAX_CHUNK_TOKENS
+        && empty_tokens >= MIN_CHUNK_TOKENS
+    {
+        return Some(empty_idx);
+    }
+    None
+}
+
+fn should_emit_on_empty_line(line: &str, tokens: usize) -> bool {
+    line.trim().is_empty() && (MIN_CHUNK_TOKENS..=MAX_CHUNK_TOKENS).contains(&tokens)
+}
+
+struct EmitMeta<'life> { file_path: &'life str, base_id: &'life str, part_num: usize }
+
+fn emit_chunk_from_range(meta: &EmitMeta, lines: &[&str], start: usize, end: usize, chunks: &mut Vec<FileChunk>) {
+    let mut split_content = String::new();
+    for (idx, line) in lines.iter().enumerate().take(end + 1).skip(start) {
+        if idx > start {
+            split_content.push('\n');
+        }
+        split_content.push_str(line);
+    }
+    chunks.push(FileChunk::new(
+        meta.file_path.to_owned(),
+        split_content,
+        format!("{} (part {})", meta.base_id, meta.part_num),
+        start + 1,
+        end + 1,
+    ));
+}
+
+fn rebuild_buffer_after_split(lines: &[&str], split_end: usize, current_idx: usize, buffer: &mut String, line_count: &mut usize) {
+    buffer.clear();
+    *line_count = 0;
+    for line in lines.iter().take(current_idx + 1).skip(split_end + 1) {
+        if *line_count > 0 {
+            buffer.push('\n');
+        }
+        buffer.push_str(line);
+        *line_count += 1;
+    }
+}
+
+fn emit_chunk(meta: &EmitMeta, buffer: &mut String, chunk_start: usize, end_line: usize, chunks: &mut Vec<FileChunk>) {
+    chunks.push(FileChunk::new(
+        meta.file_path.to_owned(),
+        mem::take(buffer),
+        format!("{} (part {})", meta.base_id, meta.part_num),
+        chunk_start + 1,
+        end_line + 1,
+    ));
+}
+
+fn flush_remaining(meta: &EmitMeta, buffer: String, chunk_start: usize, end_idx: usize, chunks: &mut Vec<FileChunk>) {
+    if !buffer.is_empty() {
         let tokens = estimate_tokens(&buffer);
         if tokens >= MIN_CHUNK_TOKENS {
             chunks.push(FileChunk::new(
-                file_path.to_owned(),
+                meta.file_path.to_owned(),
                 buffer,
-                format!("{base_id} (part {part_num})"),
+                format!("{} (part {})", meta.base_id, meta.part_num),
                 chunk_start + 1,
                 end_idx + 1,
             ));
-        } else if !chunks.is_empty() && let Some(last_chunk) = chunks.last_mut() {
-            // Merge small remainder with last chunk if possible
+        } else if let Some(last_chunk) = chunks.last_mut() {
             last_chunk.content.push('\n');
             last_chunk.content.push_str(&buffer);
             last_chunk.end_line = end_idx + 1;
         }
     }
-    
-    chunks
 }
 
 /// Extract identifier from Rust item declaration
@@ -299,34 +357,26 @@ fn extract_rust_identifier(line: &str) -> String {
         .trim_start_matches("const ")
         .trim_start_matches("unsafe ");
 
-    // Extract based on keyword - using map_or_else to satisfy clippy
-    line.strip_prefix("fn ").map_or_else(
-        || {
-            line.strip_prefix("struct ").map_or_else(
-                || {
-                    line.strip_prefix("enum ").map_or_else(
-                        || {
-                            line.strip_prefix("trait ").map_or_else(
-                                || {
-                                    if line.starts_with("impl ") || line.starts_with("impl<") {
-                                        let impl_part = line.split('{').next().unwrap_or(line).trim();
-                                        format!("impl {}", impl_part.strip_prefix("impl ").unwrap_or("").trim())
-                                    } else {
-                                        line.strip_prefix("mod ").map_or_else(
-                                            || String::from("item"),
-                                            |rest| format!("mod {}", rest.split(&[' ', '{'][..]).next().unwrap_or("unknown"))
-                                        )
-                                    }
-                                },
-                                |rest| format!("trait {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"))
-                            )
-                        },
-                        |rest| format!("enum {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"))
-                    )
-                },
-                |rest| format!("struct {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"))
-            )
-        },
-        |rest| format!("fn {}", rest.split(&['(', '<', ' '][..]).next().unwrap_or("unknown"))
-    )
+    // Extract based on keyword
+    if let Some(rest) = line.strip_prefix("fn ") {
+        return format!("fn {}", rest.split(&['(', '<', ' '][..]).next().unwrap_or("unknown"));
+    }
+    if let Some(rest) = line.strip_prefix("struct ") {
+        return format!("struct {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"));
+    }
+    if let Some(rest) = line.strip_prefix("enum ") {
+        return format!("enum {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"));
+    }
+    if let Some(rest) = line.strip_prefix("trait ") {
+        return format!("trait {}", rest.split(&[' ', '<', '{'][..]).next().unwrap_or("unknown"));
+    }
+    if line.starts_with("impl ") || line.starts_with("impl<") {
+        let impl_part = line.split('{').next().unwrap_or(line).trim();
+        return format!("impl {}", impl_part.strip_prefix("impl ").unwrap_or("").trim());
+    }
+    if let Some(rest) = line.strip_prefix("mod ") {
+        return format!("mod {}", rest.split(&[' ', '{'][..]).next().unwrap_or("unknown"));
+    }
+
+    String::from("item")
 }

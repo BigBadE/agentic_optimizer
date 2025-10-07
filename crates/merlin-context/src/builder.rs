@@ -1,9 +1,10 @@
 use std::path::{Path, PathBuf};
 use std::time::Duration;
 use std::collections::HashMap;
-use walkdir::WalkDir;
+use walkdir::{WalkDir, DirEntry};
 use indicatif::{ProgressBar, ProgressStyle};
 use tokio::task::{spawn_blocking, JoinError};
+use tokio::spawn;
 
 use merlin_core::{Context, Error, FileContext, Query, Result};
 use merlin_languages::LanguageProvider;
@@ -20,6 +21,7 @@ use crate::context_inclusion::{
 type BackendJoinResult = CoreResult<(Option<Box<dyn LanguageProvider>>, Result<()>), JoinError>;
 type VectorJoinResult = CoreResult<(VectorSearchManager, Result<()>), JoinError>;
 type ProcessSearchResultsReturn = (Vec<PrioritizedFile>, Vec<(PathBuf, f32, Option<f32>, Option<f32>)>);
+type FileChunksMap = HashMap<PathBuf, Vec<(usize, usize, f32)>>;
 
 /// Default system prompt used when constructing the base context.
 const DEFAULT_SYSTEM_PROMPT: &str = "You are a helpful coding assistant. You help users understand and modify their codebase.\n\nWhen making changes:\n1. Be precise and accurate\n2. Explain your reasoning\n3. Provide complete, working code\n4. Follow the existing code style\n\nYou have access to the user's codebase context below.";
@@ -125,6 +127,10 @@ impl ContextBuilder {
     }
 
     /// Use hybrid search to intelligently gather context
+    ///
+    /// # Errors
+    /// Returns an error if language backend is not initialized or hybrid search fails
+    #[allow(clippy::min_ident_chars, reason = "Standard loop iterator variable")]
     async fn use_subagent_for_context(&self, _intent: &QueryIntent, query_text: &str) -> Result<Vec<FileContext>> {
         // Initialize the language backend if needed
         if !self.language_backend_initialized {
@@ -277,6 +283,10 @@ impl ContextBuilder {
     }
 
     /// Extract a chunk with surrounding context (only for code files)
+    ///
+    /// # Errors
+    /// Returns an error if file cannot be read
+    #[allow(clippy::min_ident_chars, reason = "Standard loop iterator variable")]
     fn extract_chunk_with_context(file_path: &PathBuf, start_line: usize, end_line: usize, include_context: bool) -> Result<FileContext> {
         use std::fs;
 
@@ -352,7 +362,7 @@ impl ContextBuilder {
     }
 
     /// Check if a directory entry should be ignored
-    fn is_ignored(entry: &walkdir::DirEntry) -> bool {
+    fn is_ignored(entry: &DirEntry) -> bool {
         let file_name = entry.file_name().to_string_lossy();
 
         // Don't filter the root directory itself (depth 0)
@@ -434,7 +444,7 @@ impl ContextBuilder {
             tracing::info!("Building embedding index...");
             let mut manager = VectorSearchManager::new(self.project_root.clone());
 
-            tokio::spawn(async move {
+            spawn(async move {
                 let result = manager.initialize().await;
                 (manager, result)
             })
@@ -488,6 +498,9 @@ impl ContextBuilder {
     }
 
     /// Performs hybrid search (BM25 + vector) for relevant code chunks.
+    ///
+    /// # Errors
+    /// Returns an error if hybrid search fails
     async fn perform_hybrid_search(&self, query_text: &str) -> Result<Vec<SearchResult>> {
         let spinner = ProgressBar::new_spinner();
         spinner.set_style(
@@ -528,6 +541,35 @@ impl ContextBuilder {
         Ok(semantic_matches)
     }
 
+    /// Helper to process merged chunks for a single file.
+    fn process_merged_chunks(
+        file_path: &PathBuf,
+        merged: Vec<(usize, usize, f32)>,
+        is_code: bool,
+        search_prioritized: &mut Vec<PrioritizedFile>,
+    ) {
+        for (start, end, score) in merged {
+            match Self::extract_chunk_with_context(file_path, start, end, is_code) {
+                Ok(chunk_ctx) => {
+                    let priority = if is_code {
+                        FilePriority::High
+                    } else {
+                        FilePriority::Medium
+                    };
+
+                    search_prioritized.push(PrioritizedFile::with_score(
+                        chunk_ctx,
+                        priority,
+                        score,
+                    ));
+                }
+                Err(extract_error) => {
+                    tracing::warn!("Failed to extract chunk from {}: {extract_error}", file_path.display());
+                }
+            }
+        }
+    }
+
     /// Processes search results into prioritized file chunks.
     fn process_search_results(
         semantic_matches: &[SearchResult]
@@ -555,7 +597,7 @@ impl ContextBuilder {
         );
 
         // Group chunks by file
-        let mut file_chunks: HashMap<PathBuf, Vec<(usize, usize, f32)>> = HashMap::new();
+        let mut file_chunks: FileChunksMap = HashMap::new();
 
         for result in &filtered_matches {
             if let Some(path_str) = result.file_path.to_str()
@@ -578,29 +620,11 @@ impl ContextBuilder {
             let merged = Self::merge_overlapping_chunks(chunks);
             let is_code = Self::is_code_file(&file_path);
 
-            for (start, end, score) in merged {
-                match Self::extract_chunk_with_context(&file_path, start, end, is_code) {
-                    Ok(chunk_ctx) => {
-                        let priority = if is_code {
-                            FilePriority::High
-                        } else {
-                            FilePriority::Medium
-                        };
-
-                        search_prioritized.push(PrioritizedFile::with_score(
-                            chunk_ctx,
-                            priority,
-                            score,
-                        ));
-                    }
-                    Err(extract_error) => {
-                        tracing::warn!("Failed to extract chunk from {}: {extract_error}", file_path.display());
-                    }
-                }
-            }
+            Self::process_merged_chunks(&file_path, merged, is_code, &mut search_prioritized);
         }
 
         // Track scores for display
+        #[allow(clippy::type_complexity, reason = "Tuple for intermediate score tracking")]
         let file_scores: Vec<(PathBuf, f32, Option<f32>, Option<f32>)> = filtered_matches.iter()
             .filter_map(|result| {
                 result.file_path.to_str()

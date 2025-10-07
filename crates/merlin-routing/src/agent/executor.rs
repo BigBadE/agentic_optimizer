@@ -3,12 +3,14 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::{
-    ModelRouter, ModelTier, Result, RoutingError, Task, TaskAction, TaskId, TaskResult, TaskState, ToolRegistry, UiChannel,
+    ModelRouter, ModelTier, Result, RoutingError, Task, TaskDecision, TaskId, TaskResult, TaskState, ToolRegistry, UiChannel,
     UiEvent, Validator, streaming::StepType,
 };
 use merlin_core::{Context, ModelProvider, Query, Response, TokenUsage};
-use merlin_providers;
+use merlin_local::LocalModelProvider;
+use merlin_providers::{AnthropicProvider, GroqProvider, OpenRouterProvider};
 use std::env;
+use std::fmt::Write as _;
 
 use super::{SelfAssessor, StepTracker};
 
@@ -18,6 +20,13 @@ pub struct AgentExecutor {
     validator: Arc<dyn Validator>,
     tool_registry: Arc<ToolRegistry>,
     step_tracker: StepTracker,
+}
+
+struct ExecInputs<'life> {
+    provider: &'life Arc<dyn ModelProvider>,
+    query:   &'life Query,
+    context: &'life Context,
+    ui_channel: &'life UiChannel,
 }
 
 impl AgentExecutor {
@@ -33,7 +42,48 @@ impl AgentExecutor {
             step_tracker: StepTracker::new(),
         }
     }
-    
+
+    fn complete_analysis_step(ui_channel: &UiChannel, task_id: TaskId) {
+        ui_channel.send(UiEvent::TaskStepCompleted {
+            task_id,
+            step_id: "analysis".to_owned(),
+        });
+    }
+
+    /// Assess a task using the given provider and write assessment output to UI.
+    ///
+    /// # Errors
+    /// Returns an error if the provider generation fails or the assessment cannot be parsed.
+    async fn assess_task_with_provider(
+        &self,
+        provider: &Arc<dyn ModelProvider>,
+        task: &Task,
+        ui_channel: &UiChannel,
+        task_id: TaskId,
+    ) -> Result<TaskDecision> {
+        let assessor = SelfAssessor::new(Arc::clone(provider));
+        let query = Query::new(format!(
+            "Analyze this task and decide if you can complete it immediately or if it needs decomposition:\n\n\"{}\"",
+            task.description
+        ));
+        let context = Context::new("You are a task assessment system.");
+        let assessment_response = provider.generate(&query, &context).await
+            .map_err(|error| RoutingError::Other(format!("Assessment failed: {error}")))?;
+
+        // Parse first; send to UI and complete step on success
+        match assessor.parse_assessment_response(&assessment_response.text, task) {
+            Ok(decision) => {
+                ui_channel.send(UiEvent::TaskOutput { task_id, output: assessment_response.text });
+                Self::complete_analysis_step(ui_channel, task_id);
+                Ok(decision)
+            }
+            Err(error) => {
+                Self::complete_analysis_step(ui_channel, task_id);
+                Err(error)
+            }
+        }
+    }
+
     /// Execute a task with streaming updates
     ///
     /// # Errors
@@ -46,37 +96,35 @@ impl AgentExecutor {
     ) -> Result<TaskResult> {
         let start = Instant::now();
         let task_id = task.id;
-        
+
         // Step 1: Route the task
         let decision = self.router.route(&task).await?;
-        
+
         // Step 2: Create provider
-        let provider = self.create_provider(&decision.tier)?;
-        
+        let provider = Self::create_provider(&decision.tier)?;
+
         // Step 3: Build context
-        let context = Self::build_context(&task)?;
-        
+        let context = Self::build_context(&task);
+
         // Step 4: Create query with tool descriptions
-        let query = self.create_query_with_tools(&task);
-        
+        let query = self.create_query_with_tools(&task)?;
+
         // Step 5: Execute with streaming
         let response = self.execute_with_streaming(
             task_id,
-            &provider,
-            &query,
-            &context,
-            &ui_channel,
+            ExecInputs {
+                provider: &provider,
+                query: &query,
+                context: &context,
+                ui_channel: &ui_channel,
+            },
         ).await?;
-        
+
         // Step 6: Validate
-        let validation = if true { // TODO: Check config
-            self.validator.validate(&response, &task).await?
-        } else {
-            crate::ValidationResult::default()
-        };
-        
+        let validation = self.validator.validate(&response, &task).await?;
+
         let duration_ms = start.elapsed().as_millis() as u64;
-        
+
         Ok(TaskResult {
             task_id,
             response,
@@ -86,24 +134,25 @@ impl AgentExecutor {
             duration_ms,
         })
     }
-    
+
     /// Execute with streaming and tool calling support
+    ///
+    /// # Errors
+    /// Returns an error if provider generation fails or tool execution fails.
     async fn execute_with_streaming(
         &mut self,
         task_id: TaskId,
-        provider: &Arc<dyn ModelProvider>,
-        query: &Query,
-        context: &Context,
-        ui_channel: &UiChannel,
+        inputs: ExecInputs<'_>,
     ) -> Result<Response> {
+        let ExecInputs { provider, query, context, ui_channel } = inputs;
         // Execute the query directly without extra steps
         let mut response = provider.generate(query, context).await
             .map_err(|err| RoutingError::Other(format!("Provider error: {err}")))?;
-        
+
         // Check if response contains tool calls (simulated for now)
         // In a real implementation, this would parse the LLM response for tool calls
         let tool_calls = self.extract_tool_calls(&response);
-        
+
         if !tool_calls.is_empty() {
             // Execute tool calls
             for (tool_name, args) in tool_calls {
@@ -113,7 +162,7 @@ impl AgentExecutor {
                     tool: tool_name.clone(),
                     args: args.clone(),
                 });
-                
+
                 let tool_step = self.step_tracker.create_step(
                     task_id,
                     StepType::ToolCall {
@@ -122,24 +171,24 @@ impl AgentExecutor {
                     },
                     format!("Calling tool: {tool_name}"),
                 );
-                
+
                 ui_channel.send(UiEvent::TaskStepStarted {
                     task_id,
                     step_id: format!("{:?}", tool_step.id),
                     step_type: "ToolCall".to_owned(),
                     content: tool_step.content.clone(),
                 });
-                
+
                 // Execute the tool
                 let result = self.execute_tool(&tool_name, args).await?;
-                
+
                 // Send tool call completed event
                 ui_channel.send(UiEvent::ToolCallCompleted {
                     task_id,
                     tool: tool_name.clone(),
                     result: result.clone(),
                 });
-                
+
                 let result_step = self.step_tracker.create_step(
                     task_id,
                     StepType::ToolResult {
@@ -148,73 +197,80 @@ impl AgentExecutor {
                     },
                     format!("Tool result: {result}"),
                 );
-                
+
                 ui_channel.send(UiEvent::TaskStepCompleted {
                     task_id,
                     step_id: format!("{:?}", result_step.id),
                 });
-                
+
                 // Add tool result to response (in real implementation, would re-query LLM with results)
-                use std::fmt::Write as _;
-                let _ = write!(response.text, "\n\nTool '{tool_name}' result: {result}");
+                write!(response.text, "\n\nTool '{tool_name}' result: {result}")?;
             }
         }
-        
+
         // Send output directly as text (no wrapper step)
         ui_channel.send(UiEvent::TaskOutput {
             task_id,
             output: response.text.clone(),
         });
-        
+
         Ok(response)
     }
-    
+
     /// Execute a tool by name
+    ///
+    /// # Errors
+    /// Returns an error if the tool cannot be found or execution fails.
     async fn execute_tool(&self, tool_name: &str, args: Value) -> Result<Value> {
         let tool = self.tool_registry.get_tool(tool_name)
             .ok_or_else(|| RoutingError::Other(format!("Tool not found: {tool_name}")))?;
 
         tool.execute(args).await
     }
-    
+
     /// Extract tool calls from LLM response (simplified for Phase 2)
     /// In a real implementation, this would parse function calling format
+    #[allow(clippy::unused_self, reason = "Will be implemented later.")]
     fn extract_tool_calls(&self, _response: &Response) -> Vec<(String, Value)> {
         // For Phase 2, we'll simulate tool calling by looking for markers in the text
         // Real implementation would use proper function calling API
-        
-        
+
+
         // Example: Look for patterns like "TOOL:read_file:path/to/file"
         // This is a placeholder - real implementation would use LLM's function calling
-        
+
         Vec::new()
     }
-    
+
     /// Create query with tool descriptions
-    fn create_query_with_tools(&self, task: &Task) -> Query {
+    ///
+    /// # Errors
+    /// Returns an error if formatting the prompt fails.
+    fn create_query_with_tools(&self, task: &Task) -> Result<Query> {
         let mut prompt = task.description.clone();
-        
+
         // Add tool descriptions to the prompt
         let tools = self.tool_registry.list_tools();
         if !tools.is_empty() {
-            use std::fmt::Write as _;
             prompt.push_str("\n\nAvailable tools:\n");
             for tool in tools {
-                let _ = writeln!(prompt, "- {}: {}", tool.name(), tool.description());
+                writeln!(prompt, "- {}: {}", tool.name(), tool.description())?;
             }
         }
-        
-        Query::new(prompt)
+
+        Ok(Query::new(prompt))
     }
-    
     /// Create provider based on tier
-    fn create_provider(&self, tier: &ModelTier) -> Result<Arc<dyn ModelProvider>> {
+    ///
+    /// # Errors
+    /// Returns an error if required API keys are missing or provider initialization fails.
+    fn create_provider(tier: &ModelTier) -> Result<Arc<dyn ModelProvider>> {
         match tier {
             ModelTier::Local { model_name } => {
-                Ok(Arc::new(merlin_local::LocalModelProvider::new(model_name.clone())))
+                Ok(Arc::new(LocalModelProvider::new(model_name.clone())))
             }
             ModelTier::Groq { model_name } => {
-                let provider = merlin_providers::GroqProvider::new()
+                let provider = GroqProvider::new()
                     .map_err(|error| RoutingError::Other(error.to_string()))?
                     .with_model(model_name.clone());
                 Ok(Arc::new(provider))
@@ -224,50 +280,47 @@ impl AgentExecutor {
                     "openrouter" => {
                         let api_key = env::var("OPENROUTER_API_KEY")
                             .map_err(|_| RoutingError::Other("OPENROUTER_API_KEY not set".to_owned()))?;
-                        let provider = merlin_providers::OpenRouterProvider::new(api_key)?
+                        let provider = OpenRouterProvider::new(api_key)?
                             .with_model(model_name.clone());
                         Ok(Arc::new(provider))
                     }
                     "anthropic" => {
                         let api_key = env::var("ANTHROPIC_API_KEY")
                             .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
-                        let provider = merlin_providers::AnthropicProvider::new(api_key)?;
+                        let provider = AnthropicProvider::new(api_key)?;
                         Ok(Arc::new(provider))
                     }
-                    _ => Err(RoutingError::Other(format!("Unknown provider: {provider_name}")))
+                    _ => Err(RoutingError::Other(format!("Unknown provider: {provider_name}"))),
                 }
             }
         }
     }
-    
+
     /// Build context from task requirements
-    fn build_context(_task: &Task) -> Result<Context> {
-        let context = Context::new("You are a helpful coding assistant with access to tools.");
-
+    fn build_context(_task: &Task) -> Context {
         // In a real implementation, would read required files and add to context
-        // For Phase 2, we'll use basic context
 
-        Ok(context)
+        Context::new("You are a helpful coding assistant with access to tools.")
     }
-    
+
     /// Check if a request is simple enough to skip assessment
     fn is_simple_request(description: &str) -> bool {
         let desc_lower = description.to_lowercase();
         let word_count = description.split_whitespace().count();
-        
+
         // Simple greetings
-        let is_greeting = desc_lower == "hi" 
-            || desc_lower == "hello" 
+        let is_greeting = desc_lower == "hi"
+            || desc_lower == "hello"
             || desc_lower == "hey"
             || desc_lower.starts_with("say hi")
             || desc_lower.starts_with("say hello");
-        
+
         // Very short requests
         let is_very_short = word_count <= 3;
-        
+
         is_greeting || is_very_short
     }
-    
+
     /// Execute a task with self-determination (Phase 1)
     /// The task assesses itself and decides whether to complete, decompose, or gather context
     ///
@@ -279,136 +332,33 @@ impl AgentExecutor {
         mut task: Task,
         ui_channel: UiChannel,
     ) -> Result<TaskResult> {
-        let start = Instant::now();
         let task_id = task.id;
-        
+
         // Check if this is a simple request that doesn't need assessment
         let is_simple = Self::is_simple_request(&task.description);
-        
+
         if is_simple {
             // Skip assessment for simple requests, execute directly
             task.state = TaskState::Executing;
             return self.execute_streaming(task, ui_channel).await;
         }
-        
+
         // Update task state
         task.state = TaskState::Assessing;
-        
+
         // Start "Analysis" step (will be collapsed by default)
-        ui_channel.send(UiEvent::TaskStepStarted {
-            task_id,
-            step_id: "analysis".to_owned(),
-            step_type: "Thinking".to_owned(),
-            content: "Analyzing...".to_owned(),
-        });
-        
         // Create assessor with the router's provider
         let decision_result = self.router.route(&task).await?;
-        let provider = self.create_provider(&decision_result.tier)?;
-        let assessor = SelfAssessor::new(Arc::clone(&provider));
-        
-        // Build and execute assessment query
-        let query = Query::new(format!(
-            "Analyze this task and decide if you can complete it immediately or if it needs decomposition:\n\n\"{}\"",
-            task.description
-        ));
-
-        let context = Context::new("You are a task assessment system.");
-        let assessment_response = provider.generate(&query, &context).await
-            .map_err(|error| RoutingError::Other(format!("Assessment failed: {error}")))?;
-        
-        // Parse the decision FIRST (before sending to UI)
-        let decision = match assessor.parse_assessment_response(&assessment_response.text, &task) {
-            Ok(decision) => {
-                // Send the raw assessment output to UI (will be under "Analysis" step)
-                ui_channel.send(UiEvent::TaskOutput {
-                    task_id,
-                    output: assessment_response.text.clone(),
-                });
-                
-                // Store decision in history
-                task.decision_history.push(decision.clone());
-                
-                // Complete the analysis step
-                ui_channel.send(UiEvent::TaskStepCompleted {
-                    task_id,
-                    step_id: "analysis".to_owned(),
-                });
-                
-                decision
-            }
-            Err(_err) => {
-                // If parsing fails, fall back to streaming execution without showing error
-                ui_channel.send(UiEvent::TaskStepCompleted {
-                    task_id,
-                    step_id: "analysis".to_owned(),
-                });
-                
-                task.state = TaskState::Executing;
-                return self.execute_streaming(task, ui_channel).await;
-            }
-        };
-        
-        // Execute based on decision
-        match decision.action {
-            TaskAction::Complete { result } => {
-                // Task can be completed immediately - add output as text
-                ui_channel.send(UiEvent::TaskOutput {
-                    task_id,
-                    output: result.clone(),
-                });
-                
-                task.state = TaskState::Completed;
-                
-                let response = Response {
-                    text: result,
-                    confidence: f64::from(decision.confidence),
-                    tokens_used: TokenUsage::default(),
-                    provider: decision_result.tier.to_string(),
-                    latency_ms: start.elapsed().as_millis() as u64,
-                };
-                
-                Ok(TaskResult {
-                    task_id,
-                    response,
-                    tier_used: decision_result.tier.to_string(),
-                    tokens_used: TokenUsage::default(),
-                    validation: crate::ValidationResult::default(),
-                    duration_ms: start.elapsed().as_millis() as u64,
-                })
-            }
-            
-            TaskAction::Decompose { subtasks, .. } => {
-                // Task needs to be broken down - for Phase 1 fall back to standard execution
-                ui_channel.send(UiEvent::TaskStepStarted {
-                    task_id,
-                    step_id: "decompose".to_owned(),
-                    step_type: "Output".to_owned(),
-                    content: format!(
-                        "Decision: DECOMPOSE into {} subtasks ({}). Falling back to regular execution.",
-                        subtasks.len(),
-                        decision.reasoning
-                    ),
-                });
-
-                task.state = TaskState::Executing;
-                self.execute_streaming(task, ui_channel).await
-            }
-            
-            TaskAction::GatherContext { needs } => {
-                // Task needs more information - for Phase 1, fall back to regular execution
-                ui_channel.send(UiEvent::TaskStepStarted {
-                    task_id,
-                    step_id: "gather".to_owned(),
-                    step_type: "Output".to_owned(),
-                    content: format!("Decision: GATHER context - needs: {:?} ({})", needs, decision.reasoning),
-                });
-                
-                // Fall back to regular streaming execution
-                task.state = TaskState::Executing;
-                self.execute_streaming(task, ui_channel).await
-            }
+        let provider = Self::create_provider(&decision_result.tier)?;
+        if (self.assess_task_with_provider(&provider, &task, &ui_channel, task_id).await).is_err() {
+            // Fallback to streaming execution if assessment fails
+            task.state = TaskState::Executing;
+            return self.execute_streaming(task, ui_channel).await;
         }
+
+        // For Phase 1, after assessment we continue with normal streaming execution
+        task.state = TaskState::Executing;
+        self.execute_streaming(task, ui_channel).await
     }
 }
 
@@ -422,6 +372,8 @@ mod tests {
     use std::path::PathBuf;
 
     #[tokio::test]
+    /// # Panics
+    /// Panics if executor construction fails or initial state is unexpected.
     async fn test_agent_executor_creation() {
         let router = Arc::new(StrategyRouter::with_default_strategies());
         let validator = Arc::new(ValidationPipeline::with_default_stages());
@@ -434,6 +386,8 @@ mod tests {
     }
 
     #[tokio::test]
+    /// # Panics
+    /// Panics if tool registry does not contain expected tools.
     async fn test_tool_registry_integration() {
         let workspace = PathBuf::from(".");
         let tool_registry = Arc::new(

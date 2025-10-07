@@ -2,6 +2,8 @@
 //!
 //! This crate provides various tools that agents can use to interact with
 //! the file system and execute commands.
+
+
 /// Core abstractions shared by all tools.
 mod tool;
 /// Editing tool implementation.

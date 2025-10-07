@@ -108,9 +108,15 @@ impl ValidationStage for BuildValidationStage {
 mod tests {
     use super::*;
     use merlin_core::TokenUsage;
+    use crate::Result;
 
     #[tokio::test]
-    async fn test_build_validation_skip_no_files() {
+    /// # Errors
+    /// Returns an error if stage validation fails unexpectedly in the test harness.
+    ///
+    /// # Panics
+    /// Panics if the result is not marked as skipped when no files are modified.
+    async fn test_build_validation_skip_no_files() -> Result<()> {
         let stage = BuildValidationStage::new();
         let response = Response {
             text: "fn main() {}".to_owned(),
@@ -121,13 +127,19 @@ mod tests {
         };
         let task = Task::new("Test".to_owned());
         
-        let result = stage.validate(&response, &task).await.unwrap();
+        let result = stage.validate(&response, &task).await?;
         assert!(result.passed);
         assert!(result.details.contains("skipped"));
+        Ok(())
     }
     
     #[tokio::test]
-    async fn test_quick_check() {
+    /// # Errors
+    /// Returns an error if `quick_check` fails unexpectedly.
+    ///
+    /// # Panics
+    /// Panics if `quick_check` logic does not match expected patterns.
+    async fn test_quick_check() -> Result<()> {
         let stage = BuildValidationStage::new();
         
         let good_response = Response {
@@ -137,7 +149,7 @@ mod tests {
             provider: "test".to_owned(),
             latency_ms: 0,
         };
-        assert!(stage.quick_check(&good_response).await.unwrap());
+        assert!(stage.quick_check(&good_response).await?);
         
         let bad_response = Response {
             text: "error[E0425]: cannot find value".to_owned(),
@@ -146,7 +158,8 @@ mod tests {
             provider: "test".to_owned(),
             latency_ms: 0,
         };
-        assert!(!stage.quick_check(&bad_response).await.unwrap());
+        assert!(!stage.quick_check(&bad_response).await?);
+        Ok(())
     }
 }
 

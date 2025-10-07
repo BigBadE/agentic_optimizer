@@ -1,17 +1,22 @@
 //! Benchmark runner for context fetching evaluation.
 
-use std::path::PathBuf;
+use std::fs;
+use std::path::{Path, PathBuf};
 use clap::Parser;
-use merlin_context::benchmark::{load_test_cases, BenchmarkResult, RankedFile};
+use merlin_context::benchmark::{load_test_cases, BenchmarkResult, RankedFile, TestCase};
 use merlin_context::ContextBuilder;
-use merlin_core::Result;
+use merlin_core::{Error, Result};
+use chrono::Local;
+use tracing::info;
+use std::fmt::Write as _;
+use std::process::exit;
 
 #[derive(Parser)]
 #[command(name = "benchmark")]
 #[command(about = "Run context fetching benchmarks")]
 struct Args {
     /// Project to benchmark (directory name in `benchmarks/test_cases`/)
-    #[arg(short, long, default_value = "valor")]
+    #[arg(short, long)]
     project: String,
 
     /// Specific test case to run (without .toml extension)
@@ -32,6 +37,11 @@ struct Args {
 }
 
 #[tokio::main]
+/// # Errors
+/// Returns an error if loading test cases, running benchmarks, or writing reports fails.
+///
+/// # Panics
+/// May panic if terminal output fails or in unexpected runtime conditions.
 async fn main() -> Result<()> {
     let args = Args::parse();
 
@@ -40,23 +50,21 @@ async fn main() -> Result<()> {
         .join(&args.project);
 
     if !test_cases_dir.exists() {
-        eprintln!("Error: Test cases directory not found: {}", test_cases_dir.display());
-        eprintln!("Available projects:");
-        if let Ok(entries) = std::fs::read_dir("benchmarks/test_cases") {
-            for entry in entries.flatten() {
-                if entry.path().is_dir() {
-                    eprintln!("  - {}", entry.file_name().to_string_lossy());
-                }
+        tracing::error!("Test cases directory not found: {}", test_cases_dir.display());
+        tracing::info!("Available projects:");
+        if let Ok(entries) = fs::read_dir("benchmarks/test_cases") {
+            for entry in entries.flatten().filter(|e| e.path().is_dir()) {
+                tracing::info!("  - {}", entry.file_name().to_string_lossy());
             }
         }
-        std::process::exit(1);
+        exit(1);
     }
 
     let test_cases = load_test_cases(&test_cases_dir)?;
 
     if test_cases.is_empty() {
-        eprintln!("No test cases found in {}", test_cases_dir.display());
-        std::process::exit(1);
+        tracing::error!("No test cases found in {}", test_cases_dir.display());
+        exit(1);
     }
 
     let filtered_cases: Vec<_> = if let Some(test_name) = &args.test {
@@ -64,8 +72,8 @@ async fn main() -> Result<()> {
             .into_iter()
             .filter(|(path, _)| {
                 path.file_stem()
-                    .and_then(|s| s.to_str())
-                    .is_some_and(|s| s == test_name)
+                    .and_then(|stem| stem.to_str())
+                    .is_some_and(|name| name == test_name)
             })
             .collect()
     } else {
@@ -73,23 +81,23 @@ async fn main() -> Result<()> {
     };
 
     if filtered_cases.is_empty() {
-        eprintln!("No matching test cases found");
-        std::process::exit(1);
+        tracing::error!("No matching test cases found");
+        exit(1);
     }
 
-    println!("Running {} benchmark(s) for project: {}\n", filtered_cases.len(), args.project);
+    info!("Running {} benchmark(s) for project: {}\n", filtered_cases.len(), args.project);
 
     let mut all_results = Vec::new();
 
     for (_test_path, test_case) in filtered_cases {
-        println!("\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}");
-        println!("Running: {}", test_case.name);
-        println!("\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\n");
+        info!("{banner}", banner = "\u{2550}".repeat(59));
+        info!("Running: {}", test_case.name);
+        info!("{banner}\n", banner = "\u{2550}".repeat(59));
 
         let result = run_benchmark(&args.root, &test_case, args.verbose).await?;
 
-        println!("{}", result.format_report());
-        println!();
+        info!("{}", result.format_report());
+        info!("");
 
         all_results.push(result);
     }
@@ -100,29 +108,32 @@ async fn main() -> Result<()> {
 
     if let Some(report_path) = args.report {
         generate_report(&all_results, &report_path)?;
-        println!("Report saved to: {}", report_path.display());
+        info!("Report saved to: {}", report_path.display());
     }
 
     Ok(())
 }
 
+/// Run a single benchmark and return the result.
+///
+/// # Errors
+/// Returns an error if context building or searching fails.
 async fn run_benchmark(
-    default_root: &PathBuf,
-    test_case: &merlin_context::benchmark::TestCase,
+    default_root: &Path,
+    test_case: &TestCase,
     verbose: bool,
 ) -> Result<BenchmarkResult> {
     if verbose {
-        println!("Query: \"{}\"\n", test_case.query);
+        info!("Query: \"{}\"\n", test_case.query);
     }
 
-    let project_root = if let Some(ref custom_root) = test_case.project_root {
-        PathBuf::from(custom_root)
-    } else {
-        default_root.clone()
-    };
+    let project_root = test_case
+        .project_root
+        .as_ref()
+        .map_or_else(|| default_root.to_path_buf(), PathBuf::from);
 
     if verbose {
-        println!("Project root: {}\n", project_root.display());
+        info!("Project root: {}\n", project_root.display());
     }
 
     let mut builder = ContextBuilder::new(project_root);
@@ -132,15 +143,15 @@ async fn run_benchmark(
         .await?;
 
     if verbose {
-        println!("Found {} search results\n", search_results.len());
+        info!("Found {} search results\n", search_results.len());
     }
 
     let ranked_files: Vec<RankedFile> = search_results
         .iter()
         .enumerate()
-        .map(|(i, result)| RankedFile {
+        .map(|(index, result)| RankedFile {
             path: result.file_path.clone(),
-            rank: i + 1,
+            rank: index + 1,
             score: result.score,
         })
         .collect();
@@ -149,63 +160,67 @@ async fn run_benchmark(
 }
 
 fn print_summary(results: &[BenchmarkResult]) {
-    println!("\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}");
-    println!("SUMMARY");
-    println!("\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\u{2550}\n");
+    info!("{banner}", banner = "\u{2550}".repeat(59));
+    info!("SUMMARY");
+    info!("{banner}\n", banner = "\u{2550}".repeat(59));
 
-    let avg_precision_3 = results.iter().map(|r| r.metrics.precision_at_3).sum::<f32>() / results.len() as f32;
-    let avg_precision_5 = results.iter().map(|r| r.metrics.precision_at_5).sum::<f32>() / results.len() as f32;
-    let avg_precision_10 = results.iter().map(|r| r.metrics.precision_at_10).sum::<f32>() / results.len() as f32;
-    let avg_recall_10 = results.iter().map(|r| r.metrics.recall_at_10).sum::<f32>() / results.len() as f32;
-    let avg_mrr = results.iter().map(|r| r.metrics.mrr).sum::<f32>() / results.len() as f32;
-    let avg_ndcg = results.iter().map(|r| r.metrics.ndcg_at_10).sum::<f32>() / results.len() as f32;
-    let avg_exclusion = results.iter().map(|r| r.metrics.exclusion_rate).sum::<f32>() / results.len() as f32;
-    let avg_critical = results.iter().map(|r| r.metrics.critical_in_top_3).sum::<f32>() / results.len() as f32;
-    let avg_high = results.iter().map(|r| r.metrics.high_in_top_5).sum::<f32>() / results.len() as f32;
+    let avg_precision_3 = results.iter().map(|res| res.metrics.precision_at_3).sum::<f32>() / results.len() as f32;
+    let avg_precision_5 = results.iter().map(|res| res.metrics.precision_at_5).sum::<f32>() / results.len() as f32;
+    let avg_precision_10 = results.iter().map(|res| res.metrics.precision_at_10).sum::<f32>() / results.len() as f32;
+    let avg_recall_10 = results.iter().map(|res| res.metrics.recall_at_10).sum::<f32>() / results.len() as f32;
+    let avg_mrr = results.iter().map(|res| res.metrics.mrr).sum::<f32>() / results.len() as f32;
+    let avg_ndcg = results.iter().map(|res| res.metrics.ndcg_at_10).sum::<f32>() / results.len() as f32;
+    let avg_exclusion = results.iter().map(|res| res.metrics.exclusion_rate).sum::<f32>() / results.len() as f32;
+    let avg_critical = results.iter().map(|res| res.metrics.critical_in_top_3).sum::<f32>() / results.len() as f32;
+    let avg_high = results.iter().map(|res| res.metrics.high_in_top_5).sum::<f32>() / results.len() as f32;
 
-    println!("Average Metrics ({} test cases):", results.len());
-    println!("  Precision@3:        {:.1}%", avg_precision_3 * 100.0);
-    println!("  Precision@5:        {:.1}%", avg_precision_5 * 100.0);
-    println!("  Precision@10:       {:.1}%", avg_precision_10 * 100.0);
-    println!("  Recall@10:          {:.1}%", avg_recall_10 * 100.0);
-    println!("  MRR:                {avg_mrr:.3}");
-    println!("  NDCG@10:            {avg_ndcg:.3}");
-    println!("  Exclusion Rate:     {:.1}%", avg_exclusion * 100.0);
-    println!("  Critical in Top-3:  {:.1}%", avg_critical * 100.0);
-    println!("  High in Top-5:      {:.1}%", avg_high * 100.0);
-    println!();
+    info!("Average Metrics ({} test cases):", results.len());
+    info!("  Precision@3:        {:.1}%", avg_precision_3 * 100.0);
+    info!("  Precision@5:        {:.1}%", avg_precision_5 * 100.0);
+    info!("  Precision@10:       {:.1}%", avg_precision_10 * 100.0);
+    info!("  Recall@10:          {:.1}%", avg_recall_10 * 100.0);
+    info!("  MRR:                {avg_mrr:.3}");
+    info!("  NDCG@10:            {avg_ndcg:.3}");
+    info!("  Exclusion Rate:     {:.1}%", avg_exclusion * 100.0);
+    info!("  Critical in Top-3:  {:.1}%", avg_critical * 100.0);
+    info!("  High in Top-5:      {:.1}%", avg_high * 100.0);
+    info!("");
 }
 
+/// Generate a Markdown report summarizing benchmark results.
+///
+/// # Errors
+/// Returns an error if writing the report fails.
 fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
     let mut report = String::new();
 
     report.push_str("# Context Fetching Benchmark Report\n\n");
-    report.push_str(&format!("**Date**: {}\n\n", chrono::Local::now().format("%Y-%m-%d %H:%M:%S")));
-    report.push_str(&format!("**Test Cases**: {}\n\n", results.len()));
+    write!(report, "**Date**: {}\n\n", Local::now().format("%Y-%m-%d %H:%M:%S")).map_err(|error| Error::Other(error.to_string()))?;
+    write!(report, "**Test Cases**: {}\n\n", results.len()).map_err(|error| Error::Other(error.to_string()))?;
 
     report.push_str("## Summary\n\n");
 
-    let avg_precision_3 = results.iter().map(|r| r.metrics.precision_at_3).sum::<f32>() / results.len() as f32;
-    let avg_precision_5 = results.iter().map(|r| r.metrics.precision_at_5).sum::<f32>() / results.len() as f32;
-    let avg_precision_10 = results.iter().map(|r| r.metrics.precision_at_10).sum::<f32>() / results.len() as f32;
-    let avg_recall_10 = results.iter().map(|r| r.metrics.recall_at_10).sum::<f32>() / results.len() as f32;
-    let avg_mrr = results.iter().map(|r| r.metrics.mrr).sum::<f32>() / results.len() as f32;
-    let avg_ndcg = results.iter().map(|r| r.metrics.ndcg_at_10).sum::<f32>() / results.len() as f32;
-    let avg_exclusion = results.iter().map(|r| r.metrics.exclusion_rate).sum::<f32>() / results.len() as f32;
-    let avg_critical = results.iter().map(|r| r.metrics.critical_in_top_3).sum::<f32>() / results.len() as f32;
-    let avg_high = results.iter().map(|r| r.metrics.high_in_top_5).sum::<f32>() / results.len() as f32;
+    let avg_precision_3 = results.iter().map(|res| res.metrics.precision_at_3).sum::<f32>() / results.len() as f32;
+    let avg_precision_5 = results.iter().map(|res| res.metrics.precision_at_5).sum::<f32>() / results.len() as f32;
+    let avg_precision_10 = results.iter().map(|res| res.metrics.precision_at_10).sum::<f32>() / results.len() as f32;
+    let avg_recall_10 = results.iter().map(|res| res.metrics.recall_at_10).sum::<f32>() / results.len() as f32;
+    let avg_mrr = results.iter().map(|res| res.metrics.mrr).sum::<f32>() / results.len() as f32;
+    let avg_ndcg = results.iter().map(|res| res.metrics.ndcg_at_10).sum::<f32>() / results.len() as f32;
+    let avg_exclusion = results.iter().map(|res| res.metrics.exclusion_rate).sum::<f32>() / results.len() as f32;
+    let avg_critical = results.iter().map(|res| res.metrics.critical_in_top_3).sum::<f32>() / results.len() as f32;
+    let avg_high = results.iter().map(|res| res.metrics.high_in_top_5).sum::<f32>() / results.len() as f32;
 
     report.push_str("| Metric | Value |\n");
     report.push_str("|--------|-------|\n");
-    report.push_str(&format!("| Precision@3 | {:.1}% |\n", avg_precision_3 * 100.0));
-    report.push_str(&format!("| Precision@5 | {:.1}% |\n", avg_precision_5 * 100.0));
-    report.push_str(&format!("| Precision@10 | {:.1}% |\n", avg_precision_10 * 100.0));
-    report.push_str(&format!("| Recall@10 | {:.1}% |\n", avg_recall_10 * 100.0));
-    report.push_str(&format!("| MRR | {avg_mrr:.3} |\n"));
-    report.push_str(&format!("| NDCG@10 | {avg_ndcg:.3} |\n"));
-    report.push_str(&format!("| Exclusion Rate | {:.1}% |\n", avg_exclusion * 100.0));
-    report.push_str(&format!("| Critical in Top-3 | {:.1}% |\n", avg_critical * 100.0));
-    report.push_str(&format!("| High in Top-5 | {:.1}% |\n\n", avg_high * 100.0));
+    writeln!(report, "| Precision@3 | {:.1}% |", avg_precision_3 * 100.0).map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| Precision@5 | {:.1}% |", avg_precision_5 * 100.0).map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| Precision@10 | {:.1}% |", avg_precision_10 * 100.0).map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| Recall@10 | {:.1}% |", avg_recall_10 * 100.0).map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| MRR | {avg_mrr:.3} |").map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| NDCG@10 | {avg_ndcg:.3} |").map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| Exclusion Rate | {:.1}% |", avg_exclusion * 100.0).map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| Critical in Top-3 | {:.1}% |", avg_critical * 100.0).map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| High in Top-5 | {:.1}% |\n", avg_high * 100.0).map_err(|error| Error::Other(error.to_string()))?;
 
     report.push_str("## Individual Test Cases\n\n");
 
@@ -215,7 +230,7 @@ fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
         report.push('\n');
     }
 
-    std::fs::write(path, report)?;
+    fs::write(path, report)?;
 
     Ok(())
 }

@@ -3,6 +3,7 @@
 //! This crate provides language provider abstractions and implementations
 //! for semantic code analysis using language-specific tools like rust-analyzer.
 
+
 pub mod provider;
 mod backends;
 

@@ -3,11 +3,12 @@ use std::path::Path;
 use std::sync::Arc;
 use std::time::Instant;
 
+use anyhow::Result as AnyResult;
 use merlin_context::ContextBuilder;
 use merlin_core::{Context, ModelProvider, Query};
 use merlin_languages::LanguageProvider;
 use merlin_tools::ToolInput;
-use serde_json::Value;
+use serde_json::{from_str, Value};
 use tracing::{info, warn};
 
 use crate::{AgentConfig, AgentRequest, AgentResponse, ExecutionMetadata, ExecutionResult, ToolRegistry};
@@ -51,7 +52,7 @@ impl AgentExecutor {
     ///
     /// # Errors
     /// Returns an error if context building or provider generation fails
-    pub async fn execute(&mut self, request: AgentRequest) -> anyhow::Result<ExecutionResult> {
+    pub async fn execute(&mut self, request: AgentRequest) -> AnyResult<ExecutionResult> {
         let total_start = Instant::now();
 
         info!("Executing agent request: {}", request.query);
@@ -101,7 +102,9 @@ impl AgentExecutor {
         })
     }
 
-    async fn build_context(&mut self, request: &AgentRequest) -> anyhow::Result<Context> {
+    /// # Errors
+    /// Returns an error if building the context fails.
+    async fn build_context(&mut self, request: &AgentRequest) -> AnyResult<Context> {
         if self.context_builder.is_none() {
             self.context_builder = Some(
                 ContextBuilder::new(request.workspace_root.clone())
@@ -144,8 +147,11 @@ impl AgentExecutor {
             prompt.push_str("You have access to the following tools to help complete tasks:\n\n");
             
             for (name, description) in tools {
-                use std::fmt::Write as _;
-                let _ = write!(prompt, "## {name}\n{description}\n\n");
+                prompt.push_str("## ");
+                prompt.push_str(name);
+                prompt.push('\n');
+                prompt.push_str(description);
+                prompt.push_str("\n\n");
             }
             
             prompt.push_str("To use a tool, respond with a JSON object in the following format:\n");
@@ -219,7 +225,7 @@ impl AgentExecutor {
             return None;
         };
 
-        let value: Value = serde_json::from_str(json_str).ok()?;
+        let value: Value = from_str(json_str).ok()?;
         
         let tool = value.get("tool")?.as_str()?.to_owned();
         let params = value.get("params")?.clone();

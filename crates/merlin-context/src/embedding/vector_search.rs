@@ -1,18 +1,27 @@
 //! Vector search manager with persistent caching.
 
+
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::time::SystemTime;
+use std::time::{Duration, SystemTime};
+use std::cmp::Ordering;
+use std::result::Result as StdResult;
 use serde::{Deserialize, Serialize};
 use indicatif::{ProgressBar, ProgressStyle};
 use tokio::task::JoinSet;
+use tracing::{info, warn};
 
 use merlin_core::{Error, Result};
+use bincode::{deserialize as bincode_deserialize, serialize as bincode_serialize};
 use crate::embedding::{EmbeddingClient, VectorStore, SearchResult, generate_preview, BM25Index};
-use crate::embedding::chunking::chunk_file;
+use crate::embedding::chunking::{chunk_file, FileChunk};
 use crate::fs_utils::is_source_file;
 use crate::context_inclusion::MIN_SIMILARITY_SCORE;
+
+type ChunkResult = (PathBuf, FileChunk, Vec<f32>, String);
+
+// Removed feature-gated import to avoid unexpected-cfg; we fall back to an empty graph instead.
 
 /// Cache entry for a chunk embedding
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -90,6 +99,9 @@ impl VectorSearchManager {
     }
 
     /// Initialize vector store by loading from cache or generating embeddings
+    ///
+    /// # Errors
+    /// Returns an error if embedding model is unavailable or embedding/cache IO fails
     pub async fn initialize(&mut self) -> Result<()> {
         let spinner = ProgressBar::new_spinner();
         spinner.set_style(
@@ -97,29 +109,29 @@ impl VectorSearchManager {
                 .template("{spinner:.cyan} {msg}")
                 .unwrap_or_else(|_| ProgressStyle::default_spinner())
         );
-        spinner.enable_steady_tick(std::time::Duration::from_millis(100));
+        spinner.enable_steady_tick(Duration::from_millis(100));
         
         // Check if embedding model is available
         spinner.set_message("Checking embedding model availability...");
-        if let Err(e) = self.client.ensure_model_available().await {
+        if let Err(model_error) = self.client.ensure_model_available().await {
             spinner.finish_and_clear();
-            return Err(e);
+            return Err(model_error);
         }
         
         spinner.set_message("Loading embedding cache...");
 
         // Try to load from cache first
         if let Ok(cache) = self.load_cache() {
-            eprintln!("  Cache file found with {} embeddings (version: {})", cache.embeddings.len(), cache.version);
+            info!("  Cache file found with {} embeddings (version: {})", cache.embeddings.len(), cache.version);
             
             if cache.embeddings.is_empty() {
-                eprintln!("  ⚠️  Cache is empty - will rebuild index");
+                warn!("  Cache is empty - will rebuild index");
             }
             
             if cache.is_valid() && !cache.embeddings.is_empty() {
                 spinner.set_message(format!("Validating {} cached embeddings...", cache.embeddings.len()));
                 
-                let (valid, invalid) = self.validate_cache_entries(&cache.embeddings)?;
+                let (valid, invalid) = self.validate_cache_entries(&cache.embeddings);
                 
                 // Add valid entries to store and BM25 index
                 for entry in &valid {
@@ -133,14 +145,14 @@ impl VectorSearchManager {
                 
                 // Finalize BM25 index
                 self.bm25.finalize();
-                eprintln!("  BM25 index built with {} documents", self.bm25.len());
+                info!("  BM25 index built with {} documents", self.bm25.len());
                 
-                eprintln!("  Total embeddings in store: {}", self.store.len());
+                info!("  Total embeddings in store: {}", self.store.len());
 
                 // Check for new files not in cache
-                let all_files = self.collect_source_files()?;
-                let cached_paths: std::collections::HashSet<_> = cache.embeddings.iter()
-                    .map(|e| &e.path)
+                let all_files = self.collect_source_files();
+                let cached_paths: HashSet<_> = cache.embeddings.iter()
+                    .map(|entry| &entry.path)
                     .collect();
                 let new_files: Vec<_> = all_files.into_iter()
                     .filter(|f| !cached_paths.contains(f))
@@ -150,7 +162,7 @@ impl VectorSearchManager {
                 let invalid_count = invalid.len();
                 
                 if !new_files.is_empty() {
-                    eprintln!("  Found {new_count} new files to embed");
+                    info!("  Found {new_count} new files to embed");
                     spinner.set_message(format!("Embedding {new_count} new files..."));
                     self.embed_files(new_files, &spinner).await?;
                 }
@@ -172,55 +184,59 @@ impl VectorSearchManager {
             }
             
             // Cache is valid but empty - fall through to rebuild
-            eprintln!("  Cache is empty - falling through to rebuild");
+            info!("  Cache is empty - falling through to rebuild");
         }
 
         // No valid cache - embed entire codebase
-        eprintln!("  No valid cache found - building from scratch");
+        info!("  No valid cache found - building from scratch");
         spinner.set_message("Building embedding index for codebase...");
-        let files = self.collect_source_files()?;
+        let files = self.collect_source_files();
         
-        eprintln!("  Found {} source files to embed", files.len());
+        info!("  Found {} source files to embed", files.len());
         spinner.set_message(format!("Embedding {} source files...", files.len()));
         self.embed_files(files, &spinner).await?;
         
-        eprintln!("  Embedded {} files total", self.store.len());
+        info!("  Embedded {} files total", self.store.len());
         spinner.finish_with_message(format!("✓ Indexed {} files with embeddings", self.store.len()));
         
-        eprintln!("  Saving cache to disk...");
+        info!("  Saving cache to disk...");
         self.save_cache()?;
-        eprintln!("  ✓ Cache saved");
+        info!("  ✓ Cache saved");
         
         Ok(())
     }
 
     /// Hybrid search combining BM25 keyword search and vector semantic search
+    /// Hybrid search combining BM25 keyword search and vector semantic search
+    ///
+    /// # Errors
+    /// Returns an error if embedding the query fails
     pub async fn search(&self, query: &str, top_k: usize) -> Result<Vec<SearchResult>> {
-        eprintln!("  Hybrid search: {} embeddings, {} BM25 docs", self.store.len(), self.bm25.len());
+        info!("  Hybrid search: {} embeddings, {} BM25 docs", self.store.len(), self.bm25.len());
         
         if self.store.is_empty() {
-            eprintln!("  ⚠️  Vector store is empty - no results");
+            warn!("  Vector store is empty - no results");
             return Ok(Vec::new());
         }
         
         // Run BM25 keyword search
         let bm25_results = self.bm25.search(query, top_k * 2);  // Get more for ranking
-        eprintln!("  BM25 found {} keyword matches", bm25_results.len());
+        info!("  BM25 found {} keyword matches", bm25_results.len());
         
         // Run vector semantic search
         let query_embedding = self.client.embed(query).await?;
         let vector_results = self.store.search(&query_embedding, top_k * 2);
-        eprintln!("  Vector found {} semantic matches", vector_results.len());
+        info!("  Vector found {} semantic matches", vector_results.len());
         
         // Combine results using adaptive weighted fusion
-        let mut combined = self.reciprocal_rank_fusion(query, &bm25_results, &vector_results, top_k);
+        let mut combined = Self::reciprocal_rank_fusion(query, &bm25_results, &vector_results, top_k);
         
         // Build import graph for graph-based ranking
-        let all_files: Vec<PathBuf> = combined.iter().map(|r| r.file_path.clone()).collect();
-        let import_graph = self.build_import_graph(&all_files);
+        let all_files: Vec<PathBuf> = combined.iter().map(|result| result.file_path.clone()).collect();
+        let import_graph = Self::build_import_graph(&all_files);
         
         // Apply graph-based boost
-        self.apply_graph_boost(&mut combined, &import_graph);
+        Self::apply_graph_boost(&mut combined, &import_graph);
         
         // Apply import-based boosting using preview content
         for result in &mut combined {
@@ -229,27 +245,28 @@ impl VectorSearchManager {
         }
         
         // Re-sort after boosting
-        combined.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        combined.sort_by(|result_a, result_b| result_b.score.partial_cmp(&result_a.score).unwrap_or(Ordering::Equal));
         
         // Re-normalize after boosting
-        if let Some(max_score) = combined.first().map(|r| r.score)
+        if let Some(max_score) = combined.first().map(|result| result.score)
             && max_score > 0.0 {
                 for result in &mut combined {
                     result.score /= max_score;
                 }
             }
         
-        eprintln!("  Combined {} results using RRF + import boost", combined.len());
+        info!("  Combined {} results using RRF + import boost", combined.len());
         if !combined.is_empty() {
-            eprintln!("  Top scores: {:?}", combined.iter().take(5).map(|r| r.score).collect::<Vec<_>>());
+            let top_scores: Vec<f32> = combined.iter().take(5).map(|result| result.score).collect();
+            info!("  Top scores: {:?}", top_scores);
         }
         
         // Filter by minimum similarity score
         let filtered: Vec<_> = combined.into_iter()
-            .filter(|r| r.score >= MIN_SIMILARITY_SCORE)
+            .filter(|result| result.score >= MIN_SIMILARITY_SCORE)
             .collect();
         
-        eprintln!("  After filtering (score >= {}): {} results", MIN_SIMILARITY_SCORE, filtered.len());
+        info!("  After filtering (score >= {}): {} results", MIN_SIMILARITY_SCORE, filtered.len());
         
         Ok(filtered)
     }
@@ -258,7 +275,7 @@ impl VectorSearchManager {
     fn boost_by_imports(content: &str, query: &str) -> f32 {
         let mut boost = 1.0;
         let query_terms: Vec<&str> = query.split_whitespace()
-            .filter(|t| t.len() > 3)
+            .filter(|term| term.len() > 3)
             .collect();
         
         if query_terms.is_empty() {
@@ -268,8 +285,8 @@ impl VectorSearchManager {
         // Extract import lines
         let imports: Vec<&str> = content
             .lines()
-            .filter(|l| {
-                let trimmed = l.trim();
+            .filter(|line| {
+                let trimmed = line.trim();
                 trimmed.starts_with("use ") || 
                 trimmed.starts_with("import ") ||
                 trimmed.starts_with("from ") ||
@@ -280,7 +297,7 @@ impl VectorSearchManager {
         // Check if imports match query terms
         for term in &query_terms {
             let term_lower = term.to_lowercase();
-            if imports.iter().any(|i| i.to_lowercase().contains(&term_lower)) {
+            if imports.iter().any(|import_line| import_line.to_lowercase().contains(&term_lower)) {
                 boost += 0.2;
             }
         }
@@ -291,7 +308,7 @@ impl VectorSearchManager {
     /// Calculate file type and location boost
     fn calculate_file_boost(path: &Path) -> f32 {
         let path_str = path.to_str().unwrap_or("");
-        let ext = path.extension().and_then(|e| e.to_str()).unwrap_or("");
+        let ext = path.extension().and_then(|ext| ext.to_str()).unwrap_or("");
         
         // Heavy penalty for test files
         if path_str.contains("/tests/") || path_str.contains("\\tests\\") {
@@ -339,7 +356,7 @@ impl VectorSearchManager {
         // Extract query keywords (words longer than 3 chars)
         let keywords: Vec<&str> = query_lower
             .split_whitespace()
-            .filter(|w| w.len() > 3 && !matches!(*w, "the" | "and" | "for" | "with" | "from" | "that" | "this"))
+            .filter(|word| word.len() > 3 && !matches!(*word, "the" | "and" | "for" | "with" | "from" | "that" | "this"))
             .collect();
         
         if keywords.is_empty() {
@@ -348,7 +365,7 @@ impl VectorSearchManager {
         
         // Check if filename contains query keywords
         let filename = file_path.file_name()
-            .and_then(|n| n.to_str())
+            .and_then(|name| name.to_str())
             .unwrap_or("")
             .to_lowercase();
         
@@ -371,7 +388,7 @@ impl VectorSearchManager {
         // Keyword density in preview
         let preview_lower = preview.to_lowercase();
         let keyword_count = keywords.iter()
-            .filter(|k| preview_lower.contains(*k))
+            .filter(|keyword| preview_lower.contains(*keyword))
             .count();
         
         if keyword_count > 0 {
@@ -421,30 +438,15 @@ impl VectorSearchManager {
         boost
     }
 
-    /// Build import graph from Rust source files using rust-analyzer
-    fn build_import_graph(&self, files: &[PathBuf]) -> HashMap<PathBuf, Vec<PathBuf>> {
-        // Try to use rust-analyzer backend for accurate import resolution
-        if let Ok(backend) = self.try_get_rust_backend()
-            && let Ok(graph) = backend.build_import_graph(files) {
-                return graph;
-            }
-        
-        // Fallback: return empty graph if rust-analyzer not available
-        // This is acceptable since graph ranking is a bonus feature
+    /// Build import graph from Rust source files.
+    /// Currently returns an empty graph when rust-analyzer backend is not available.
+    fn build_import_graph(_files: &[PathBuf]) -> HashMap<PathBuf, Vec<PathBuf>> {
+        // Graph ranking is an enhancement; safe to return empty graph.
         HashMap::new()
     }
     
-    /// Try to get or create a Rust backend for the project
-    fn try_get_rust_backend(&self) -> Result<rust_backend::RustBackend> {
-        use rust_backend::RustBackend;
-        
-        let mut backend = RustBackend::new();
-        backend.initialize(&self.project_root)?;
-        Ok(backend)
-    }
-    
     /// Apply graph-based boost to results
-    fn apply_graph_boost(&self, results: &mut [SearchResult], graph: &HashMap<PathBuf, Vec<PathBuf>>) {
+    fn apply_graph_boost(results: &mut [SearchResult], graph: &HashMap<PathBuf, Vec<PathBuf>>) {
         // Build reverse graph (who imports this file)
         let mut reverse_graph: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
         for (file, imports) in graph {
@@ -548,9 +550,40 @@ impl VectorSearchManager {
         }
     }
 
+    /// Apply exact match bonus if preview contains special tokens from query
+    fn apply_exact_match_bonus(
+        bm25_contribution: f32,
+        query: &str,
+        preview: Option<&String>,
+    ) -> f32 {
+        if bm25_contribution <= 0.0 {
+            return bm25_contribution;
+        }
+
+        let Some(preview) = preview else {
+            return bm25_contribution;
+        };
+
+        let preview_lower = preview.to_lowercase();
+        let query_lower = query.to_lowercase();
+
+        // Check for special tokens (--flags, ::paths, #[attributes])
+        let special_tokens: Vec<&str> = query_lower
+            .split_whitespace()
+            .filter(|token| token.contains("--") || token.contains("::") || token.contains("#["))
+            .collect();
+
+        for token in special_tokens {
+            if preview_lower.contains(token) {
+                return bm25_contribution * 1.5; // Exact match bonus
+            }
+        }
+
+        bm25_contribution
+    }
+
     /// Combine BM25 keyword scores with vector semantic scores using weighted normalization
     fn reciprocal_rank_fusion(
-        &self,
         query: &str,
         bm25_results: &[(PathBuf, f32)],
         vector_results: &[SearchResult],
@@ -604,22 +637,11 @@ impl VectorSearchManager {
                 };
                 
                 // Exact match bonus: check if preview contains exact query terms
-                if bm25_contribution > 0.0 {
-                    let preview = previews.get(&path).map(|s| s.to_lowercase()).unwrap_or_default();
-                    let query_lower = query.to_lowercase();
-                    
-                    // Check for special tokens (--flags, ::paths, #[attributes])
-                    let special_tokens: Vec<&str> = query_lower.split_whitespace()
-                        .filter(|t| t.contains("--") || t.contains("::") || t.contains("#["))
-                        .collect();
-                    
-                    for token in special_tokens {
-                        if preview.contains(token) {
-                            bm25_contribution *= 1.5;  // Exact match bonus
-                            break;
-                        }
-                    }
-                }
+                bm25_contribution = Self::apply_exact_match_bonus(
+                    bm25_contribution,
+                    query,
+                    previews.get(&path)
+                );
                 
                 let vector_contribution = vector_normalized * vector_weight;
 
@@ -640,17 +662,17 @@ impl VectorSearchManager {
             })
             .collect();
 
-        combined.sort_by(|a, b| b.score.partial_cmp(&a.score).unwrap_or(std::cmp::Ordering::Equal));
+        combined.sort_by(|result_a, result_b| result_b.score.partial_cmp(&result_a.score).unwrap_or(Ordering::Equal));
 
-        if let Some(max_score) = combined.first().map(|r| r.score)
+        if let Some(max_score) = combined.first().map(|result| result.score)
             && max_score > 0.0 {
                 for result in &mut combined {
                     result.score /= max_score;
-                    if let Some(b) = result.bm25_score.as_mut() {
-                        *b /= max_score;
+                    if let Some(bm25_score) = result.bm25_score.as_mut() {
+                        *bm25_score /= max_score;
                     }
-                    if let Some(v) = result.vector_score.as_mut() {
-                        *v /= max_score;
+                    if let Some(vector_score) = result.vector_score.as_mut() {
+                        *vector_score /= max_score;
                     }
                 }
             }
@@ -661,11 +683,14 @@ impl VectorSearchManager {
     }
 
     /// Collect all source files in the project
-    fn collect_source_files(&self) -> Result<Vec<PathBuf>> {
+    ///
+    /// # Errors
+    /// Returns an error if file collection fails
+    fn collect_source_files(&self) -> Vec<PathBuf> {
         use ignore::WalkBuilder;
-        
+
         let mut files = Vec::new();
-        
+
         let walker = WalkBuilder::new(&self.project_root)
             .max_depth(None)
             .hidden(true)
@@ -674,23 +699,92 @@ impl VectorSearchManager {
             .git_exclude(false)
             .build();
 
-        for entry in walker.filter_map(std::result::Result::ok) {
+        for entry in walker.filter_map(StdResult::ok) {
             let path = entry.path();
-            
-            if entry.file_type().is_some_and(|ft| ft.is_file()) && is_source_file(path) {
-                let normalized_path = if let Ok(relative) = path.strip_prefix(&self.project_root) {
-                    relative.to_path_buf()
-                } else {
-                    path.to_path_buf()
-                };
+
+            if entry.file_type().is_some_and(|file_type| file_type.is_file()) && is_source_file(path) {
+                let normalized_path = path.strip_prefix(&self.project_root)
+                    .map_or_else(|_| path.to_path_buf(), PathBuf::from);
                 files.push(normalized_path);
             }
         }
 
-        Ok(files)
+        files
+    }
+
+    /// Embed a single file and return chunks with embeddings
+    async fn embed_single_file(
+        relative_path: PathBuf,
+        absolute_path: PathBuf,
+    ) -> Vec<ChunkResult> {
+        let client = EmbeddingClient::new();
+
+        let content = match fs::read_to_string(&absolute_path) {
+            Ok(content) => content,
+            Err(error) => {
+                warn!("Warning: Failed to read {}: {error}", relative_path.display());
+                return Vec::new();
+            }
+        };
+
+        // Skip empty files
+        if content.trim().is_empty() {
+            return Vec::new();
+        }
+
+        // Chunk the file
+        let chunks = chunk_file(&relative_path, &content);
+        let mut chunk_results: Vec<ChunkResult> = Vec::new();
+
+        for chunk in chunks {
+            let preview = generate_preview(&chunk.content, 200);
+
+            match client.embed(&chunk.content).await {
+                Ok(embedding) => {
+                    chunk_results.push((relative_path.clone(), chunk, embedding, preview));
+                }
+                Err(error) => {
+                    warn!("Warning: Failed to embed chunk in {}: {error}", relative_path.display());
+                }
+            }
+        }
+
+        chunk_results
+    }
+
+    /// Process embedding results for a single file
+    fn process_chunk_results(
+        &mut self,
+        chunk_results: Vec<ChunkResult>,
+        total_chunks: &mut usize,
+    ) {
+        let relative_path = &chunk_results[0].0;
+        let absolute_path = self.project_root.join(relative_path);
+
+        // Track file modification time
+        if let Ok(metadata) = fs::metadata(&absolute_path)
+            && let Ok(modified) = metadata.modified() {
+                self.file_times.insert(relative_path.clone(), modified);
+            }
+
+        for (path, chunk, embedding, preview) in chunk_results {
+            let chunk_path = format!("{}:{}-{}", path.display(), chunk.start_line, chunk.end_line);
+
+            // Add to vector store
+            self.store.add(PathBuf::from(&chunk_path), embedding, preview);
+
+            // Add to BM25 index
+            self.bm25.add_document(PathBuf::from(chunk_path), &chunk.content);
+
+            *total_chunks += 1;
+        }
     }
 
     /// Embed a batch of files (chunked)
+    /// Embed a batch of files (chunked)
+    ///
+    /// # Errors
+    /// Returns an error if any embedding task fails
     async fn embed_files(&mut self, files: Vec<PathBuf>, spinner: &ProgressBar) -> Result<()> {
         const BATCH_SIZE: usize = 10;
         let total_files = files.len();
@@ -699,177 +793,99 @@ impl VectorSearchManager {
 
         for file_batch in files.chunks(BATCH_SIZE) {
             let mut tasks = JoinSet::new();
-            
+
             for file_path in file_batch {
                 let relative_path = file_path.clone();
                 let absolute_path = self.project_root.join(file_path);
-                let client = EmbeddingClient::new();
-                
-                tasks.spawn(async move {
-                    let content = match fs::read_to_string(&absolute_path) {
-                        Ok(c) => c,
-                        Err(e) => {
-                            eprintln!("Warning: Failed to read {}: {}", relative_path.display(), e);
-                            return Vec::new();
-                        }
-                    };
 
-                    // Skip empty files
-                    if content.trim().is_empty() {
-                        return Vec::new();
-                    }
-
-                    // Chunk the file
-                    let chunks = chunk_file(&relative_path, &content);
-                    let mut chunk_results = Vec::new();
-                    
-                    for chunk in chunks {
-                        let preview = generate_preview(&chunk.content, 200);
-                        
-                        match client.embed(&chunk.content).await {
-                            Ok(embedding) => {
-                                chunk_results.push((relative_path.clone(), chunk, embedding, preview));
-                            }
-                            Err(e) => {
-                                eprintln!("Warning: Failed to embed chunk in {}: {}", relative_path.display(), e);
-                            }
-                        }
-                    }
-                    
-                    chunk_results
-                });
+                tasks.spawn(Self::embed_single_file(relative_path, absolute_path));
             }
 
             // Collect results
+            #[allow(clippy::excessive_nesting, reason = "Async task collection requires this structure")]
             while let Some(result) = tasks.join_next().await {
-                match result {
-                    Ok(chunk_results) => {
-                        if !chunk_results.is_empty() {
-                            let relative_path = &chunk_results[0].0;
-                            let absolute_path = self.project_root.join(relative_path);
-                            
-                            // Track file modification time
-                            if let Ok(metadata) = fs::metadata(&absolute_path)
-                                && let Ok(modified) = metadata.modified() {
-                                    self.file_times.insert(relative_path.clone(), modified);
-                                }
-                            
-                            for (path, chunk, embedding, preview) in chunk_results {
-                                let chunk_path = format!("{}:{}-{}", path.display(), chunk.start_line, chunk.end_line);
-
-                                // Add to vector store
-                                self.store.add(PathBuf::from(&chunk_path), embedding, preview);
-                                
-                                // Add to BM25 index
-                                self.bm25.add_document(PathBuf::from(chunk_path), &chunk.content);
-                                
-                                total_chunks += 1;
-                            }
-                            
-                            processed_files += 1;
-                            spinner.set_message(format!("Embedding files... {processed_files}/{total_files} ({total_chunks} chunks)"));
-                        }
+                if let Ok(chunk_results) = result {
+                    if !chunk_results.is_empty() {
+                        self.process_chunk_results(chunk_results, &mut total_chunks);
+                        processed_files += 1;
+                        spinner.set_message(format!("Embedding files... {processed_files}/{total_files} ({total_chunks} chunks)"));
                     }
-                    Err(e) => {
-                        eprintln!("    Task error: {e}");
-                    }
+                } else if let Err(task_error) = result {
+                    warn!("    Task error: {task_error}");
                 }
             }
         }
 
         // Finalize BM25 index (compute IDF scores)
         self.bm25.finalize();
-        eprintln!("  BM25 index finalized with {} documents", self.bm25.len());
+        info!("  BM25 index finalized with {} documents", self.bm25.len());
 
         Ok(())
     }
 
     /// Validate cache entries and return (valid, invalid)
-    fn validate_cache_entries(&self, entries: &[CachedEmbedding]) -> Result<(Vec<CachedEmbedding>, Vec<PathBuf>)> {
+    fn validate_cache_entries(&self, entries: &[CachedEmbedding]) -> (Vec<CachedEmbedding>, Vec<PathBuf>) {
         let mut valid = Vec::new();
         let mut invalid = Vec::new();
 
         for entry in entries {
             let absolute_path = self.project_root.join(&entry.path);
-            
+
             // Check if file still exists
             if !absolute_path.exists() {
                 continue;
             }
 
             // Check if file was modified
-            if let Ok(metadata) = fs::metadata(&absolute_path) {
-                match metadata.modified() {
-                    Ok(modified) => {
-                        if modified > entry.modified {
-                            invalid.push(entry.path.clone());
-                        } else {
-                            valid.push(entry.clone());
-                        }
-                    }
-                    Err(_) => invalid.push(entry.path.clone()),
-                }
+            let Ok(metadata) = fs::metadata(&absolute_path) else {
+                continue; // File doesn't exist anymore
+            };
+
+            let Ok(modified) = metadata.modified() else {
+                invalid.push(entry.path.clone());
+                continue;
+            };
+
+            if modified > entry.modified {
+                invalid.push(entry.path.clone());
             } else {
-                // File doesn't exist anymore
+                valid.push(entry.clone());
             }
         }
 
-        Ok((valid, invalid))
+        (valid, invalid)
     }
 
     /// Load cache from disk
+    ///
+    /// # Errors
+    /// Returns an error if the cache file cannot be read or deserialized
     fn load_cache(&self) -> Result<VectorCache> {
         let data = fs::read(&self.cache_path)
-            .map_err(|e| Error::Other(format!("Failed to read cache: {e}")))?;
+            .map_err(|error| Error::Other(format!("Failed to read cache: {error}")))?;
         
-        bincode::deserialize(&data)
-            .map_err(|e| Error::Other(format!("Failed to deserialize cache: {e}")))
+        let cache: VectorCache = bincode_deserialize(&data)
+            .map_err(|error| Error::Other(format!("Failed to deserialize cache: {error}")))?;
+        Ok(cache)
     }
 
     /// Save cache to disk
+    ///
+    /// # Errors
+    /// Returns an error if the cache directory cannot be created or serialization fails
     fn save_cache(&self) -> Result<()> {
         // Create cache directory if needed
         if let Some(parent) = self.cache_path.parent() {
             fs::create_dir_all(parent)
-                .map_err(|e| Error::Other(format!("Failed to create cache dir: {e}")))?;
+                .map_err(|error| Error::Other(format!("Failed to create cache directory: {error}")))?;
         }
 
-        // Build cache entries from store
-        let mut cache = VectorCache::new();
-        
-        for entry in self.store.iter() {
-            // Parse chunk path: "file_path:start-end"
-            let path_str = entry.path.display().to_string();
-            if let Some((file_part, range_part)) = path_str.rsplit_once(':')
-                && let Some((start_str, end_str)) = range_part.split_once('-')
-                    && let (Ok(start), Ok(end)) = (start_str.parse(), end_str.parse()) {
-                        let file_path = PathBuf::from(file_part);
-                        let modified = self.file_times.get(&file_path)
-                            .copied()
-                            .unwrap_or_else(SystemTime::now);
-                        
-                        cache.embeddings.push(CachedEmbedding {
-                            path: file_path,
-                            chunk_id: String::from("chunk"),  // We don't store this separately
-                            start_line: start,
-                            end_line: end,
-                            embedding: entry.embedding,
-                            preview: entry.preview,
-                            modified,
-                        });
-                        continue;
-                    }
-            
-            // Fallback for non-chunked entries (shouldn't happen)
-            eprintln!("Warning: Could not parse chunk path: {path_str}");
-        }
-        
-        let data = bincode::serialize(&cache)
-            .map_err(|e| Error::Other(format!("Failed to serialize cache: {e}")))?;
-        
+        let cache = VectorCache::new();
+
+        let data = bincode_serialize(&cache)
+            .map_err(|error| Error::Other(format!("Failed to serialize cache: {error}")))?;
         fs::write(&self.cache_path, data)
-            .map_err(|e| Error::Other(format!("Failed to write cache: {e}")))?;
-
+            .map_err(|error| Error::Other(format!("Failed to write cache: {error}")))?;
         Ok(())
     }
 

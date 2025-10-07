@@ -1,7 +1,9 @@
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tempfile::TempDir;
 use tokio::process::Command;
+use tokio::fs::{create_dir_all, write, remove_file};
+use tokio::time::timeout;
 use crate::{FileChange, Result, RoutingError};
 use super::state::WorkspaceState;
 
@@ -13,9 +15,12 @@ pub struct IsolatedBuildEnv {
 
 impl IsolatedBuildEnv {
     /// Create isolated build environment
+    ///
+    /// # Errors
+    /// Returns an error if the temporary directory cannot be created.
     pub fn new(workspace: &WorkspaceState) -> Result<Self> {
         let temp_dir = TempDir::new()
-            .map_err(|e| RoutingError::Other(format!("Failed to create temp dir: {e}")))?;
+            .map_err(|err| RoutingError::Other(format!("Failed to create temp dir: {err}")))?;
         
         // TODO: Copy workspace files for full isolation
         // For now, we just create an empty temp directory
@@ -28,6 +33,9 @@ impl IsolatedBuildEnv {
     }
     
     /// Apply changes to isolated environment
+    ///
+    /// # Errors
+    /// Returns an error if filesystem operations fail when applying changes.
     pub async fn apply_changes(&self, changes: &[FileChange]) -> Result<()> {
         for change in changes {
             match change {
@@ -36,15 +44,15 @@ impl IsolatedBuildEnv {
                     let full_path = self.temp_dir.path().join(path);
                     
                     if let Some(parent) = full_path.parent() {
-                        tokio::fs::create_dir_all(parent).await?;
+                        create_dir_all(parent).await?;
                     }
                     
-                    tokio::fs::write(full_path, content).await?;
+                    write(full_path, content).await?;
                 }
                 FileChange::Delete { path } => {
                     let full_path = self.temp_dir.path().join(path);
                     if full_path.exists() {
-                        tokio::fs::remove_file(full_path).await.ok();
+                        remove_file(full_path).await?;
                     }
                 }
             }
@@ -53,8 +61,11 @@ impl IsolatedBuildEnv {
     }
     
     /// Run build validation in isolation
+    ///
+    /// # Errors
+    /// Returns an error if the cargo command fails to execute.
     pub async fn validate_build(&self) -> Result<BuildResult> {
-        let start = std::time::Instant::now();
+        let start = Instant::now();
         
         let output = Command::new("cargo")
             .arg("check")
@@ -74,10 +85,13 @@ impl IsolatedBuildEnv {
     }
     
     /// Run tests in isolation
+    ///
+    /// # Errors
+    /// Returns an error on timeout or if the cargo test command fails to execute.
     pub async fn run_tests(&self, timeout_secs: u64) -> Result<TestResult> {
-        let start = std::time::Instant::now();
+        let start = Instant::now();
         
-        let output = tokio::time::timeout(
+        let output = timeout(
             Duration::from_secs(timeout_secs),
             Command::new("cargo")
                 .arg("test")
@@ -101,8 +115,11 @@ impl IsolatedBuildEnv {
     }
     
     /// Run clippy in isolation
+    ///
+    /// # Errors
+    /// Returns an error if cargo clippy fails to execute.
     pub async fn run_clippy(&self) -> Result<LintResult> {
-        let start = std::time::Instant::now();
+        let start = Instant::now();
         
         let output = Command::new("cargo")
             .arg("clippy")

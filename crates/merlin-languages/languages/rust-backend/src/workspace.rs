@@ -7,13 +7,19 @@ use std::time::{Duration, SystemTime};
 
 use anyhow::Context as _;
 use indicatif::{MultiProgress, ProgressBar, ProgressStyle};
-use ra_ap_ide::AnalysisHost;
-use ra_ap_load_cargo::{LoadCargoConfig, load_workspace_at};
+use ra_ap_ide::{AnalysisHost, FileId};
+use ra_ap_load_cargo::{LoadCargoConfig, ProcMacroServerChoice, load_workspace_at};
 use ra_ap_project_model::{CargoConfig, RustLibSource};
 use ra_ap_vfs::Vfs;
 
-use merlin_core::{Error, Result};
 use crate::cache::WorkspaceCache;
+use merlin_core::{Error, Result};
+
+/// File ID mapping from paths to rust-analyzer file IDs
+pub type FileIdMap = HashMap<PathBuf, FileId>;
+
+/// Loaded workspace components
+pub type LoadedWorkspace = (AnalysisHost, Vfs, FileIdMap);
 
 /// Configuration for workspace loading
 #[derive(Debug, Clone)]
@@ -29,10 +35,10 @@ pub struct LoadConfig {
 type FileMetadata = HashMap<PathBuf, SystemTime>;
 
 fn insert_file_metadata(path: &PathBuf, metadata_map: &mut FileMetadata) {
-    if let Ok(metadata) = fs::metadata(path) {
-        if let Ok(modified) = metadata.modified() {
-            metadata_map.insert(path.clone(), modified);
-        }
+    if let Ok(metadata) = fs::metadata(path)
+        && let Ok(modified) = metadata.modified()
+    {
+        metadata_map.insert(path.clone(), modified);
     }
 }
 
@@ -77,125 +83,127 @@ impl WorkspaceLoader {
     ///
     /// # Errors
     /// Returns an error if the workspace cannot be loaded.
-    pub fn load(&self) -> Result<(AnalysisHost, Vfs, HashMap<PathBuf, ra_ap_ide::FileId>)> {
-        let multi = self.config.show_progress.then(MultiProgress::new);
+    pub fn load(&self) -> Result<LoadedWorkspace> {
+        let progress_group = self.config.show_progress.then(MultiProgress::new);
+        let progress_group = progress_group.as_ref();
 
-        let pb1 = multi.as_ref().map(|multi_progress| {
-            let pb = multi_progress.add(ProgressBar::new_spinner());
-            pb.set_style(ProgressStyle::default_spinner());
-            pb.set_message("Checking cache...");
-            pb.enable_steady_tick(Duration::from_millis(100));
-            pb
-        });
+        self.report_cache_status(progress_group);
+        self.log_loading_path();
 
-        if self.config.use_cache && {
-            if let Ok(cache) = WorkspaceCache::load(&self.project_root) {
-                if cache.is_valid(&self.project_root).unwrap_or(false) {
-                    tracing::info!("Using cached rust-analyzer state ({} files)", cache.file_count);
-                    true
-                } else {
-                    false
-                }
-            } else {
-                false
-            }
-        } {
-            if let Some(pb) = pb1 {
-                pb.finish_with_message("\x1b[32m\u{2713}\x1b[0m Cache checked");
-            }
+        let cargo_config = self.build_cargo_config();
+        let load_config = self.build_load_config();
+        let (host, virtual_fs) = self.initialize_rust_analyzer(progress_group, &cargo_config, &load_config)?;
+
+        let (file_id_map, file_metadata) = Self::index_files(progress_group, &virtual_fs);
+        self.maybe_save_cache(progress_group, file_metadata);
+
+        Ok((host, virtual_fs, file_id_map))
+    }
+
+    fn report_cache_status(&self, progress_group: Option<&MultiProgress>) {
+        let progress_cache = progress_group.map(|group| create_spinner(group, "Checking cache..."));
+        if self.config.use_cache
+            && let Ok(cache) = WorkspaceCache::load(&self.project_root)
+            && cache.is_valid(&self.project_root).unwrap_or(false)
+        {
+            tracing::info!("Using cached rust-analyzer state ({} files)", cache.file_count);
         }
+        finish_spinner(progress_cache.as_ref(), "\x1b[32m\u{2713}\x1b[0m Cache checked");
+    }
 
-        let pb2 = multi.as_ref().map(|multi_progress| {
-            let pb = multi_progress.add(ProgressBar::new_spinner());
-            pb.set_style(ProgressStyle::default_spinner());
-            pb.set_message("Initializing rust-analyzer...");
-            pb.enable_steady_tick(Duration::from_millis(100));
-            pb
-        });
-
+    fn log_loading_path(&self) {
         tracing::info!("Loading Cargo workspace from: {}", self.project_root.display());
+    }
 
-        let cargo_config = CargoConfig {
-            sysroot: if self.config.workspace_only {
-                None
-            } else {
-                Some(RustLibSource::Discover)
-            },
+    fn build_cargo_config(&self) -> CargoConfig {
+        CargoConfig {
+            sysroot: if self.config.workspace_only { None } else { Some(RustLibSource::Discover) },
             ..Default::default()
-        };
+        }
+    }
 
-        let load_config = LoadCargoConfig {
+    fn build_load_config(&self) -> LoadCargoConfig {
+        LoadCargoConfig {
             load_out_dirs_from_check: !self.config.workspace_only,
-            with_proc_macro_server: ra_ap_load_cargo::ProcMacroServerChoice::None,
+            with_proc_macro_server: ProcMacroServerChoice::None,
             prefill_caches: false,
-        };
+        }
+    }
 
-        let progress = |message: String| {
-            tracing::debug!("Workspace loading: {}", message);
-        };
-
-        let (db, vfs, _) = load_workspace_at(
+    /// Initialize rust-analyzer by loading the workspace.
+    ///
+    /// # Errors
+    /// Returns an error when the cargo workspace cannot be loaded or transformed into an analysis database.
+    fn initialize_rust_analyzer(
+        &self,
+        progress_group: Option<&MultiProgress>,
+        cargo_config: &CargoConfig,
+        load_config: &LoadCargoConfig,
+    ) -> Result<(AnalysisHost, Vfs)> {
+        let progress_ra_init = progress_group.map(|group| create_spinner(group, "Initializing rust-analyzer..."));
+        let on_progress = |message: String| tracing::debug!("Workspace loading: {}", message);
+        let (analysis_db, virtual_fs, _) = load_workspace_at(
             self.project_root.as_path(),
-            &cargo_config,
-            &load_config,
-            &progress,
+            cargo_config,
+            load_config,
+            &on_progress,
         )
         .with_context(|| format!("Failed to load workspace at {}", self.project_root.display()))
         .map_err(|error| Error::Other(error.to_string()))?;
+        finish_spinner(progress_ra_init.as_ref(), "\x1b[32m\u{2713}\x1b[0m Rust-analyzer initialized");
+        Ok((AnalysisHost::with_database(analysis_db), virtual_fs))
+    }
 
-        if let Some(pb) = pb2 {
-            pb.finish_with_message("\x1b[32m\u{2713}\x1b[0m Rust-analyzer initialized");
-        }
-
-        let pb3 = multi.as_ref().map(|multi_progress| {
-            let pb = multi_progress.add(ProgressBar::new_spinner());
-            pb.set_style(ProgressStyle::default_spinner());
-            pb.set_message("Building file index...");
-            pb.enable_steady_tick(Duration::from_millis(100));
-            pb
-        });
-
-        let host = AnalysisHost::with_database(db);
-
-        let mut file_id_map = HashMap::new();
-        let mut file_metadata = FileMetadata::new();
-        
-        for (file_id, path) in vfs.iter() {
-            if let Some(abs_path) = path.as_path() {
-                let path_buf: PathBuf = abs_path.to_path_buf().into();
-                if path_buf.to_string_lossy().ends_with(".rs") {
-                    file_id_map.insert(path_buf.clone(), file_id);
-                    insert_file_metadata(&path_buf, &mut file_metadata);
-                }
-            }
-        }
-
-        if let Some(pb) = pb3 {
-            pb.finish_with_message(format!("\x1b[32m\u{2713}\x1b[0m Indexed {} Rust files", file_id_map.len()));
-        }
-
+    fn index_files(progress_group: Option<&MultiProgress>, virtual_fs: &Vfs) -> (FileIdMap, FileMetadata) {
+        let progress_index = progress_group.map(|group| create_spinner(group, "Building file index..."));
+        let (file_id_map, file_metadata) = build_file_index(virtual_fs);
+        finish_spinner(
+            progress_index.as_ref(),
+            &format!("\x1b[32m\u{2713}\x1b[0m Indexed {} Rust files", file_id_map.len()),
+        );
         tracing::info!("Loaded {} Rust files", file_id_map.len());
+        (file_id_map, file_metadata)
+    }
 
-        let pb4 = multi.as_ref().map(|multi_progress| {
-            let pb = multi_progress.add(ProgressBar::new_spinner());
-            pb.set_style(ProgressStyle::default_spinner());
-            pb.set_message("Saving cache...");
-            pb.enable_steady_tick(Duration::from_millis(100));
-            pb
-        });
-
+    fn maybe_save_cache(&self, progress_group: Option<&MultiProgress>, file_metadata: FileMetadata) {
+        let progress_save = progress_group.map(|group| create_spinner(group, "Saving cache..."));
         if self.config.use_cache {
             let cache = WorkspaceCache::new(self.project_root.clone(), file_metadata);
             if let Err(error) = cache.save(&self.project_root) {
                 tracing::warn!("Failed to save cache: {}", error);
             }
         }
-
-        if let Some(pb) = pb4 {
-            pb.finish_with_message("\x1b[32m\u{2713}\x1b[0m Cache saved");
-        }
-
-        Ok((host, vfs, file_id_map))
+        finish_spinner(progress_save.as_ref(), "\x1b[32m\u{2713}\x1b[0m Cache saved");
     }
 }
 
+fn create_spinner(group: &MultiProgress, message: &str) -> ProgressBar {
+    let spinner = group.add(ProgressBar::new_spinner());
+    spinner.set_style(ProgressStyle::default_spinner());
+    spinner.set_message(message.to_string());
+    spinner.enable_steady_tick(Duration::from_millis(100));
+    spinner
+}
+
+fn finish_spinner(progress: Option<&ProgressBar>, message: &str) {
+    if let Some(progress_bar) = progress {
+        progress_bar.finish_with_message(message.to_string());
+    }
+}
+
+fn build_file_index(vfs: &Vfs) -> (FileIdMap, FileMetadata) {
+    let mut file_id_map = HashMap::new();
+    let mut file_metadata = FileMetadata::new();
+
+    for (file_id, path) in vfs.iter() {
+        if let Some(abs_path) = path.as_path() {
+            let path_buf: PathBuf = abs_path.to_path_buf().into();
+            if path_buf.to_string_lossy().ends_with(".rs") {
+                file_id_map.insert(path_buf.clone(), file_id);
+                insert_file_metadata(&path_buf, &mut file_metadata);
+            }
+        }
+    }
+
+    (file_id_map, file_metadata)
+}

@@ -1,18 +1,27 @@
+use std::{fmt, io};
+use std::path::PathBuf;
+use serde_json;
+use std::result::Result as StdResult;
+use merlin_core::Error as CoreError;
+use serde_json::Error as JsonError;
 use thiserror::Error;
 use crate::types::{TaskId, ValidationResult};
 
-pub type Result<T> = std::result::Result<T, RoutingError>;
+pub type Result<T> = StdResult<T, RoutingError>;
 
 #[derive(Debug, Error)]
 pub enum RoutingError {
     #[error("Core error: {0}")]
-    Core(#[from] merlin_core::Error),
+    Core(#[from] CoreError),
 
     #[error("IO error: {0}")]
-    Io(#[from] std::io::Error),
+    Io(#[from] io::Error),
+
+    #[error("Format error: {0}")]
+    Format(#[from] fmt::Error),
 
     #[error("JSON error: {0}")]
-    Json(#[from] serde_json::Error),
+    Json(#[from] JsonError),
 
     #[error("Provider temporarily unavailable: {0}")]
     ProviderUnavailable(String),
@@ -43,13 +52,13 @@ pub enum RoutingError {
 
     #[error("File locked by task {holder:?}: {file}")]
     FileLockedByTask {
-        file: std::path::PathBuf,
+        file: PathBuf,
         holder: TaskId,
     },
 
     #[error("File has {readers} active readers: {file}")]
     FileHasActiveReaders {
-        file: std::path::PathBuf,
+        file: PathBuf,
         readers: usize,
     },
 
@@ -97,7 +106,7 @@ pub struct ConflictReport {
 
 #[derive(Debug, Clone)]
 pub struct FileConflict {
-    pub path: std::path::PathBuf,
+    pub path: PathBuf,
     pub base_hash: u64,
     pub current_hash: u64,
 }

@@ -1,4 +1,4 @@
-use crate::Task;
+use crate::{Task, Complexity};
 use super::intent::{Action, Intent};
 
 /// Decomposes complex requests into smaller tasks
@@ -13,95 +13,95 @@ impl TaskDecomposer {
     #[must_use]
     pub fn decompose(&self, intent: &Intent, request: &str) -> Vec<Task> {
         match &intent.action {
-            Action::Refactor => self.decompose_refactor(intent, request),
-            Action::Create if self.is_complex_creation(request) => {
-                self.decompose_creation(intent, request)
+            Action::Refactor => Self::decompose_refactor(intent, request),
+            Action::Create if Self::is_complex_creation(request) => {
+                Self::decompose_creation(intent, request)
             }
-            Action::Fix if self.requires_analysis(request) => {
-                self.decompose_fix(intent, request)
+            Action::Fix if Self::requires_analysis(request) => {
+                Self::decompose_fix(intent, request)
             }
-            _ => vec![self.create_single_task(intent, request)],
+            _ => vec![Self::create_single_task(intent, request)],
         }
     }
     
-    fn decompose_refactor(&self, intent: &Intent, request: &str) -> Vec<Task> {
+    fn decompose_refactor(intent: &Intent, request: &str) -> Vec<Task> {
         let mut tasks = Vec::new();
-        
+
         let analyze_task = Task::new(format!("Analyze current structure: {request}"))
-            .with_complexity(crate::Complexity::Medium)
+            .with_complexity(Complexity::Medium)
             .with_priority(intent.priority);
         tasks.push(analyze_task.clone());
-        
+
         let refactor_task = Task::new(format!("Refactor: {request}"))
-            .with_complexity(crate::Complexity::Complex)
+            .with_complexity(Complexity::Complex)
             .with_priority(intent.priority)
             .with_dependencies(vec![analyze_task.id]);
         tasks.push(refactor_task.clone());
-        
+
         let test_task = Task::new(format!("Test refactored code: {request}"))
-            .with_complexity(crate::Complexity::Medium)
+            .with_complexity(Complexity::Medium)
             .with_priority(intent.priority)
             .with_dependencies(vec![refactor_task.id]);
         tasks.push(test_task);
-        
+
         tasks
     }
     
-    fn decompose_creation(&self, intent: &Intent, request: &str) -> Vec<Task> {
+    fn decompose_creation(intent: &Intent, request: &str) -> Vec<Task> {
         let mut tasks = Vec::new();
-        
+
         let design_task = Task::new(format!("Design structure: {request}"))
-            .with_complexity(crate::Complexity::Simple)
+            .with_complexity(Complexity::Simple)
             .with_priority(intent.priority);
         tasks.push(design_task.clone());
-        
+
         let implement_task = Task::new(format!("Implement: {request}"))
-            .with_complexity(crate::Complexity::Medium)
+            .with_complexity(Complexity::Medium)
             .with_priority(intent.priority)
             .with_dependencies(vec![design_task.id]);
         tasks.push(implement_task.clone());
-        
+
         let test_task = Task::new(format!("Add tests: {request}"))
-            .with_complexity(crate::Complexity::Simple)
+            .with_complexity(Complexity::Simple)
             .with_priority(intent.priority)
             .with_dependencies(vec![implement_task.id]);
         tasks.push(test_task);
-        
+
         tasks
     }
     
-    fn decompose_fix(&self, intent: &Intent, request: &str) -> Vec<Task> {
+    fn decompose_fix(intent: &Intent, request: &str) -> Vec<Task> {
         let mut tasks = Vec::new();
-        
+
         let diagnose_task = Task::new(format!("Diagnose issue: {request}"))
-            .with_complexity(crate::Complexity::Medium)
+            .with_complexity(Complexity::Medium)
             .with_priority(intent.priority);
         tasks.push(diagnose_task.clone());
-        
+
         let fix_task = Task::new(format!("Fix: {request}"))
-            .with_complexity(crate::Complexity::Medium)
+            .with_complexity(Complexity::Medium)
             .with_priority(intent.priority)
             .with_dependencies(vec![diagnose_task.id]);
         tasks.push(fix_task.clone());
-        
+
         let verify_task = Task::new(format!("Verify fix: {request}"))
-            .with_complexity(crate::Complexity::Simple)
+            .with_complexity(Complexity::Simple)
             .with_priority(intent.priority)
             .with_dependencies(vec![fix_task.id]);
         tasks.push(verify_task);
-        
+
         tasks
     }
     
-    fn create_single_task(&self, intent: &Intent, request: &str) -> Task {
-        let complexity = intent.complexity_hint.unwrap_or(crate::Complexity::Medium);
+    fn create_single_task(intent: &Intent, request: &str) -> Task {
+        let complexity = intent.complexity_hint.unwrap_or(Complexity::Medium);
         
         Task::new(request.to_string())
             .with_complexity(complexity)
             .with_priority(intent.priority)
     }
     
-    fn is_complex_creation(&self, request: &str) -> bool {
+    fn is_complex_creation(request: &str) -> bool {
         let request_lower = request.to_lowercase();
         request_lower.contains("new module")
             || request_lower.contains("new crate")
@@ -109,7 +109,7 @@ impl TaskDecomposer {
             || request_lower.split_whitespace().count() > 20
     }
     
-    fn requires_analysis(&self, request: &str) -> bool {
+    fn requires_analysis(request: &str) -> bool {
         let request_lower = request.to_lowercase();
         request_lower.contains("complex")
             || request_lower.contains("investigate")
@@ -130,6 +130,8 @@ mod tests {
     use super::super::intent::IntentExtractor;
 
     #[test]
+    /// # Panics
+    /// Panics if decompose logic returns unexpected number of tasks.
     fn test_simple_task_no_decomposition() {
         let decomposer = TaskDecomposer::new();
         let extractor = IntentExtractor::new();
@@ -141,6 +143,8 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if refactor decomposition does not produce analyze/refactor/test sequence.
     fn test_refactor_decomposition() {
         let decomposer = TaskDecomposer::new();
         let extractor = IntentExtractor::new();
@@ -158,6 +162,8 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if complex creation does not produce design/implement/test sequence.
     fn test_complex_creation_decomposition() {
         let decomposer = TaskDecomposer::new();
         let extractor = IntentExtractor::new();
@@ -172,6 +178,8 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if fix path does not produce diagnose/fix/verify tasks.
     fn test_fix_with_analysis() {
         let decomposer = TaskDecomposer::new();
         let extractor = IntentExtractor::new();

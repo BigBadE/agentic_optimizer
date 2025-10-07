@@ -22,13 +22,13 @@ impl BuildValidationStage {
             workspace: None,
         }
     }
-    
+
     #[must_use]
     pub fn with_timeout(mut self, timeout_seconds: u64) -> Self {
         self.timeout_seconds = timeout_seconds;
         self
     }
-    
+
     #[must_use]
     pub fn with_workspace(mut self, workspace: Arc<WorkspaceState>) -> Self {
         self.workspace = Some(workspace);
@@ -54,7 +54,7 @@ impl ValidationStage for BuildValidationStage {
                 score: 1.0,
             });
         }
-        
+
         let Some(workspace) = &self.workspace else {
             return Ok(StageResult {
                 stage: StageType::Build,
@@ -64,21 +64,28 @@ impl ValidationStage for BuildValidationStage {
                 score: 1.0,
             });
         };
-        
+
         let build_env = IsolatedBuildEnv::new(workspace.as_ref())?;
-        
+
         let build_result = build_env.validate_build().await?;
-        
+
         let passed = build_result.success;
         let score = if passed { 1.0 } else { 0.0 };
-        
+
         let details = if passed {
             format!("Build succeeded ({}ms)", build_result.duration_ms)
         } else {
-            format!("Build failed: {}", 
-                build_result.stderr.lines().take(3).collect::<Vec<_>>().join("; "))
+            format!(
+                "Build failed: {}",
+                build_result
+                    .stderr
+                    .lines()
+                    .take(3)
+                    .collect::<Vec<_>>()
+                    .join("; ")
+            )
         };
-        
+
         Ok(StageResult {
             stage: StageType::Build,
             passed,
@@ -87,18 +94,18 @@ impl ValidationStage for BuildValidationStage {
             score,
         })
     }
-    
+
     async fn quick_check(&self, response: &Response) -> Result<bool> {
         let has_build_errors = response.text.contains("error[E")
             || response.text.contains("cannot find")
             || response.text.contains("mismatched types");
         Ok(!has_build_errors)
     }
-    
+
     fn name(&self) -> &'static str {
         "Build"
     }
-    
+
     fn stage_type(&self) -> StageType {
         StageType::Build
     }
@@ -107,8 +114,8 @@ impl ValidationStage for BuildValidationStage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_core::TokenUsage;
     use crate::Result;
+    use merlin_core::TokenUsage;
 
     #[tokio::test]
     /// # Errors
@@ -126,13 +133,13 @@ mod tests {
             latency_ms: 0,
         };
         let task = Task::new("Test".to_owned());
-        
+
         let result = stage.validate(&response, &task).await?;
         assert!(result.passed);
         assert!(result.details.contains("skipped"));
         Ok(())
     }
-    
+
     #[tokio::test]
     /// # Errors
     /// Returns an error if `quick_check` fails unexpectedly.
@@ -141,7 +148,7 @@ mod tests {
     /// Panics if `quick_check` logic does not match expected patterns.
     async fn test_quick_check() -> Result<()> {
         let stage = BuildValidationStage::new();
-        
+
         let good_response = Response {
             text: "fn main() {}".to_owned(),
             confidence: 1.0,
@@ -150,7 +157,7 @@ mod tests {
             latency_ms: 0,
         };
         assert!(stage.quick_check(&good_response).await?);
-        
+
         let bad_response = Response {
             text: "error[E0425]: cannot find value".to_owned(),
             confidence: 1.0,
@@ -162,4 +169,3 @@ mod tests {
         Ok(())
     }
 }
-

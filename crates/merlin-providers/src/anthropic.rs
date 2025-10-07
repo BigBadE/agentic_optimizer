@@ -65,11 +65,7 @@ impl ModelProvider for AnthropicProvider {
         let user_message = if context.files.is_empty() {
             query.text.clone()
         } else {
-            format!(
-                "{}\n\nContext:\n{}",
-                query.text,
-                context.files_to_string()
-            )
+            format!("{}\n\nContext:\n{}", query.text, context.files_to_string())
         };
 
         let request_body = json!({
@@ -149,9 +145,9 @@ struct AnthropicResponse {
 /// Message content returned by Anthropic.
 enum ContentBlock {
     /// A text block.
-    Text { 
+    Text {
         /// The text content.
-        text: String 
+        text: String,
     },
 }
 
@@ -171,4 +167,3 @@ struct Usage {
     #[serde(default, rename = "cache_creation_input_tokens")]
     cache_creation_input: Option<u64>,
 }
-

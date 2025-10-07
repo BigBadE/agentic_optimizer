@@ -1,8 +1,8 @@
+use super::strategy::RoutingStrategy;
+use crate::{ModelRouter, ModelTier, Result, RoutingDecision, RoutingError, Task};
+use async_trait::async_trait;
 use std::cmp::Reverse;
 use std::sync::Arc;
-use crate::{ModelRouter, ModelTier, Result, RoutingDecision, RoutingError, Task};
-use super::strategy::RoutingStrategy;
-use async_trait::async_trait;
 
 /// Availability checker for model tiers
 pub struct AvailabilityChecker {
@@ -14,8 +14,8 @@ impl AvailabilityChecker {
     pub fn new() -> Self {
         Self {}
     }
-    
-    #[must_use] 
+
+    #[must_use]
     pub fn check(&self, _tier: &ModelTier) -> bool {
         // For now, assume all tiers are available
         // In production, this would check:
@@ -47,7 +47,7 @@ impl StrategyRouter {
     pub fn new(strategies: Vec<Arc<dyn RoutingStrategy>>) -> Self {
         let mut sorted_strategies = strategies;
         sorted_strategies.sort_by_key(|strategy| Reverse(strategy.priority()));
-        
+
         Self {
             strategies: sorted_strategies,
             availability_checker: Arc::new(AvailabilityChecker::new()),
@@ -64,24 +64,27 @@ impl StrategyRouter {
         self.premium_enabled = premium;
         self
     }
-    
+
     #[must_use]
     pub fn with_default_strategies() -> Self {
-        use super::strategies::{QualityCriticalStrategy, LongContextStrategy, CostOptimizationStrategy, ComplexityBasedStrategy};
-        
+        use super::strategies::{
+            ComplexityBasedStrategy, CostOptimizationStrategy, LongContextStrategy,
+            QualityCriticalStrategy,
+        };
+
         let strategies: Vec<Arc<dyn RoutingStrategy>> = vec![
             Arc::new(QualityCriticalStrategy::new()),
             Arc::new(LongContextStrategy::default()),
             Arc::new(CostOptimizationStrategy::default()),
             Arc::new(ComplexityBasedStrategy::new()),
         ];
-        
+
         Self::new(strategies)
     }
-    
+
     fn estimate_cost(tier: &ModelTier, task: &Task) -> f64 {
         let tokens = task.context_needs.estimated_tokens as f64;
-        
+
         match tier {
             ModelTier::Local { .. } | ModelTier::Groq { .. } => 0.0,
             ModelTier::Premium { model_name, .. } => {
@@ -97,7 +100,7 @@ impl StrategyRouter {
             }
         }
     }
-    
+
     fn estimate_latency(tier: &ModelTier) -> u64 {
         match tier {
             ModelTier::Local { .. } => 100,
@@ -115,16 +118,16 @@ impl ModelRouter for StrategyRouter {
             if !strategy.applies_to(task) {
                 continue;
             }
-            
+
             let tier = strategy.select_tier(task).await?;
-            
+
             // Check if tier is enabled in config
             let tier_enabled = match &tier {
                 ModelTier::Local { .. } => self.local_enabled,
                 ModelTier::Groq { .. } => self.groq_enabled,
                 ModelTier::Premium { .. } => self.premium_enabled,
             };
-            
+
             if tier_enabled && self.is_available(&tier).await {
                 return Ok(RoutingDecision {
                     tier: tier.clone(),
@@ -134,7 +137,7 @@ impl ModelRouter for StrategyRouter {
                 });
             }
         }
-        
+
         // Fallback: Try any enabled tier
         if self.groq_enabled {
             return Ok(RoutingDecision {
@@ -146,7 +149,7 @@ impl ModelRouter for StrategyRouter {
                 reasoning: "Fallback to Groq (no other tiers available)".to_owned(),
             });
         }
-        
+
         if self.local_enabled {
             return Ok(RoutingDecision {
                 tier: ModelTier::Local {
@@ -157,10 +160,10 @@ impl ModelRouter for StrategyRouter {
                 reasoning: "Fallback to Local (no other tiers available)".to_owned(),
             });
         }
-        
+
         Err(RoutingError::NoAvailableTier)
     }
-    
+
     async fn is_available(&self, tier: &ModelTier) -> bool {
         self.availability_checker.check(tier)
     }
@@ -169,8 +172,8 @@ impl ModelRouter for StrategyRouter {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{Complexity, ContextRequirements, Priority};
     use crate::Result;
+    use crate::{Complexity, ContextRequirements, Priority};
 
     #[tokio::test]
     /// # Errors
@@ -180,21 +183,23 @@ mod tests {
     /// Panics if premium tier is not selected for critical tasks.
     async fn test_strategy_router_priority() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
-        
+
         let critical_task = Task::new("Critical task".to_owned())
             .with_priority(Priority::Critical)
             .with_complexity(Complexity::Simple);
-        
+
         let decision = router.route(&critical_task).await?;
-        
+
         if let ModelTier::Premium { provider, .. } = decision.tier {
             assert_eq!(provider, "anthropic");
-        } else { panic!("Critical task should use premium tier"); }
-        
+        } else {
+            panic!("Critical task should use premium tier");
+        }
+
         assert!(decision.reasoning.contains("QualityCritical"));
         Ok(())
     }
-    
+
     #[tokio::test]
     /// # Errors
     /// Returns an error if routing fails unexpectedly in the test harness.
@@ -203,16 +208,16 @@ mod tests {
     /// Panics if long context strategy does not select a premium tier.
     async fn test_long_context_strategy() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
-        
+
         let long_context_task = Task::new("Long context task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(50000));
-        
+
         let decision = router.route(&long_context_task).await?;
         assert!(matches!(decision.tier, ModelTier::Premium { .. }));
         assert!(decision.reasoning.contains("LongContext"));
         Ok(())
     }
-    
+
     #[tokio::test]
     /// # Errors
     /// Returns an error if routing fails unexpectedly in the test harness.
@@ -221,17 +226,17 @@ mod tests {
     /// Panics if low-cost tier is not selected for cheap tasks.
     async fn test_cost_optimization() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
-        
+
         let cheap_task = Task::new("Cheap task".to_owned())
             .with_priority(Priority::Low)
             .with_context(ContextRequirements::new().with_estimated_tokens(2000));
-        
+
         let decision = router.route(&cheap_task).await?;
         // Floating-point comparison: use epsilon to avoid pedantic float-cmp lint
         assert!(decision.estimated_cost.abs() < f64::EPSILON);
         Ok(())
     }
-    
+
     #[tokio::test]
     /// # Errors
     /// Returns an error if routing fails unexpectedly in the test harness.
@@ -240,11 +245,11 @@ mod tests {
     /// Panics if router reasoning does not mention expected strategies for medium tasks.
     async fn test_complexity_fallback() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
-        
+
         let medium_task = Task::new("Medium task".to_owned())
             .with_complexity(Complexity::Medium)
             .with_priority(Priority::Medium);
-        
+
         let decision = router.route(&medium_task).await?;
         assert!(decision.reasoning.contains("Complexity") || decision.reasoning.contains("Cost"));
         Ok(())

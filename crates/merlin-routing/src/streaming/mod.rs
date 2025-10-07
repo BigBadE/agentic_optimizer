@@ -1,7 +1,7 @@
+use crate::TaskId;
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
 use std::time::Instant;
-use crate::TaskId;
 use uuid::Uuid;
 
 pub mod channel;
@@ -13,7 +13,7 @@ pub use channel::StreamingChannel;
 pub struct StepId(Uuid);
 
 impl StepId {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self(Uuid::new_v4())
     }
@@ -37,7 +37,7 @@ pub struct TaskStep {
 }
 
 impl TaskStep {
-    #[must_use] 
+    #[must_use]
     pub fn new(task_id: TaskId, step_type: StepType, content: String) -> Self {
         Self {
             id: StepId::new(),
@@ -72,11 +72,23 @@ pub enum StreamingEvent {
     /// Task step completed
     StepCompleted { task_id: TaskId, step: TaskStep },
     /// Tool call started
-    ToolCallStarted { task_id: TaskId, tool: String, args: Value },
+    ToolCallStarted {
+        task_id: TaskId,
+        tool: String,
+        args: Value,
+    },
     /// Tool call completed
-    ToolCallCompleted { task_id: TaskId, tool: String, result: Value },
+    ToolCallCompleted {
+        task_id: TaskId,
+        tool: String,
+        result: Value,
+    },
     /// Thinking update
     ThinkingUpdate { task_id: TaskId, content: String },
     /// Subtask spawned
-    SubtaskSpawned { parent_id: TaskId, child_id: TaskId, description: String },
+    SubtaskSpawned {
+        parent_id: TaskId,
+        child_id: TaskId,
+        description: String,
+    },
 }

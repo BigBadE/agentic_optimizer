@@ -1,22 +1,21 @@
+use indicatif::{ProgressBar, ProgressStyle};
+use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::time::Duration;
-use std::collections::HashMap;
-use walkdir::{WalkDir, DirEntry};
-use indicatif::{ProgressBar, ProgressStyle};
-use tokio::task::{spawn_blocking, JoinError};
 use tokio::spawn;
+use tokio::task::{JoinError, spawn_blocking};
+use walkdir::{DirEntry, WalkDir};
 
+use core::result::Result as CoreResult;
 use merlin_core::{Context, Error, FileContext, Query, Result};
 use merlin_languages::LanguageProvider;
-use core::result::Result as CoreResult;
 
+use crate::context_inclusion::{
+    ContextManager, FilePriority, MAX_CONTEXT_TOKENS, PrioritizedFile, add_prioritized_files,
+};
+use crate::embedding::{SearchResult, VectorSearchManager};
 use crate::fs_utils::is_source_file;
 use crate::query::{QueryAnalyzer, QueryIntent};
-use crate::embedding::{VectorSearchManager, SearchResult};
-use crate::context_inclusion::{
-    ContextManager, PrioritizedFile, FilePriority, MAX_CONTEXT_TOKENS,
-    add_prioritized_files,
-};
 
 type BackendJoinResult = CoreResult<(Option<Box<dyn LanguageProvider>>, Result<()>), JoinError>;
 type VectorJoinResult = CoreResult<(VectorSearchManager, Result<()>), JoinError>;
@@ -28,7 +27,15 @@ type FileChunksMap = HashMap<PathBuf, Vec<(usize, usize, f32)>>;
 const DEFAULT_SYSTEM_PROMPT: &str = "You are a helpful coding assistant. You help users understand and modify their codebase.\n\nWhen making changes:\n1. Be precise and accurate\n2. Explain your reasoning\n3. Provide complete, working code\n4. Follow the existing code style\n\nYou have access to the user's codebase context below.";
 
 /// Directories ignored during project scan.
-const IGNORED_DIRS: &[&str] = &["target", "node_modules", "dist", "build", ".git", ".idea", ".vscode"];
+const IGNORED_DIRS: &[&str] = &[
+    "target",
+    "node_modules",
+    "dist",
+    "build",
+    ".git",
+    ".idea",
+    ".vscode",
+];
 
 /// Builds a `Context` by scanning files under a project root.
 pub struct ContextBuilder {
@@ -68,7 +75,7 @@ impl ContextBuilder {
     }
 
     /// Enable a language backend for semantic analysis.
-    /// 
+    ///
     /// This accepts any implementation of the `LanguageProvider` trait,
     /// allowing support for multiple languages (Rust, Java, Python, etc.)
     #[must_use]
@@ -85,10 +92,18 @@ impl ContextBuilder {
         // Step 1: Analyze the query to extract intent
         let analyzer = QueryAnalyzer::new();
         let intent = analyzer.analyze(&query.text);
-        
-        tracing::info!("Query intent: action={:?}, scope={:?}, complexity={:?}", 
-            intent.action, intent.scope, intent.complexity);
-        tracing::debug!("Keywords: {:?}, Entities: {:?}", intent.keywords, intent.entities);
+
+        tracing::info!(
+            "Query intent: action={:?}, scope={:?}, complexity={:?}",
+            intent.action,
+            intent.scope,
+            intent.complexity
+        );
+        tracing::debug!(
+            "Keywords: {:?}, Entities: {:?}",
+            intent.keywords,
+            intent.entities
+        );
 
         let mut files = if query.files_context.is_empty() {
             // Step 2: Initialize backend and vector search IN PARALLEL
@@ -97,11 +112,14 @@ impl ContextBuilder {
             // Step 3: Use subagent to generate context plan (backend is required)
             if self.language_backend.is_some() && self.language_backend_initialized {
                 let agent_files = self.use_subagent_for_context(&intent, &query.text).await?;
-                tracing::info!("Intelligent context fetching found {} files", agent_files.len());
+                tracing::info!(
+                    "Intelligent context fetching found {} files",
+                    agent_files.len()
+                );
                 agent_files
             } else {
                 return Err(Error::Other(
-                    "Language backend not initialized. This should not happen.".into()
+                    "Language backend not initialized. This should not happen.".into(),
                 ));
             }
         } else {
@@ -122,7 +140,11 @@ impl ContextBuilder {
         };
 
         files.truncate(self.max_files);
-        tracing::info!("Final context: {} files (max: {})", files.len(), self.max_files);
+        tracing::info!(
+            "Final context: {} files (max: {})",
+            files.len(),
+            self.max_files
+        );
 
         Ok(Context::new(DEFAULT_SYSTEM_PROMPT).with_files(files))
     }
@@ -131,7 +153,11 @@ impl ContextBuilder {
     ///
     /// # Errors
     /// Returns an error if language backend is not initialized or hybrid search fails
-    async fn use_subagent_for_context(&self, _intent: &QueryIntent, query_text: &str) -> Result<Vec<FileContext>> {
+    async fn use_subagent_for_context(
+        &self,
+        _intent: &QueryIntent,
+        query_text: &str,
+    ) -> Result<Vec<FileContext>> {
         // Initialize the language backend if needed
         if !self.language_backend_initialized {
             return Err(Error::Other("Language backend not initialized".into()));
@@ -145,54 +171,74 @@ impl ContextBuilder {
 
         // Use context manager to add hybrid search results
         let mut context_mgr = ContextManager::new(MAX_CONTEXT_TOKENS);
-        
+
         let added = add_prioritized_files(&mut context_mgr, search_prioritized);
-        tracing::info!("Added {} chunks from hybrid search ({} tokens used)", added, context_mgr.token_count());
+        tracing::info!(
+            "Added {} chunks from hybrid search ({} tokens used)",
+            added,
+            context_mgr.token_count()
+        );
 
         // Show relevant sections for prompt
         tracing::info!("RELEVANT SECTIONS FOR PROMPT");
-        tracing::info!("Total: {} chunks ({} tokens)", context_mgr.file_count(), context_mgr.token_count());
-        
+        tracing::info!(
+            "Total: {} chunks ({} tokens)",
+            context_mgr.file_count(),
+            context_mgr.token_count()
+        );
+
         // List all chunks with their sections and scores
         for (index, file) in context_mgr.files().iter().enumerate() {
             let tokens = ContextManager::estimate_tokens(&file.content);
 
             // Find the scores for this file
-            let (total_score, bm25, vector) = file_scores.iter()
+            let (total_score, bm25, vector) = file_scores
+                .iter()
                 .find(|(path, _, _, _)| path == &file.path)
-                .map_or((0.0, None, None), |(_, total, bm25, vector)| (*total, *bm25, *vector));
-            
+                .map_or((0.0, None, None), |(_, total, bm25, vector)| {
+                    (*total, *bm25, *vector)
+                });
+
             // Extract section info from content
             let section_info = file.content.lines().next().map_or_else(
                 || "chunk".to_owned(),
                 |first_line| {
                     if first_line.starts_with("--- Context: lines") {
                         // Code file with context
-                        first_line.trim_start_matches("--- Context: lines ").trim_end_matches(" ---").to_owned()
+                        first_line
+                            .trim_start_matches("--- Context: lines ")
+                            .trim_end_matches(" ---")
+                            .to_owned()
                     } else if first_line.starts_with("--- Lines") {
                         // Text file without context
-                        first_line.trim_start_matches("--- Lines ").trim_end_matches(" ---").to_owned()
+                        first_line
+                            .trim_start_matches("--- Lines ")
+                            .trim_end_matches(" ---")
+                            .to_owned()
                     } else if file.content.lines().count() < 100 {
                         // Small content without markers is likely a chunk
                         format!("chunk (~{} lines)", file.content.lines().count())
                     } else {
                         "full file".to_owned()
                     }
-                }
+                },
             );
-            
+
             // Format score display
             // Note: component scores are raw RRF contributions, total is normalized to 0-1
             let score_display = match (bm25, vector) {
                 (Some(bm25_score), Some(vec_score)) => {
                     let sum = bm25_score + vec_score;
-                    format!("score: {total_score:.3} (bm25: {bm25_score:.3} + vec: {vec_score:.3} = {sum:.3})")
-                },
-                (Some(bm25_score), None) => format!("score: {total_score:.3} (bm25: {bm25_score:.3})"),
+                    format!(
+                        "score: {total_score:.3} (bm25: {bm25_score:.3} + vec: {vec_score:.3} = {sum:.3})"
+                    )
+                }
+                (Some(bm25_score), None) => {
+                    format!("score: {total_score:.3} (bm25: {bm25_score:.3})")
+                }
                 (None, Some(vec_score)) => format!("score: {total_score:.3} (vec: {vec_score:.3})"),
                 (None, None) => format!("score: {total_score:.3}"),
             };
-
 
             tracing::info!(
                 "{}. {} [{}] ({}, {} tokens)",
@@ -204,10 +250,9 @@ impl ContextBuilder {
             );
         }
         tracing::info!("=====================================");
-        
+
         Ok(context_mgr.into_files())
     }
-
 
     /// Collect a list of readable code files under the project root.
     fn collect_all_files(&self) -> Vec<FileContext> {
@@ -256,13 +301,13 @@ impl ContextBuilder {
         let mut current_start = chunks[0].0;
         let mut current_end = chunks[0].1;
         let mut max_score = chunks[0].2;
-        
+
         for (start, end, score) in chunks.into_iter().skip(1) {
             // Check if chunks overlap when considering context expansion
             // Two chunks overlap if: start - CONTEXT <= current_end + CONTEXT
             let expanded_current_end = current_end + CONTEXT_LINES;
             let expanded_start = start.saturating_sub(CONTEXT_LINES);
-            
+
             if expanded_start <= expanded_current_end {
                 // Merge: extend current chunk
                 current_end = current_end.max(end);
@@ -275,10 +320,10 @@ impl ContextBuilder {
                 max_score = score;
             }
         }
-        
+
         // Add the last chunk
         merged.push((current_start, current_end, max_score));
-        
+
         merged
     }
 
@@ -286,26 +331,31 @@ impl ContextBuilder {
     ///
     /// # Errors
     /// Returns an error if file cannot be read
-    fn extract_chunk_with_context(file_path: &PathBuf, start_line: usize, end_line: usize, include_context: bool) -> Result<FileContext> {
+    fn extract_chunk_with_context(
+        file_path: &PathBuf,
+        start_line: usize,
+        end_line: usize,
+        include_context: bool,
+    ) -> Result<FileContext> {
         use std::fs;
 
         let content = fs::read_to_string(file_path)
             .map_err(|read_error| Error::Other(format!("Failed to read file: {read_error}")))?;
-        
+
         let lines: Vec<&str> = content.lines().collect();
-        
+
         // Calculate context window (±50 lines for code, exact chunk for text)
         let (context_start, context_end) = if include_context {
             const CONTEXT_LINES: usize = 50;
             (
                 start_line.saturating_sub(CONTEXT_LINES).max(1),
-                (end_line + CONTEXT_LINES).min(lines.len())
+                (end_line + CONTEXT_LINES).min(lines.len()),
             )
         } else {
             // Text files: exact chunk only
             (start_line, end_line)
         };
-        
+
         // Extract lines with context
         let chunk_lines: Vec<&str> = lines
             .iter()
@@ -313,9 +363,9 @@ impl ContextBuilder {
             .filter(|(line_index, _)| *line_index + 1 >= context_start && *line_index < context_end)
             .map(|(_, line)| *line)
             .collect();
-        
+
         let chunk_content = chunk_lines.join("\n");
-        
+
         // Create a marker to show the actual matched chunk (only if we added context)
         let marker = if include_context && (context_start < start_line || context_end > end_line) {
             format!("\n\n--- Matched chunk: lines {start_line}-{end_line} ---\n")
@@ -331,7 +381,7 @@ impl ContextBuilder {
             // Text files without context - still show line range
             format!("--- Lines {context_start}-{context_end} ---\n{chunk_content}")
         };
-        
+
         Ok(FileContext {
             path: file_path.clone(),
             content: final_content,
@@ -341,10 +391,10 @@ impl ContextBuilder {
     /// Check if a chunk should be included based on size and score
     fn should_include_chunk(tokens: usize, score: f32) -> bool {
         if tokens < 50 {
-            return false;  // Always filter tiny chunks
+            return false; // Always filter tiny chunks
         }
         if tokens < 100 && score < 0.7 {
-            return false;  // Filter small low-score chunks
+            return false; // Filter small low-score chunks
         }
         true
     }
@@ -353,11 +403,33 @@ impl ContextBuilder {
     fn is_code_file(path: &Path) -> bool {
         path.extension()
             .and_then(|ext| ext.to_str())
-            .is_some_and(|ext| matches!(ext,
-                "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "java" | "c" | "cpp" |
-                "h" | "hpp" | "go" | "rb" | "php" | "cs" | "swift" | "kt" | "scala" |
-                "toml" | "yaml" | "yml" | "json" | "xml"
-            ))
+            .is_some_and(|ext| {
+                matches!(
+                    ext,
+                    "rs" | "py"
+                        | "js"
+                        | "ts"
+                        | "jsx"
+                        | "tsx"
+                        | "java"
+                        | "c"
+                        | "cpp"
+                        | "h"
+                        | "hpp"
+                        | "go"
+                        | "rb"
+                        | "php"
+                        | "cs"
+                        | "swift"
+                        | "kt"
+                        | "scala"
+                        | "toml"
+                        | "yaml"
+                        | "yml"
+                        | "json"
+                        | "xml"
+                )
+            })
     }
 
     /// Check if a directory entry should be ignored
@@ -412,7 +484,8 @@ impl ContextBuilder {
     /// # Errors
     /// Returns an error if critical initialization fails.
     async fn initialize_systems_parallel(&mut self) -> Result<()> {
-        let needs_backend_init = self.language_backend.is_some() && !self.language_backend_initialized;
+        let needs_backend_init =
+            self.language_backend.is_some() && !self.language_backend_initialized;
         let needs_vector_init = self.vector_manager.is_none();
 
         if !needs_backend_init && !needs_vector_init {
@@ -505,7 +578,7 @@ impl ContextBuilder {
         spinner.set_style(
             ProgressStyle::default_spinner()
                 .template("{spinner:.cyan} {msg}")
-                .unwrap_or_else(|_| ProgressStyle::default_spinner())
+                .unwrap_or_else(|_| ProgressStyle::default_spinner()),
         );
         spinner.enable_steady_tick(Duration::from_millis(100));
 
@@ -529,7 +602,12 @@ impl ContextBuilder {
         } else {
             tracing::info!("Hybrid search found {} matches", semantic_matches.len());
             for (idx, result) in semantic_matches.iter().enumerate().take(10) {
-                tracing::debug!("  {}. {} (score: {:.3})", idx + 1, result.file_path.display(), result.score);
+                tracing::debug!(
+                    "  {}. {} (score: {:.3})",
+                    idx + 1,
+                    result.file_path.display(),
+                    result.score
+                );
             }
             if semantic_matches.len() > 10 {
                 tracing::debug!("  ... and {} more", semantic_matches.len() - 10);
@@ -556,30 +634,30 @@ impl ContextBuilder {
                         FilePriority::Medium
                     };
 
-                    search_prioritized.push(PrioritizedFile::with_score(
-                        chunk_ctx,
-                        priority,
-                        score,
-                    ));
+                    search_prioritized
+                        .push(PrioritizedFile::with_score(chunk_ctx, priority, score));
                 }
                 Err(extract_error) => {
-                    tracing::warn!("Failed to extract chunk from {}: {extract_error}", file_path.display());
+                    tracing::warn!(
+                        "Failed to extract chunk from {}: {extract_error}",
+                        file_path.display()
+                    );
                 }
             }
         }
     }
 
     /// Processes search results into prioritized file chunks.
-    fn process_search_results(
-        semantic_matches: &[SearchResult]
-    ) -> ProcessSearchResultsReturn {
+    fn process_search_results(semantic_matches: &[SearchResult]) -> ProcessSearchResultsReturn {
         // Filter out low-quality small chunks
-        let filtered_matches: Vec<_> = semantic_matches.iter()
+        let filtered_matches: Vec<_> = semantic_matches
+            .iter()
             .filter(|result| {
                 if let Some(path_str) = result.file_path.to_str()
                     && let Some((_, range_part)) = path_str.rsplit_once(':')
                     && let Some((start_str, end_str)) = range_part.split_once('-')
-                    && let (Ok(start), Ok(end)) = (start_str.parse::<usize>(), end_str.parse::<usize>())
+                    && let (Ok(start), Ok(end)) =
+                        (start_str.parse::<usize>(), end_str.parse::<usize>())
                 {
                     let line_count = end.saturating_sub(start);
                     let estimated_tokens = line_count * 10;
@@ -604,9 +682,13 @@ impl ContextBuilder {
             {
                 let path = PathBuf::from(file_part);
                 if let Some((start_str, end_str)) = range_part.split_once('-')
-                    && let (Ok(start), Ok(end)) = (start_str.parse::<usize>(), end_str.parse::<usize>())
+                    && let (Ok(start), Ok(end)) =
+                        (start_str.parse::<usize>(), end_str.parse::<usize>())
                 {
-                    file_chunks.entry(path).or_default().push((start, end, result.score));
+                    file_chunks
+                        .entry(path)
+                        .or_default()
+                        .push((start, end, result.score));
                 }
             }
         }
@@ -623,21 +705,24 @@ impl ContextBuilder {
         }
 
         // Track scores for display
-        let file_scores: Vec<FileScoreInfo> = filtered_matches.iter()
+        let file_scores: Vec<FileScoreInfo> = filtered_matches
+            .iter()
             .filter_map(|result| {
-                result.file_path.to_str()
+                result
+                    .file_path
+                    .to_str()
                     .and_then(|path_str| path_str.rsplit_once(':'))
-                    .map(|(file_part, _)| (
-                        PathBuf::from(file_part),
-                        result.score,
-                        result.bm25_score,
-                        result.vector_score,
-                    ))
+                    .map(|(file_part, _)| {
+                        (
+                            PathBuf::from(file_part),
+                            result.score,
+                            result.bm25_score,
+                            result.vector_score,
+                        )
+                    })
             })
             .collect();
 
         (search_prioritized, file_scores)
     }
-
 }
-

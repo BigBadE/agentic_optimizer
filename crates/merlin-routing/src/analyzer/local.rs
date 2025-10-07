@@ -1,8 +1,8 @@
-use async_trait::async_trait;
-use crate::{Complexity, ExecutionStrategy, Result, TaskAnalysis, TaskAnalyzer};
 use super::complexity::ComplexityEstimator;
 use super::decompose::TaskDecomposer;
 use super::intent::IntentExtractor;
+use crate::{Complexity, ExecutionStrategy, Result, TaskAnalysis, TaskAnalyzer};
+use async_trait::async_trait;
 
 /// Local task analyzer using heuristics (no LLM required)
 pub struct LocalTaskAnalyzer {
@@ -22,7 +22,7 @@ impl LocalTaskAnalyzer {
             max_parallel_tasks: 4,
         }
     }
-    
+
     #[must_use]
     pub fn with_max_parallel(mut self, max: usize) -> Self {
         self.max_parallel_tasks = max;
@@ -40,16 +40,18 @@ impl Default for LocalTaskAnalyzer {
 impl TaskAnalyzer for LocalTaskAnalyzer {
     async fn analyze(&self, request: &str) -> Result<TaskAnalysis> {
         let intent = self.intent_extractor.extract(request);
-        
+
         let _complexity = self.complexity_estimator.estimate(&intent, request);
-        
+
         let mut tasks = self.task_decomposer.decompose(&intent, request);
-        
+
         for task in &mut tasks {
-            let context_needs = self.complexity_estimator.estimate_context_needs(&intent, request);
+            let context_needs = self
+                .complexity_estimator
+                .estimate_context_needs(&intent, request);
             *task = task.clone().with_context(context_needs);
         }
-        
+
         let execution_strategy = if tasks.len() == 1 {
             ExecutionStrategy::Sequential
         } else if tasks.iter().all(|task| task.dependencies.is_empty()) {
@@ -59,13 +61,13 @@ impl TaskAnalyzer for LocalTaskAnalyzer {
         } else {
             ExecutionStrategy::Pipeline
         };
-        
+
         Ok(TaskAnalysis {
             tasks,
             execution_strategy,
         })
     }
-    
+
     fn estimate_complexity(&self, request: &str) -> Complexity {
         let intent = self.intent_extractor.extract(request);
         self.complexity_estimator.estimate(&intent, request)
@@ -85,11 +87,14 @@ mod tests {
             Ok(analysis) => analysis,
             Err(error) => panic!("analyze failed: {error}"),
         };
-        
+
         assert_eq!(analysis.tasks.len(), 1);
-        assert!(matches!(analysis.execution_strategy, ExecutionStrategy::Sequential));
+        assert!(matches!(
+            analysis.execution_strategy,
+            ExecutionStrategy::Sequential
+        ));
     }
-    
+
     #[tokio::test]
     /// # Panics
     /// Panics if analyze returns an error in the test harness.
@@ -99,24 +104,27 @@ mod tests {
             Ok(analysis) => analysis,
             Err(error) => panic!("analyze failed: {error}"),
         };
-        
+
         assert_eq!(analysis.tasks.len(), 3);
-        assert!(matches!(analysis.execution_strategy, ExecutionStrategy::Pipeline));
+        assert!(matches!(
+            analysis.execution_strategy,
+            ExecutionStrategy::Pipeline
+        ));
     }
-    
+
     #[tokio::test]
     /// # Panics
     /// Panics if complexity estimation produces unexpected categories.
     async fn test_complexity_estimation() {
         let analyzer = LocalTaskAnalyzer::new();
-        
+
         let simple = analyzer.estimate_complexity("Add a comment");
         assert!(matches!(simple, Complexity::Trivial | Complexity::Simple));
-        
+
         let complex = analyzer.estimate_complexity("Refactor the entire architecture");
         assert!(matches!(complex, Complexity::Complex));
     }
-    
+
     #[tokio::test]
     /// # Panics
     /// Panics if analyze returns an error in the test harness.
@@ -126,7 +134,7 @@ mod tests {
             Ok(analysis) => analysis,
             Err(error) => panic!("analyze failed: {error}"),
         };
-        
+
         assert!(!analysis.tasks.is_empty());
         let task = &analysis.tasks[0];
         assert!(!task.context_needs.required_files.is_empty());

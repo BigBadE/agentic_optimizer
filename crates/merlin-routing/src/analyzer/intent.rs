@@ -1,5 +1,5 @@
-use std::cmp::Ordering;
 use crate::{Complexity, Priority};
+use std::cmp::Ordering;
 
 /// Extracted intent from user request
 #[derive(Debug, Clone)]
@@ -39,7 +39,7 @@ impl IntentExtractor {
     pub fn new() -> Self {
         Self
     }
-    
+
     #[must_use]
     pub fn extract(&self, request: &str) -> Intent {
         let request_lower = request.to_lowercase();
@@ -47,7 +47,7 @@ impl IntentExtractor {
         let scope = Self::detect_scope(request);
         let priority = Self::detect_priority(&request_lower);
         let complexity_hint = Some(Self::estimate_complexity(&request_lower, &action));
-        
+
         Intent {
             action,
             scope,
@@ -55,11 +55,14 @@ impl IntentExtractor {
             complexity_hint,
         }
     }
-    
+
     fn detect_action(request: &str) -> Action {
         if request.contains("create") || request.contains("add") || request.contains("new") {
             Action::Create
-        } else if request.contains("modify") || request.contains("update") || request.contains("change") {
+        } else if request.contains("modify")
+            || request.contains("update")
+            || request.contains("change")
+        {
             Action::Modify
         } else if request.contains("delete") || request.contains("remove") {
             Action::Delete
@@ -79,7 +82,7 @@ impl IntentExtractor {
             Action::Modify
         }
     }
-    
+
     fn detect_scope(request: &str) -> Scope {
         if request.contains(".rs") || request.contains(".toml") {
             let files: Vec<String> = request
@@ -100,7 +103,7 @@ impl IntentExtractor {
             Scope::Project
         }
     }
-    
+
     fn detect_priority(request: &str) -> Priority {
         if request.contains("critical") || request.contains("urgent") || request.contains("asap") {
             Priority::Critical
@@ -112,11 +115,13 @@ impl IntentExtractor {
             Priority::Medium
         }
     }
-    
+
     fn estimate_complexity(request: &str, action: &Action) -> Complexity {
         let word_count = request.split_whitespace().count();
         let base_complexity = match action {
-            Action::Create | Action::Delete | Action::Modify | Action::Document => Complexity::Simple,
+            Action::Create | Action::Delete | Action::Modify | Action::Document => {
+                Complexity::Simple
+            }
             Action::Fix | Action::Test | Action::Analyze => Complexity::Medium,
             Action::Refactor | Action::Optimize => Complexity::Complex,
         };
@@ -150,7 +155,7 @@ mod tests {
         let intent = extractor.extract("Create a new file test.rs");
         assert_eq!(intent.action, Action::Create);
     }
-    
+
     #[test]
     /// # Panics
     /// Panics if action detection fails for fix.
@@ -159,7 +164,7 @@ mod tests {
         let intent = extractor.extract("Fix the bug in parser.rs");
         assert_eq!(intent.action, Action::Fix);
     }
-    
+
     #[test]
     /// # Panics
     /// Panics if action detection fails for refactor.
@@ -168,7 +173,7 @@ mod tests {
         let intent = extractor.extract("Refactor the entire module");
         assert_eq!(intent.action, Action::Refactor);
     }
-    
+
     #[test]
     /// # Panics
     /// Panics if file scope detection fails.
@@ -177,7 +182,7 @@ mod tests {
         let intent = extractor.extract("Modify test.rs");
         assert!(matches!(intent.scope, Scope::File(_)));
     }
-    
+
     #[test]
     /// # Panics
     /// Panics if priority detection fails.
@@ -186,16 +191,16 @@ mod tests {
         let intent = extractor.extract("Critical bug fix needed");
         assert_eq!(intent.priority, Priority::Critical);
     }
-    
+
     #[test]
     /// # Panics
     /// Panics if complexity estimation mapping fails.
     fn test_complexity_estimation() {
         let extractor = IntentExtractor::new();
-        
+
         let simple = extractor.extract("Add a comment");
         assert_eq!(simple.complexity_hint, Some(Complexity::Simple));
-        
+
         let complex = extractor.extract("Refactor the entire codebase");
         assert_eq!(complex.complexity_hint, Some(Complexity::Complex));
     }

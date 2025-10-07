@@ -1,11 +1,11 @@
 //! Benchmark system for evaluating context fetching quality.
 
+use merlin_core::Result;
+use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
-use serde::{Deserialize, Serialize};
 use toml::from_str as toml_from_str;
-use merlin_core::Result;
 
 /// Priority level for expected files
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
@@ -19,7 +19,7 @@ pub enum Priority {
 
 impl Priority {
     /// Get weight for NDCG calculation
-    #[must_use] 
+    #[must_use]
     pub fn weight(self) -> f32 {
         match self {
             Self::Critical => 1.0,
@@ -30,7 +30,7 @@ impl Priority {
     }
 
     /// Get expected rank range
-    #[must_use] 
+    #[must_use]
     pub fn expected_rank(self) -> usize {
         match self {
             Self::Critical => 3,
@@ -104,13 +104,13 @@ pub struct BenchmarkResult {
 
 impl BenchmarkResult {
     /// Create result from test case and ranked files
-    #[must_use] 
+    #[must_use]
     pub fn new(test_case: TestCase, ranked_files: Vec<RankedFile>) -> Self {
         let metrics = Self::calculate_metrics(&test_case, &ranked_files);
-        
+
         let mut found_expected = Vec::new();
         let mut missing_expected = Vec::new();
-        
+
         for expected in &test_case.expected {
             if let Some(rank) = Self::find_file_rank(&ranked_files, &expected.path) {
                 found_expected.push((rank, expected.clone()));
@@ -118,14 +118,16 @@ impl BenchmarkResult {
                 missing_expected.push(expected.clone());
             }
         }
-        
+
         let mut found_excluded = Vec::new();
         for excluded in &test_case.excluded {
-            if let Some(rank) = Self::find_file_rank(&ranked_files, &excluded.path) && rank <= 20 {
+            if let Some(rank) = Self::find_file_rank(&ranked_files, &excluded.path)
+                && rank <= 20
+            {
                 found_excluded.push((rank, excluded.clone()));
             }
         }
-        
+
         Self {
             test_case,
             metrics,
@@ -135,11 +137,11 @@ impl BenchmarkResult {
             found_excluded,
         }
     }
-    
+
     fn find_file_rank(ranked_files: &[RankedFile], path: &str) -> Option<usize> {
         // Normalize path separators for comparison
         let normalized_expected = path.replace('/', "\\");
-        
+
         for file in ranked_files {
             let file_path_str = file.path.to_str().unwrap_or("");
             // Check both original and normalized versions
@@ -149,13 +151,17 @@ impl BenchmarkResult {
         }
         None
     }
-    
+
     fn calculate_metrics(test_case: &TestCase, ranked_files: &[RankedFile]) -> BenchmarkMetrics {
-        let expected_paths: HashSet<String> = test_case.expected.iter()
+        let expected_paths: HashSet<String> = test_case
+            .expected
+            .iter()
             .map(|expected_file| expected_file.path.clone())
             .collect();
 
-        let excluded_paths: HashSet<String> = test_case.excluded.iter()
+        let excluded_paths: HashSet<String> = test_case
+            .excluded
+            .iter()
             .map(|excluded_file| excluded_file.path.clone())
             .collect();
 
@@ -171,13 +177,10 @@ impl BenchmarkResult {
             &test_case.expected,
             ranked_files,
             Priority::Critical,
-            3
+            3,
         );
-        let high_in_top_5 = Self::calculate_high_priority_in_top_k(
-            &test_case.expected,
-            ranked_files,
-            5
-        );
+        let high_in_top_5 =
+            Self::calculate_high_priority_in_top_k(&test_case.expected, ranked_files, 5);
 
         BenchmarkMetrics {
             precision_at_3,
@@ -196,10 +199,11 @@ impl BenchmarkResult {
     fn calculate_precision_at_k(
         ranked_files: &[RankedFile],
         expected_paths: &HashSet<String>,
-        limit: usize
+        limit: usize,
     ) -> f32 {
         let top_k: Vec<_> = ranked_files.iter().take(limit).collect();
-        let relevant = top_k.iter()
+        let relevant = top_k
+            .iter()
             .filter(|ranked_file| {
                 let path_str = ranked_file.path.to_str().unwrap_or("");
                 expected_paths.iter().any(|expected_path| {
@@ -214,10 +218,11 @@ impl BenchmarkResult {
     fn calculate_recall_at_k(
         ranked_files: &[RankedFile],
         expected_paths: &HashSet<String>,
-        limit: usize
+        limit: usize,
     ) -> f32 {
         let top_k: Vec<_> = ranked_files.iter().take(limit).collect();
-        let found = top_k.iter()
+        let found = top_k
+            .iter()
             .filter(|ranked_file| {
                 let path_str = ranked_file.path.to_str().unwrap_or("");
                 expected_paths.iter().any(|expected_path| {
@@ -230,24 +235,24 @@ impl BenchmarkResult {
     }
 
     fn calculate_mrr(ranked_files: &[RankedFile], expected_paths: &HashSet<String>) -> f32 {
-        let first_relevant = ranked_files.iter()
-            .position(|ranked_file| {
-                let path_str = ranked_file.path.to_str().unwrap_or("");
-                expected_paths.iter().any(|expected_path| {
-                    let normalized = expected_path.replace('/', "\\");
-                    path_str.contains(expected_path) || path_str.contains(&normalized)
-                })
-            });
+        let first_relevant = ranked_files.iter().position(|ranked_file| {
+            let path_str = ranked_file.path.to_str().unwrap_or("");
+            expected_paths.iter().any(|expected_path| {
+                let normalized = expected_path.replace('/', "\\");
+                path_str.contains(expected_path) || path_str.contains(&normalized)
+            })
+        });
 
         first_relevant.map_or(0.0, |rank| 1.0 / (rank + 1) as f32)
     }
 
     fn calculate_exclusion_rate(
         ranked_files: &[RankedFile],
-        excluded_paths: &HashSet<String>
+        excluded_paths: &HashSet<String>,
     ) -> f32 {
         let top_20: Vec<_> = ranked_files.iter().take(20).collect();
-        let excluded_found = top_20.iter()
+        let excluded_found = top_20
+            .iter()
             .filter(|ranked_file| {
                 let path_str = ranked_file.path.to_str().unwrap_or("");
                 excluded_paths.iter().any(|excluded_path| {
@@ -264,9 +269,10 @@ impl BenchmarkResult {
         expected_files: &[ExpectedFile],
         ranked_files: &[RankedFile],
         priority: Priority,
-        limit: usize
+        limit: usize,
     ) -> f32 {
-        let priority_files: Vec<_> = expected_files.iter()
+        let priority_files: Vec<_> = expected_files
+            .iter()
             .filter(|expected_file| expected_file.priority == priority)
             .collect();
 
@@ -274,7 +280,8 @@ impl BenchmarkResult {
             return 1.0;
         }
 
-        let found = priority_files.iter()
+        let found = priority_files
+            .iter()
             .filter(|expected_file| {
                 let normalized = expected_file.path.replace('/', "\\");
                 ranked_files.iter().take(limit).any(|ranked_file| {
@@ -289,17 +296,21 @@ impl BenchmarkResult {
     fn calculate_high_priority_in_top_k(
         expected_files: &[ExpectedFile],
         ranked_files: &[RankedFile],
-        limit: usize
+        limit: usize,
     ) -> f32 {
-        let high_priority_files: Vec<_> = expected_files.iter()
-            .filter(|expected_file| matches!(expected_file.priority, Priority::Critical | Priority::High))
+        let high_priority_files: Vec<_> = expected_files
+            .iter()
+            .filter(|expected_file| {
+                matches!(expected_file.priority, Priority::Critical | Priority::High)
+            })
             .collect();
 
         if high_priority_files.is_empty() {
             return 1.0;
         }
 
-        let found = high_priority_files.iter()
+        let found = high_priority_files
+            .iter()
             .filter(|expected_file| {
                 let normalized = expected_file.path.replace('/', "\\");
                 ranked_files.iter().take(limit).any(|ranked_file| {
@@ -310,20 +321,23 @@ impl BenchmarkResult {
             .count();
         found as f32 / high_priority_files.len() as f32
     }
-    
+
     fn calculate_ndcg(expected: &[ExpectedFile], ranked_files: &[RankedFile], top_k: usize) -> f32 {
         use std::cmp::Ordering;
 
-        let expected_map: HashMap<String, f32> = expected.iter()
+        let expected_map: HashMap<String, f32> = expected
+            .iter()
             .map(|expected_file| (expected_file.path.clone(), expected_file.priority.weight()))
             .collect();
 
-        let dcg: f32 = ranked_files.iter()
+        let dcg: f32 = ranked_files
+            .iter()
             .take(top_k)
             .enumerate()
             .map(|(index, ranked_file)| {
                 let path_str = ranked_file.path.to_str().unwrap_or("");
-                let relevance = expected_map.iter()
+                let relevance = expected_map
+                    .iter()
                     .find(|(path, _)| {
                         let normalized = path.replace('/', "\\");
                         path_str.contains(path.as_str()) || path_str.contains(&normalized)
@@ -334,26 +348,23 @@ impl BenchmarkResult {
             })
             .sum();
 
-        let mut ideal_relevances: Vec<f32> = expected.iter()
+        let mut ideal_relevances: Vec<f32> = expected
+            .iter()
             .map(|expected_file| expected_file.priority.weight())
             .collect();
-        ideal_relevances.sort_by(|first, second| {
-            second.partial_cmp(first).unwrap_or(Ordering::Equal)
-        });
+        ideal_relevances
+            .sort_by(|first, second| second.partial_cmp(first).unwrap_or(Ordering::Equal));
 
-        let idcg: f32 = ideal_relevances.iter()
+        let idcg: f32 = ideal_relevances
+            .iter()
             .take(top_k)
             .enumerate()
             .map(|(index, relevance)| relevance / (index as f32 + 2.0).log2())
             .sum();
 
-        if idcg > 0.0 {
-            dcg / idcg
-        } else {
-            0.0
-        }
+        if idcg > 0.0 { dcg / idcg } else { 0.0 }
     }
-    
+
     /// Format result as human-readable text
     #[must_use]
     #[allow(clippy::unused_io_amount, reason = "Writing to String never fails")]
@@ -363,39 +374,100 @@ impl BenchmarkResult {
         {
             write!(report, "# Benchmark: {}\n\n", self.test_case.name).unwrap_or(());
             write!(report, "**Query**: \"{}\"\n\n", self.test_case.query).unwrap_or(());
-            write!(report, "**Description**: {}\n\n", self.test_case.description).unwrap_or(());
+            write!(
+                report,
+                "**Description**: {}\n\n",
+                self.test_case.description
+            )
+            .unwrap_or(());
 
             report.push_str("## Metrics\n\n");
-            writeln!(report, "- **Precision@3**:  {:.1}%", self.metrics.precision_at_3 * 100.0).unwrap_or(());
-            writeln!(report, "- **Precision@5**:  {:.1}%", self.metrics.precision_at_5 * 100.0).unwrap_or(());
-            writeln!(report, "- **Precision@10**: {:.1}%", self.metrics.precision_at_10 * 100.0).unwrap_or(());
-            writeln!(report, "- **Recall@10**:    {:.1}%", self.metrics.recall_at_10 * 100.0).unwrap_or(());
-            writeln!(report, "- **Recall@20**:    {:.1}%", self.metrics.recall_at_20 * 100.0).unwrap_or(());
+            writeln!(
+                report,
+                "- **Precision@3**:  {:.1}%",
+                self.metrics.precision_at_3 * 100.0
+            )
+            .unwrap_or(());
+            writeln!(
+                report,
+                "- **Precision@5**:  {:.1}%",
+                self.metrics.precision_at_5 * 100.0
+            )
+            .unwrap_or(());
+            writeln!(
+                report,
+                "- **Precision@10**: {:.1}%",
+                self.metrics.precision_at_10 * 100.0
+            )
+            .unwrap_or(());
+            writeln!(
+                report,
+                "- **Recall@10**:    {:.1}%",
+                self.metrics.recall_at_10 * 100.0
+            )
+            .unwrap_or(());
+            writeln!(
+                report,
+                "- **Recall@20**:    {:.1}%",
+                self.metrics.recall_at_20 * 100.0
+            )
+            .unwrap_or(());
             writeln!(report, "- **MRR**:          {:.3}", self.metrics.mrr).unwrap_or(());
             writeln!(report, "- **NDCG@10**:      {:.3}", self.metrics.ndcg_at_10).unwrap_or(());
-            writeln!(report, "- **Exclusion**:    {:.1}%", self.metrics.exclusion_rate * 100.0).unwrap_or(());
-            writeln!(report, "- **Critical in Top-3**: {:.1}%", self.metrics.critical_in_top_3 * 100.0).unwrap_or(());
-            writeln!(report, "- **High in Top-5**:     {:.1}%\n", self.metrics.high_in_top_5 * 100.0).unwrap_or(());
+            writeln!(
+                report,
+                "- **Exclusion**:    {:.1}%",
+                self.metrics.exclusion_rate * 100.0
+            )
+            .unwrap_or(());
+            writeln!(
+                report,
+                "- **Critical in Top-3**: {:.1}%",
+                self.metrics.critical_in_top_3 * 100.0
+            )
+            .unwrap_or(());
+            writeln!(
+                report,
+                "- **High in Top-5**:     {:.1}%\n",
+                self.metrics.high_in_top_5 * 100.0
+            )
+            .unwrap_or(());
 
             report.push_str("## Top 10 Results\n\n");
             for (index, ranked_file) in self.ranked_files.iter().take(10).enumerate() {
                 let rank = index + 1;
                 let path_str = ranked_file.path.to_str().unwrap_or("?");
 
-                let status = if let Some((_, expected)) = self.found_expected.iter().find(|(found_rank, _)| *found_rank == rank) {
-                    format!("Check mark (expected: {})", match expected.priority {
-                        Priority::Critical => "Critical",
-                        Priority::High => "High",
-                        Priority::Medium => "Medium",
-                        Priority::Low => "Low",
-                    })
-                } else if self.found_excluded.iter().any(|(excluded_rank, _)| *excluded_rank == rank) {
+                let status = if let Some((_, expected)) = self
+                    .found_expected
+                    .iter()
+                    .find(|(found_rank, _)| *found_rank == rank)
+                {
+                    format!(
+                        "Check mark (expected: {})",
+                        match expected.priority {
+                            Priority::Critical => "Critical",
+                            Priority::High => "High",
+                            Priority::Medium => "Medium",
+                            Priority::Low => "Low",
+                        }
+                    )
+                } else if self
+                    .found_excluded
+                    .iter()
+                    .any(|(excluded_rank, _)| *excluded_rank == rank)
+                {
                     "Cross mark (excluded)".to_string()
                 } else {
                     "Cross mark (not expected)".to_string()
                 };
 
-                writeln!(report, "{}. {} {} (score: {:.3})", rank, path_str, status, ranked_file.score).unwrap_or(());
+                writeln!(
+                    report,
+                    "{}. {} {} (score: {:.3})",
+                    rank, path_str, status, ranked_file.score
+                )
+                .unwrap_or(());
             }
 
             if !self.missing_expected.is_empty() {
@@ -407,7 +479,12 @@ impl BenchmarkResult {
                         Priority::Medium => "Medium",
                         Priority::Low => "Low",
                     };
-                    writeln!(report, "- **{}** ({}): {}", expected.path, priority_str, expected.reason).unwrap_or(());
+                    writeln!(
+                        report,
+                        "- **{}** ({}): {}",
+                        expected.path, priority_str, expected.reason
+                    )
+                    .unwrap_or(());
                 }
             }
         }
@@ -447,7 +524,9 @@ pub fn load_test_cases(dir: &Path) -> Result<TestCaseCollection> {
         if path.extension().and_then(|ext| ext.to_str()) == Some("toml") {
             match load_test_case(&path) {
                 Ok(test_case) => test_cases.push((path, test_case)),
-                Err(error) => tracing::warn!("Warning: Failed to load {}: {}", path.display(), error),
+                Err(error) => {
+                    tracing::warn!("Warning: Failed to load {}: {}", path.display(), error)
+                }
             }
         }
     }

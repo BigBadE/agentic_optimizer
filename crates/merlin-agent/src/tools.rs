@@ -1,16 +1,16 @@
 use std::collections::HashMap;
 use std::sync::Arc;
 
+use anyhow::Result;
 use merlin_tools::{BashTool, EditTool, ShowTool, Tool, ToolInput, ToolOutput};
 use tracing::info;
-use anyhow::Result;
 
 pub struct ToolRegistry {
     tools: HashMap<String, Arc<dyn Tool>>,
 }
 
 impl ToolRegistry {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         let mut registry = Self {
             tools: HashMap::new(),
@@ -29,12 +29,12 @@ impl ToolRegistry {
         self.tools.insert(name, tool);
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn get(&self, name: &str) -> Option<&Arc<dyn Tool>> {
         self.tools.get(name)
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn list_tools(&self) -> Vec<(&str, &str)> {
         self.tools
             .values()
@@ -61,4 +61,3 @@ impl Default for ToolRegistry {
         Self::new()
     }
 }
-

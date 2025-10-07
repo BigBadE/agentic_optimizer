@@ -2,9 +2,9 @@ pub mod strategies;
 pub mod strategy;
 pub mod tiers;
 
+use crate::{Result, Task};
 use async_trait::async_trait;
 use serde::{Deserialize, Serialize};
-use crate::{Result, Task};
 use std::fmt::{Display, Formatter, Result as FmtResult};
 
 pub use strategies::{
@@ -16,9 +16,16 @@ pub use tiers::{AvailabilityChecker, StrategyRouter};
 /// Model tier selection
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ModelTier {
-    Local { model_name: String },
-    Groq { model_name: String },
-    Premium { provider: String, model_name: String },
+    Local {
+        model_name: String,
+    },
+    Groq {
+        model_name: String,
+    },
+    Premium {
+        provider: String,
+        model_name: String,
+    },
 }
 
 impl ModelTier {
@@ -55,7 +62,10 @@ impl Display for ModelTier {
         match self {
             Self::Local { model_name } => write!(f, "Local({model_name})"),
             Self::Groq { model_name } => write!(f, "Groq({model_name})"),
-            Self::Premium { provider, model_name } => write!(f, "{provider}/{model_name}"),
+            Self::Premium {
+                provider,
+                model_name,
+            } => write!(f, "{provider}/{model_name}"),
         }
     }
 }
@@ -74,7 +84,7 @@ pub struct RoutingDecision {
 pub trait ModelRouter: Send + Sync {
     /// Route a task to appropriate model tier
     async fn route(&self, task: &Task) -> Result<RoutingDecision>;
-    
+
     /// Check if a tier is available and has quota
     async fn is_available(&self, tier: &ModelTier) -> bool;
 }

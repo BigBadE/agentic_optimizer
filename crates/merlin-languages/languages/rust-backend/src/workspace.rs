@@ -92,7 +92,8 @@ impl WorkspaceLoader {
 
         let cargo_config = self.build_cargo_config();
         let load_config = self.build_load_config();
-        let (host, virtual_fs) = self.initialize_rust_analyzer(progress_group, &cargo_config, &load_config)?;
+        let (host, virtual_fs) =
+            self.initialize_rust_analyzer(progress_group, &cargo_config, &load_config)?;
 
         let (file_id_map, file_metadata) = Self::index_files(progress_group, &virtual_fs);
         self.maybe_save_cache(progress_group, file_metadata);
@@ -106,18 +107,31 @@ impl WorkspaceLoader {
             && let Ok(cache) = WorkspaceCache::load(&self.project_root)
             && cache.is_valid(&self.project_root).unwrap_or(false)
         {
-            tracing::info!("Using cached rust-analyzer state ({} files)", cache.file_count);
+            tracing::info!(
+                "Using cached rust-analyzer state ({} files)",
+                cache.file_count
+            );
         }
-        finish_spinner(progress_cache.as_ref(), "\x1b[32m\u{2713}\x1b[0m Cache checked");
+        finish_spinner(
+            progress_cache.as_ref(),
+            "\x1b[32m\u{2713}\x1b[0m Cache checked",
+        );
     }
 
     fn log_loading_path(&self) {
-        tracing::info!("Loading Cargo workspace from: {}", self.project_root.display());
+        tracing::info!(
+            "Loading Cargo workspace from: {}",
+            self.project_root.display()
+        );
     }
 
     fn build_cargo_config(&self) -> CargoConfig {
         CargoConfig {
-            sysroot: if self.config.workspace_only { None } else { Some(RustLibSource::Discover) },
+            sysroot: if self.config.workspace_only {
+                None
+            } else {
+                Some(RustLibSource::Discover)
+            },
             ..Default::default()
         }
     }
@@ -140,7 +154,8 @@ impl WorkspaceLoader {
         cargo_config: &CargoConfig,
         load_config: &LoadCargoConfig,
     ) -> Result<(AnalysisHost, Vfs)> {
-        let progress_ra_init = progress_group.map(|group| create_spinner(group, "Initializing rust-analyzer..."));
+        let progress_ra_init =
+            progress_group.map(|group| create_spinner(group, "Initializing rust-analyzer..."));
         let on_progress = |message: String| tracing::debug!("Workspace loading: {}", message);
         let (analysis_db, virtual_fs, _) = load_workspace_at(
             self.project_root.as_path(),
@@ -148,24 +163,43 @@ impl WorkspaceLoader {
             load_config,
             &on_progress,
         )
-        .with_context(|| format!("Failed to load workspace at {}", self.project_root.display()))
+        .with_context(|| {
+            format!(
+                "Failed to load workspace at {}",
+                self.project_root.display()
+            )
+        })
         .map_err(|error| Error::Other(error.to_string()))?;
-        finish_spinner(progress_ra_init.as_ref(), "\x1b[32m\u{2713}\x1b[0m Rust-analyzer initialized");
+        finish_spinner(
+            progress_ra_init.as_ref(),
+            "\x1b[32m\u{2713}\x1b[0m Rust-analyzer initialized",
+        );
         Ok((AnalysisHost::with_database(analysis_db), virtual_fs))
     }
 
-    fn index_files(progress_group: Option<&MultiProgress>, virtual_fs: &Vfs) -> (FileIdMap, FileMetadata) {
-        let progress_index = progress_group.map(|group| create_spinner(group, "Building file index..."));
+    fn index_files(
+        progress_group: Option<&MultiProgress>,
+        virtual_fs: &Vfs,
+    ) -> (FileIdMap, FileMetadata) {
+        let progress_index =
+            progress_group.map(|group| create_spinner(group, "Building file index..."));
         let (file_id_map, file_metadata) = build_file_index(virtual_fs);
         finish_spinner(
             progress_index.as_ref(),
-            &format!("\x1b[32m\u{2713}\x1b[0m Indexed {} Rust files", file_id_map.len()),
+            &format!(
+                "\x1b[32m\u{2713}\x1b[0m Indexed {} Rust files",
+                file_id_map.len()
+            ),
         );
         tracing::info!("Loaded {} Rust files", file_id_map.len());
         (file_id_map, file_metadata)
     }
 
-    fn maybe_save_cache(&self, progress_group: Option<&MultiProgress>, file_metadata: FileMetadata) {
+    fn maybe_save_cache(
+        &self,
+        progress_group: Option<&MultiProgress>,
+        file_metadata: FileMetadata,
+    ) {
         let progress_save = progress_group.map(|group| create_spinner(group, "Saving cache..."));
         if self.config.use_cache {
             let cache = WorkspaceCache::new(self.project_root.clone(), file_metadata);
@@ -173,7 +207,10 @@ impl WorkspaceLoader {
                 tracing::warn!("Failed to save cache: {}", error);
             }
         }
-        finish_spinner(progress_save.as_ref(), "\x1b[32m\u{2713}\x1b[0m Cache saved");
+        finish_spinner(
+            progress_save.as_ref(),
+            "\x1b[32m\u{2713}\x1b[0m Cache saved",
+        );
     }
 }
 

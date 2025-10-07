@@ -1,15 +1,15 @@
 //! Local context agent using Ollama.
 
+use serde_json::{from_str, from_value};
 use std::env;
 use std::time::Instant;
-use serde_json::{from_str, from_value};
 
-use ollama_rs::{generation::chat::ChatMessage, Ollama};
-use merlin_core::{Error, Result};
-use crate::query::{QueryIntent, ContextPlan};
-use crate::models::{ModelConfig, TaskComplexity};
 use super::agent::ContextAgent;
 use super::prompts;
+use crate::models::{ModelConfig, TaskComplexity};
+use crate::query::{ContextPlan, QueryIntent};
+use merlin_core::{Error, Result};
+use ollama_rs::{Ollama, generation::chat::ChatMessage};
 use serde_json::Value;
 
 /// Local context agent that uses Ollama for planning
@@ -22,8 +22,7 @@ impl LocalContextAgent {
     /// Creates a new local context agent.
     #[must_use]
     pub fn new() -> Self {
-        let host = env::var("OLLAMA_HOST")
-            .unwrap_or_else(|_| "http://localhost:11434".to_owned());
+        let host = env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".to_owned());
 
         Self {
             ollama: Ollama::new(host, 11434),
@@ -41,7 +40,12 @@ impl LocalContextAgent {
     /// Calls Ollama API using the ollama-rs crate.
     /// # Errors
     /// Returns an error when the Ollama request fails.
-    async fn call_ollama_static(ollama: &Ollama, system: &str, user: &str, model: &str) -> Result<String> {
+    async fn call_ollama_static(
+        ollama: &Ollama,
+        system: &str,
+        user: &str,
+        model: &str,
+    ) -> Result<String> {
         use ollama_rs::generation::chat::request::ChatMessageRequest;
 
         let messages = vec![
@@ -67,10 +71,16 @@ impl LocalContextAgent {
     fn parse_plan(response: &str) -> Result<ContextPlan> {
         // Try to extract JSON from markdown code blocks if present
         let json_str = response.find("```json").map_or_else(
-            || response.find('{').map_or_else(|| response.trim(), |start| &response[start..]),
+            || {
+                response
+                    .find('{')
+                    .map_or_else(|| response.trim(), |start| &response[start..])
+            },
             |start| {
                 let after_start = &response[start + 7..];
-                after_start.find("```").map_or_else(|| response.trim(), |end| after_start[..end].trim())
+                after_start
+                    .find("```")
+                    .map_or_else(|| response.trim(), |end| after_start[..end].trim())
             },
         );
 
@@ -79,9 +89,11 @@ impl LocalContextAgent {
             Ok(plan) => Ok(plan),
             Err(first_err) => {
                 // Fallback: be lenient and normalize common schema mistakes
-                let mut value: Value = from_str(json_str).map_err(|err| Error::Other(format!(
-                    "Failed to parse context plan: {err}\nResponse: {json_str}"
-                )))?;
+                let mut value: Value = from_str(json_str).map_err(|err| {
+                    Error::Other(format!(
+                        "Failed to parse context plan: {err}\nResponse: {json_str}"
+                    ))
+                })?;
 
                 // Normalize: strategy.Focused with `patterns` -> `symbols`
                 if let Some(strategy) = value.get_mut("strategy")
@@ -109,7 +121,12 @@ impl LocalContextAgent {
     ///
     /// # Errors
     /// Returns an error if the Ollama API call fails or the response cannot be parsed.
-    pub async fn generate_plan(&self, intent: &QueryIntent, query_text: &str, file_tree: &str) -> Result<ContextPlan> {
+    pub async fn generate_plan(
+        &self,
+        intent: &QueryIntent,
+        query_text: &str,
+        file_tree: &str,
+    ) -> Result<ContextPlan> {
         let system = prompts::system_prompt();
         let user = prompts::user_prompt(query_text, intent, file_tree);
 
@@ -131,12 +148,15 @@ impl LocalContextAgent {
 
         tracing::info!(
             "Received response: {} chars (~{} tokens) in {:.2}s ({:.1} tok/s)",
-            response_chars, tokens_estimate, elapsed.as_secs_f64(), tokens_per_sec
+            response_chars,
+            tokens_estimate,
+            elapsed.as_secs_f64(),
+            tokens_per_sec
         );
 
         tracing::info!("Parsing context plan...");
         let plan = Self::parse_plan(&response)?;
-        
+
         Ok(plan)
     }
 
@@ -161,14 +181,14 @@ impl ContextAgent for LocalContextAgent {
         // This is a sync wrapper - should not be called from async context
         // For now, return an error suggesting to use the async version
         Err(Error::Other(
-            "generate_plan_sync called from async context. This is a bug.".into()
+            "generate_plan_sync called from async context. This is a bug.".into(),
         ))
     }
 
     fn is_available_sync(&self) -> Result<bool> {
         // This is a sync wrapper - should not be called from async context
         Err(Error::Other(
-            "is_available_sync called from async context. This is a bug.".into()
+            "is_available_sync called from async context. This is a bug.".into(),
         ))
     }
 
@@ -176,4 +196,3 @@ impl ContextAgent for LocalContextAgent {
         "LocalContextAgent (Ollama)"
     }
 }
-

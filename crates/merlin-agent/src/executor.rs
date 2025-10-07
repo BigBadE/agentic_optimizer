@@ -8,10 +8,12 @@ use merlin_context::ContextBuilder;
 use merlin_core::{Context, ModelProvider, Query};
 use merlin_languages::LanguageProvider;
 use merlin_tools::ToolInput;
-use serde_json::{from_str, Value};
+use serde_json::{Value, from_str};
 use tracing::{info, warn};
 
-use crate::{AgentConfig, AgentRequest, AgentResponse, ExecutionMetadata, ExecutionResult, ToolRegistry};
+use crate::{
+    AgentConfig, AgentRequest, AgentResponse, ExecutionMetadata, ExecutionResult, ToolRegistry,
+};
 
 pub struct AgentExecutor {
     provider: Arc<dyn ModelProvider>,
@@ -43,7 +45,7 @@ impl AgentExecutor {
         self
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn tool_registry(&self) -> &ToolRegistry {
         &self.tool_registry
     }
@@ -73,7 +75,10 @@ impl AgentExecutor {
         let provider_call_time = provider_start.elapsed().as_millis() as u64;
 
         // Check if response contains a tool call and execute it
-        if let Some(tool_result) = self.try_execute_tool_call(&response.text, &request.workspace_root).await {
+        if let Some(tool_result) = self
+            .try_execute_tool_call(&response.text, &request.workspace_root)
+            .await
+        {
             info!("Tool call detected and executed");
             response.text = tool_result;
         }
@@ -139,13 +144,13 @@ impl AgentExecutor {
 
     fn build_system_prompt(&self) -> String {
         let tools = self.tool_registry.list_tools();
-        
+
         let mut prompt = self.config.system_prompt.clone();
-        
+
         if !tools.is_empty() {
             prompt.push_str("\n\n# Available Tools\n\n");
             prompt.push_str("You have access to the following tools to help complete tasks:\n\n");
-            
+
             for (name, description) in tools {
                 prompt.push_str("## ");
                 prompt.push_str(name);
@@ -153,7 +158,7 @@ impl AgentExecutor {
                 prompt.push_str(description);
                 prompt.push_str("\n\n");
             }
-            
+
             prompt.push_str("To use a tool, respond with a JSON object in the following format:\n");
             prompt.push_str("```json\n");
             prompt.push_str("{\n");
@@ -171,18 +176,26 @@ impl AgentExecutor {
             prompt.push_str("- WRONG: \"lib.rs\" (ambiguous - which lib.rs?)\n");
             prompt.push_str("- WRONG: \"testing.md\" (ambiguous - which directory?)\n");
         }
-        
+
         prompt
     }
 
-    async fn try_execute_tool_call(&self, response_text: &str, workspace_root: &Path) -> Option<String> {
+    async fn try_execute_tool_call(
+        &self,
+        response_text: &str,
+        workspace_root: &Path,
+    ) -> Option<String> {
         let mut tool_call = Self::extract_tool_call(response_text)?;
-        
-        info!("Detected tool call: {} with params: {:?}", tool_call.tool, tool_call.input.params);
-        
+
+        info!(
+            "Detected tool call: {} with params: {:?}",
+            tool_call.tool, tool_call.input.params
+        );
+
         // Resolve all file paths relative to workspace root
         if let Some(params_obj) = tool_call.input.params.as_object_mut()
-            && let Some(file_path) = params_obj.get("file_path").and_then(|value| value.as_str()) {
+            && let Some(file_path) = params_obj.get("file_path").and_then(|value| value.as_str())
+        {
             let path = Path::new(file_path);
             // Always resolve relative to workspace root (even if path looks absolute)
             let absolute_path = if path.is_absolute() {
@@ -191,24 +204,42 @@ impl AgentExecutor {
                 workspace_root.join(path)
             };
             let absolute_path_str = absolute_path.to_string_lossy().to_string();
-            info!("Resolved path '{}' to '{}'", file_path, absolute_path.display());
+            info!(
+                "Resolved path '{}' to '{}'",
+                file_path,
+                absolute_path.display()
+            );
             params_obj.insert("file_path".to_owned(), serde_json::json!(absolute_path_str));
         }
-        
-        match self.tool_registry.execute(&tool_call.tool, tool_call.input.clone()).await {
+
+        match self
+            .tool_registry
+            .execute(&tool_call.tool, tool_call.input.clone())
+            .await
+        {
             Ok(output) => {
                 let result = if output.success {
-                    format!("Tool '{}' executed successfully:\n{}\n\nData: {:?}", 
-                        tool_call.tool, output.message, output.data)
+                    format!(
+                        "Tool '{}' executed successfully:\n{}\n\nData: {:?}",
+                        tool_call.tool, output.message, output.data
+                    )
                 } else {
-                    format!("Tool '{}' failed:\n{}\n\nInput: {:?}", 
-                        tool_call.tool, output.message, tool_call.input.params)
+                    format!(
+                        "Tool '{}' failed:\n{}\n\nInput: {:?}",
+                        tool_call.tool, output.message, tool_call.input.params
+                    )
                 };
                 Some(result)
             }
             Err(error) => {
-                warn!("Tool execution failed: {} with input: {:?}", error, tool_call.input.params);
-                Some(format!("Tool execution failed: {error}\n\nInput: {:?}", tool_call.input.params))
+                warn!(
+                    "Tool execution failed: {} with input: {:?}",
+                    error, tool_call.input.params
+                );
+                Some(format!(
+                    "Tool execution failed: {error}\n\nInput: {:?}",
+                    tool_call.input.params
+                ))
             }
         }
     }
@@ -226,10 +257,10 @@ impl AgentExecutor {
         };
 
         let value: Value = from_str(json_str).ok()?;
-        
+
         let tool = value.get("tool")?.as_str()?.to_owned();
         let params = value.get("params")?.clone();
-        
+
         Some(ToolCall {
             tool,
             input: ToolInput { params },
@@ -241,4 +272,3 @@ struct ToolCall {
     tool: String,
     input: ToolInput,
 }
-

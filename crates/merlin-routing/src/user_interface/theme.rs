@@ -1,9 +1,9 @@
 use ratatui::style::Color;
 use serde::{Deserialize, Serialize};
+use serde_json::{from_str, to_string};
+use std::fs::{read_to_string as read_file_to_string, write as write_file};
 use std::io;
 use std::path::Path;
-use std::fs::{read_to_string as read_file_to_string, write as write_file};
-use serde_json::{from_str, to_string};
 
 /// UI theme configuration
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -158,8 +158,8 @@ impl Theme {
         };
 
         let theme_file = parent.join("theme.json");
-        let json = to_string(&self)
-            .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
+        let json =
+            to_string(&self).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
 
         write_file(theme_file, json)
     }

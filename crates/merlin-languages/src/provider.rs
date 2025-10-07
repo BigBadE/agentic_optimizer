@@ -81,41 +81,45 @@ pub trait LanguageProvider: Send + Sync {
     /// # Errors
     /// Returns an error if the project cannot be loaded or analyzed
     fn initialize(&mut self, project_root: &Path) -> Result<()>;
-    
+
     /// Search for symbols matching a query
     ///
     /// # Errors
     /// Returns an error if the search fails
     fn search_symbols(&self, query: &SearchQuery) -> Result<SearchResult>;
-    
+
     /// Find the definition of a symbol at a specific location
     ///
     /// # Errors
     /// Returns an error if the file cannot be analyzed
-    fn find_definition(&self, symbol_name: &str, file: &Path, line: u32) -> Result<Option<SymbolInfo>>;
-    
+    fn find_definition(
+        &self,
+        symbol_name: &str,
+        file: &Path,
+        line: u32,
+    ) -> Result<Option<SymbolInfo>>;
+
     /// Find all references to a symbol
     ///
     /// # Errors
     /// Returns an error if the search fails
     fn find_references(&self, symbol_name: &str) -> Result<Vec<SymbolInfo>>;
-    
+
     /// Get files related to a given file through imports/dependencies
     ///
     /// # Errors
     /// Returns an error if the file cannot be analyzed
     fn get_related_context(&self, file: &Path) -> Result<Vec<FileContext>>;
-    
+
     /// Extract import paths from a file
     ///
     /// # Errors
     /// Returns an error if the file cannot be parsed
     fn extract_imports(&self, file: &Path) -> Result<Vec<PathBuf>>;
-    
+
     /// List all symbols defined in a file
     ///
     /// # Errors
     /// Returns an error if the file cannot be analyzed
     fn list_symbols_in_file(&self, file: &Path) -> Result<Vec<SymbolInfo>>;
 }
-

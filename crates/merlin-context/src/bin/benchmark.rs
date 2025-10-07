@@ -1,15 +1,15 @@
 //! Benchmark runner for context fetching evaluation.
 
+use chrono::Local;
+use clap::Parser;
+use merlin_context::ContextBuilder;
+use merlin_context::benchmark::{BenchmarkResult, RankedFile, TestCase, load_test_cases};
+use merlin_core::{Error, Result};
+use std::fmt::Write as _;
 use std::fs;
 use std::path::{Path, PathBuf};
-use clap::Parser;
-use merlin_context::benchmark::{load_test_cases, BenchmarkResult, RankedFile, TestCase};
-use merlin_context::ContextBuilder;
-use merlin_core::{Error, Result};
-use chrono::Local;
-use tracing::info;
-use std::fmt::Write as _;
 use std::process::exit;
+use tracing::info;
 
 #[derive(Parser)]
 #[command(name = "benchmark")]
@@ -50,7 +50,10 @@ async fn main() -> Result<()> {
         .join(&args.project);
 
     if !test_cases_dir.exists() {
-        tracing::error!("Test cases directory not found: {}", test_cases_dir.display());
+        tracing::error!(
+            "Test cases directory not found: {}",
+            test_cases_dir.display()
+        );
         tracing::info!("Available projects:");
         if let Ok(entries) = fs::read_dir("benchmarks/test_cases") {
             for entry in entries.flatten().filter(|entry| entry.path().is_dir()) {
@@ -85,7 +88,11 @@ async fn main() -> Result<()> {
         exit(1);
     }
 
-    info!("Running {} benchmark(s) for project: {}\n", filtered_cases.len(), args.project);
+    info!(
+        "Running {} benchmark(s) for project: {}\n",
+        filtered_cases.len(),
+        args.project
+    );
 
     let mut all_results = Vec::new();
 
@@ -138,9 +145,7 @@ async fn run_benchmark(
 
     let mut builder = ContextBuilder::new(project_root);
 
-    let search_results = builder
-        .search_context(&test_case.query)
-        .await?;
+    let search_results = builder.search_context(&test_case.query).await?;
 
     if verbose {
         info!("Found {} search results\n", search_results.len());
@@ -164,15 +169,47 @@ fn print_summary(results: &[BenchmarkResult]) {
     info!("SUMMARY");
     info!("{banner}\n", banner = "\u{2550}".repeat(59));
 
-    let avg_precision_3 = results.iter().map(|res| res.metrics.precision_at_3).sum::<f32>() / results.len() as f32;
-    let avg_precision_5 = results.iter().map(|res| res.metrics.precision_at_5).sum::<f32>() / results.len() as f32;
-    let avg_precision_10 = results.iter().map(|res| res.metrics.precision_at_10).sum::<f32>() / results.len() as f32;
-    let avg_recall_10 = results.iter().map(|res| res.metrics.recall_at_10).sum::<f32>() / results.len() as f32;
+    let avg_precision_3 = results
+        .iter()
+        .map(|res| res.metrics.precision_at_3)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_precision_5 = results
+        .iter()
+        .map(|res| res.metrics.precision_at_5)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_precision_10 = results
+        .iter()
+        .map(|res| res.metrics.precision_at_10)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_recall_10 = results
+        .iter()
+        .map(|res| res.metrics.recall_at_10)
+        .sum::<f32>()
+        / results.len() as f32;
     let avg_mrr = results.iter().map(|res| res.metrics.mrr).sum::<f32>() / results.len() as f32;
-    let avg_ndcg = results.iter().map(|res| res.metrics.ndcg_at_10).sum::<f32>() / results.len() as f32;
-    let avg_exclusion = results.iter().map(|res| res.metrics.exclusion_rate).sum::<f32>() / results.len() as f32;
-    let avg_critical = results.iter().map(|res| res.metrics.critical_in_top_3).sum::<f32>() / results.len() as f32;
-    let avg_high = results.iter().map(|res| res.metrics.high_in_top_5).sum::<f32>() / results.len() as f32;
+    let avg_ndcg = results
+        .iter()
+        .map(|res| res.metrics.ndcg_at_10)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_exclusion = results
+        .iter()
+        .map(|res| res.metrics.exclusion_rate)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_critical = results
+        .iter()
+        .map(|res| res.metrics.critical_in_top_3)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_high = results
+        .iter()
+        .map(|res| res.metrics.high_in_top_5)
+        .sum::<f32>()
+        / results.len() as f32;
 
     info!("Average Metrics ({} test cases):", results.len());
     info!("  Precision@3:        {:.1}%", avg_precision_3 * 100.0);
@@ -195,32 +232,86 @@ fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
     let mut report = String::new();
 
     report.push_str("# Context Fetching Benchmark Report\n\n");
-    write!(report, "**Date**: {}\n\n", Local::now().format("%Y-%m-%d %H:%M:%S")).map_err(|error| Error::Other(error.to_string()))?;
-    write!(report, "**Test Cases**: {}\n\n", results.len()).map_err(|error| Error::Other(error.to_string()))?;
+    write!(
+        report,
+        "**Date**: {}\n\n",
+        Local::now().format("%Y-%m-%d %H:%M:%S")
+    )
+    .map_err(|error| Error::Other(error.to_string()))?;
+    write!(report, "**Test Cases**: {}\n\n", results.len())
+        .map_err(|error| Error::Other(error.to_string()))?;
 
     report.push_str("## Summary\n\n");
 
-    let avg_precision_3 = results.iter().map(|res| res.metrics.precision_at_3).sum::<f32>() / results.len() as f32;
-    let avg_precision_5 = results.iter().map(|res| res.metrics.precision_at_5).sum::<f32>() / results.len() as f32;
-    let avg_precision_10 = results.iter().map(|res| res.metrics.precision_at_10).sum::<f32>() / results.len() as f32;
-    let avg_recall_10 = results.iter().map(|res| res.metrics.recall_at_10).sum::<f32>() / results.len() as f32;
+    let avg_precision_3 = results
+        .iter()
+        .map(|res| res.metrics.precision_at_3)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_precision_5 = results
+        .iter()
+        .map(|res| res.metrics.precision_at_5)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_precision_10 = results
+        .iter()
+        .map(|res| res.metrics.precision_at_10)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_recall_10 = results
+        .iter()
+        .map(|res| res.metrics.recall_at_10)
+        .sum::<f32>()
+        / results.len() as f32;
     let avg_mrr = results.iter().map(|res| res.metrics.mrr).sum::<f32>() / results.len() as f32;
-    let avg_ndcg = results.iter().map(|res| res.metrics.ndcg_at_10).sum::<f32>() / results.len() as f32;
-    let avg_exclusion = results.iter().map(|res| res.metrics.exclusion_rate).sum::<f32>() / results.len() as f32;
-    let avg_critical = results.iter().map(|res| res.metrics.critical_in_top_3).sum::<f32>() / results.len() as f32;
-    let avg_high = results.iter().map(|res| res.metrics.high_in_top_5).sum::<f32>() / results.len() as f32;
+    let avg_ndcg = results
+        .iter()
+        .map(|res| res.metrics.ndcg_at_10)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_exclusion = results
+        .iter()
+        .map(|res| res.metrics.exclusion_rate)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_critical = results
+        .iter()
+        .map(|res| res.metrics.critical_in_top_3)
+        .sum::<f32>()
+        / results.len() as f32;
+    let avg_high = results
+        .iter()
+        .map(|res| res.metrics.high_in_top_5)
+        .sum::<f32>()
+        / results.len() as f32;
 
     report.push_str("| Metric | Value |\n");
     report.push_str("|--------|-------|\n");
-    writeln!(report, "| Precision@3 | {:.1}% |", avg_precision_3 * 100.0).map_err(|error| Error::Other(error.to_string()))?;
-    writeln!(report, "| Precision@5 | {:.1}% |", avg_precision_5 * 100.0).map_err(|error| Error::Other(error.to_string()))?;
-    writeln!(report, "| Precision@10 | {:.1}% |", avg_precision_10 * 100.0).map_err(|error| Error::Other(error.to_string()))?;
-    writeln!(report, "| Recall@10 | {:.1}% |", avg_recall_10 * 100.0).map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| Precision@3 | {:.1}% |", avg_precision_3 * 100.0)
+        .map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| Precision@5 | {:.1}% |", avg_precision_5 * 100.0)
+        .map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(
+        report,
+        "| Precision@10 | {:.1}% |",
+        avg_precision_10 * 100.0
+    )
+    .map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| Recall@10 | {:.1}% |", avg_recall_10 * 100.0)
+        .map_err(|error| Error::Other(error.to_string()))?;
     writeln!(report, "| MRR | {avg_mrr:.3} |").map_err(|error| Error::Other(error.to_string()))?;
-    writeln!(report, "| NDCG@10 | {avg_ndcg:.3} |").map_err(|error| Error::Other(error.to_string()))?;
-    writeln!(report, "| Exclusion Rate | {:.1}% |", avg_exclusion * 100.0).map_err(|error| Error::Other(error.to_string()))?;
-    writeln!(report, "| Critical in Top-3 | {:.1}% |", avg_critical * 100.0).map_err(|error| Error::Other(error.to_string()))?;
-    writeln!(report, "| High in Top-5 | {:.1}% |\n", avg_high * 100.0).map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| NDCG@10 | {avg_ndcg:.3} |")
+        .map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| Exclusion Rate | {:.1}% |", avg_exclusion * 100.0)
+        .map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(
+        report,
+        "| Critical in Top-3 | {:.1}% |",
+        avg_critical * 100.0
+    )
+    .map_err(|error| Error::Other(error.to_string()))?;
+    writeln!(report, "| High in Top-5 | {:.1}% |\n", avg_high * 100.0)
+        .map_err(|error| Error::Other(error.to_string()))?;
 
     report.push_str("## Individual Test Cases\n\n");
 
@@ -234,4 +325,3 @@ fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
 
     Ok(())
 }
-

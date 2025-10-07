@@ -22,13 +22,13 @@ impl LintValidationStage {
             max_warnings: 10,
         }
     }
-    
+
     #[must_use]
     pub fn with_workspace(mut self, workspace: Arc<WorkspaceState>) -> Self {
         self.workspace = Some(workspace);
         self
     }
-    
+
     #[must_use]
     pub fn with_max_warnings(mut self, max_warnings: usize) -> Self {
         self.max_warnings = max_warnings;
@@ -54,7 +54,7 @@ impl ValidationStage for LintValidationStage {
                 score: 1.0,
             });
         }
-        
+
         let Some(workspace) = &self.workspace else {
             return Ok(StageResult {
                 stage: StageType::Lint,
@@ -64,14 +64,14 @@ impl ValidationStage for LintValidationStage {
                 score: 1.0,
             });
         };
-        
+
         let build_env = IsolatedBuildEnv::new(workspace.as_ref())?;
-        
+
         let lint_result = build_env.run_clippy().await?;
-        
+
         let warning_count = lint_result.warnings.len();
         let passed = lint_result.success && warning_count <= self.max_warnings;
-        
+
         let score = if warning_count == 0 {
             1.0
         } else if warning_count <= self.max_warnings {
@@ -79,13 +79,18 @@ impl ValidationStage for LintValidationStage {
         } else {
             0.5
         };
-        
+
         let details = if passed {
             if warning_count == 0 {
-                format!("Clippy passed with no warnings ({}ms)", lint_result.duration_ms)
+                format!(
+                    "Clippy passed with no warnings ({}ms)",
+                    lint_result.duration_ms
+                )
             } else {
-                format!("Clippy passed with {} warnings ({}ms)", 
-                    warning_count, lint_result.duration_ms)
+                format!(
+                    "Clippy passed with {} warnings ({}ms)",
+                    warning_count, lint_result.duration_ms
+                )
             }
         } else {
             format!(
@@ -93,7 +98,7 @@ impl ValidationStage for LintValidationStage {
                 self.max_warnings
             )
         };
-        
+
         Ok(StageResult {
             stage: StageType::Lint,
             passed,
@@ -102,17 +107,17 @@ impl ValidationStage for LintValidationStage {
             score,
         })
     }
-    
+
     async fn quick_check(&self, response: &Response) -> Result<bool> {
         let has_lint_issues = response.text.contains("warning:")
             && (response.text.contains("clippy") || response.text.contains("lint"));
         Ok(!has_lint_issues)
     }
-    
+
     fn name(&self) -> &'static str {
         "Lint"
     }
-    
+
     fn stage_type(&self) -> StageType {
         StageType::Lint
     }
@@ -121,8 +126,8 @@ impl ValidationStage for LintValidationStage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_core::TokenUsage;
     use crate::Result;
+    use merlin_core::TokenUsage;
 
     #[tokio::test]
     /// # Panics
@@ -140,13 +145,13 @@ mod tests {
             latency_ms: 0,
         };
         let task = Task::new("Test".to_owned());
-        
+
         let result = stage.validate(&response, &task).await?;
         assert!(result.passed);
         assert!(result.details.contains("skipped"));
         Ok(())
     }
-    
+
     #[tokio::test]
     /// # Panics
     /// Panics if `quick_check` logic does not match expected patterns.
@@ -155,7 +160,7 @@ mod tests {
     /// Returns an error if `quick_check` returns an unexpected failure in the test harness.
     async fn test_quick_check() -> Result<()> {
         let stage = LintValidationStage::new();
-        
+
         let good_response = Response {
             text: "Finished dev [unoptimized + debuginfo]".to_owned(),
             confidence: 1.0,
@@ -164,7 +169,7 @@ mod tests {
             latency_ms: 0,
         };
         assert!(stage.quick_check(&good_response).await?);
-        
+
         let bad_response = Response {
             text: "warning: unused variable - clippy::unused_variable".to_owned(),
             confidence: 1.0,
@@ -176,4 +181,3 @@ mod tests {
         Ok(())
     }
 }
-

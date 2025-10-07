@@ -1,6 +1,6 @@
-use async_trait::async_trait;
-use crate::{ModelTier, Priority, Result, Task};
 use super::super::strategy::RoutingStrategy;
+use crate::{ModelTier, Priority, Result, Task};
+use async_trait::async_trait;
 
 /// Routes tasks to minimize cost (prefer local/free tiers)
 pub struct CostOptimizationStrategy {
@@ -27,7 +27,7 @@ impl RoutingStrategy for CostOptimizationStrategy {
     fn applies_to(&self, task: &Task) -> bool {
         task.priority != Priority::Critical
     }
-    
+
     async fn select_tier(&self, task: &Task) -> Result<ModelTier> {
         if task.context_needs.estimated_tokens <= self.max_tokens_for_local {
             Ok(ModelTier::Local {
@@ -44,11 +44,11 @@ impl RoutingStrategy for CostOptimizationStrategy {
             })
         }
     }
-    
+
     fn priority(&self) -> u8 {
         70
     }
-    
+
     fn name(&self) -> &'static str {
         "CostOptimization"
     }
@@ -64,7 +64,7 @@ mod tests {
     /// Panics if selected tiers do not match expected routing.
     async fn test_cost_optimization() {
         let strategy = CostOptimizationStrategy::new(4000);
-        
+
         let small_task = Task::new("Small task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(2000));
         let tier_small = match strategy.select_tier(&small_task).await {
@@ -72,7 +72,7 @@ mod tests {
             Err(error) => panic!("failed to select tier for small task: {error}"),
         };
         assert!(matches!(tier_small, ModelTier::Local { .. }));
-        
+
         let medium_task = Task::new("Medium task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(6000));
         let tier_medium = match strategy.select_tier(&medium_task).await {
@@ -80,7 +80,7 @@ mod tests {
             Err(error) => panic!("failed to select tier for medium task: {error}"),
         };
         assert!(matches!(tier_medium, ModelTier::Groq { .. }));
-        
+
         let large_task = Task::new("Large task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(10000));
         let tier_large = match strategy.select_tier(&large_task).await {
@@ -89,16 +89,15 @@ mod tests {
         };
         assert!(matches!(tier_large, ModelTier::Premium { .. }));
     }
-    
+
     #[tokio::test]
     /// # Panics
     /// Panics if applicability check fails unexpectedly.
     async fn test_critical_tasks_not_applicable() {
         let strategy = CostOptimizationStrategy::new(4000);
-        
-        let critical_task = Task::new("Critical task".to_owned())
-            .with_priority(Priority::Critical);
-        
+
+        let critical_task = Task::new("Critical task".to_owned()).with_priority(Priority::Critical);
+
         assert!(!strategy.applies_to(&critical_task));
     }
 }

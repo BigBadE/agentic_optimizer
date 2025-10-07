@@ -5,6 +5,7 @@ An intelligent AI coding assistant with multi-model routing, automatic task deco
 
 **Core Features:**
 - **Interactive Agent** - Continuous conversation with context retention
+- **Self-Determining Tasks** - Adaptive task decomposition at runtime
 - **Multi-Model Routing** - Intelligent tier selection (Local/Groq/Premium)
 - **Task Decomposition** - Automatic splitting of complex requests
 - **Parallel Execution** - Concurrent task execution with dependency tracking
@@ -19,7 +20,7 @@ An intelligent AI coding assistant with multi-model routing, automatic task deco
 - **Premium** - Claude 3.5 Sonnet, DeepSeek Coder - Paid, ~2000ms
 {{ ... }}
 
-**Test Coverage:** 72 tests passing across all modules
+**Test Coverage:** 93 tests passing (74 unit, 19 integration) with 26% code coverage
 
 ## Quick Start
 
@@ -215,23 +216,21 @@ RoutingConfig {
 
 ## Documentation
 
-### Main Documentation
-- **[FINAL_SUMMARY.md](docs/FINAL_SUMMARY.md)** - Complete overview and quick start
-- **[PRODUCTION_READY.md](docs/PRODUCTION_READY.md)** - Production readiness guide
-- **[ROUTING_ARCHITECTURE.md](docs/ROUTING_ARCHITECTURE.md)** - Complete architecture (11 phases)
-- **[CLI_ROUTING.md](docs/CLI_ROUTING.md)** - CLI usage and examples
+### User Guides
+- **[USAGE.md](USAGE.md)** - Quick start and usage examples
+- **[TESTING_GUIDE.md](docs/TESTING_GUIDE.md)** - Testing strategy and coverage
+
+### Technical Documentation
+- **[AGENTIC_SYSTEM_DESIGN.md](docs/AGENTIC_SYSTEM_DESIGN.md)** - Architecture and design
+- **[SELF_DETERMINING_TASKS.md](docs/SELF_DETERMINING_TASKS.md)** - Adaptive task system
+- **[PHASES.md](docs/PHASES.md)** - Implementation roadmap
+- **[PLAN.md](docs/PLAN.md)** - Cost optimization strategy
 
 ### Module Documentation
 - **[merlin-routing](crates/merlin-routing/README.md)** - Multi-model routing system
 - **[merlin-local](crates/merlin-local/README.md)** - Local model integration (Ollama)
 - **[merlin-providers](crates/merlin-providers/README.md)** - External providers (Groq, OpenRouter, Anthropic)
 - **[merlin-core](crates/merlin-core/README.md)** - Core types and traits
-
-### Legacy Documentation
-- `PLAN.md` - Cost analysis and optimization strategies
-- `DESIGN.md` - High-level architecture
-- `ARCHITECTURE.md` - Module design and traits
-- `PHASES.md` - Phase-by-phase implementation guide
 
 ## Testing
 
@@ -310,13 +309,17 @@ cargo test --test integration_tests -- --nocapture
 ```
 
 **Test Coverage:**
-- **Total**: 59 passing tests
-- **Analyzer**: 18 tests (intent, complexity, decomposition)
-- **Router**: 13 tests (strategies, tier selection)
-- **Executor**: 12 tests (graph, pool, isolation)
-- **Validator**: 11 tests (pipeline, stages)
-- **Config**: 2 tests (serialization, defaults)
-- **Orchestrator**: 3 tests (analysis, execution)
+- **Total**: 93 passing tests (74 unit + 19 integration)
+- **Code Coverage**: 26.61% overall
+  - Routing/Analyzer: 60-90% coverage ✅
+  - TUI Components: Baseline tests added
+  - Tools: 10-20% coverage
+  - Providers: 20-40% coverage
+- **Test Categories**:
+  - Unit tests: 74 tests (inline in src/)
+  - Integration tests: 19 tests (tests/ folders)
+  - TUI tests: 12 tests (TaskManager)
+  - CLI E2E tests: 7 tests
 
 ## Development
 

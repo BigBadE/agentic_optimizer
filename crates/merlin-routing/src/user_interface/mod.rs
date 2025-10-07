@@ -1,30 +1,30 @@
 //! User interface (TUI) subsystem for Merlin routing.
 //! Provides event handling, state management, rendering, and persistence.
-use tokio::sync::mpsc;
 use crate::{TaskId, TaskResult};
+use tokio::sync::mpsc;
 
 // Public modules
 pub mod events;
 mod text_width;
 
 // Publicly exposed for testing
-pub mod output_tree;
-pub mod task_manager;
-pub mod state;
-pub mod renderer;
-pub mod theme;
 pub mod input;
+pub mod output_tree;
+pub mod renderer;
+pub mod state;
+pub mod task_manager;
+pub mod theme;
 
 // Private modules
-mod persistence;
-mod event_handler;
 /// TUI application and main event loop
 mod app;
+mod event_handler;
+mod persistence;
 
 // Re-exports
+pub use app::TuiApp;
 pub use events::{MessageLevel, TaskProgress, UiEvent};
 pub use text_width::{EmojiMode, calculate_width, strip_emojis, truncate_to_width, wrap_text};
-pub use app::TuiApp;
 
 /// UI update channel - REQUIRED for all task execution
 #[derive(Clone)]

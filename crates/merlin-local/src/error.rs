@@ -32,4 +32,3 @@ pub enum LocalError {
     #[error("{0}")]
     Other(String),
 }
-

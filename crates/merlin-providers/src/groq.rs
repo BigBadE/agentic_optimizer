@@ -1,9 +1,9 @@
 use async_trait::async_trait;
+use merlin_core::{Context, Error, ModelProvider, Query, Response, Result, TokenUsage};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::time::Instant;
-use merlin_core::{Context, Error, ModelProvider, Query, Response, Result, TokenUsage};
 
 /// Groq API endpoint URL.
 const GROQ_API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
@@ -29,7 +29,7 @@ impl GroqProvider {
     pub fn new() -> Result<Self> {
         let api_key = env::var("GROQ_API_KEY")
             .map_err(|_| Error::Other("GROQ_API_KEY not set".to_owned()))?;
-        
+
         Ok(Self {
             client: Client::new(),
             api_key,
@@ -111,23 +111,23 @@ impl ModelProvider for GroqProvider {
     fn name(&self) -> &'static str {
         "Groq"
     }
-    
+
     async fn is_available(&self) -> bool {
         !self.api_key.is_empty()
     }
-    
+
     async fn generate(&self, query: &Query, context: &Context) -> Result<Response> {
         let start = Instant::now();
-        
+
         let mut messages = vec![
             GroqMessage {
                 role: "system".to_owned(),
                 content: "You are an expert coding assistant. Provide clear, concise, and correct code solutions.".to_owned(),
             }
         ];
-        
+
         let mut user_content = query.text.clone();
-        
+
         if !context.files.is_empty() {
             user_content.push_str("\n\nContext files:\n");
             for file_ctx in &context.files {
@@ -138,20 +138,21 @@ impl ModelProvider for GroqProvider {
                 user_content.push('\n');
             }
         }
-        
+
         messages.push(GroqMessage {
             role: "user".to_owned(),
             content: user_content,
         });
-        
+
         let request = GroqRequest {
             model: self.model.clone(),
             messages,
             temperature: 0.7,
             max_tokens: 8000,
         };
-        
-        let response = self.client
+
+        let response = self
+            .client
             .post(GROQ_API_URL)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
@@ -162,27 +163,35 @@ impl ModelProvider for GroqProvider {
 
         if !response.status().is_success() {
             let status = response.status();
-            let error_text = response.text().await.unwrap_or_else(|_| "Unknown error".to_owned());
-            return Err(Error::Other(format!("Groq API error {status}: {error_text}")));
+            let error_text = response
+                .text()
+                .await
+                .unwrap_or_else(|_| "Unknown error".to_owned());
+            return Err(Error::Other(format!(
+                "Groq API error {status}: {error_text}"
+            )));
         }
 
-        let groq_response: GroqResponse = response.json().await
+        let groq_response: GroqResponse = response
+            .json()
+            .await
             .map_err(|err| Error::Other(format!("Failed to parse Groq response: {err}")))?;
-        
+
         let latency_ms = start.elapsed().as_millis() as u64;
-        
-        let text = groq_response.choices
+
+        let text = groq_response
+            .choices
             .first()
             .map(|choice| choice.message.content.clone())
             .ok_or_else(|| Error::Other("No response from Groq".to_owned()))?;
-        
+
         let tokens_used = TokenUsage {
             input: groq_response.usage.prompt_tokens as u64,
             output: groq_response.usage.completion_tokens as u64,
             cache_read: 0,
             cache_write: 0,
         };
-        
+
         Ok(Response {
             text,
             confidence: 0.9,
@@ -191,7 +200,7 @@ impl ModelProvider for GroqProvider {
             latency_ms,
         })
     }
-    
+
     fn estimate_cost(&self, _context: &Context) -> f64 {
         0.0
     }
@@ -243,4 +252,3 @@ mod tests {
         assert!(cost.abs() < f64::EPSILON);
     }
 }
-

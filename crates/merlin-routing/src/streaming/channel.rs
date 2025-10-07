@@ -1,5 +1,5 @@
-use tokio::sync::mpsc;
 use super::StreamingEvent;
+use tokio::sync::mpsc;
 
 /// Channel for streaming execution events
 #[derive(Clone)]
@@ -8,12 +8,12 @@ pub struct StreamingChannel {
 }
 
 impl StreamingChannel {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> (Self, mpsc::UnboundedReceiver<StreamingEvent>) {
         let (sender, receiver) = mpsc::unbounded_channel();
         (Self { sender }, receiver)
     }
-    
+
     pub fn send(&self, event: StreamingEvent) {
         drop(self.sender.send(event));
     }

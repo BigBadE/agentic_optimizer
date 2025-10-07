@@ -1,6 +1,6 @@
 use serde::{Deserialize, Serialize};
-use std::path::PathBuf;
 use std::collections::HashMap;
+use std::path::PathBuf;
 use std::time::Instant;
 
 use merlin_core::{Response, TokenUsage};
@@ -32,7 +32,7 @@ pub struct Task {
     pub priority: Priority,
     pub dependencies: Vec<TaskId>,
     pub context_needs: ContextRequirements,
-    
+
     // Self-determinations fields
     #[serde(skip)]
     pub state: TaskState,
@@ -298,13 +298,13 @@ pub struct TaskDecision {
 pub enum TaskAction {
     /// Complete the task immediately with this result
     Complete { result: String },
-    
+
     /// Decompose into subtasks
     Decompose {
         subtasks: Vec<SubtaskSpec>,
         execution_mode: ExecutionMode,
     },
-    
+
     /// Need more information before proceeding
     GatherContext { needs: Vec<String> },
 }

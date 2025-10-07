@@ -1,23 +1,23 @@
 use crossterm::event::{self, Event, KeyCode, KeyModifiers};
 use crossterm::terminal;
-use ratatui::{backend::CrosstermBackend, Terminal};
+use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::mpsc;
 
-use crate::TaskId;
-use crate::{Result, RoutingError};
-use crossterm::event::{KeyEvent, KeyEventKind};
-use std::time::Instant;
 use super::event_handler::EventHandler;
 use super::events::UiEvent;
 use super::input::InputManager;
 use super::persistence::TaskPersistence;
-use super::renderer::{FocusedPane, Renderer, RenderCtx, UiCtx};
+use super::renderer::{FocusedPane, RenderCtx, Renderer, UiCtx};
 use super::state::{ConversationEntry, ConversationRole, UiState};
 use super::task_manager::TaskManager;
 use super::theme::Theme;
+use crate::TaskId;
+use crate::{Result, RoutingError};
+use crossterm::event::{KeyEvent, KeyEventKind};
+use std::time::Instant;
 
 /// Main TUI application
 pub struct TuiApp {
@@ -78,7 +78,9 @@ impl TuiApp {
             .and_then(|dir| Theme::load(dir).ok())
             .unwrap_or_default();
 
-        let persistence = tasks_dir.as_ref().map(|dir| TaskPersistence::new(dir.clone()));
+        let persistence = tasks_dir
+            .as_ref()
+            .map(|dir| TaskPersistence::new(dir.clone()));
 
         let app = Self {
             terminal,
@@ -102,7 +104,8 @@ impl TuiApp {
         if let Some(persistence) = &self.persistence {
             if let Ok(tasks) = persistence.load_all_tasks().await {
                 for (task_id, task_display) in tasks {
-                    self.task_manager.insert_task_for_load(task_id, task_display);
+                    self.task_manager
+                        .insert_task_for_load(task_id, task_display);
                 }
 
                 self.task_manager.rebuild_order();
@@ -117,8 +120,7 @@ impl TuiApp {
     /// # Errors
     /// Returns an error if enabling raw mode fails.
     pub fn enable_raw_mode(&self) -> Result<()> {
-        terminal::enable_raw_mode()
-            .map_err(|err| RoutingError::Other(err.to_string()))
+        terminal::enable_raw_mode().map_err(|err| RoutingError::Other(err.to_string()))
     }
 
     /// Disables raw mode
@@ -126,8 +128,7 @@ impl TuiApp {
     /// # Errors
     /// Returns an error if disabling raw mode or clearing the terminal fails.
     pub fn disable_raw_mode(&mut self) -> Result<()> {
-        terminal::disable_raw_mode()
-            .map_err(|err| RoutingError::Other(err.to_string()))?;
+        terminal::disable_raw_mode().map_err(|err| RoutingError::Other(err.to_string()))?;
         self.terminal
             .clear()
             .map_err(|err| RoutingError::Other(err.to_string()))
@@ -212,10 +213,11 @@ impl TuiApp {
             }
 
             if let Some(task) = self.task_manager.get_task(task_id)
-                && task.parent_id == Some(parent_id) {
-                    let output = task.output_tree.to_text();
-                    context.push((task_id, task.description.clone(), output));
-                }
+                && task.parent_id == Some(parent_id)
+            {
+                let output = task.output_tree.to_text();
+                context.push((task_id, task.description.clone(), output));
+            }
         }
 
         context
@@ -379,9 +381,7 @@ impl TuiApp {
             KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete
         );
 
-        self.input_manager
-            .input_area_mut()
-            .input(Event::Key(*key));
+        self.input_manager.input_area_mut().input(Event::Key(*key));
 
         if should_wrap {
             let terminal_width = self.terminal.size().map(|size| size.width).unwrap_or(80);
@@ -456,7 +456,9 @@ impl TuiApp {
 
     /// Submits the current input if non-empty and returns true if it indicates quitting
     fn submit_input(&mut self) -> bool {
-        let input = self.input_manager.input_area().lines()[0].trim().to_string();
+        let input = self.input_manager.input_area().lines()[0]
+            .trim()
+            .to_string();
 
         if input.is_empty() {
             return false;
@@ -533,7 +535,9 @@ impl TuiApp {
 
     /// Selects the last task from the provided `visible_tasks` if available
     fn select_last_visible_task(&mut self, visible_tasks: &[TaskId]) {
-        let Some(&last_task_id) = visible_tasks.last() else { return; };
+        let Some(&last_task_id) = visible_tasks.last() else {
+            return;
+        };
         if let Some(new_index) = self
             .task_manager
             .task_order()
@@ -547,7 +551,9 @@ impl TuiApp {
 
     /// Selects the first task from the provided `visible_tasks` if available
     fn select_first_visible_task(&mut self, visible_tasks: &[TaskId]) {
-        let Some(&first_task_id) = visible_tasks.first() else { return; };
+        let Some(&first_task_id) = visible_tasks.first() else {
+            return;
+        };
         if let Some(new_index) = self
             .task_manager
             .task_order()
@@ -659,8 +665,7 @@ impl TuiApp {
         if self.state.selected_task_index >= self.task_manager.task_order().len()
             && !self.task_manager.is_empty()
         {
-            self.state.selected_task_index =
-                self.task_manager.task_order().len().saturating_sub(1);
+            self.state.selected_task_index = self.task_manager.task_order().len().saturating_sub(1);
         }
     }
 
@@ -672,7 +677,10 @@ impl TuiApp {
         self.terminal
             .draw(|frame| {
                 let ctx = RenderCtx {
-                    ui_ctx: UiCtx { task_manager: &self.task_manager, state: &self.state },
+                    ui_ctx: UiCtx {
+                        task_manager: &self.task_manager,
+                        state: &self.state,
+                    },
                     input: &self.input_manager,
                     focused: self.focused_pane,
                 };
@@ -683,4 +691,3 @@ impl TuiApp {
         Ok(())
     }
 }
-

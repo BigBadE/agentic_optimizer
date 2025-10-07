@@ -1,6 +1,5 @@
 //! Caching and persistence for rust-analyzer state.
 
-
 use std::collections::HashMap;
 use std::fs::{self as filesystem, File};
 use std::io::{BufReader, BufWriter};
@@ -39,7 +38,9 @@ impl WorkspaceCache {
 
     /// Get the cache file path for a project
     fn cache_path(project_root: &Path) -> PathBuf {
-        let cache_dir = project_root.join("../../../../../target").join(".agentic-cache");
+        let cache_dir = project_root
+            .join("../../../../../target")
+            .join(".agentic-cache");
         cache_dir.join("rust-analyzer.cache")
     }
 
@@ -53,8 +54,9 @@ impl WorkspaceCache {
         let cache_path = Self::cache_path(project_root);
 
         if let Some(parent) = cache_path.parent() {
-            filesystem::create_dir_all(parent)
-                .map_err(|error| CoreError::Other(format!("Failed to create cache directory: {error}")))?;
+            filesystem::create_dir_all(parent).map_err(|error| {
+                CoreError::Other(format!("Failed to create cache directory: {error}"))
+            })?;
         }
 
         let file = File::create(&cache_path)

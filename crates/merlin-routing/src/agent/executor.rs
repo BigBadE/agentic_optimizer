@@ -3,8 +3,8 @@ use std::sync::Arc;
 use std::time::Instant;
 
 use crate::{
-    ModelRouter, ModelTier, Result, RoutingError, Task, TaskDecision, TaskId, TaskResult, TaskState, ToolRegistry, UiChannel,
-    UiEvent, Validator, streaming::StepType,
+    ModelRouter, ModelTier, Result, RoutingError, Task, TaskDecision, TaskId, TaskResult,
+    TaskState, ToolRegistry, UiChannel, UiEvent, Validator, streaming::StepType,
 };
 use merlin_core::{Context, ModelProvider, Query, Response, TokenUsage};
 use merlin_local::LocalModelProvider;
@@ -24,7 +24,7 @@ pub struct AgentExecutor {
 
 struct ExecInputs<'life> {
     provider: &'life Arc<dyn ModelProvider>,
-    query:   &'life Query,
+    query: &'life Query,
     context: &'life Context,
     ui_channel: &'life UiChannel,
 }
@@ -67,13 +67,18 @@ impl AgentExecutor {
             task.description
         ));
         let context = Context::new("You are a task assessment system.");
-        let assessment_response = provider.generate(&query, &context).await
+        let assessment_response = provider
+            .generate(&query, &context)
+            .await
             .map_err(|error| RoutingError::Other(format!("Assessment failed: {error}")))?;
 
         // Parse first; send to UI and complete step on success
         match assessor.parse_assessment_response(&assessment_response.text, task) {
             Ok(decision) => {
-                ui_channel.send(UiEvent::TaskOutput { task_id, output: assessment_response.text });
+                ui_channel.send(UiEvent::TaskOutput {
+                    task_id,
+                    output: assessment_response.text,
+                });
                 Self::complete_analysis_step(ui_channel, task_id);
                 Ok(decision)
             }
@@ -110,15 +115,17 @@ impl AgentExecutor {
         let query = self.create_query_with_tools(&task)?;
 
         // Step 5: Execute with streaming
-        let response = self.execute_with_streaming(
-            task_id,
-            ExecInputs {
-                provider: &provider,
-                query: &query,
-                context: &context,
-                ui_channel: &ui_channel,
-            },
-        ).await?;
+        let response = self
+            .execute_with_streaming(
+                task_id,
+                ExecInputs {
+                    provider: &provider,
+                    query: &query,
+                    context: &context,
+                    ui_channel: &ui_channel,
+                },
+            )
+            .await?;
 
         // Step 6: Validate
         let validation = self.validator.validate(&response, &task).await?;
@@ -144,9 +151,16 @@ impl AgentExecutor {
         task_id: TaskId,
         inputs: ExecInputs<'_>,
     ) -> Result<Response> {
-        let ExecInputs { provider, query, context, ui_channel } = inputs;
+        let ExecInputs {
+            provider,
+            query,
+            context,
+            ui_channel,
+        } = inputs;
         // Execute the query directly without extra steps
-        let mut response = provider.generate(query, context).await
+        let mut response = provider
+            .generate(query, context)
+            .await
             .map_err(|err| RoutingError::Other(format!("Provider error: {err}")))?;
 
         // Check if response contains tool calls (simulated for now)
@@ -222,7 +236,9 @@ impl AgentExecutor {
     /// # Errors
     /// Returns an error if the tool cannot be found or execution fails.
     async fn execute_tool(&self, tool_name: &str, args: Value) -> Result<Value> {
-        let tool = self.tool_registry.get_tool(tool_name)
+        let tool = self
+            .tool_registry
+            .get_tool(tool_name)
             .ok_or_else(|| RoutingError::Other(format!("Tool not found: {tool_name}")))?;
 
         tool.execute(args).await
@@ -234,7 +250,6 @@ impl AgentExecutor {
     fn extract_tool_calls(&self, _response: &Response) -> Vec<(String, Value)> {
         // For Phase 2, we'll simulate tool calling by looking for markers in the text
         // Real implementation would use proper function calling API
-
 
         // Example: Look for patterns like "TOOL:read_file:path/to/file"
         // This is a placeholder - real implementation would use LLM's function calling
@@ -275,24 +290,27 @@ impl AgentExecutor {
                     .with_model(model_name.clone());
                 Ok(Arc::new(provider))
             }
-            ModelTier::Premium { provider: provider_name, model_name } => {
-                match provider_name.as_str() {
-                    "openrouter" => {
-                        let api_key = env::var("OPENROUTER_API_KEY")
-                            .map_err(|_| RoutingError::Other("OPENROUTER_API_KEY not set".to_owned()))?;
-                        let provider = OpenRouterProvider::new(api_key)?
-                            .with_model(model_name.clone());
-                        Ok(Arc::new(provider))
-                    }
-                    "anthropic" => {
-                        let api_key = env::var("ANTHROPIC_API_KEY")
-                            .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
-                        let provider = AnthropicProvider::new(api_key)?;
-                        Ok(Arc::new(provider))
-                    }
-                    _ => Err(RoutingError::Other(format!("Unknown provider: {provider_name}"))),
+            ModelTier::Premium {
+                provider: provider_name,
+                model_name,
+            } => match provider_name.as_str() {
+                "openrouter" => {
+                    let api_key = env::var("OPENROUTER_API_KEY").map_err(|_| {
+                        RoutingError::Other("OPENROUTER_API_KEY not set".to_owned())
+                    })?;
+                    let provider = OpenRouterProvider::new(api_key)?.with_model(model_name.clone());
+                    Ok(Arc::new(provider))
                 }
-            }
+                "anthropic" => {
+                    let api_key = env::var("ANTHROPIC_API_KEY")
+                        .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
+                    let provider = AnthropicProvider::new(api_key)?;
+                    Ok(Arc::new(provider))
+                }
+                _ => Err(RoutingError::Other(format!(
+                    "Unknown provider: {provider_name}"
+                ))),
+            },
         }
     }
 
@@ -350,7 +368,11 @@ impl AgentExecutor {
         // Create assessor with the router's provider
         let decision_result = self.router.route(&task).await?;
         let provider = Self::create_provider(&decision_result.tier)?;
-        if (self.assess_task_with_provider(&provider, &task, &ui_channel, task_id).await).is_err() {
+        if (self
+            .assess_task_with_provider(&provider, &task, &ui_channel, task_id)
+            .await)
+            .is_err()
+        {
             // Fallback to streaming execution if assessment fails
             task.state = TaskState::Executing;
             return self.execute_streaming(task, ui_channel).await;
@@ -366,8 +388,8 @@ impl AgentExecutor {
 mod tests {
     use super::*;
     use crate::{
-        StrategyRouter, ToolRegistry,
-        ValidationPipeline, ReadFileTool, WriteFileTool, ListFilesTool, RunCommandTool,
+        ListFilesTool, ReadFileTool, RunCommandTool, StrategyRouter, ToolRegistry,
+        ValidationPipeline, WriteFileTool,
     };
     use std::path::PathBuf;
 
@@ -378,9 +400,9 @@ mod tests {
         let router = Arc::new(StrategyRouter::with_default_strategies());
         let validator = Arc::new(ValidationPipeline::with_default_stages());
         let tool_registry = Arc::new(ToolRegistry::new());
-        
+
         let executor = AgentExecutor::new(router, validator, tool_registry);
-        
+
         // Just verify it was created successfully
         assert!(executor.step_tracker.get_steps(&TaskId::new()).is_none());
     }
@@ -395,9 +417,9 @@ mod tests {
                 .with_tool(Arc::new(ReadFileTool::new(workspace.clone())))
                 .with_tool(Arc::new(WriteFileTool::new(workspace.clone())))
                 .with_tool(Arc::new(ListFilesTool::new(workspace.clone())))
-                .with_tool(Arc::new(RunCommandTool::new(workspace)))
+                .with_tool(Arc::new(RunCommandTool::new(workspace))),
         );
-        
+
         assert!(tool_registry.get_tool("read_file").is_some());
         assert!(tool_registry.get_tool("write_file").is_some());
         assert!(tool_registry.get_tool("list_files").is_some());

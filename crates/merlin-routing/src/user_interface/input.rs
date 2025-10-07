@@ -2,9 +2,9 @@ use ratatui::{
     style::{Modifier, Style},
     widgets::{Block, Borders},
 };
-use std::collections::HashSet;
 use std::borrow::Cow;
-use textwrap::{wrap, Options, WordSeparator};
+use std::collections::HashSet;
+use textwrap::{Options, WordSeparator, wrap};
 use tui_textarea::{CursorMove, TextArea};
 
 /// Manages input area state and text wrapping
@@ -164,8 +164,7 @@ impl InputManager {
                 let wrapped = wrap_paragraph(para, max_line_width);
 
                 if para_idx == cursor_info.paragraph && !found_cursor {
-                    let (row_offset, col) =
-                        find_cursor_position(&wrapped, cursor_info.position);
+                    let (row_offset, col) = find_cursor_position(&wrapped, cursor_info.position);
                     new_cursor_row += row_offset;
                     new_cursor_col = col;
                     found_cursor = true;
@@ -247,10 +246,12 @@ fn wrap_paragraph(para: &[String], max_line_width: usize) -> Vec<String> {
         .map(Cow::into_owned)
         .collect();
 
-    if ends_with_space && !wrapped_lines.is_empty()
-        && let Some(last) = wrapped_lines.last_mut() {
-            last.push(' ');
-        }
+    if ends_with_space
+        && !wrapped_lines.is_empty()
+        && let Some(last) = wrapped_lines.last_mut()
+    {
+        last.push(' ');
+    }
 
     wrapped_lines
 }

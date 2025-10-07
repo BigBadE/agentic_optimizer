@@ -11,7 +11,9 @@ pub struct AgentConfig {
 impl Default for AgentConfig {
     fn default() -> Self {
         Self {
-            system_prompt: "You are a helpful AI assistant that analyzes code and provides insights.".to_owned(),
+            system_prompt:
+                "You are a helpful AI assistant that analyzes code and provides insights."
+                    .to_owned(),
             max_context_tokens: 100_000,
             temperature: 0.7,
             top_k_context_files: 10,
@@ -20,7 +22,7 @@ impl Default for AgentConfig {
 }
 
 impl AgentConfig {
-    #[must_use] 
+    #[must_use]
     pub fn new() -> Self {
         Self::default()
     }

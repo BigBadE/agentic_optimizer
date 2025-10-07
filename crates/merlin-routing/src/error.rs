@@ -1,11 +1,11 @@
-use std::{fmt, io};
-use std::path::PathBuf;
-use serde_json;
-use std::result::Result as StdResult;
-use merlin_core::Error as CoreError;
-use serde_json::Error as JsonError;
-use thiserror::Error;
 use crate::types::{TaskId, ValidationResult};
+use merlin_core::Error as CoreError;
+use serde_json;
+use serde_json::Error as JsonError;
+use std::path::PathBuf;
+use std::result::Result as StdResult;
+use std::{fmt, io};
+use thiserror::Error;
 
 pub type Result<T> = StdResult<T, RoutingError>;
 
@@ -51,16 +51,10 @@ pub enum RoutingError {
     NoHigherTierAvailable,
 
     #[error("File locked by task {holder:?}: {file}")]
-    FileLockedByTask {
-        file: PathBuf,
-        holder: TaskId,
-    },
+    FileLockedByTask { file: PathBuf, holder: TaskId },
 
     #[error("File has {readers} active readers: {file}")]
-    FileHasActiveReaders {
-        file: PathBuf,
-        readers: usize,
-    },
+    FileHasActiveReaders { file: PathBuf, readers: usize },
 
     #[error("Conflict detected: {0:?}")]
     ConflictDetected(ConflictReport),
@@ -110,4 +104,3 @@ pub struct FileConflict {
     pub base_hash: u64,
     pub current_hash: u64,
 }
-

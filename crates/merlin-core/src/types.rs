@@ -45,7 +45,7 @@ pub struct TokenUsage {
 }
 
 impl TokenUsage {
-    #[must_use] 
+    #[must_use]
     pub fn total(&self) -> u64 {
         self.input + self.output + self.cache_read + self.cache_write
     }
@@ -71,7 +71,7 @@ impl Context {
         self
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn files_to_string(&self) -> String {
         self.files
             .iter()
@@ -80,7 +80,7 @@ impl Context {
             .join("\n")
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn token_estimate(&self) -> usize {
         let files_len: usize = self.files.iter().map(|file| file.content.len()).sum();
         (self.system_prompt.len() + files_len) / 4
@@ -97,8 +97,8 @@ impl FileContext {
     /// # Errors
     /// Returns an error if the file cannot be read
     pub fn from_path(path: &PathBuf) -> Result<Self> {
-        let content = read_to_string(path)
-            .map_err(|_| Error::FileNotFound(path.display().to_string()))?;
+        let content =
+            read_to_string(path).map_err(|_| Error::FileNotFound(path.display().to_string()))?;
 
         Ok(Self {
             path: path.clone(),
@@ -106,7 +106,7 @@ impl FileContext {
         })
     }
 
-    #[must_use] 
+    #[must_use]
     pub fn new(path: PathBuf, content: String) -> Self {
         Self { path, content }
     }

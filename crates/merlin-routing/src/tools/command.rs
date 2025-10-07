@@ -1,10 +1,10 @@
+use super::Tool;
+use crate::{Result, RoutingError};
 use async_trait::async_trait;
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::path::PathBuf;
 use std::process::Stdio;
 use tokio::process::Command;
-use crate::{Result, RoutingError};
-use super::Tool;
 
 /// Tool for running shell commands
 pub struct RunCommandTool {
@@ -13,7 +13,7 @@ pub struct RunCommandTool {
 }
 
 impl RunCommandTool {
-    #[must_use] 
+    #[must_use]
     pub fn new(workspace_root: PathBuf) -> Self {
         Self {
             workspace_root,
@@ -27,7 +27,7 @@ impl RunCommandTool {
             ],
         }
     }
-    
+
     #[must_use]
     pub fn with_allowed_commands(mut self, commands: Vec<String>) -> Self {
         self.allowed_commands = commands;
@@ -40,11 +40,11 @@ impl Tool for RunCommandTool {
     fn name(&self) -> &'static str {
         "run_command"
     }
-    
+
     fn description(&self) -> &'static str {
         "Execute a shell command in the workspace directory. Only whitelisted commands are allowed."
     }
-    
+
     fn parameters_schema(&self) -> Value {
         json!({
             "type": "object",
@@ -57,29 +57,34 @@ impl Tool for RunCommandTool {
             "required": ["command"]
         })
     }
-    
+
     async fn execute(&self, args: Value) -> Result<Value> {
-        let command_str = args.get("command")
+        let command_str = args
+            .get("command")
             .and_then(|value| value.as_str())
             .ok_or_else(|| RoutingError::Other("Missing 'command' argument".to_owned()))?;
-        
+
         // Parse command into parts
         let parts: Vec<&str> = command_str.split_whitespace().collect();
         if parts.is_empty() {
             return Err(RoutingError::Other("Empty command".to_owned()));
         }
-        
+
         let program = parts[0];
         let args_list = &parts[1..];
-        
+
         // Security check: only allow whitelisted commands
-        if !self.allowed_commands.iter().any(|allowed| allowed == program) {
-            return Err(RoutingError::Other(
-                format!("Command '{}' is not in the whitelist. Allowed: {:?}", 
-                    program, self.allowed_commands)
-            ));
+        if !self
+            .allowed_commands
+            .iter()
+            .any(|allowed| allowed == program)
+        {
+            return Err(RoutingError::Other(format!(
+                "Command '{}' is not in the whitelist. Allowed: {:?}",
+                program, self.allowed_commands
+            )));
         }
-        
+
         // Execute command
         let output = Command::new(program)
             .args(args_list)
@@ -89,11 +94,11 @@ impl Tool for RunCommandTool {
             .output()
             .await
             .map_err(|error| RoutingError::Other(format!("Failed to execute command: {error}")))?;
-        
+
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
         let exit_code = output.status.code().unwrap_or(-1);
-        
+
         Ok(json!({
             "command": command_str,
             "exit_code": exit_code,
@@ -107,8 +112,8 @@ impl Tool for RunCommandTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
     use crate::Result;
+    use tempfile::TempDir;
 
     #[tokio::test]
     /// # Errors
@@ -118,12 +123,14 @@ mod tests {
     /// Panics if returned JSON is missing expected fields.
     async fn test_run_command_tool() -> Result<()> {
         let temp_dir = TempDir::new()?;
-        
+
         let tool = RunCommandTool::new(temp_dir.path().to_path_buf());
-        
+
         // Test a safe command (cargo --version should work)
-        let result = tool.execute(json!({ "command": "cargo --version" })).await?;
-        
+        let result = tool
+            .execute(json!({ "command": "cargo --version" }))
+            .await?;
+
         assert_eq!(result["exit_code"], 0);
         assert_eq!(result["success"].as_bool(), Some(true));
         if let Some(stdout_str) = result["stdout"].as_str() {
@@ -142,9 +149,9 @@ mod tests {
     /// Panics if a non-whitelisted command unexpectedly succeeds.
     async fn test_command_whitelist() -> Result<()> {
         let temp_dir = TempDir::new()?;
-        
+
         let tool = RunCommandTool::new(temp_dir.path().to_path_buf());
-        
+
         // Test a non-whitelisted command
         let result = tool.execute(json!({ "command": "rm -rf /" })).await;
         match result {
@@ -162,13 +169,15 @@ mod tests {
     /// Panics if returned JSON is missing expected fields.
     async fn test_custom_whitelist() -> Result<()> {
         let temp_dir = TempDir::new()?;
-        
+
         // Use a command that exists on all platforms
         let tool = RunCommandTool::new(temp_dir.path().to_path_buf())
             .with_allowed_commands(vec!["cargo".to_owned()]);
-        
-        let result = tool.execute(json!({ "command": "cargo --version" })).await?;
-        
+
+        let result = tool
+            .execute(json!({ "command": "cargo --version" }))
+            .await?;
+
         assert_eq!(result["exit_code"], 0);
         if let Some(stdout_str) = result["stdout"].as_str() {
             assert!(stdout_str.contains("cargo"));

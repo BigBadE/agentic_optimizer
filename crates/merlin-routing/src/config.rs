@@ -56,7 +56,10 @@ impl Default for TierConfig {
 
 /// Validation configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(clippy::struct_excessive_bools, reason = "Configuration struct can have more bools")]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Configuration struct can have more bools"
+)]
 pub struct ValidationConfig {
     pub enabled: bool,
     pub early_exit: bool,
@@ -135,7 +138,7 @@ mod tests {
         assert!(config.validation.enabled);
         assert_eq!(config.execution.max_concurrent_tasks, 4);
     }
-    
+
     #[test]
     /// # Panics
     /// Panics if serialization or deserialization fails.

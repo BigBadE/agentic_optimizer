@@ -1,9 +1,9 @@
+use super::events::TaskProgress;
+use super::output_tree::OutputTree;
+use crate::TaskId;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
 use std::time::Instant;
-use crate::TaskId;
-use super::output_tree::OutputTree;
-use super::events::TaskProgress;
 
 /// Status of a task
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -29,13 +29,25 @@ pub struct TaskDisplay {
 /// Task step information
 #[derive(Clone)]
 pub struct TaskStepInfo {
-    #[allow(dead_code, reason = "Field is part of public API for task step tracking")]
+    #[allow(
+        dead_code,
+        reason = "Field is part of public API for task step tracking"
+    )]
     pub step_id: String,
-    #[allow(dead_code, reason = "Field is part of public API for task step tracking")]
+    #[allow(
+        dead_code,
+        reason = "Field is part of public API for task step tracking"
+    )]
     pub step_type: String,
-    #[allow(dead_code, reason = "Field is part of public API for task step tracking")]
+    #[allow(
+        dead_code,
+        reason = "Field is part of public API for task step tracking"
+    )]
     pub content: String,
-    #[allow(dead_code, reason = "Field is part of public API for task step tracking")]
+    #[allow(
+        dead_code,
+        reason = "Field is part of public API for task step tracking"
+    )]
     pub timestamp: Instant,
 }
 
@@ -128,7 +140,8 @@ impl TaskManager {
     pub fn rebuild_order(&mut self) {
         self.task_order.clear();
 
-        let mut all_tasks: Vec<(TaskId, Instant)> = self.tasks
+        let mut all_tasks: Vec<(TaskId, Instant)> = self
+            .tasks
             .iter()
             .map(|(&id, task)| (id, task.start_time))
             .collect();
@@ -159,7 +172,6 @@ impl TaskManager {
             .filter(|&task_id| !self.is_hidden_by_collapse(task_id))
             .collect()
     }
-
 
     /// Checks if a task is a descendant of another
     pub fn is_descendant_of(&self, task_id: TaskId, ancestor_id: TaskId) -> bool {
@@ -201,12 +213,9 @@ impl TaskManager {
 
     /// Checks if a task has children
     pub fn has_children(&self, task_id: TaskId) -> bool {
-        self.task_order.iter().any(|id| {
-            self.tasks
-                .get(id)
-                .and_then(|task| task.parent_id)
-                == Some(task_id)
-        })
+        self.task_order
+            .iter()
+            .any(|id| self.tasks.get(id).and_then(|task| task.parent_id) == Some(task_id))
     }
 
     /// Iterates over all tasks
@@ -254,14 +263,10 @@ impl TaskManager {
         let mut index = 0;
         while index < to_delete.len() {
             let current = to_delete[index];
-            let children: Vec<TaskId> = self.task_order
+            let children: Vec<TaskId> = self
+                .task_order
                 .iter()
-                .filter(|&&id| {
-                    self.tasks
-                        .get(&id)
-                        .and_then(|task| task.parent_id)
-                        == Some(current)
-                })
+                .filter(|&&id| self.tasks.get(&id).and_then(|task| task.parent_id) == Some(current))
                 .copied()
                 .collect();
             to_delete.extend(children);
@@ -273,7 +278,8 @@ impl TaskManager {
     fn add_task_and_descendants(&mut self, task_id: TaskId) {
         self.task_order.push(task_id);
 
-        let mut children: Vec<(TaskId, Instant)> = self.tasks
+        let mut children: Vec<(TaskId, Instant)> = self
+            .tasks
             .iter()
             .filter(|(_, task)| task.parent_id == Some(task_id))
             .map(|(&id, task)| (id, task.start_time))

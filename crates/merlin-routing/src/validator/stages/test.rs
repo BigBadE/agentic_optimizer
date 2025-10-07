@@ -25,19 +25,19 @@ impl TestValidationStage {
             min_pass_rate: 1.0,
         }
     }
-    
+
     #[must_use]
     pub fn with_timeout(mut self, timeout_seconds: u64) -> Self {
         self.timeout_seconds = timeout_seconds;
         self
     }
-    
+
     #[must_use]
     pub fn with_workspace(mut self, workspace: Arc<WorkspaceState>) -> Self {
         self.workspace = Some(workspace);
         self
     }
-    
+
     #[must_use]
     pub fn with_min_pass_rate(mut self, min_pass_rate: f64) -> Self {
         self.min_pass_rate = min_pass_rate;
@@ -63,7 +63,7 @@ impl ValidationStage for TestValidationStage {
                 score: 1.0,
             });
         }
-        
+
         let Some(workspace) = &self.workspace else {
             return Ok(StageResult {
                 stage: StageType::Test,
@@ -73,29 +73,35 @@ impl ValidationStage for TestValidationStage {
                 score: 1.0,
             });
         };
-        
+
         let build_env = IsolatedBuildEnv::new(workspace.as_ref())?;
-        
+
         let test_result = build_env.run_tests(self.timeout_seconds).await?;
-        
+
         let total_tests = test_result.passed + test_result.failed;
         let pass_rate = if total_tests > 0 {
             test_result.passed as f64 / total_tests as f64
         } else {
             1.0
         };
-        
+
         let passed = test_result.success && pass_rate >= self.min_pass_rate;
         let score = pass_rate;
-        
+
         let details = if passed {
-            format!("Tests passed: {}/{} ({}ms)", 
-                test_result.passed, total_tests, test_result.duration_ms)
+            format!(
+                "Tests passed: {}/{} ({}ms)",
+                test_result.passed, total_tests, test_result.duration_ms
+            )
         } else {
-            format!("Tests failed: {}/{} ({:.1}% pass rate)", 
-                test_result.failed, total_tests, pass_rate * 100.0)
+            format!(
+                "Tests failed: {}/{} ({:.1}% pass rate)",
+                test_result.failed,
+                total_tests,
+                pass_rate * 100.0
+            )
         };
-        
+
         Ok(StageResult {
             stage: StageType::Test,
             passed,
@@ -104,17 +110,17 @@ impl ValidationStage for TestValidationStage {
             score,
         })
     }
-    
+
     async fn quick_check(&self, response: &Response) -> Result<bool> {
         let has_test_failures = response.text.contains("test result: FAILED")
             || response.text.contains("assertion failed");
         Ok(!has_test_failures)
     }
-    
+
     fn name(&self) -> &'static str {
         "Test"
     }
-    
+
     fn stage_type(&self) -> StageType {
         StageType::Test
     }
@@ -123,8 +129,8 @@ impl ValidationStage for TestValidationStage {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_core::TokenUsage;
     use crate::Result;
+    use merlin_core::TokenUsage;
 
     #[tokio::test]
     /// # Errors
@@ -142,13 +148,13 @@ mod tests {
             latency_ms: 0,
         };
         let task = Task::new("Test".to_owned());
-        
+
         let result = stage.validate(&response, &task).await?;
         assert!(result.passed);
         assert!(result.details.contains("skipped"));
         Ok(())
     }
-    
+
     #[tokio::test]
     /// # Errors
     /// Returns an error if `quick_check` returns an unexpected failure in the test harness.
@@ -157,7 +163,7 @@ mod tests {
     /// Panics if `quick_check` logic does not match expected patterns.
     async fn test_quick_check() -> Result<()> {
         let stage = TestValidationStage::new();
-        
+
         let good_response = Response {
             text: "test result: ok. 5 passed".to_owned(),
             confidence: 1.0,
@@ -166,7 +172,7 @@ mod tests {
             latency_ms: 0,
         };
         assert!(stage.quick_check(&good_response).await?);
-        
+
         let bad_response = Response {
             text: "test result: FAILED. 2 passed; 3 failed".to_owned(),
             confidence: 1.0,
@@ -178,4 +184,3 @@ mod tests {
         Ok(())
     }
 }
-

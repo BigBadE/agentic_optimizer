@@ -1,11 +1,11 @@
-use std::time::Instant;
-use serde_json::Value;
-use crate::{TaskId, TaskResult};
 use super::events::{MessageLevel, UiEvent};
 use super::output_tree::StepType;
+use super::persistence::TaskPersistence;
 use super::state::{ConversationEntry, ConversationRole, UiState};
 use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo};
-use super::persistence::TaskPersistence;
+use crate::{TaskId, TaskResult};
+use serde_json::Value;
+use std::time::Instant;
 
 /// Handles UI events and updates task manager and state
 pub struct EventHandler<'handler> {
@@ -115,11 +115,7 @@ impl<'handler> EventHandler<'handler> {
         self.select_task(task_id);
     }
 
-    fn handle_task_progress(
-        &mut self,
-        task_id: TaskId,
-        progress: super::events::TaskProgress,
-    ) {
+    fn handle_task_progress(&mut self, task_id: TaskId, progress: super::events::TaskProgress) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             task.progress = Some(progress);
         }
@@ -141,9 +137,10 @@ impl<'handler> EventHandler<'handler> {
         }
 
         if let Some(persistence) = self.persistence
-            && let Some(task) = self.task_manager.get_task(task_id) {
-                drop(persistence.save_task(task_id, task));
-            }
+            && let Some(task) = self.task_manager.get_task(task_id)
+        {
+            drop(persistence.save_task(task_id, task));
+        }
 
         self.state.conversation_history.push(ConversationEntry {
             role: ConversationRole::Assistant,
@@ -164,9 +161,10 @@ impl<'handler> EventHandler<'handler> {
         }
 
         if let Some(persistence) = self.persistence
-            && let Some(task) = self.task_manager.get_task(task_id) {
-                drop(persistence.save_task(task_id, task));
-            }
+            && let Some(task) = self.task_manager.get_task(task_id)
+        {
+            drop(persistence.save_task(task_id, task));
+        }
     }
 
     fn handle_system_message(&mut self, level: MessageLevel, message: String) {
@@ -179,9 +177,10 @@ impl<'handler> EventHandler<'handler> {
 
         // Send to active task
         if let Some(task_id) = self.state.active_task_id
-            && let Some(task) = self.task_manager.get_task_mut(task_id) {
-                task.output_tree.add_text(format!("{prefix} {message}"));
-            }
+            && let Some(task) = self.task_manager.get_task_mut(task_id)
+        {
+            task.output_tree.add_text(format!("{prefix} {message}"));
+        }
 
         self.state.conversation_history.push(ConversationEntry {
             role: ConversationRole::System,
@@ -216,8 +215,7 @@ impl<'handler> EventHandler<'handler> {
         }
     }
 
-    fn handle_tool_call_started(_task_id: TaskId, _tool: String, _args: Value) {
-    }
+    fn handle_tool_call_started(_task_id: TaskId, _tool: String, _args: Value) {}
 
     fn handle_tool_call_completed(&mut self, task_id: TaskId, tool: &str, result: &Value) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {

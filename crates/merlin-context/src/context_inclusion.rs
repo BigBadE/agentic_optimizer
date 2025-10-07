@@ -37,13 +37,13 @@ impl ContextManager {
         // More accurate: count words and punctuation
         let chars = text.len();
         let words = text.split_whitespace().count();
-        
+
         // Average of character-based and word-based estimates
         // Characters: ~4 chars per token
         // Words: ~1.3 words per token
         let char_estimate = chars / 4;
         let word_estimate = (words * 10) / 13;
-        
+
         usize::midpoint(char_estimate, word_estimate)
     }
 
@@ -51,7 +51,7 @@ impl ContextManager {
     /// Returns true if added, false if would exceed token limit
     pub fn try_add_file(&mut self, file: FileContext) -> bool {
         let file_tokens = Self::estimate_tokens(&file.content);
-        
+
         if self.token_count + file_tokens > self.max_tokens {
             return false;
         }
@@ -64,13 +64,13 @@ impl ContextManager {
     /// Add a file, truncating if necessary to fit within token limit
     pub fn add_file_truncated(&mut self, mut file: FileContext) -> bool {
         let file_tokens = Self::estimate_tokens(&file.content);
-        
+
         if self.token_count >= self.max_tokens {
             return false; // Already at limit
         }
 
         let available_tokens = self.max_tokens - self.token_count;
-        
+
         if file_tokens <= available_tokens {
             // Fits completely
             self.token_count += file_tokens;
@@ -112,13 +112,13 @@ impl ContextManager {
     }
 
     /// Consume and return the files
-    #[must_use] 
+    #[must_use]
     pub fn into_files(self) -> Vec<FileContext> {
         self.files
     }
 
     /// Get files reference
-    #[must_use] 
+    #[must_use]
     pub fn files(&self) -> &[FileContext] {
         &self.files
     }
@@ -183,15 +183,16 @@ pub fn add_prioritized_files(
 ) -> usize {
     // Sort by priority (high to low), then by score (high to low)
     files.sort_by(|file_a, file_b| {
-        file_b.priority
+        file_b
+            .priority
             .cmp(&file_a.priority)
-            .then_with(|| {
-                match (file_b.score, file_a.score) {
-                    (Some(score_b), Some(score_a)) => score_b.partial_cmp(&score_a).unwrap_or(Ordering::Equal),
-                    (Some(_), None) => Ordering::Less,
-                    (None, Some(_)) => Ordering::Greater,
-                    (None, None) => Ordering::Equal,
+            .then_with(|| match (file_b.score, file_a.score) {
+                (Some(score_b), Some(score_a)) => {
+                    score_b.partial_cmp(&score_a).unwrap_or(Ordering::Equal)
                 }
+                (Some(_), None) => Ordering::Less,
+                (None, Some(_)) => Ordering::Greater,
+                (None, None) => Ordering::Equal,
             })
     });
 
@@ -206,4 +207,3 @@ pub fn add_prioritized_files(
 
     added
 }
-

@@ -4,6 +4,7 @@ use std::path::PathBuf;
 use std::collections::HashMap;
 use std::cmp::Ordering;
 use std::env;
+use std::process::Command;
 use ollama_rs::Ollama;
 use merlin_core::{Result, Error};
 use crate::models::ModelConfig;
@@ -63,7 +64,6 @@ impl VectorStore {
 
     /// Search for similar files
     #[must_use]
-    #[allow(clippy::min_ident_chars, reason = "Closure parameters in sorting")]
     pub fn search(&self, query_embedding: &[f32], top_k: usize) -> Vec<SearchResult> {
         let mut scores: Vec<(PathBuf, f32)> = self
             .embeddings
@@ -74,7 +74,7 @@ impl VectorStore {
             })
             .collect();
 
-        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(Ordering::Equal));
+        scores.sort_by(|first, second| second.1.partial_cmp(&first.1).unwrap_or(Ordering::Equal));
 
         scores
             .into_iter()
@@ -140,10 +140,7 @@ impl EmbeddingClient {
     ///
     /// # Errors
     /// Returns an error if Ollama is not running or model pull fails
-    #[allow(clippy::print_stderr, reason = "User-facing installation feedback")]
     pub async fn ensure_model_available(&self) -> Result<()> {
-        use std::process::Command;
-
         // Check if Ollama is running by trying to list models
         let models = match self.ollama.list_local_models().await {
             Ok(models) => models,
@@ -158,10 +155,9 @@ impl EmbeddingClient {
         let model_available = models.iter().any(|model| model.name.contains(&self.model));
 
         if !model_available {
-            eprintln!("⚙️  Embedding model '{}' not found", self.model);
-            eprintln!("⬇️  Pulling model from Ollama (this may take a few minutes)...");
-            eprintln!("    Running: ollama pull {}", self.model);
-            eprintln!();
+            tracing::info!("⚙️  Embedding model '{}' not found", self.model);
+            tracing::info!("⬇️  Pulling model from Ollama (this may take a few minutes)...");
+            tracing::info!("    Running: ollama pull {}", self.model);
 
             // Pull the model using Ollama CLI with inherited stdio for progress
             let status = Command::new("ollama")
@@ -177,8 +173,7 @@ impl EmbeddingClient {
                 ));
             }
 
-            eprintln!();
-            eprintln!("✓ Successfully pulled embedding model '{}'", self.model);
+            tracing::info!("✓ Successfully pulled embedding model '{}'", self.model);
         }
 
         Ok(())

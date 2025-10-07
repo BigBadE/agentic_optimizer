@@ -53,7 +53,7 @@ async fn main() -> Result<()> {
         tracing::error!("Test cases directory not found: {}", test_cases_dir.display());
         tracing::info!("Available projects:");
         if let Ok(entries) = fs::read_dir("benchmarks/test_cases") {
-            for entry in entries.flatten().filter(|e| e.path().is_dir()) {
+            for entry in entries.flatten().filter(|entry| entry.path().is_dir()) {
                 tracing::info!("  - {}", entry.file_name().to_string_lossy());
             }
         }

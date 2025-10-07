@@ -20,7 +20,8 @@ use crate::context_inclusion::{
 
 type BackendJoinResult = CoreResult<(Option<Box<dyn LanguageProvider>>, Result<()>), JoinError>;
 type VectorJoinResult = CoreResult<(VectorSearchManager, Result<()>), JoinError>;
-type ProcessSearchResultsReturn = (Vec<PrioritizedFile>, Vec<(PathBuf, f32, Option<f32>, Option<f32>)>);
+type FileScoreInfo = (PathBuf, f32, Option<f32>, Option<f32>);
+type ProcessSearchResultsReturn = (Vec<PrioritizedFile>, Vec<FileScoreInfo>);
 type FileChunksMap = HashMap<PathBuf, Vec<(usize, usize, f32)>>;
 
 /// Default system prompt used when constructing the base context.
@@ -130,7 +131,6 @@ impl ContextBuilder {
     ///
     /// # Errors
     /// Returns an error if language backend is not initialized or hybrid search fails
-    #[allow(clippy::min_ident_chars, reason = "Standard loop iterator variable")]
     async fn use_subagent_for_context(&self, _intent: &QueryIntent, query_text: &str) -> Result<Vec<FileContext>> {
         // Initialize the language backend if needed
         if !self.language_backend_initialized {
@@ -154,7 +154,7 @@ impl ContextBuilder {
         tracing::info!("Total: {} chunks ({} tokens)", context_mgr.file_count(), context_mgr.token_count());
         
         // List all chunks with their sections and scores
-        for (i, file) in context_mgr.files().iter().enumerate() {
+        for (index, file) in context_mgr.files().iter().enumerate() {
             let tokens = ContextManager::estimate_tokens(&file.content);
 
             // Find the scores for this file
@@ -196,7 +196,7 @@ impl ContextBuilder {
 
             tracing::info!(
                 "{}. {} [{}] ({}, {} tokens)",
-                i + 1,
+                index + 1,
                 file.path.display(),
                 section_info,
                 score_display,
@@ -286,7 +286,6 @@ impl ContextBuilder {
     ///
     /// # Errors
     /// Returns an error if file cannot be read
-    #[allow(clippy::min_ident_chars, reason = "Standard loop iterator variable")]
     fn extract_chunk_with_context(file_path: &PathBuf, start_line: usize, end_line: usize, include_context: bool) -> Result<FileContext> {
         use std::fs;
 
@@ -311,7 +310,7 @@ impl ContextBuilder {
         let chunk_lines: Vec<&str> = lines
             .iter()
             .enumerate()
-            .filter(|(i, _)| *i + 1 >= context_start && *i < context_end)
+            .filter(|(line_index, _)| *line_index + 1 >= context_start && *line_index < context_end)
             .map(|(_, line)| *line)
             .collect();
         
@@ -624,8 +623,7 @@ impl ContextBuilder {
         }
 
         // Track scores for display
-        #[allow(clippy::type_complexity, reason = "Tuple for intermediate score tracking")]
-        let file_scores: Vec<(PathBuf, f32, Option<f32>, Option<f32>)> = filtered_matches.iter()
+        let file_scores: Vec<FileScoreInfo> = filtered_matches.iter()
             .filter_map(|result| {
                 result.file_path.to_str()
                     .and_then(|path_str| path_str.rsplit_once(':'))

@@ -12,7 +12,7 @@ use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use std::sync::Arc;
 use tokio::spawn;
 use tracing_subscriber::{
@@ -291,6 +291,10 @@ struct InteractiveFlags {
     local_only: bool,
 }
 
+/// Handle interactive agent mode
+///
+/// # Errors
+/// Returns an error if the orchestrator fails to initialize or process requests
 async fn handle_interactive_agent(
     project: PathBuf,
     flags: InteractiveFlags,
@@ -307,7 +311,10 @@ async fn handle_interactive_agent(
 
     let orchestrator = RoutingOrchestrator::new(config);
 
-    if !matches!(flags.ui, UiMode::Tui) {
+    if matches!(flags.ui, UiMode::Tui) {
+        // TUI mode (DEFAULT) - fully self-contained
+        run_tui_interactive(orchestrator, project, flags.local_only, matches!(flags.ui, UiMode::PlainVerbose)).await?;
+    } else {
         // Plain console mode
         let term = Term::stdout();
 
@@ -347,9 +354,6 @@ async fn handle_interactive_agent(
                 }
             }
         }
-    } else {
-        // TUI mode (DEFAULT) - fully self-contained
-        run_tui_interactive(orchestrator, project, flags.local_only, matches!(flags.ui, UiMode::PlainVerbose)).await?;
     }
 
     Ok(())
@@ -401,7 +405,7 @@ async fn run_tui_interactive(
     orchestrator: RoutingOrchestrator,
     project: PathBuf,
     local_only: bool,
-    verbose: bool,
+    _verbose: bool,
 ) -> Result<()> {
     // Create .merlin directory for logs and task storage
     let merlin_dir = project.join(".merlin");
@@ -450,7 +454,6 @@ async fn run_tui_interactive(
             
             let orchestrator_clone = orchestrator.clone();
             let ui_channel_clone = ui_channel.clone();
-            let verbose_clone = verbose;
             let mut log_clone = log_file.try_clone()?;
             
             // Get selected task as parent for new task
@@ -493,8 +496,6 @@ async fn run_tui_interactive(
                             result.duration_ms,
                             result.response.tokens_used.total()
                         ));
-                        
-                        maybe_send_verbose(&ui_channel_clone, &result, verbose_clone);
                     }
                     Err(error) => {
                         try_write_log(&ui_channel_clone, &mut log_clone, &format!("Error: {error}"));

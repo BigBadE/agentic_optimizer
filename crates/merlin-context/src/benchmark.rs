@@ -356,27 +356,26 @@ impl BenchmarkResult {
     
     /// Format result as human-readable text
     #[must_use]
-    #[allow(clippy::too_many_lines, reason = "Report formatting requires detailed output")]
-    #[allow(clippy::expect_used, reason = "Writing to String should never fail")]
+    #[allow(clippy::unused_io_amount, reason = "Writing to String never fails")]
     pub fn format_report(&self) -> String {
         let mut report = String::new();
 
         {
-            writeln!(report, "# Benchmark: {}\n", self.test_case.name).expect("String write should not fail");
-            writeln!(report, "**Query**: \"{}\"\n", self.test_case.query).expect("String write should not fail");
-            writeln!(report, "**Description**: {}\n", self.test_case.description).expect("String write should not fail");
+            write!(report, "# Benchmark: {}\n\n", self.test_case.name).unwrap_or(());
+            write!(report, "**Query**: \"{}\"\n\n", self.test_case.query).unwrap_or(());
+            write!(report, "**Description**: {}\n\n", self.test_case.description).unwrap_or(());
 
             report.push_str("## Metrics\n\n");
-            writeln!(report, "- **Precision@3**:  {:.1}%", self.metrics.precision_at_3 * 100.0).expect("String write should not fail");
-            writeln!(report, "- **Precision@5**:  {:.1}%", self.metrics.precision_at_5 * 100.0).expect("String write should not fail");
-            writeln!(report, "- **Precision@10**: {:.1}%", self.metrics.precision_at_10 * 100.0).expect("String write should not fail");
-            writeln!(report, "- **Recall@10**:    {:.1}%", self.metrics.recall_at_10 * 100.0).expect("String write should not fail");
-            writeln!(report, "- **Recall@20**:    {:.1}%", self.metrics.recall_at_20 * 100.0).expect("String write should not fail");
-            writeln!(report, "- **MRR**:          {:.3}", self.metrics.mrr).expect("String write should not fail");
-            writeln!(report, "- **NDCG@10**:      {:.3}", self.metrics.ndcg_at_10).expect("String write should not fail");
-            writeln!(report, "- **Exclusion**:    {:.1}%", self.metrics.exclusion_rate * 100.0).expect("String write should not fail");
-            writeln!(report, "- **Critical in Top-3**: {:.1}%", self.metrics.critical_in_top_3 * 100.0).expect("String write should not fail");
-            writeln!(report, "- **High in Top-5**:     {:.1}%\n", self.metrics.high_in_top_5 * 100.0).expect("String write should not fail");
+            writeln!(report, "- **Precision@3**:  {:.1}%", self.metrics.precision_at_3 * 100.0).unwrap_or(());
+            writeln!(report, "- **Precision@5**:  {:.1}%", self.metrics.precision_at_5 * 100.0).unwrap_or(());
+            writeln!(report, "- **Precision@10**: {:.1}%", self.metrics.precision_at_10 * 100.0).unwrap_or(());
+            writeln!(report, "- **Recall@10**:    {:.1}%", self.metrics.recall_at_10 * 100.0).unwrap_or(());
+            writeln!(report, "- **Recall@20**:    {:.1}%", self.metrics.recall_at_20 * 100.0).unwrap_or(());
+            writeln!(report, "- **MRR**:          {:.3}", self.metrics.mrr).unwrap_or(());
+            writeln!(report, "- **NDCG@10**:      {:.3}", self.metrics.ndcg_at_10).unwrap_or(());
+            writeln!(report, "- **Exclusion**:    {:.1}%", self.metrics.exclusion_rate * 100.0).unwrap_or(());
+            writeln!(report, "- **Critical in Top-3**: {:.1}%", self.metrics.critical_in_top_3 * 100.0).unwrap_or(());
+            writeln!(report, "- **High in Top-5**:     {:.1}%\n", self.metrics.high_in_top_5 * 100.0).unwrap_or(());
 
             report.push_str("## Top 10 Results\n\n");
             for (index, ranked_file) in self.ranked_files.iter().take(10).enumerate() {
@@ -396,19 +395,19 @@ impl BenchmarkResult {
                     "Cross mark (not expected)".to_string()
                 };
 
-                writeln!(report, "{}. {} {} (score: {:.3})", rank, path_str, status, ranked_file.score).expect("String write should not fail");
+                writeln!(report, "{}. {} {} (score: {:.3})", rank, path_str, status, ranked_file.score).unwrap_or(());
             }
 
             if !self.missing_expected.is_empty() {
                 report.push_str("\n## Missing Expected Files\n\n");
                 for expected in &self.missing_expected {
-                    writeln!(report, "- **{}** ({}): {}", expected.path,
-                        match expected.priority {
-                            Priority::Critical => "Critical",
-                            Priority::High => "High",
-                            Priority::Medium => "Medium",
-                            Priority::Low => "Low",
-                        }, expected.reason).expect("String write should not fail");
+                    let priority_str = match expected.priority {
+                        Priority::Critical => "Critical",
+                        Priority::High => "High",
+                        Priority::Medium => "Medium",
+                        Priority::Low => "Low",
+                    };
+                    writeln!(report, "- **{}** ({}): {}", expected.path, priority_str, expected.reason).unwrap_or(());
                 }
             }
         }

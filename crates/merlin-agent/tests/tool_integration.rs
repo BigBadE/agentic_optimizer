@@ -1,18 +1,22 @@
 #![cfg(test)]
 
 mod tests {
-    use std::sync::Arc;
+    use async_trait::async_trait;
     use merlin_agent::{Agent, AgentConfig};
     use merlin_core::{Context, ModelProvider, Query, Response, Result, TokenUsage};
-    use async_trait::async_trait;
+    use std::sync::Arc;
 
     struct MockProvider;
 
     #[async_trait]
     impl ModelProvider for MockProvider {
-        fn name(&self) -> &'static str { "mock" }
+        fn name(&self) -> &'static str {
+            "mock"
+        }
 
-        async fn is_available(&self) -> bool { true }
+        async fn is_available(&self) -> bool {
+            true
+        }
 
         async fn generate(&self, _query: &Query, _context: &Context) -> Result<Response> {
             Ok(Response {
@@ -24,7 +28,9 @@ mod tests {
             })
         }
 
-        fn estimate_cost(&self, _context: &Context) -> f64 { 0.0 }
+        fn estimate_cost(&self, _context: &Context) -> f64 {
+            0.0
+        }
     }
 
     /// Verify default tools are registered in the executor's tool registry.
@@ -39,13 +45,12 @@ mod tests {
         let executor = agent.executor();
 
         let tools = executor.tool_registry().list_tools();
-        
+
         assert_eq!(tools.len(), 3, "Should have 3 tools registered");
-        
+
         let tool_names: Vec<&str> = tools.iter().map(|(name, _)| *name).collect();
         assert!(tool_names.contains(&"edit"), "Should have edit tool");
         assert!(tool_names.contains(&"show"), "Should have show tool");
         assert!(tool_names.contains(&"bash"), "Should have bash tool");
     }
 }
-

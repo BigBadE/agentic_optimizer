@@ -1,7 +1,7 @@
 //! Types for query analysis and context planning.
 
-use std::path::PathBuf;
 use serde::{Deserialize, Serialize};
+use std::path::PathBuf;
 
 /// Analyzed intent from a user query
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,7 +84,9 @@ impl Default for ContextPlan {
             file_patterns: Vec::new(),
             include_tests: false,
             max_depth: 2,
-            strategy: ExpansionStrategy::Focused { symbols: Vec::new() },
+            strategy: ExpansionStrategy::Focused {
+                symbols: Vec::new(),
+            },
             reasoning: String::new(),
         }
     }

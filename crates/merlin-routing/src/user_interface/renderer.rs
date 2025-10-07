@@ -1,18 +1,18 @@
 use ratatui::{
+    Frame,
     layout::{Alignment, Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
-    widgets::{Block, Borders, List, ListItem, Paragraph, Padding},
-    Frame,
+    widgets::{Block, Borders, List, ListItem, Padding, Paragraph},
 };
 // Formatting helpers are implemented via push methods to avoid extra allocations
-use std::time::Instant;
-use textwrap::wrap;
-use crate::TaskId;
 use super::input::InputManager;
 use super::output_tree;
 use super::state::UiState;
 use super::task_manager::{TaskManager, TaskStatus};
 use super::theme::Theme;
+use crate::TaskId;
+use std::time::Instant;
+use textwrap::wrap;
 
 /// Handles rendering of the TUI
 pub struct Renderer {
@@ -144,7 +144,11 @@ impl Renderer {
     // Rendering methods
 
     fn render_output_area(&self, frame: &mut Frame, params: &RenderOutputAreaParams<'_>) {
-        let RenderOutputAreaParams { area, ui_ctx, focused } = *params;
+        let RenderOutputAreaParams {
+            area,
+            ui_ctx,
+            focused,
+        } = *params;
         if ui_ctx.state.loading_tasks {
             self.render_loading(frame, area);
         } else if let Some(task_id) = ui_ctx.state.active_task_id {
@@ -177,7 +181,12 @@ impl Renderer {
     }
 
     fn render_task_output(&self, frame: &mut Frame, params: &RenderTaskOutputParams<'_>) {
-        let RenderTaskOutputParams { area, ui_ctx, task_id, focused } = *params;
+        let RenderTaskOutputParams {
+            area,
+            ui_ctx,
+            task_id,
+            focused,
+        } = *params;
         let Some(task) = ui_ctx.task_manager.get_task(task_id) else {
             return;
         };
@@ -256,7 +265,12 @@ impl Renderer {
     }
 
     fn render_task_list(&self, frame: &mut Frame, params: &TaskListContext<'_>) {
-        let TaskListContext { area, task_manager, state, focused_pane } = *params;
+        let TaskListContext {
+            area,
+            task_manager,
+            state,
+            focused_pane,
+        } = *params;
         let visible_tasks = task_manager.get_visible_tasks();
         let task_items = self.build_task_items(task_manager, state, &visible_tasks);
 
@@ -291,12 +305,7 @@ impl Renderer {
         frame.render_widget(list, area);
     }
 
-    fn render_status_bar(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        ui_ctx: &UiCtx<'_>,
-    ) {
+    fn render_status_bar(&self, frame: &mut Frame, area: Rect, ui_ctx: &UiCtx<'_>) {
         let (running, failed) = Self::count_tasks(ui_ctx.task_manager, ui_ctx.state);
 
         let status = Paragraph::new(format!(
@@ -334,7 +343,11 @@ impl Renderer {
             .enumerate()
             .flat_map(|(idx, (node_ref, depth))| {
                 let is_selected = idx == selected_idx && focused_pane == FocusedPane::Output;
-                let prefix = output_tree::build_tree_prefix(*depth, node_ref.is_last, &node_ref.parent_states);
+                let prefix = output_tree::build_tree_prefix(
+                    *depth,
+                    node_ref.is_last,
+                    &node_ref.parent_states,
+                );
                 let is_collapsed = task.output_tree.is_collapsed(node_ref.node);
                 let icon = node_ref.node.get_icon(is_collapsed).to_string();
                 let content = node_ref.node.get_content();
@@ -353,7 +366,11 @@ impl Renderer {
 
     fn format_tree_node(params: &NodeFormatParams) -> Vec<String> {
         let selector = if params.is_selected { "► " } else { "  " };
-        let line_prefix = format!("{selector}{prefix}{icon} ", prefix = params.prefix, icon = params.icon);
+        let line_prefix = format!(
+            "{selector}{prefix}{icon} ",
+            prefix = params.prefix,
+            icon = params.icon
+        );
         let prefix_width = line_prefix.len();
 
         let content_width = params.available_width.saturating_sub(prefix_width);
@@ -378,10 +395,15 @@ impl Renderer {
                 if !visible_tasks.contains(task_id) {
                     return None;
                 }
-                task_manager.get_task(*task_id).map(|task| (idx, task_id, task))
+                task_manager
+                    .get_task(*task_id)
+                    .map(|task| (idx, task_id, task))
             })
             .map(|(idx, task_id, task)| {
-                let env = TaskEnv { task_manager, state };
+                let env = TaskEnv {
+                    task_manager,
+                    state,
+                };
                 self.build_task_item(idx, *task_id, task, &env)
             })
             .collect()
@@ -435,8 +457,8 @@ impl Renderer {
             .duration_since(task.start_time)
             .as_secs_f64();
 
-        let is_orphaned = task.status == TaskStatus::Running
-            && !state.active_running_tasks.contains(&task_id);
+        let is_orphaned =
+            task.status == TaskStatus::Running && !state.active_running_tasks.contains(&task_id);
         let is_stuck = task.status == TaskStatus::Running && elapsed > 300.0;
         let is_failed = is_orphaned || is_stuck;
 
@@ -517,7 +539,9 @@ impl Renderer {
         };
 
         if state.active_task_id.is_some() && state.selected_task_index == idx {
-            style = style.fg(self.theme.highlight()).add_modifier(Modifier::BOLD);
+            style = style
+                .fg(self.theme.highlight())
+                .add_modifier(Modifier::BOLD);
         }
 
         style
@@ -550,15 +574,11 @@ impl Renderer {
     }
 
     /// Counts the number of running and failed tasks for the status bar
-    fn count_tasks(
-        task_manager: &TaskManager,
-        state: &UiState,
-    ) -> (usize, usize) {
+    fn count_tasks(task_manager: &TaskManager, state: &UiState) -> (usize, usize) {
         let running = task_manager
             .iter_tasks()
             .filter(|(task_id, task)| {
-                task.status == TaskStatus::Running
-                    && state.active_running_tasks.contains(task_id)
+                task.status == TaskStatus::Running && state.active_running_tasks.contains(task_id)
             })
             .count();
 
@@ -628,11 +648,7 @@ fn wrap_tree_content(
 
 /// Builds the textual tree prefix (e.g., vertical and elbow glyphs) for a task
 /// Builds the textual tree prefix (e.g., │, ├─, └─) for a task based on ancestry and position
-fn build_task_tree_prefix(
-    task_id: TaskId,
-    idx: usize,
-    task_manager: &TaskManager,
-) -> String {
+fn build_task_tree_prefix(task_id: TaskId, idx: usize, task_manager: &TaskManager) -> String {
     let Some(task) = task_manager.get_task(task_id) else {
         return String::new();
     };
@@ -663,14 +679,18 @@ fn build_task_tree_prefix(
 /// Collects up to a limited number of ancestor task IDs for the given task
 fn collect_ancestors(task_id: TaskId, task_manager: &TaskManager) -> Vec<TaskId> {
     let mut ancestors = Vec::new();
-    let mut current_parent = task_manager.get_task(task_id).and_then(|task_item| task_item.parent_id);
+    let mut current_parent = task_manager
+        .get_task(task_id)
+        .and_then(|task_item| task_item.parent_id);
 
     while let Some(parent_id) = current_parent {
         ancestors.push(parent_id);
         if ancestors.len() >= 5 {
             break;
         }
-        current_parent = task_manager.get_task(parent_id).and_then(|task_item| task_item.parent_id);
+        current_parent = task_manager
+            .get_task(parent_id)
+            .and_then(|task_item| task_item.parent_id);
     }
 
     ancestors
@@ -698,11 +718,7 @@ fn check_more_siblings(ancestor_id: TaskId, task_manager: &TaskManager) -> bool 
 }
 
 /// Checks if the given task is the last child of its parent in the task list
-fn check_is_last_child(
-    task_id: TaskId,
-    idx: usize,
-    task_manager: &TaskManager,
-) -> bool {
+fn check_is_last_child(task_id: TaskId, idx: usize, task_manager: &TaskManager) -> bool {
     let Some(task) = task_manager.get_task(task_id) else {
         return false;
     };
@@ -732,10 +748,7 @@ struct TaskTextParts<'text> {
 }
 
 /// Formats the visible text for a task line, including progress if present
-fn format_task_text(
-    parts: &TaskTextParts<'_>,
-    task: &super::task_manager::TaskDisplay,
-) -> String {
+fn format_task_text(parts: &TaskTextParts<'_>, task: &super::task_manager::TaskDisplay) -> String {
     let mut text = parts.elapsed_seconds.map_or_else(
         || {
             format!(

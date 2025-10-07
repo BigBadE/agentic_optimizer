@@ -43,7 +43,7 @@ impl Config {
 }
 
 /// Configuration for remote model providers
-/// 
+///
 /// This is where you configure which models to use for different task complexities.
 /// Add or modify models here to customize the AI behavior.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -65,5 +65,3 @@ impl Default for ProvidersConfig {
         }
     }
 }
-
-

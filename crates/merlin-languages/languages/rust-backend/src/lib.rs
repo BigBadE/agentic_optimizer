@@ -3,11 +3,10 @@
 //! This crate provides a concrete implementation of language analysis for Rust
 //! codebases using rust-analyzer's APIs.
 
-
-mod workspace;
-mod symbol_search;
-mod context_builder;
 mod cache;
+mod context_builder;
+mod symbol_search;
+mod workspace;
 
 pub use cache::WorkspaceCache;
 pub use workspace::{LoadConfig, WorkspaceLoader};
@@ -111,20 +110,27 @@ impl RustBackend {
     ///
     /// # Errors
     /// Returns an error if the project root is invalid or if the workspace cannot be loaded
-    pub fn initialize_with_config(&mut self, project_root: &Path, config: LoadConfig) -> Result<()> {
+    pub fn initialize_with_config(
+        &mut self,
+        project_root: &Path,
+        config: LoadConfig,
+    ) -> Result<()> {
         tracing::info!("Initializing Rust workspace at: {}", project_root.display());
-        
+
         self.project_root = project_root.to_path_buf();
-        
+
         let loader = WorkspaceLoader::with_config(project_root, config);
         let (analysis_host, vfs, file_id_map) = loader.load()?;
-        
+
         self.analysis_host = Some(Arc::new(Mutex::new(analysis_host)));
         self.vfs = Some(Arc::new(vfs));
         self.file_id_map = Arc::new(file_id_map);
-        
-        tracing::info!("Workspace initialized with {} files", self.file_id_map.len());
-        
+
+        tracing::info!(
+            "Workspace initialized with {} files",
+            self.file_id_map.len()
+        );
+
         Ok(())
     }
 
@@ -179,7 +185,7 @@ impl RustBackend {
     pub fn search_symbols(&self, query: &SearchQuery) -> Result<SearchResult> {
         let analysis = self.analysis()?;
         let searcher = symbol_search::SymbolSearcher::new(&analysis, self);
-        
+
         searcher.search(query)
     }
 
@@ -187,10 +193,15 @@ impl RustBackend {
     ///
     /// # Errors
     /// Returns an error if the workspace is not initialized or if the symbol is not found
-    pub fn find_definition(&self, symbol_name: &str, file: &Path, line: u32) -> Result<Option<SymbolInfo>> {
+    pub fn find_definition(
+        &self,
+        symbol_name: &str,
+        file: &Path,
+        line: u32,
+    ) -> Result<Option<SymbolInfo>> {
         let analysis = self.analysis()?;
         let searcher = symbol_search::SymbolSearcher::new(&analysis, self);
-        
+
         searcher.find_definition(symbol_name, file, line)
     }
 
@@ -201,7 +212,7 @@ impl RustBackend {
     pub fn find_references(&self, symbol_name: &str) -> Result<Vec<SymbolInfo>> {
         let analysis = self.analysis()?;
         let searcher = symbol_search::SymbolSearcher::new(&analysis, self);
-        
+
         searcher.find_references(symbol_name)
     }
 
@@ -212,7 +223,7 @@ impl RustBackend {
     pub fn get_related_context(&self, file: &Path) -> Result<Vec<FileContext>> {
         let analysis = self.analysis()?;
         let builder = context_builder::ContextBuilder::new(&analysis, self);
-        
+
         builder.get_related_context(file)
     }
 
@@ -223,7 +234,7 @@ impl RustBackend {
     pub fn extract_imports(&self, file: &Path) -> Result<Vec<PathBuf>> {
         let analysis = self.analysis()?;
         let builder = context_builder::ContextBuilder::new(&analysis, self);
-        
+
         builder.extract_imports(file)
     }
 
@@ -234,7 +245,7 @@ impl RustBackend {
     pub fn list_symbols_in_file(&self, file: &Path) -> Result<Vec<SymbolInfo>> {
         let analysis = self.analysis()?;
         let searcher = symbol_search::SymbolSearcher::new(&analysis, self);
-        
+
         searcher.list_symbols_in_file(file)
     }
 
@@ -245,13 +256,13 @@ impl RustBackend {
     /// Returns an error if the workspace is not initialized
     pub fn build_import_graph(&self, files: &[PathBuf]) -> Result<ImportGraph> {
         let mut graph = HashMap::new();
-        
+
         for file in files {
             if let Ok(imports) = self.extract_imports(file) {
                 graph.insert(file.clone(), imports);
             }
         }
-        
+
         Ok(graph)
     }
 }

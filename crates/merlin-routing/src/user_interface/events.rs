@@ -1,6 +1,6 @@
+use crate::{TaskId, TaskResult};
 use serde::{Deserialize, Serialize};
 use serde_json::Value;
-use crate::{TaskId, TaskResult};
 
 /// UI event that tasks send to update display
 #[derive(Debug, Clone, Serialize, Deserialize)]

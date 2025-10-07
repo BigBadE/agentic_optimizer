@@ -1,7 +1,7 @@
 //! Query analysis and intent extraction for context building.
 
-mod types;
 mod analyzer;
+mod types;
 
-pub use types::{QueryIntent, Action, Scope, ContextPlan, ExpansionStrategy};
 pub use analyzer::QueryAnalyzer;
+pub use types::{Action, ContextPlan, ExpansionStrategy, QueryIntent, Scope};

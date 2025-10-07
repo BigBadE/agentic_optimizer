@@ -4,7 +4,6 @@
 //! local model execution that mirrors the remote provider APIs used elsewhere
 //! in the system.
 
-
 pub mod error;
 pub mod inference;
 pub mod manager;

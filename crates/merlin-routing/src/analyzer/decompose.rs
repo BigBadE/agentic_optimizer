@@ -1,5 +1,5 @@
-use crate::{Task, Complexity};
 use super::intent::{Action, Intent};
+use crate::{Complexity, Task};
 
 /// Decomposes complex requests into smaller tasks
 pub struct TaskDecomposer;
@@ -9,7 +9,7 @@ impl TaskDecomposer {
     pub fn new() -> Self {
         Self
     }
-    
+
     #[must_use]
     pub fn decompose(&self, intent: &Intent, request: &str) -> Vec<Task> {
         match &intent.action {
@@ -17,13 +17,11 @@ impl TaskDecomposer {
             Action::Create if Self::is_complex_creation(request) => {
                 Self::decompose_creation(intent, request)
             }
-            Action::Fix if Self::requires_analysis(request) => {
-                Self::decompose_fix(intent, request)
-            }
+            Action::Fix if Self::requires_analysis(request) => Self::decompose_fix(intent, request),
             _ => vec![Self::create_single_task(intent, request)],
         }
     }
-    
+
     fn decompose_refactor(intent: &Intent, request: &str) -> Vec<Task> {
         let mut tasks = Vec::new();
 
@@ -46,7 +44,7 @@ impl TaskDecomposer {
 
         tasks
     }
-    
+
     fn decompose_creation(intent: &Intent, request: &str) -> Vec<Task> {
         let mut tasks = Vec::new();
 
@@ -69,7 +67,7 @@ impl TaskDecomposer {
 
         tasks
     }
-    
+
     fn decompose_fix(intent: &Intent, request: &str) -> Vec<Task> {
         let mut tasks = Vec::new();
 
@@ -92,15 +90,15 @@ impl TaskDecomposer {
 
         tasks
     }
-    
+
     fn create_single_task(intent: &Intent, request: &str) -> Task {
         let complexity = intent.complexity_hint.unwrap_or(Complexity::Medium);
-        
+
         Task::new(request.to_string())
             .with_complexity(complexity)
             .with_priority(intent.priority)
     }
-    
+
     fn is_complex_creation(request: &str) -> bool {
         let request_lower = request.to_lowercase();
         request_lower.contains("new module")
@@ -108,7 +106,7 @@ impl TaskDecomposer {
             || request_lower.contains("entire")
             || request_lower.split_whitespace().count() > 20
     }
-    
+
     fn requires_analysis(request: &str) -> bool {
         let request_lower = request.to_lowercase();
         request_lower.contains("complex")
@@ -126,8 +124,8 @@ impl Default for TaskDecomposer {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
     use super::super::intent::IntentExtractor;
+    use super::*;
 
     #[test]
     /// # Panics
@@ -135,58 +133,59 @@ mod tests {
     fn test_simple_task_no_decomposition() {
         let decomposer = TaskDecomposer::new();
         let extractor = IntentExtractor::new();
-        
+
         let intent = extractor.extract("Add a comment to main.rs");
         let tasks = decomposer.decompose(&intent, "Add a comment to main.rs");
-        
+
         assert_eq!(tasks.len(), 1);
     }
-    
+
     #[test]
     /// # Panics
     /// Panics if refactor decomposition does not produce analyze/refactor/test sequence.
     fn test_refactor_decomposition() {
         let decomposer = TaskDecomposer::new();
         let extractor = IntentExtractor::new();
-        
+
         let intent = extractor.extract("Refactor the parser module");
         let tasks = decomposer.decompose(&intent, "Refactor the parser module");
-        
+
         assert_eq!(tasks.len(), 3);
         assert!(tasks[0].description.contains("Analyze"));
         assert!(tasks[1].description.contains("Refactor"));
         assert!(tasks[2].description.contains("Test"));
-        
+
         assert_eq!(tasks[1].dependencies.len(), 1);
         assert_eq!(tasks[2].dependencies.len(), 1);
     }
-    
+
     #[test]
     /// # Panics
     /// Panics if complex creation does not produce design/implement/test sequence.
     fn test_complex_creation_decomposition() {
         let decomposer = TaskDecomposer::new();
         let extractor = IntentExtractor::new();
-        
+
         let intent = extractor.extract("Create a new module for handling authentication");
-        let tasks = decomposer.decompose(&intent, "Create a new module for handling authentication");
-        
+        let tasks =
+            decomposer.decompose(&intent, "Create a new module for handling authentication");
+
         assert_eq!(tasks.len(), 3);
         assert!(tasks[0].description.contains("Design"));
         assert!(tasks[1].description.contains("Implement"));
         assert!(tasks[2].description.contains("tests"));
     }
-    
+
     #[test]
     /// # Panics
     /// Panics if fix path does not produce diagnose/fix/verify tasks.
     fn test_fix_with_analysis() {
         let decomposer = TaskDecomposer::new();
         let extractor = IntentExtractor::new();
-        
+
         let intent = extractor.extract("Fix the complex bug in the parser");
         let tasks = decomposer.decompose(&intent, "Fix the complex bug in the parser");
-        
+
         assert_eq!(tasks.len(), 3);
         assert!(tasks[0].description.contains("Diagnose"));
         assert!(tasks[1].description.contains("Fix"));

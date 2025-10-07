@@ -6,22 +6,22 @@ use std::collections::HashSet;
 use std::path::PathBuf;
 
 /// BM25 parameters
-const TERM_SATURATION_K1: f32 = 1.5;  // Term frequency saturation parameter
-const LENGTH_NORM_B: f32 = 0.75;  // Length normalization parameter
+const TERM_SATURATION_K1: f32 = 1.5; // Term frequency saturation parameter
+const LENGTH_NORM_B: f32 = 0.75; // Length normalization parameter
 
 /// Document in the BM25 index
 #[derive(Debug, Clone)]
 struct Document {
     path: PathBuf,
-    terms: HashMap<String, usize>,  // term -> frequency
-    length: usize,  // total terms in document
+    terms: HashMap<String, usize>, // term -> frequency
+    length: usize,                 // total terms in document
 }
 
 /// BM25 search index
 pub struct BM25Index {
     documents: Vec<Document>,
     avg_doc_length: f32,
-    idf_cache: HashMap<String, f32>,  // term -> IDF score
+    idf_cache: HashMap<String, f32>, // term -> IDF score
 }
 
 impl BM25Index {
@@ -32,15 +32,84 @@ impl BM25Index {
         static STOPWORDS: OnceLock<HashSet<&'static str>> = OnceLock::new();
         STOPWORDS.get_or_init(|| {
             [
-                "the", "and", "for", "with", "that", "from", "this", "have", "will", "into",
-                "when", "where", "what", "your", "their", "about", "which", "there", "been",
-                "while", "without", "should", "could", "would", "using", "used", "they", "them",
-                "then", "than", "only", "also", "over", "under", "after", "before", "each",
-                "every", "more", "most", "some", "such", "within", "between", "because", "again",
-                "almost", "always", "never", "being", "having", "through", "across", "please",
-                "however", "though", "whereas", "among", "amongst", "whose", "ourselves", "yourselves",
-                "themselves", "itself", "hers", "his", "herself", "himself", "it", "its",
-                "you", "we", "our", "ours", "can", "cannot", "can't", "cant"
+                "the",
+                "and",
+                "for",
+                "with",
+                "that",
+                "from",
+                "this",
+                "have",
+                "will",
+                "into",
+                "when",
+                "where",
+                "what",
+                "your",
+                "their",
+                "about",
+                "which",
+                "there",
+                "been",
+                "while",
+                "without",
+                "should",
+                "could",
+                "would",
+                "using",
+                "used",
+                "they",
+                "them",
+                "then",
+                "than",
+                "only",
+                "also",
+                "over",
+                "under",
+                "after",
+                "before",
+                "each",
+                "every",
+                "more",
+                "most",
+                "some",
+                "such",
+                "within",
+                "between",
+                "because",
+                "again",
+                "almost",
+                "always",
+                "never",
+                "being",
+                "having",
+                "through",
+                "across",
+                "please",
+                "however",
+                "though",
+                "whereas",
+                "among",
+                "amongst",
+                "whose",
+                "ourselves",
+                "yourselves",
+                "themselves",
+                "itself",
+                "hers",
+                "his",
+                "herself",
+                "himself",
+                "it",
+                "its",
+                "you",
+                "we",
+                "our",
+                "ours",
+                "can",
+                "cannot",
+                "can't",
+                "cant",
             ]
             .into_iter()
             .collect()
@@ -93,13 +162,15 @@ impl BM25Index {
 
         let num_docs = self.documents.len() as f32;
         for (term, document_frequency) in doc_freq {
-            let idf = ((num_docs - document_frequency as f32 + 0.5) / (document_frequency as f32 + 0.5)).ln_1p();
+            let idf = ((num_docs - document_frequency as f32 + 0.5)
+                / (document_frequency as f32 + 0.5))
+                .ln_1p();
             self.idf_cache.insert(term, idf);
         }
     }
 
     /// Search for documents matching the query
-    #[must_use] 
+    #[must_use]
     pub fn search(&self, query: &str, top_k: usize) -> Vec<(PathBuf, f32)> {
         let query_terms = Self::tokenize(query);
         let mut scores: Vec<(PathBuf, f32)> = Vec::new();
@@ -112,7 +183,12 @@ impl BM25Index {
         }
 
         // Sort by score descending
-        scores.sort_by(|left_score, right_score| right_score.1.partial_cmp(&left_score.1).unwrap_or(Ordering::Equal));
+        scores.sort_by(|left_score, right_score| {
+            right_score
+                .1
+                .partial_cmp(&left_score.1)
+                .unwrap_or(Ordering::Equal)
+        });
         scores.truncate(top_k);
 
         scores
@@ -130,11 +206,14 @@ impl BM25Index {
 
             let idf = self.idf_cache.get(term).copied().unwrap_or(0.0);
             let doc_len_norm = doc.length as f32 / self.avg_doc_length;
-            
+
             // BM25 formula
             let numerator = term_freq * (TERM_SATURATION_K1 + 1.0);
-            let denominator = TERM_SATURATION_K1.mul_add(LENGTH_NORM_B.mul_add(doc_len_norm, 1.0 - LENGTH_NORM_B), term_freq);
-            
+            let denominator = TERM_SATURATION_K1.mul_add(
+                LENGTH_NORM_B.mul_add(doc_len_norm, 1.0 - LENGTH_NORM_B),
+                term_freq,
+            );
+
             score += idf * (numerator / denominator);
         }
         score
@@ -175,18 +254,27 @@ impl BM25Index {
                 .filter(|character| character.is_alphanumeric() || *character == '_')
                 .collect();
 
-            if !clean.is_empty() && clean.len() > 2 && !stopwords.contains(clean.as_str())
-                && (!has_special || clean != lower) {
-                    terms.push(clean);
-                }
+            if !clean.is_empty()
+                && clean.len() > 2
+                && !stopwords.contains(clean.as_str())
+                && (!has_special || clean != lower)
+            {
+                terms.push(clean);
+            }
         }
 
         for window in words.windows(2) {
             let first_word = window[0].to_lowercase();
             let second_word = window[1].to_lowercase();
 
-            let clean0: String = first_word.chars().filter(|character| character.is_alphanumeric() || *character == '_').collect();
-            let clean1: String = second_word.chars().filter(|character| character.is_alphanumeric() || *character == '_').collect();
+            let clean0: String = first_word
+                .chars()
+                .filter(|character| character.is_alphanumeric() || *character == '_')
+                .collect();
+            let clean1: String = second_word
+                .chars()
+                .filter(|character| character.is_alphanumeric() || *character == '_')
+                .collect();
 
             if clean0.len() > 2
                 && clean1.len() > 2

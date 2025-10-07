@@ -57,4 +57,3 @@ pub struct ExecutionMetadata {
     pub total_time_ms: u64,
     pub context_token_estimate: usize,
 }
-

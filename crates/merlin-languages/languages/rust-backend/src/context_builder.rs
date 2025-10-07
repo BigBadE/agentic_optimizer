@@ -5,10 +5,10 @@ use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 
 use ra_ap_ide::Analysis;
-use ra_ap_syntax::{ast, AstNode as _, SyntaxKind};
+use ra_ap_syntax::{AstNode as _, SyntaxKind, ast};
 
-use merlin_core::{Error, FileContext, Result};
 use crate::RustBackend;
+use merlin_core::{Error, FileContext, Result};
 
 /// Helper to compute related files and imports for a Rust source file.
 pub struct ContextBuilder<'analysis> {
@@ -87,7 +87,7 @@ impl<'analysis> ContextBuilder<'analysis> {
     /// Resolve a single import path relative to the current file into a file path.
     fn resolve_import(&self, import_path: &str, current_file: &Path) -> Option<PathBuf> {
         let parts: Vec<&str> = import_path.split("::").collect();
-        
+
         if parts.is_empty() {
             return None;
         }
@@ -117,7 +117,10 @@ impl<'analysis> ContextBuilder<'analysis> {
     }
 
     /// Resolve a module path inside a crate starting from a base path.
-    #[allow(clippy::only_used_in_recursion, reason = "Parameter is used in recursive calls through resolve_module_path")]
+    #[allow(
+        clippy::only_used_in_recursion,
+        reason = "Parameter is used in recursive calls through resolve_module_path"
+    )]
     fn resolve_crate_import(&self, parts: &[&str], base_path: &Path) -> Option<PathBuf> {
         if parts.is_empty() {
             return None;
@@ -125,7 +128,7 @@ impl<'analysis> ContextBuilder<'analysis> {
 
         let module_name = parts[0];
         let module_file = base_path.join(format!("{module_name}.rs"));
-        
+
         if module_file.exists() && parts.len() == 1 {
             return Some(module_file);
         }
@@ -135,11 +138,10 @@ impl<'analysis> ContextBuilder<'analysis> {
             if parts.len() == 1 {
                 return Some(module_dir);
             }
-            
+
             return self.resolve_crate_import(&parts[1..], &base_path.join(module_name));
         }
 
         None
     }
 }
-

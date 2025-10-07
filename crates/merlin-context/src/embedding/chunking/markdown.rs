@@ -1,7 +1,7 @@
 //! Markdown chunking by headers with token-based limits.
 
+use super::{FileChunk, MIN_CHUNK_TOKENS, OPTIMAL_MIN_TOKENS, estimate_tokens};
 use std::mem::take;
-use super::{FileChunk, estimate_tokens, MIN_CHUNK_TOKENS, OPTIMAL_MIN_TOKENS};
 
 /// Chunk Markdown by headers with token-based limits
 #[must_use]
@@ -41,7 +41,9 @@ pub fn chunk_markdown(file_path: String, content: &str) -> Vec<FileChunk> {
             current_header = format!("{} {}", "#".repeat(header_level), header_text);
         }
 
-        if line_count > 0 { buffer.push('\n'); }
+        if line_count > 0 {
+            buffer.push('\n');
+        }
         buffer.push_str(line);
         line_count += 1;
 

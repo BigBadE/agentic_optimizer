@@ -90,6 +90,4 @@ pub enum Commands {
         #[arg(long, help = "Show daily metrics")]
         daily: bool,
     },
-
 }
-

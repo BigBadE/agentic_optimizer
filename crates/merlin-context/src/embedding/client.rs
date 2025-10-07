@@ -1,13 +1,13 @@
 //! Embedding and vector search functionality using Ollama.
 
-use std::path::PathBuf;
-use std::collections::HashMap;
-use std::cmp::Ordering;
-use std::env;
-use std::process::Command;
-use ollama_rs::Ollama;
-use merlin_core::{Result, Error};
 use crate::models::ModelConfig;
+use merlin_core::{Error, Result};
+use ollama_rs::Ollama;
+use std::cmp::Ordering;
+use std::collections::HashMap;
+use std::env;
+use std::path::PathBuf;
+use std::process::Command;
 
 /// A single embedding vector
 type Embedding = Vec<f32>;
@@ -125,11 +125,10 @@ impl EmbeddingClient {
     /// Create a new embedding client
     #[must_use]
     pub fn new() -> Self {
-        let host = env::var("OLLAMA_HOST")
-            .unwrap_or_else(|_| "http://localhost:11434".to_string());
-        
+        let host = env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".to_string());
+
         let config = ModelConfig::from_env();
-        
+
         Self {
             ollama: Ollama::new(host, 11434),
             model: config.embedding,
@@ -145,9 +144,9 @@ impl EmbeddingClient {
         let models = match self.ollama.list_local_models().await {
             Ok(models) => models,
             Err(error) => {
-                return Err(Error::Other(
-                    format!("Failed to connect to Ollama: {error}.\n\nPlease ensure Ollama is installed and running:\n  - Install from: https://ollama.ai\n  - Start with: ollama serve")
-                ));
+                return Err(Error::Other(format!(
+                    "Failed to connect to Ollama: {error}.\n\nPlease ensure Ollama is installed and running:\n  - Install from: https://ollama.ai\n  - Start with: ollama serve"
+                )));
             }
         };
 
@@ -163,14 +162,18 @@ impl EmbeddingClient {
             let status = Command::new("ollama")
                 .args(["pull", &self.model])
                 .status()
-                .map_err(|error| Error::Other(
-                    format!("Failed to run 'ollama pull {}': {}. Is Ollama installed?", self.model, error)
-                ))?;
+                .map_err(|error| {
+                    Error::Other(format!(
+                        "Failed to run 'ollama pull {}': {}. Is Ollama installed?",
+                        self.model, error
+                    ))
+                })?;
 
             if !status.success() {
-                return Err(Error::Other(
-                    format!("Failed to pull model '{}'. Check Ollama is running.", self.model)
-                ));
+                return Err(Error::Other(format!(
+                    "Failed to pull model '{}'. Check Ollama is running.",
+                    self.model
+                )));
             }
 
             tracing::info!("✓ Successfully pulled embedding model '{}'", self.model);
@@ -196,16 +199,20 @@ impl EmbeddingClient {
                 // Provide more detailed error message
                 let error_str = format!("{error:?}");
                 if error_str.contains("model") && error_str.contains("not found") {
-                    Error::Other(
-                        format!("Embedding model '{}' not found. Run: ollama pull {}", self.model, self.model)
-                    )
+                    Error::Other(format!(
+                        "Embedding model '{}' not found. Run: ollama pull {}",
+                        self.model, self.model
+                    ))
                 } else {
                     Error::Other(format!("Embedding generation failed: {error}"))
                 }
             })?;
 
         // Ollama returns Vec<Vec<f32>>, we want the first embedding
-        response.embeddings.into_iter().next()
+        response
+            .embeddings
+            .into_iter()
+            .next()
             .ok_or_else(|| Error::Other("No embeddings returned".into()))
     }
 
@@ -215,11 +222,11 @@ impl EmbeddingClient {
     /// Returns an error if any embedding generation fails
     pub async fn embed_batch(&self, texts: Vec<String>) -> Result<Vec<Embedding>> {
         let mut embeddings = Vec::new();
-        
+
         for text in texts {
             embeddings.push(self.embed(&text).await?);
         }
-        
+
         Ok(embeddings)
     }
 }
@@ -230,7 +237,11 @@ fn cosine_similarity(vector_a: &[f32], vector_b: &[f32]) -> f32 {
         return 0.0;
     }
 
-    let dot_product: f32 = vector_a.iter().zip(vector_b.iter()).map(|(x, y)| x * y).sum();
+    let dot_product: f32 = vector_a
+        .iter()
+        .zip(vector_b.iter())
+        .map(|(x, y)| x * y)
+        .sum();
     let magnitude_a = vector_a.iter().map(|x| x * x).sum::<f32>().sqrt();
     let magnitude_b = vector_b.iter().map(|x| x * x).sum::<f32>().sqrt();
 
@@ -242,11 +253,11 @@ fn cosine_similarity(vector_a: &[f32], vector_b: &[f32]) -> f32 {
 }
 
 /// Generate a preview from file content (first few lines or summary)
-#[must_use] 
+#[must_use]
 pub fn generate_preview(content: &str, max_chars: usize) -> String {
     let lines: Vec<&str> = content.lines().take(10).collect();
     let preview = lines.join("\n");
-    
+
     if preview.chars().count() > max_chars {
         // Use char boundaries to avoid panics with multi-byte characters
         let truncated: String = preview.chars().take(max_chars).collect();
@@ -267,4 +278,3 @@ impl Default for EmbeddingClient {
         Self::new()
     }
 }
-

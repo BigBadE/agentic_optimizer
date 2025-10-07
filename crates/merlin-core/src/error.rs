@@ -45,11 +45,8 @@ pub enum Error {
 }
 
 impl Error {
-    #[must_use] 
+    #[must_use]
     pub fn is_retryable(&self) -> bool {
-        matches!(
-            self,
-            Self::Request(_) | Self::Provider(_)
-        )
+        matches!(self, Self::Request(_) | Self::Provider(_))
     }
 }

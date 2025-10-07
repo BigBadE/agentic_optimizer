@@ -1,11 +1,11 @@
-use async_trait::async_trait;
-use std::sync::Arc;
-use std::time::Instant;
+use super::Validator;
+use crate::StageResult as PublicStageResult;
 use crate::{Result, Task, ValidationResult, ValidationStageType as StageType};
 use crate::{Severity, ValidationError};
-use crate::StageResult as PublicStageResult;
-use super::Validator;
+use async_trait::async_trait;
 use merlin_core::Response;
+use std::sync::Arc;
+use std::time::Instant;
 
 /// Individual validation stage trait
 #[async_trait]
@@ -47,18 +47,20 @@ impl ValidationPipeline {
         self.early_exit = early_exit;
         self
     }
-    
+
     #[must_use]
     pub fn with_default_stages() -> Self {
-        use super::stages::{SyntaxValidationStage, BuildValidationStage, TestValidationStage, LintValidationStage};
-        
+        use super::stages::{
+            BuildValidationStage, LintValidationStage, SyntaxValidationStage, TestValidationStage,
+        };
+
         let stages: Vec<Arc<dyn ValidationStage>> = vec![
             Arc::new(SyntaxValidationStage::new()),
             Arc::new(BuildValidationStage::new()),
             Arc::new(TestValidationStage::new()),
             Arc::new(LintValidationStage::new()),
         ];
-        
+
         Self::new(stages)
     }
 }
@@ -117,9 +119,9 @@ impl Validator for ValidationPipeline {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::Result;
     use crate::{Task, ValidationStageType as StageType};
     use merlin_core::{Response, TokenUsage};
-    use crate::Result;
 
     struct MockStage {
         name: &'static str,
@@ -158,10 +160,16 @@ mod tests {
     /// Panics if pipeline does not pass when all stages pass.
     async fn test_pipeline_all_pass() -> Result<()> {
         let stages: Vec<Arc<dyn ValidationStage>> = vec![
-            Arc::new(MockStage { name: "Stage1", should_pass: true }),
-            Arc::new(MockStage { name: "Stage2", should_pass: true }),
+            Arc::new(MockStage {
+                name: "Stage1",
+                should_pass: true,
+            }),
+            Arc::new(MockStage {
+                name: "Stage2",
+                should_pass: true,
+            }),
         ];
-        
+
         let pipeline = ValidationPipeline::new(stages);
         let task = Task::new("Test".to_owned());
         let response = Response {
@@ -171,13 +179,13 @@ mod tests {
             provider: "test".to_owned(),
             latency_ms: 0,
         };
-        
+
         let result = pipeline.validate(&response, &task).await?;
         assert!(result.passed);
         assert_eq!(result.stages.len(), 2);
         Ok(())
     }
-    
+
     #[tokio::test]
     /// # Errors
     /// Returns an error if pipeline validation returns an unexpected failure in the test harness.
@@ -186,10 +194,16 @@ mod tests {
     /// Panics if pipeline does not early-exit on first failing stage when configured.
     async fn test_pipeline_early_exit() -> Result<()> {
         let stages: Vec<Arc<dyn ValidationStage>> = vec![
-            Arc::new(MockStage { name: "Stage1", should_pass: false }),
-            Arc::new(MockStage { name: "Stage2", should_pass: true }),
+            Arc::new(MockStage {
+                name: "Stage1",
+                should_pass: false,
+            }),
+            Arc::new(MockStage {
+                name: "Stage2",
+                should_pass: true,
+            }),
         ];
-        
+
         let pipeline = ValidationPipeline::new(stages).with_early_exit(true);
         let task = Task::new("Test".to_owned());
         let response = Response {
@@ -199,11 +213,10 @@ mod tests {
             provider: "test".to_owned(),
             latency_ms: 0,
         };
-        
+
         let result = pipeline.validate(&response, &task).await?;
         assert!(!result.passed);
         assert_eq!(result.stages.len(), 1);
         Ok(())
     }
 }
-

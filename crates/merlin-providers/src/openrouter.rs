@@ -57,7 +57,9 @@ impl OpenRouterProvider {
     pub fn from_config_or_env(config_key: Option<String>) -> Result<Self> {
         let api_key = config_key
             .or_else(|| env::var("OPENROUTER_API_KEY").ok())
-            .ok_or_else(|| Error::MissingApiKey("OPENROUTER_API_KEY or config.toml openrouter_key".to_owned()))?;
+            .ok_or_else(|| {
+                Error::MissingApiKey("OPENROUTER_API_KEY or config.toml openrouter_key".to_owned())
+            })?;
         Self::new(api_key)
     }
 
@@ -125,12 +127,10 @@ impl ModelProvider for OpenRouterProvider {
     async fn generate(&self, query: &Query, context: &Context) -> Result<Response> {
         let start = Instant::now();
 
-        let mut messages = vec![
-            json!({
-                "role": "system",
-                "content": context.system_prompt
-            }),
-        ];
+        let mut messages = vec![json!({
+            "role": "system",
+            "content": context.system_prompt
+        })];
 
         if !context.files.is_empty() {
             messages.push(json!({
@@ -159,7 +159,10 @@ impl ModelProvider for OpenRouterProvider {
             .post(OPENROUTER_API_URL)
             .header("Authorization", format!("Bearer {}", self.api_key))
             .header("Content-Type", "application/json")
-            .header("HTTP-Referer", "https://github.com/BigBadE/agentic_optimizer")
+            .header(
+                "HTTP-Referer",
+                "https://github.com/BigBadE/agentic_optimizer",
+            )
             .header("X-Title", "Agentic Optimizer")
             .json(&request_body)
             .send()
@@ -213,4 +216,3 @@ impl ModelProvider for OpenRouterProvider {
         tokens * 3.0 / 1_000_000.0
     }
 }
-

@@ -1,6 +1,5 @@
 //! Provider adapters for external LLM services.
 
-
 pub mod anthropic;
 pub mod groq;
 pub mod openrouter;

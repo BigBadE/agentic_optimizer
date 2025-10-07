@@ -3,11 +3,10 @@
 //! This crate provides language provider abstractions and implementations
 //! for semantic code analysis using language-specific tools like rust-analyzer.
 
-
-pub mod provider;
 mod backends;
+pub mod provider;
 
-pub use provider::{LanguageProvider, SymbolInfo, SymbolKind, SearchQuery, SearchResult};
+pub use provider::{LanguageProvider, SearchQuery, SearchResult, SymbolInfo, SymbolKind};
 
 use merlin_core::Result;
 
@@ -31,4 +30,3 @@ pub fn create_backend(language: Language) -> Result<Box<dyn LanguageProvider>> {
         }
     }
 }
-

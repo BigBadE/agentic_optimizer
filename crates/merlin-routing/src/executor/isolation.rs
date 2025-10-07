@@ -1,9 +1,9 @@
+use crate::{Result, RoutingError, TaskId};
 use std::collections::{HashMap, HashSet};
 use std::path::PathBuf;
 use std::sync::Arc;
 use tokio::sync::RwLock;
 use tokio::task::spawn;
-use crate::{Result, RoutingError, TaskId};
 
 type WriteLocks = HashMap<PathBuf, TaskId>;
 type ReadLocks = HashMap<PathBuf, HashSet<TaskId>>;
@@ -22,7 +22,7 @@ impl FileLockManager {
             read_locks: RwLock::new(HashMap::new()),
         })
     }
-    
+
     /// Acquire write lock on files (exclusive access)
     ///
     /// # Errors
@@ -37,23 +37,26 @@ impl FileLockManager {
             {
                 let write_locks_read = self.write_locks.read().await;
                 if let Some(&holder) = write_locks_read.get(file)
-                    && holder != task_id {
-                        return Err(RoutingError::FileLockedByTask {
-                            file: file.clone(),
-                            holder,
-                        });
-                    }
+                    && holder != task_id
+                {
+                    return Err(RoutingError::FileLockedByTask {
+                        file: file.clone(),
+                        holder,
+                    });
+                }
             }
 
             {
                 let read_locks_read = self.read_locks.read().await;
                 if let Some(readers) = read_locks_read.get(file)
-                    && !readers.is_empty() && !readers.contains(&task_id) {
-                        return Err(RoutingError::FileHasActiveReaders {
-                            file: file.clone(),
-                            readers: readers.len(),
-                        });
-                    }
+                    && !readers.is_empty()
+                    && !readers.contains(&task_id)
+                {
+                    return Err(RoutingError::FileHasActiveReaders {
+                        file: file.clone(),
+                        readers: readers.len(),
+                    });
+                }
             }
         }
 
@@ -71,7 +74,7 @@ impl FileLockManager {
             files: files.to_vec(),
         })
     }
-    
+
     /// Acquire read lock on files (shared access)
     ///
     /// # Errors
@@ -86,12 +89,13 @@ impl FileLockManager {
             let write_locks = self.write_locks.read().await;
             for file in files {
                 if let Some(&holder) = write_locks.get(file)
-                    && holder != task_id {
-                        return Err(RoutingError::FileLockedByTask {
-                            file: file.clone(),
-                            holder,
-                        });
-                    }
+                    && holder != task_id
+                {
+                    return Err(RoutingError::FileLockedByTask {
+                        file: file.clone(),
+                        holder,
+                    });
+                }
             }
         }
 
@@ -112,17 +116,18 @@ impl FileLockManager {
             files: files.to_vec(),
         })
     }
-    
+
     async fn release_write_locks(&self, task_id: TaskId, files: &[PathBuf]) {
         let mut write_locks = self.write_locks.write().await;
         for file in files {
             if let Some(&holder) = write_locks.get(file)
-                && holder == task_id {
-                    write_locks.remove(file);
-                }
+                && holder == task_id
+            {
+                write_locks.remove(file);
+            }
         }
     }
-    
+
     async fn release_read_locks(&self, task_id: TaskId, files: &[PathBuf]) {
         let mut read_locks = self.read_locks.write().await;
         for file in files {
@@ -134,7 +139,6 @@ impl FileLockManager {
             }
         }
     }
-    
 }
 
 impl Default for FileLockManager {
@@ -158,7 +162,7 @@ impl Drop for WriteLockGuard {
         let manager = Arc::clone(&self.manager);
         let task_id = self.task_id;
         let files = self.files.clone();
-        
+
         spawn(async move {
             manager.release_write_locks(task_id, &files).await;
         });
@@ -177,7 +181,7 @@ impl Drop for ReadLockGuard {
         let manager = Arc::clone(&self.manager);
         let task_id = self.task_id;
         let files = self.files.clone();
-        
+
         spawn(async move {
             manager.release_read_locks(task_id, &files).await;
         });
@@ -197,16 +201,16 @@ mod tests {
         let task_a = TaskId::new();
         let task_b = TaskId::new();
         let file = PathBuf::from("test.rs");
-        
+
         let _guard_a = match manager.acquire_write_locks(task_a, from_ref(&file)).await {
             Ok(guard) => guard,
             Err(error) => panic!("failed to acquire write lock: {error}"),
         };
-        
+
         let result = manager.acquire_write_locks(task_b, &[file]).await;
         assert!(result.is_err());
     }
-    
+
     #[tokio::test]
     /// # Panics
     /// Panics if lock acquisition unexpectedly fails in the test harness.
@@ -215,7 +219,7 @@ mod tests {
         let task_a = TaskId::new();
         let task_b = TaskId::new();
         let file = PathBuf::from("test.rs");
-        
+
         let _guard_a = match manager.acquire_read_locks(task_a, from_ref(&file)).await {
             Ok(guard) => guard,
             Err(error) => panic!("failed to acquire read lock: {error}"),
@@ -225,7 +229,7 @@ mod tests {
             Err(error) => panic!("failed to acquire read lock: {error}"),
         };
     }
-    
+
     #[tokio::test]
     /// # Panics
     /// Panics if lock acquisition unexpectedly fails in the test harness.
@@ -234,12 +238,12 @@ mod tests {
         let task_a = TaskId::new();
         let task_b = TaskId::new();
         let file = PathBuf::from("test.rs");
-        
+
         let _guard_a = match manager.acquire_write_locks(task_a, from_ref(&file)).await {
             Ok(guard) => guard,
             Err(error) => panic!("failed to acquire write lock: {error}"),
         };
-        
+
         let result = manager.acquire_read_locks(task_b, from_ref(&file)).await;
         assert!(result.is_err());
     }

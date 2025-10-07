@@ -1,7 +1,7 @@
+use super::text_width::EmojiMode;
+use crate::TaskId;
 use std::collections::HashSet;
 use std::time::Instant;
-use crate::TaskId;
-use super::text_width::EmojiMode;
 
 /// Main UI state
 #[derive(Default)]
@@ -12,7 +12,10 @@ pub struct UiState {
     pub pending_delete_task_id: Option<TaskId>,
     pub loading_tasks: bool,
     pub conversation_history: Vec<ConversationEntry>,
-    #[allow(dead_code, reason = "Field is part of public API for emoji mode configuration")]
+    #[allow(
+        dead_code,
+        reason = "Field is part of public API for emoji mode configuration"
+    )]
     pub emoji_mode: EmojiMode,
 }
 
@@ -27,11 +30,20 @@ impl UiState {
 /// Conversation entry
 #[derive(Clone)]
 pub struct ConversationEntry {
-    #[allow(dead_code, reason = "Field is part of public API for conversation tracking")]
+    #[allow(
+        dead_code,
+        reason = "Field is part of public API for conversation tracking"
+    )]
     pub role: ConversationRole,
-    #[allow(dead_code, reason = "Field is part of public API for conversation tracking")]
+    #[allow(
+        dead_code,
+        reason = "Field is part of public API for conversation tracking"
+    )]
     pub text: String,
-    #[allow(dead_code, reason = "Field is part of public API for conversation tracking")]
+    #[allow(
+        dead_code,
+        reason = "Field is part of public API for conversation tracking"
+    )]
     pub timestamp: Instant,
 }
 

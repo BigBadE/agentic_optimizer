@@ -11,33 +11,50 @@ pub mod types;
 pub mod user_interface;
 pub mod validator;
 
+pub use agent::{AgentExecutor, SelfAssessor, StepTracker};
 pub use analyzer::{
-    Action, ComplexityEstimator, Intent, IntentExtractor, LocalTaskAnalyzer, Scope,
-    TaskAnalyzer, TaskDecomposer,
+    Action, ComplexityEstimator, Intent, IntentExtractor, LocalTaskAnalyzer, Scope, TaskAnalyzer,
+    TaskDecomposer,
 };
 pub use config::{ExecutionConfig, RoutingConfig, TierConfig, ValidationConfig, WorkspaceConfig};
 pub use error::{Result, RoutingError};
-pub use orchestrator::RoutingOrchestrator;
 pub use executor::{
     BuildResult, ConflictAwareTaskGraph, ConflictReport, ExecutorPool, FileConflict,
     FileLockManager, IsolatedBuildEnv, LintResult, TaskGraph, TaskWorkspace, TestResult,
     WorkspaceSnapshot, WorkspaceState,
 };
+pub use orchestrator::RoutingOrchestrator;
 pub use router::{
     AvailabilityChecker, ComplexityBasedStrategy, CostOptimizationStrategy, LongContextStrategy,
     ModelRouter, ModelTier, QualityCriticalStrategy, RoutingDecision, RoutingStrategy,
     StrategyRouter,
 };
-pub use types::{
-    CommandExecution, Complexity, ContextRequirements, ExecutionContext, ExecutionStrategy,
-    FileChange, Priority, Severity, StageResult, Task, TaskAnalysis, TaskId, TaskResult,
-    ValidationError, ValidationResult, ValidationStage as ValidationStageType,
-    // Self-determination types
-    TaskState, TaskDecision, TaskAction, SubtaskSpec, ExecutionMode,
-};
-pub use agent::{AgentExecutor, StepTracker, SelfAssessor};
 pub use streaming::{StepId, StepType, StreamingChannel, StreamingEvent, TaskStep};
 pub use tools::{ListFilesTool, ReadFileTool, RunCommandTool, Tool, ToolRegistry, WriteFileTool};
+pub use types::{
+    CommandExecution,
+    Complexity,
+    ContextRequirements,
+    ExecutionContext,
+    ExecutionMode,
+    ExecutionStrategy,
+    FileChange,
+    Priority,
+    Severity,
+    StageResult,
+    SubtaskSpec,
+    Task,
+    TaskAction,
+    TaskAnalysis,
+    TaskDecision,
+    TaskId,
+    TaskResult,
+    // Self-determination types
+    TaskState,
+    ValidationError,
+    ValidationResult,
+    ValidationStage as ValidationStageType,
+};
 pub use user_interface::{MessageLevel, TaskProgress, TuiApp, UiChannel, UiEvent};
 pub use validator::{
     BuildValidationStage, LintValidationStage, SyntaxValidationStage, TestValidationStage,

@@ -3,17 +3,16 @@
 //! This crate provides various tools that agents can use to interact with
 //! the file system and execute commands.
 
-
-/// Core abstractions shared by all tools.
-mod tool;
+/// Shell execution tool implementation.
+mod bash;
 /// Editing tool implementation.
 mod edit;
 /// File viewing tool implementation.
 mod show;
-/// Shell execution tool implementation.
-mod bash;
+/// Core abstractions shared by all tools.
+mod tool;
 
-pub use tool::{Tool, ToolError, ToolResult, ToolInput, ToolOutput};
+pub use bash::BashTool;
 pub use edit::EditTool;
 pub use show::ShowTool;
-pub use bash::BashTool;
+pub use tool::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};

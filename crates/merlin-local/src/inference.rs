@@ -1,9 +1,9 @@
+use crate::OllamaManager;
+use crate::models::{OllamaGenerateRequest, OllamaGenerateResponse};
 use async_trait::async_trait;
+use merlin_core::{Context, Error, ModelProvider, Query, Response, Result, TokenUsage};
 use reqwest::Client;
 use std::time::Instant;
-use merlin_core::{Context, Error, ModelProvider, Query, Response, Result, TokenUsage};
-use crate::models::{OllamaGenerateRequest, OllamaGenerateResponse};
-use crate::OllamaManager;
 
 /// Local model provider using `Ollama`.
 pub struct LocalModelProvider {
@@ -41,7 +41,11 @@ impl LocalModelProvider {
     ///
     /// Returns an [`Error`] if the request fails, the service reports an error,
     /// or the response payload cannot be parsed.
-    async fn generate_completion(&self, prompt: &str, system: Option<&str>) -> Result<OllamaGenerateResponse> {
+    async fn generate_completion(
+        &self,
+        prompt: &str,
+        system: Option<&str>,
+    ) -> Result<OllamaGenerateResponse> {
         let request = OllamaGenerateRequest {
             model: self.model_name.clone(),
             prompt: prompt.to_owned(),
@@ -51,7 +55,8 @@ impl LocalModelProvider {
             stream: false,
         };
 
-        let response = self.client
+        let response = self
+            .client
             .post(format!("{}/api/generate", self.base_url))
             .json(&request)
             .send()
@@ -65,9 +70,11 @@ impl LocalModelProvider {
             )));
         }
 
-        let ollama_response: OllamaGenerateResponse = response.json().await
+        let ollama_response: OllamaGenerateResponse = response
+            .json()
+            .await
             .map_err(|err| Error::Other(format!("Failed to parse Ollama response: {err}")))?;
-        
+
         Ok(ollama_response)
     }
 }
@@ -77,43 +84,49 @@ impl ModelProvider for LocalModelProvider {
     fn name(&self) -> &'static str {
         "Ollama"
     }
-    
+
     async fn is_available(&self) -> bool {
         self.manager.is_available().await
     }
-    
+
     async fn generate(&self, query: &Query, context: &Context) -> Result<Response> {
         let start = Instant::now();
-        
+
         let system_prompt = "You are an expert coding assistant. Provide clear, concise, and correct code solutions.";
-        
+
         let mut prompt = query.text.clone();
-        
+
         if !context.files.is_empty() {
             prompt.push_str("\n\nContext files:\n");
             for file_ctx in &context.files {
                 use std::fmt::Write as _;
-                if write!(prompt, "\n--- {} ---\n{}\n",
+                if write!(
+                    prompt,
+                    "\n--- {} ---\n{}\n",
                     file_ctx.path.display(),
                     file_ctx.content
-                ).is_err() {
+                )
+                .is_err()
+                {
                     // Writing to String should never fail, but handle it gracefully
                     return Err(Error::Other("Failed to write context to prompt".to_owned()));
                 }
             }
         }
-        
-        let ollama_response = self.generate_completion(&prompt, Some(system_prompt)).await?;
-        
+
+        let ollama_response = self
+            .generate_completion(&prompt, Some(system_prompt))
+            .await?;
+
         let latency_ms = start.elapsed().as_millis() as u64;
-        
+
         let tokens_used = TokenUsage {
             input: ollama_response.prompt_eval_count as u64,
             output: ollama_response.eval_count as u64,
             cache_read: 0,
             cache_write: 0,
         };
-        
+
         Ok(Response {
             text: ollama_response.response,
             confidence: 0.85,
@@ -122,7 +135,7 @@ impl ModelProvider for LocalModelProvider {
             latency_ms,
         })
     }
-    
+
     fn estimate_cost(&self, _context: &Context) -> f64 {
         0.0
     }
@@ -151,4 +164,3 @@ mod tests {
         assert!(cost.abs() < f64::EPSILON);
     }
 }
-

@@ -1,16 +1,16 @@
 /// Tests for TUI rendering components
 mod common;
 
+use common::*;
+use merlin_routing::TaskId;
 use merlin_routing::user_interface::{
-    renderer::{FocusedPane, Renderer, RenderCtx, UiCtx},
+    renderer::{FocusedPane, RenderCtx, Renderer, UiCtx},
     state::UiState,
     task_manager::TaskManager,
     theme::Theme,
 };
-use merlin_routing::TaskId;
-use ratatui::backend::TestBackend;
 use ratatui::Terminal;
-use common::*;
+use ratatui::backend::TestBackend;
 
 #[test]
 fn test_renderer_creation() {

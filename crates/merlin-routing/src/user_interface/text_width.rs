@@ -19,7 +19,7 @@ impl Default for EmojiMode {
 }
 
 /// Calculate the display width of a string, handling emojis and grapheme clusters correctly
-#[must_use] 
+#[must_use]
 pub fn calculate_width(text: &str, mode: EmojiMode) -> usize {
     text.graphemes(true)
         .map(|grapheme| grapheme_width(grapheme, mode))
@@ -31,7 +31,7 @@ fn grapheme_width(grapheme: &str, mode: EmojiMode) -> usize {
     // Check if this is an emoji or contains emoji modifiers
     if is_emoji_grapheme(grapheme) {
         match mode {
-            EmojiMode::Strict => 1, // Replace with single-width fallback
+            EmojiMode::Strict => 1,       // Replace with single-width fallback
             EmojiMode::TextFallback => 7, // Approximate width of :emoji:
             EmojiMode::Permissive => {
                 // Best-effort width calculation for emojis
@@ -73,10 +73,12 @@ fn is_emoji_char(character: char) -> bool {
 
 /// Check if grapheme contains emoji modifiers or variation selectors
 fn contains_emoji_modifier(grapheme: &str) -> bool {
-    grapheme.chars().any(|character| matches!(character,
-        '\u{FE00}'..='\u{FE0F}' | // Variation Selectors
-        '\u{1F3FB}'..='\u{1F3FF}'   // Skin tone modifiers
-    ))
+    grapheme.chars().any(|character| {
+        matches!(character,
+            '\u{FE00}'..='\u{FE0F}' | // Variation Selectors
+            '\u{1F3FB}'..='\u{1F3FF}'   // Skin tone modifiers
+        )
+    })
 }
 
 /// Check if grapheme is a ZWJ (Zero Width Joiner) sequence
@@ -85,27 +87,27 @@ fn is_zwj_sequence(grapheme: &str) -> bool {
 }
 
 /// Truncate text to fit within a maximum width, respecting grapheme boundaries
-#[must_use] 
+#[must_use]
 pub fn truncate_to_width(text: &str, max_width: usize, mode: EmojiMode) -> String {
     let mut result = String::new();
     let mut current_width = 0;
-    
+
     for grapheme in text.graphemes(true) {
         let grapheme_w = grapheme_width(grapheme, mode);
-        
+
         if current_width + grapheme_w > max_width {
             break;
         }
-        
+
         result.push_str(grapheme);
         current_width += grapheme_w;
     }
-    
+
     result
 }
 
 /// Strip emojis from text, replacing with safe fallback
-#[must_use] 
+#[must_use]
 pub fn strip_emojis(text: &str, fallback: &str) -> String {
     text.graphemes(true)
         .map(|grapheme| {
@@ -119,15 +121,15 @@ pub fn strip_emojis(text: &str, fallback: &str) -> String {
 }
 
 /// Wrap text to fit within a maximum width, respecting grapheme boundaries
-#[must_use] 
+#[must_use]
 pub fn wrap_text(text: &str, max_width: usize, mode: EmojiMode) -> Vec<String> {
     let mut lines = Vec::new();
     let mut current_line = String::new();
     let mut current_width = 0;
-    
+
     for grapheme in text.graphemes(true) {
         let grapheme_w = grapheme_width(grapheme, mode);
-        
+
         // Handle newlines
         if grapheme == "\n" {
             lines.push(current_line);
@@ -135,22 +137,22 @@ pub fn wrap_text(text: &str, max_width: usize, mode: EmojiMode) -> Vec<String> {
             current_width = 0;
             continue;
         }
-        
+
         // Check if adding this grapheme would exceed max width
         if current_width + grapheme_w > max_width && !current_line.is_empty() {
             lines.push(current_line);
             current_line = String::new();
             current_width = 0;
         }
-        
+
         current_line.push_str(grapheme);
         current_width += grapheme_w;
     }
-    
+
     if !current_line.is_empty() {
         lines.push(current_line);
     }
-    
+
     lines
 }
 
@@ -173,7 +175,7 @@ mod tests {
         // Single emoji
         assert_eq!(calculate_width("💭", EmojiMode::Permissive), 2);
         assert_eq!(calculate_width("🔧", EmojiMode::Permissive), 2);
-        
+
         // Emoji in strict mode
         assert_eq!(calculate_width("💭", EmojiMode::Strict), 1);
     }
@@ -192,7 +194,7 @@ mod tests {
     fn test_truncate() {
         let text = "Hello World";
         assert_eq!(truncate_to_width(text, 5, EmojiMode::Permissive), "Hello");
-        
+
         let emoji_text = "💭 Test";
         let truncated = truncate_to_width(emoji_text, 5, EmojiMode::Permissive);
         assert!(calculate_width(&truncated, EmojiMode::Permissive) <= 5);
@@ -213,7 +215,7 @@ mod tests {
         let text = "Hello World Test";
         let wrapped = wrap_text(text, 10, EmojiMode::Permissive);
         assert!(wrapped.len() >= 2);
-        
+
         for line in &wrapped {
             assert!(calculate_width(line, EmojiMode::Permissive) <= 10);
         }

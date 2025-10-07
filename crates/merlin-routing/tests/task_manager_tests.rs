@@ -1,10 +1,10 @@
 /// Comprehensive tests for TaskManager functionality
 mod common;
 
-use merlin_routing::user_interface::task_manager::{TaskManager, TaskStatus};
-use merlin_routing::TaskId;
-use std::time::{Duration, Instant};
 use common::*;
+use merlin_routing::TaskId;
+use merlin_routing::user_interface::task_manager::{TaskManager, TaskStatus};
+use std::time::{Duration, Instant};
 
 #[test]
 fn test_add_task() {

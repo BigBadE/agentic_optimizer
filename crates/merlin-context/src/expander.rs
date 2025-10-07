@@ -1,19 +1,22 @@
 //! Context expansion logic for following code relationships.
 
-use std::cmp::Reverse;
-use std::collections::HashSet;
-use std::path::{Path, PathBuf};
-use std::fs as fs;
-use std::time::Duration;
-use walkdir::{DirEntry, WalkDir};
-use std::result::Result as StdResult;
 use ignore::WalkBuilder;
 use indicatif::{ProgressBar, ProgressStyle};
+use std::cmp::Reverse;
+use std::collections::HashSet;
+use std::fs;
+use std::path::{Path, PathBuf};
+use std::result::Result as StdResult;
+use std::time::Duration;
+use walkdir::{DirEntry, WalkDir};
 
 use merlin_core::FileContext;
 use merlin_languages::LanguageProvider;
 
-use crate::{fs_utils::is_source_file, query::{ContextPlan, ExpansionStrategy}};
+use crate::{
+    fs_utils::is_source_file,
+    query::{ContextPlan, ExpansionStrategy},
+};
 
 /// Expands context by following code relationships
 pub struct ContextExpander<'expander> {
@@ -28,7 +31,10 @@ pub struct ContextExpander<'expander> {
 impl<'expander> ContextExpander<'expander> {
     /// Create a new context expander
     #[must_use]
-    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
+    #[allow(
+        dead_code,
+        reason = "Module reserved for future context expansion features"
+    )]
     pub fn new(
         backend: Option<&'expander dyn LanguageProvider>,
         project_root: &'expander Path,
@@ -45,25 +51,35 @@ impl<'expander> ContextExpander<'expander> {
     ///
     /// # Errors
     /// Returns an error if file operations or semantic analysis fails
-    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
+    #[allow(
+        dead_code,
+        reason = "Module reserved for future context expansion features"
+    )]
     pub fn expand(&self, plan: &ContextPlan) -> Vec<FileContext> {
         let spinner = ProgressBar::new_spinner();
         spinner.set_style(
             ProgressStyle::default_spinner()
                 .template("{spinner:.cyan} {msg}")
-                .unwrap_or_else(|_| ProgressStyle::default_spinner())
+                .unwrap_or_else(|_| ProgressStyle::default_spinner()),
         );
         spinner.enable_steady_tick(Duration::from_millis(100));
-        
+
         tracing::info!("Expanding context with strategy: {:?}", plan.strategy);
-        tracing::debug!("Context plan: keywords={:?}, symbols={:?}, patterns={:?}", 
-            plan.keywords, plan.symbols, plan.file_patterns);
+        tracing::debug!(
+            "Context plan: keywords={:?}, symbols={:?}, patterns={:?}",
+            plan.keywords,
+            plan.symbols,
+            plan.file_patterns
+        );
 
         let mut files = HashSet::new();
 
         // Step 1: Find seed files based on patterns
         if !plan.file_patterns.is_empty() {
-            spinner.set_message(format!("Searching for files matching patterns: {:?}...", plan.file_patterns));
+            spinner.set_message(format!(
+                "Searching for files matching patterns: {:?}...",
+                plan.file_patterns
+            ));
             let pattern_files = self.find_files_by_patterns(&plan.file_patterns);
             tracing::info!("Found {} files matching patterns", pattern_files.len());
             files.extend(pattern_files);
@@ -117,9 +133,11 @@ impl<'expander> ContextExpander<'expander> {
         contexts.sort_by_cached_key(|ctx| {
             let path_str = ctx.path.to_string_lossy().to_lowercase();
             let content_lower = ctx.content.to_lowercase();
-            
+
             // Count keyword matches in path and content
-            let keyword_score: usize = plan.keywords.iter()
+            let keyword_score: usize = plan
+                .keywords
+                .iter()
                 .map(|keyword| {
                     let kw_lower = keyword.to_lowercase();
                     let path_matches = path_str.matches(&kw_lower).count();
@@ -127,19 +145,24 @@ impl<'expander> ContextExpander<'expander> {
                     path_matches * 10 + content_matches
                 })
                 .sum();
-            
+
             // Higher scores should come first (reverse order)
             Reverse(keyword_score)
         });
 
-        spinner.finish_with_message(format!("✓ Context expansion complete: {} files", contexts.len()));
+        spinner.finish_with_message(format!(
+            "✓ Context expansion complete: {} files",
+            contexts.len()
+        ));
         tracing::info!("Final context: {} files", contexts.len());
         contexts
     }
 
-    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
+    #[allow(
+        dead_code,
+        reason = "Module reserved for future context expansion features"
+    )]
     fn find_files_by_patterns(&self, _patterns: &[String]) -> Vec<PathBuf> {
-
         // Use the same WalkBuilder as build_file_tree for consistency
         let walker = WalkBuilder::new(self.project_root)
             .max_depth(None)
@@ -158,7 +181,10 @@ impl<'expander> ContextExpander<'expander> {
                 }
                 Ok(dir_entry) => {
                     // Only process files
-                    if !dir_entry.file_type().is_some_and(|file_type| file_type.is_file()) {
+                    if !dir_entry
+                        .file_type()
+                        .is_some_and(|file_type| file_type.is_file())
+                    {
                         continue;
                     }
 
@@ -210,12 +236,16 @@ impl<'expander> ContextExpander<'expander> {
             }
 
             if let Ok(metadata) = fs::metadata(path)
-                && metadata.len() as usize > self.max_file_size {
+                && metadata.len() as usize > self.max_file_size
+            {
                 continue;
             }
 
             if let Ok(content) = fs::read_to_string(path)
-                && symbols.iter().any(|symbol| !symbol.is_empty() && content.contains(symbol)) {
+                && symbols
+                    .iter()
+                    .any(|symbol| !symbol.is_empty() && content.contains(symbol))
+            {
                 files.push(path.to_path_buf());
             }
         }
@@ -224,14 +254,14 @@ impl<'expander> ContextExpander<'expander> {
     }
 
     /// Expand from entry points by traversing imports
-    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
+    #[allow(
+        dead_code,
+        reason = "Module reserved for future context expansion features"
+    )]
     fn expand_from_entry_points(&self, entry_files: &[PathBuf], max_depth: usize) -> Vec<PathBuf> {
         let mut visited: HashSet<PathBuf> = HashSet::new();
-        let mut to_process: Vec<(PathBuf, usize)> = entry_files
-            .iter()
-            .cloned()
-            .map(|path| (path, 0))
-            .collect();
+        let mut to_process: Vec<(PathBuf, usize)> =
+            entry_files.iter().cloned().map(|path| (path, 0)).collect();
 
         while let Some((file, depth)) = to_process.pop() {
             if visited.contains(&file) || depth >= max_depth {
@@ -242,7 +272,8 @@ impl<'expander> ContextExpander<'expander> {
 
             // Get imports from this file
             if let Some(backend) = self.backend
-                && let Ok(imports) = backend.extract_imports(&file) {
+                && let Ok(imports) = backend.extract_imports(&file)
+            {
                 imports
                     .into_iter()
                     .filter(|import| !visited.contains(import))
@@ -254,13 +285,19 @@ impl<'expander> ContextExpander<'expander> {
     }
 
     /// Expand using semantic search
-    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
+    #[allow(
+        dead_code,
+        reason = "Module reserved for future context expansion features"
+    )]
     fn expand_semantic(_query: &str, _top_k: usize) -> Vec<PathBuf> {
         // TODO: Implement semantic search using embeddings
         Vec::new()
     }
 
-    #[allow(dead_code, reason = "Module reserved for future context expansion features")]
+    #[allow(
+        dead_code,
+        reason = "Module reserved for future context expansion features"
+    )]
     fn find_test_files(&self, files: &HashSet<PathBuf>) -> Vec<PathBuf> {
         let mut test_files = Vec::new();
 
@@ -281,8 +318,12 @@ impl<'expander> ContextExpander<'expander> {
                 continue;
             }
 
-            let Some(parent) = path.parent() else { continue };
-            let Some(name) = path.file_name().and_then(|str_path| str_path.to_str()) else { continue };
+            let Some(parent) = path.parent() else {
+                continue;
+            };
+            let Some(name) = path.file_name().and_then(|str_path| str_path.to_str()) else {
+                continue;
+            };
 
             let stem = name.trim_end_matches(".rs");
             let candidate = parent.join(format!("{stem}.rs"));
@@ -296,7 +337,15 @@ impl<'expander> ContextExpander<'expander> {
 
     /// Check if a directory entry should be ignored
     fn is_ignored(entry: &DirEntry) -> bool {
-        const IGNORED_DIRS: &[&str] = &["target", "node_modules", "dist", "build", ".git", ".idea", ".vscode"];
+        const IGNORED_DIRS: &[&str] = &[
+            "target",
+            "node_modules",
+            "dist",
+            "build",
+            ".git",
+            ".idea",
+            ".vscode",
+        ];
 
         let file_name = entry.file_name().to_string_lossy();
 
@@ -306,6 +355,4 @@ impl<'expander> ContextExpander<'expander> {
 
         IGNORED_DIRS.iter().any(|dir| file_name == *dir)
     }
-
 }
-

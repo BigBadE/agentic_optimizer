@@ -1,27 +1,27 @@
 //! Smart chunking for code and text files with token-based optimization.
 
-mod rust;
-mod markdown;
-mod text;
 mod config;
 mod generic;
+mod markdown;
+mod rust;
+mod text;
 
 use std::path::Path;
 
-pub use rust::chunk_rust;
-pub use markdown::chunk_markdown;
-pub use text::chunk_text;
 pub use config::chunk_config;
 pub use generic::chunk_generic_code;
+pub use markdown::chunk_markdown;
+pub use rust::chunk_rust;
+pub use text::chunk_text;
 
 /// Optimal token range for chunks
-pub const MIN_CHUNK_TOKENS: usize = 100;   // ~25 lines
+pub const MIN_CHUNK_TOKENS: usize = 100; // ~25 lines
 pub const OPTIMAL_MIN_TOKENS: usize = 200; // ~50 lines
 pub const OPTIMAL_MAX_TOKENS: usize = 500; // ~125 lines
-pub const MAX_CHUNK_TOKENS: usize = 800;   // ~200 lines
+pub const MAX_CHUNK_TOKENS: usize = 800; // ~200 lines
 
 /// Estimate tokens from text (rough: ~4 chars per token)
-#[must_use] 
+#[must_use]
 pub fn estimate_tokens(text: &str) -> usize {
     let chars = text.len();
     let words = text.split_whitespace().count();
@@ -68,7 +68,10 @@ impl FileChunk {
     /// Get a display name for this chunk
     #[must_use]
     pub fn display_name(&self) -> String {
-        format!("{}:{}-{} ({})", self.file_path, self.start_line, self.end_line, self.identifier)
+        format!(
+            "{}:{}-{} ({})",
+            self.file_path, self.start_line, self.end_line, self.identifier
+        )
     }
 }
 

@@ -3,7 +3,6 @@
 //! This crate provides the core agent functionality that orchestrates
 //! context gathering, provider interaction, and response generation.
 
-
 mod agent;
 mod config;
 mod executor;

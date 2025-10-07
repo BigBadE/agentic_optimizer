@@ -8,9 +8,7 @@ use tracing_subscriber::fmt;
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    let subscriber = fmt()
-        .with_writer(stderr)
-        .finish();
+    let subscriber = fmt().with_writer(stderr).finish();
     set_global_default(subscriber)?;
 
     let show_tool = ShowTool::new();
@@ -35,4 +33,3 @@ async fn main() -> Result<()> {
 
     Ok(())
 }
-

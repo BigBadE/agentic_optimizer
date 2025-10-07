@@ -1,6 +1,67 @@
 # Merlin Usage Guide
 
-## Interactive Chat
+## Quick Start
+
+The easiest way to use Merlin is the default interactive mode:
+
+```bash
+# Build first
+cargo build --release
+
+# Start interactive agent (default mode)
+./target/release/merlin
+
+# Or with options
+./target/release/merlin --local          # Use only Ollama (free, offline)
+./target/release/merlin --no-tui         # Plain text output
+./target/release/merlin --validation disabled  # Skip validation for faster iterations
+```
+
+## Interactive Mode (Default)
+
+When you run `merlin` without any subcommand, you get an interactive agent with:
+- **Continuous conversation** - Build on previous responses
+- **TUI interface** - Real-time task progress visualization
+- **Multi-model routing** - Automatic tier selection based on complexity
+- **Context awareness** - Remembers your codebase and conversation
+
+### Example Session
+
+```
+$ ./target/release/merlin --local
+
+=== Merlin - Interactive AI Coding Assistant ===
+Project: /current_projects/agentic_optimizer
+Mode: Local Only (Ollama)
+
+✓ Agent ready!
+
+Type your request (or 'exit' to quit):
+
+You:
+> Add error handling to the parse_input function
+
+[TUI shows real-time progress with task decomposition...]
+
+Merlin:
+I've analyzed the parse_input function and added comprehensive error handling...
+[Code changes displayed]
+
+You:
+> Now add tests for those error cases
+
+[Agent builds on previous context...]
+
+Merlin:
+Here are the tests for the error handling we just added...
+[Test code displayed]
+
+You:
+> exit
+Goodbye!
+```
+
+## Chat Command (Alternative)
 
 Start an interactive chat session with the AI agent:
 

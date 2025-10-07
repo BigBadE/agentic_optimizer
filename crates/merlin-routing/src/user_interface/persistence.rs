@@ -1,15 +1,15 @@
+use super::output_tree::OutputTree;
+use super::task_manager::{TaskDisplay, TaskStatus};
+use crate::TaskId;
+use flate2::{Compression, read::GzDecoder, write::GzEncoder};
+use serde::{Deserialize, Serialize};
+use serde_json::{from_str, to_string};
 use std::collections::HashMap;
 use std::fs::{self as filesystem, File};
 use std::io::{self, Read as _, Write as _};
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime};
-use flate2::{read::GzDecoder, write::GzEncoder, Compression};
-use serde::{Deserialize, Serialize};
-use serde_json::{from_str, to_string};
 use tokio::task;
-use crate::TaskId;
-use super::task_manager::{TaskDisplay, TaskStatus};
-use super::output_tree::OutputTree;
 
 /// Serializable task representation for disk storage
 #[derive(Serialize, Deserialize)]
@@ -115,9 +115,10 @@ impl TaskPersistence {
             let path = entry.path();
 
             if is_compressed_task_file(&path)
-                && let Some(task_display) = load_single_task(&path)? {
-                    tasks.insert(task_display.0, task_display.1);
-                }
+                && let Some(task_display) = load_single_task(&path)?
+            {
+                tasks.insert(task_display.0, task_display.1);
+            }
         }
 
         Ok(tasks)
@@ -136,16 +137,14 @@ type LoadedTask = Option<(TaskId, TaskDisplay)>;
 ///
 /// # Errors
 /// Returns an error if the file cannot be opened, the gzip decoding fails, or
-fn load_single_task(
-    path: &Path,
-) -> io::Result<LoadedTask> {
+fn load_single_task(path: &Path) -> io::Result<LoadedTask> {
     let file = File::open(path)?;
     let mut decoder = GzDecoder::new(file);
     let mut json_str = String::new();
     decoder.read_to_string(&mut json_str)?;
 
-    let serializable: SerializableTask = from_str(&json_str)
-        .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
+    let serializable: SerializableTask =
+        from_str(&json_str).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
 
     let task_display = deserialize_task(serializable);
     Ok(Some(task_display))
@@ -173,12 +172,12 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
 
     let start_time = now_system
         .duration_since(serializable.start_time)
-        .map_or(now_instant, |elapsed| now_instant.checked_sub(elapsed).unwrap_or(now_instant));
+        .map_or(now_instant, |elapsed| {
+            now_instant.checked_sub(elapsed).unwrap_or(now_instant)
+        });
 
     let end_time = serializable.end_time.and_then(|end_sys| {
-        let elapsed = now_system
-            .duration_since(end_sys)
-            .ok()?;
+        let elapsed = now_system.duration_since(end_sys).ok()?;
         now_instant.checked_sub(elapsed)
     });
 
@@ -202,12 +201,9 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
 /// # Errors
 ///
 /// Returns an error if the JSON serialization fails or the file cannot be written
-fn write_compressed_task(
-    path: &Path,
-    serializable: &SerializableTask,
-) -> io::Result<()> {
-    let json = to_string(serializable)
-        .map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
+fn write_compressed_task(path: &Path, serializable: &SerializableTask) -> io::Result<()> {
+    let json =
+        to_string(serializable).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
 
     let file = File::create(path)?;
     let mut encoder = GzEncoder::new(file, Compression::fast());

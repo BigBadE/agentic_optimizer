@@ -3,7 +3,6 @@
 //! This crate provides fundamental types, error handling, and trait definitions
 //! used across the agentic optimizer system.
 
-
 pub mod error;
 pub mod traits;
 pub mod types;

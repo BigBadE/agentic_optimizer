@@ -1,9 +1,9 @@
 #![allow(dead_code)]
 //! Common test utilities and helpers for merlin-routing tests
 
-use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskStatus};
-use merlin_routing::user_interface::output_tree::OutputTree;
 use merlin_routing::TaskId;
+use merlin_routing::user_interface::output_tree::OutputTree;
+use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskStatus};
 use std::time::Instant;
 
 /// Create a basic test task with sensible defaults

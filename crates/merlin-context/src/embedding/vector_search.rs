@@ -802,16 +802,17 @@ impl VectorSearchManager {
             }
 
             // Collect results
-            #[allow(clippy::excessive_nesting, reason = "Async task collection requires this structure")]
             while let Some(result) = tasks.join_next().await {
-                if let Ok(chunk_results) = result {
-                    if !chunk_results.is_empty() {
+                match result {
+                    Ok(chunk_results) if !chunk_results.is_empty() => {
                         self.process_chunk_results(chunk_results, &mut total_chunks);
                         processed_files += 1;
                         spinner.set_message(format!("Embedding files... {processed_files}/{total_files} ({total_chunks} chunks)"));
                     }
-                } else if let Err(task_error) = result {
-                    warn!("    Task error: {task_error}");
+                    Err(task_error) => {
+                        warn!("    Task error: {task_error}");
+                    }
+                    Ok(_) => {} // Empty results, skip
                 }
             }
         }

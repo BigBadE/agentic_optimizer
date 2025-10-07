@@ -53,22 +53,33 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    /// # Panics
+    /// Panics if selected tiers do not match expected routing by complexity.
     async fn test_complexity_routing() {
         let strategy = ComplexityBasedStrategy::new();
         
         let simple_task = Task::new("Simple task".to_owned())
             .with_complexity(Complexity::Simple);
-        let tier = strategy.select_tier(&simple_task).await.unwrap();
-        assert!(matches!(tier, ModelTier::Local { .. }));
+        let tier_simple = match strategy.select_tier(&simple_task).await {
+            Ok(tier) => tier,
+            Err(error) => panic!("failed to select tier for simple task: {error}"),
+        };
+        assert!(matches!(tier_simple, ModelTier::Local { .. }));
         
         let medium_task = Task::new("Medium task".to_owned())
             .with_complexity(Complexity::Medium);
-        let tier = strategy.select_tier(&medium_task).await.unwrap();
-        assert!(matches!(tier, ModelTier::Groq { .. }));
+        let tier_medium = match strategy.select_tier(&medium_task).await {
+            Ok(tier) => tier,
+            Err(error) => panic!("failed to select tier for medium task: {error}"),
+        };
+        assert!(matches!(tier_medium, ModelTier::Groq { .. }));
         
         let complex_task = Task::new("Complex task".to_owned())
             .with_complexity(Complexity::Complex);
-        let tier = strategy.select_tier(&complex_task).await.unwrap();
-        assert!(matches!(tier, ModelTier::Premium { .. }));
+        let tier_complex = match strategy.select_tier(&complex_task).await {
+            Ok(tier) => tier,
+            Err(error) => panic!("failed to select tier for complex task: {error}"),
+        };
+        assert!(matches!(tier_complex, ModelTier::Premium { .. }));
     }
 }

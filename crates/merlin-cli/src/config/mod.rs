@@ -1,7 +1,9 @@
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::read_to_string;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
+use toml::from_str;
+use tracing::warn;
 
 use merlin_core::Result;
 
@@ -13,9 +15,13 @@ pub struct Config {
 }
 
 impl Config {
-    pub fn from_file(path: &PathBuf) -> Result<Self> {
+    /// Load configuration from a TOML file.
+    ///
+    /// # Errors
+    /// Returns an error if reading the file or parsing TOML fails.
+    pub fn from_file(path: &Path) -> Result<Self> {
         let content = read_to_string(path)?;
-        let config: Self = toml::from_str(&content)?;
+        let config: Self = from_str(&content)?;
         Ok(config)
     }
 
@@ -23,11 +29,11 @@ impl Config {
         Self::default()
     }
 
-    pub fn load_from_project(project_root: &PathBuf) -> Self {
+    pub fn load_from_project(project_root: &Path) -> Self {
         let config_path = project_root.join("config.toml");
         if config_path.exists() {
             Self::from_file(&config_path).unwrap_or_else(|error| {
-                eprintln!("Warning: Failed to load config.toml: {error}");
+                warn!("Warning: Failed to load config.toml: {error}");
                 Self::from_env()
             })
         } else {

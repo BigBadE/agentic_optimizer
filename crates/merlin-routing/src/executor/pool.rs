@@ -1,14 +1,17 @@
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::time::Instant;
 
 use tokio::sync::Semaphore;
 use tokio::task::JoinSet;
 
 use merlin_core::{Context, FileContext, ModelProvider, Query, TokenUsage};
+use merlin_local::LocalModelProvider;
+use merlin_providers::{AnthropicProvider, GroqProvider, OpenRouterProvider};
 
 use super::graph::TaskGraph;
 use super::state::WorkspaceState;
-use crate::{ModelRouter, Result, RoutingError, Task, TaskResult, Validator};
+use crate::{ModelRouter, ModelTier, Result, RoutingError, Task, TaskResult, Validator};
 
 /// Parallel task executor with concurrency limits
 pub struct ExecutorPool {
@@ -33,32 +36,36 @@ impl ExecutorPool {
         }
     }
     
-    fn create_provider_for_tier(tier: &crate::ModelTier) -> Result<Arc<dyn ModelProvider>> {
+    /// Create a concrete `ModelProvider` for a specific `ModelTier`.
+    ///
+    /// # Errors
+    /// Returns an error if provider initialization fails or required API keys are missing.
+    fn create_provider_for_tier(tier: &ModelTier) -> Result<Arc<dyn ModelProvider>> {
         use std::env;
         
         match tier {
-            crate::ModelTier::Local { model_name } => {
-                Ok(Arc::new(merlin_local::LocalModelProvider::new(model_name.clone())))
+            ModelTier::Local { model_name } => {
+                Ok(Arc::new(LocalModelProvider::new(model_name.clone())))
             }
-            crate::ModelTier::Groq { model_name } => {
-                let provider = merlin_providers::GroqProvider::new()
-                    .map_err(|e| RoutingError::Other(e.to_string()))?
+            ModelTier::Groq { model_name } => {
+                let provider = GroqProvider::new()
+                    .map_err(|err| RoutingError::Other(err.to_string()))?
                     .with_model(model_name.clone());
                 Ok(Arc::new(provider))
             }
-            crate::ModelTier::Premium { provider: provider_name, model_name } => {
+            ModelTier::Premium { provider: provider_name, model_name } => {
                 match provider_name.as_str() {
                     "openrouter" => {
                         let api_key = env::var("OPENROUTER_API_KEY")
                             .map_err(|_| RoutingError::Other("OPENROUTER_API_KEY not set".to_owned()))?;
-                        let provider = merlin_providers::OpenRouterProvider::new(api_key)?
+                        let provider = OpenRouterProvider::new(api_key)?
                             .with_model(model_name.clone());
                         Ok(Arc::new(provider))
                     }
                     "anthropic" => {
                         let api_key = env::var("ANTHROPIC_API_KEY")
                             .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
-                        let provider = merlin_providers::AnthropicProvider::new(api_key)?;
+                        let provider = AnthropicProvider::new(api_key)?;
                         Ok(Arc::new(provider))
                     }
                     _ => Err(RoutingError::Other(format!("Unknown provider: {provider_name}")))
@@ -68,6 +75,10 @@ impl ExecutorPool {
     }
     
     /// Execute task graph with parallel execution
+    ///
+    /// # Errors
+    /// Returns an error if the graph has cycles, if task execution fails, or if acquiring
+    /// a semaphore permit fails.
     pub async fn execute_graph(&self, graph: TaskGraph) -> Result<Vec<TaskResult>> {
         if graph.has_cycles() {
             return Err(RoutingError::CyclicDependency);
@@ -97,11 +108,11 @@ impl ExecutorPool {
                 
                 running.insert(task.id);
                 
-                let router = self.router.clone();
-                let validator = self.validator.clone();
-                let workspace = self.workspace.clone();
-                let permit = semaphore.clone().acquire_owned().await
-                    .map_err(|e| RoutingError::Other(e.to_string()))?;
+                let router = Arc::clone(&self.router);
+                let validator = Arc::clone(&self.validator);
+                let workspace = Arc::clone(&self.workspace);
+                let permit = Arc::clone(&semaphore).acquire_owned().await
+                    .map_err(|err| RoutingError::Other(err.to_string()))?;
                 
                 join_set.spawn(async move {
                     let result = Self::execute_task(
@@ -117,7 +128,7 @@ impl ExecutorPool {
             
             if let Some(result) = join_set.join_next().await {
                 let task_result = result
-                    .map_err(|e| RoutingError::ExecutionFailed(e.to_string()))??;
+                    .map_err(|err| RoutingError::ExecutionFailed(err.to_string()))??;
                 running.remove(&task_result.task_id);
                 completed.insert(task_result.task_id);
                 results.push(task_result);
@@ -127,13 +138,17 @@ impl ExecutorPool {
         Ok(results)
     }
     
+    /// Execute a single task with the selected provider and validate the response.
+    ///
+    /// # Errors
+    /// Returns an error if routing, provider execution, or validation fails.
     async fn execute_task(
         task: Task,
         router: Arc<dyn ModelRouter>,
         validator: Arc<dyn Validator>,
         workspace: Arc<WorkspaceState>,
     ) -> Result<TaskResult> {
-        let start = std::time::Instant::now();
+        let start = Instant::now();
         
         let routing_decision = router.route(&task).await?;
         
@@ -172,7 +187,7 @@ impl ExecutorPool {
         
         // Execute with provider
         let response = provider.generate(&query, &context).await
-            .map_err(|e| RoutingError::Other(e.to_string()))?;
+            .map_err(|err| RoutingError::Other(err.to_string()))?;
         
         let validation = validator.validate(&response, &task).await?;
         
@@ -199,15 +214,15 @@ mod tests {
 
     use merlin_core::Response;
 
-    use crate::{Task, ValidationResult};
+    use crate::{RoutingDecision, ModelTier, Task, ValidationResult};
 
     struct MockRouter;
     
     #[async_trait]
     impl ModelRouter for MockRouter {
-        async fn route(&self, _task: &Task) -> Result<crate::RoutingDecision> {
-            Ok(crate::RoutingDecision {
-                tier: crate::ModelTier::Local {
+        async fn route(&self, _task: &Task) -> Result<RoutingDecision> {
+            Ok(RoutingDecision {
+                tier: ModelTier::Local {
                     model_name: "test".to_owned(),
                 },
                 estimated_cost: 0.0,
@@ -216,7 +231,7 @@ mod tests {
             })
         }
         
-        async fn is_available(&self, _tier: &crate::ModelTier) -> bool {
+        async fn is_available(&self, _tier: &ModelTier) -> bool {
             true
         }
     }
@@ -239,7 +254,9 @@ mod tests {
     }
     
     #[tokio::test]
-    #[ignore] // Requires actual Ollama instance
+    #[ignore = "Requires actual Ollama instance"]
+    /// # Panics
+    /// Panics if executing the graph returns an error in the test harness.
     async fn test_executor_pool_basic() {
         let router = Arc::new(MockRouter);
         let validator = Arc::new(MockValidator);
@@ -250,8 +267,11 @@ mod tests {
         let task_a = Task::new("Task A".to_owned());
         let task_b = Task::new("Task B".to_owned());
         
-        let graph = TaskGraph::from_tasks(vec![task_a, task_b]);
-        let results = executor.execute_graph(graph).await.unwrap();
+        let graph = TaskGraph::from_tasks(&[task_a, task_b]);
+        let results = match executor.execute_graph(graph).await {
+            Ok(results) => results,
+            Err(error) => panic!("execute_graph failed: {error}"),
+        };
         
         assert_eq!(results.len(), 2);
     }

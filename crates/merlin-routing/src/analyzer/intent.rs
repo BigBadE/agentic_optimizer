@@ -1,3 +1,4 @@
+use std::cmp::Ordering;
 use crate::{Complexity, Priority};
 
 /// Extracted intent from user request
@@ -31,7 +32,6 @@ pub enum Scope {
     Multiple(Vec<String>),
 }
 
-/// Extract intent from user request using keyword matching
 pub struct IntentExtractor;
 
 impl IntentExtractor {
@@ -43,11 +43,10 @@ impl IntentExtractor {
     #[must_use]
     pub fn extract(&self, request: &str) -> Intent {
         let request_lower = request.to_lowercase();
-        
-        let action = self.detect_action(&request_lower);
-        let scope = self.detect_scope(request);
-        let priority = self.detect_priority(&request_lower);
-        let complexity_hint = self.estimate_complexity(&request_lower, &action);
+        let action = Self::detect_action(&request_lower);
+        let scope = Self::detect_scope(request);
+        let priority = Self::detect_priority(&request_lower);
+        let complexity_hint = Some(Self::estimate_complexity(&request_lower, &action));
         
         Intent {
             action,
@@ -57,7 +56,7 @@ impl IntentExtractor {
         }
     }
     
-    fn detect_action(&self, request: &str) -> Action {
+    fn detect_action(request: &str) -> Action {
         if request.contains("create") || request.contains("add") || request.contains("new") {
             Action::Create
         } else if request.contains("modify") || request.contains("update") || request.contains("change") {
@@ -81,33 +80,28 @@ impl IntentExtractor {
         }
     }
     
-    fn detect_scope(&self, request: &str) -> Scope {
+    fn detect_scope(request: &str) -> Scope {
         if request.contains(".rs") || request.contains(".toml") {
             let files: Vec<String> = request
                 .split_whitespace()
                 .filter(|word| word.contains('.'))
                 .map(String::from)
                 .collect();
-            
-            if files.len() == 1 {
-                Scope::File(files[0].clone())
-            } else if files.len() > 1 {
-                Scope::Multiple(files)
-            } else {
-                Scope::Project
+            match files.len().cmp(&1) {
+                Ordering::Equal => Scope::File(files[0].clone()),
+                Ordering::Greater => Scope::Multiple(files),
+                Ordering::Less => Scope::Project,
             }
         } else if request.contains("function") || request.contains("fn ") {
             Scope::Function(String::new())
         } else if request.contains("module") || request.contains("mod ") {
             Scope::Module(String::new())
-        } else if request.contains("project") || request.contains("crate") {
-            Scope::Project
         } else {
             Scope::Project
         }
     }
     
-    fn detect_priority(&self, request: &str) -> Priority {
+    fn detect_priority(request: &str) -> Priority {
         if request.contains("critical") || request.contains("urgent") || request.contains("asap") {
             Priority::Critical
         } else if request.contains("important") || request.contains("high priority") {
@@ -119,29 +113,22 @@ impl IntentExtractor {
         }
     }
     
-    fn estimate_complexity(&self, request: &str, action: &Action) -> Option<Complexity> {
+    fn estimate_complexity(request: &str, action: &Action) -> Complexity {
         let word_count = request.split_whitespace().count();
-        
         let base_complexity = match action {
-            Action::Create | Action::Delete => Complexity::Simple,
-            Action::Modify | Action::Document => Complexity::Simple,
-            Action::Fix | Action::Test => Complexity::Medium,
+            Action::Create | Action::Delete | Action::Modify | Action::Document => Complexity::Simple,
+            Action::Fix | Action::Test | Action::Analyze => Complexity::Medium,
             Action::Refactor | Action::Optimize => Complexity::Complex,
-            Action::Analyze => Complexity::Medium,
         };
-        
-        let adjusted = if word_count > 50 {
+        if word_count > 50 {
             match base_complexity {
                 Complexity::Trivial => Complexity::Simple,
                 Complexity::Simple => Complexity::Medium,
-                Complexity::Medium => Complexity::Complex,
-                Complexity::Complex => Complexity::Complex,
+                Complexity::Medium | Complexity::Complex => Complexity::Complex,
             }
         } else {
             base_complexity
-        };
-        
-        Some(adjusted)
+        }
     }
 }
 
@@ -156,6 +143,8 @@ mod tests {
     use super::*;
 
     #[test]
+    /// # Panics
+    /// Panics if action detection fails for create.
     fn test_create_action() {
         let extractor = IntentExtractor::new();
         let intent = extractor.extract("Create a new file test.rs");
@@ -163,6 +152,8 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if action detection fails for fix.
     fn test_fix_action() {
         let extractor = IntentExtractor::new();
         let intent = extractor.extract("Fix the bug in parser.rs");
@@ -170,6 +161,8 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if action detection fails for refactor.
     fn test_refactor_action() {
         let extractor = IntentExtractor::new();
         let intent = extractor.extract("Refactor the entire module");
@@ -177,6 +170,8 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if file scope detection fails.
     fn test_file_scope() {
         let extractor = IntentExtractor::new();
         let intent = extractor.extract("Modify test.rs");
@@ -184,6 +179,8 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if priority detection fails.
     fn test_critical_priority() {
         let extractor = IntentExtractor::new();
         let intent = extractor.extract("Critical bug fix needed");
@@ -191,6 +188,8 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if complexity estimation mapping fails.
     fn test_complexity_estimation() {
         let extractor = IntentExtractor::new();
         

@@ -4,7 +4,7 @@ use std::mem::take;
 use super::{FileChunk, estimate_tokens, MIN_CHUNK_TOKENS, OPTIMAL_MIN_TOKENS, MAX_CHUNK_TOKENS};
 
 /// Chunk plain text by paragraphs with token limits
-#[must_use] 
+#[must_use]
 pub fn chunk_text(file_path: String, content: &str) -> Vec<FileChunk> {
     let lines: Vec<&str> = content.lines().collect();
     let mut chunks = Vec::new();
@@ -13,7 +13,7 @@ pub fn chunk_text(file_path: String, content: &str) -> Vec<FileChunk> {
     let mut chunk_num = 1;
     let mut line_count = 0;
 
-    for (i, line) in lines.iter().enumerate() {
+    for (index, line) in lines.iter().enumerate() {
         if line_count > 0 {
             buffer.push('\n');
         }
@@ -30,14 +30,14 @@ pub fn chunk_text(file_path: String, content: &str) -> Vec<FileChunk> {
                     take(&mut buffer),
                     format!("paragraph {chunk_num}"),
                     current_chunk_start + 1,
-                    i + 1,
+                    index + 1,
                 ));
                 chunk_num += 1;
             } else {
                 buffer.clear();
             }
             line_count = 0;
-            current_chunk_start = i + 1;
+            current_chunk_start = index + 1;
         }
     }
     

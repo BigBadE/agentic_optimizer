@@ -4,10 +4,11 @@ use std::path::{Path, PathBuf};
 
 use merlin_core::{FileContext, Result};
 use crate::provider::{LanguageProvider, SearchQuery, SearchResult, SymbolInfo, SymbolKind};
+use rust_backend::{RustBackend, SearchQuery as RustSearchQuery, SymbolKind as RustSymbolKind};
 
 /// Wrapper for `RustBackend` that implements `LanguageProvider`
 pub struct RustBackendWrapper {
-    backend: rust_backend::RustBackend,
+    backend: RustBackend,
 }
 
 impl RustBackendWrapper {
@@ -15,7 +16,7 @@ impl RustBackendWrapper {
     #[must_use]
     pub fn new() -> Self {
         Self {
-            backend: rust_backend::RustBackend::new(),
+            backend: RustBackend::new(),
         }
     }
 }
@@ -33,7 +34,7 @@ impl LanguageProvider for RustBackendWrapper {
     
     fn search_symbols(&self, query: &SearchQuery) -> Result<SearchResult> {
         // Convert between the two SearchQuery types
-        let backend_query = rust_backend::SearchQuery {
+        let backend_query = RustSearchQuery {
             symbol_name: query.symbol_name.clone(),
             include_references: query.include_references,
             include_implementations: query.include_implementations,
@@ -102,18 +103,18 @@ impl LanguageProvider for RustBackendWrapper {
 }
 
 /// Convert rust-backend `SymbolKind` to provider `SymbolKind`
-fn convert_symbol_kind(kind: rust_backend::SymbolKind) -> SymbolKind {
+fn convert_symbol_kind(kind: RustSymbolKind) -> SymbolKind {
     match kind {
-        rust_backend::SymbolKind::Function => SymbolKind::Function,
-        rust_backend::SymbolKind::Struct => SymbolKind::Struct,
-        rust_backend::SymbolKind::Enum => SymbolKind::Enum,
-        rust_backend::SymbolKind::Trait => SymbolKind::Trait,
-        rust_backend::SymbolKind::Module => SymbolKind::Module,
-        rust_backend::SymbolKind::Constant => SymbolKind::Constant,
-        rust_backend::SymbolKind::Variable => SymbolKind::Variable,
-        rust_backend::SymbolKind::Field => SymbolKind::Field,
-        rust_backend::SymbolKind::Method => SymbolKind::Method,
-        rust_backend::SymbolKind::Type => SymbolKind::Type,
+        RustSymbolKind::Function => SymbolKind::Function,
+        RustSymbolKind::Struct => SymbolKind::Struct,
+        RustSymbolKind::Enum => SymbolKind::Enum,
+        RustSymbolKind::Trait => SymbolKind::Trait,
+        RustSymbolKind::Module => SymbolKind::Module,
+        RustSymbolKind::Constant => SymbolKind::Constant,
+        RustSymbolKind::Variable => SymbolKind::Variable,
+        RustSymbolKind::Field => SymbolKind::Field,
+        RustSymbolKind::Method => SymbolKind::Method,
+        RustSymbolKind::Type => SymbolKind::Type,
     }
 }
 

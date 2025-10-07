@@ -1,5 +1,7 @@
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use std::collections::HashMap;
+use std::time::Instant;
 
 use merlin_core::{Response, TokenUsage};
 use uuid::Uuid;
@@ -245,8 +247,8 @@ impl FileChange {
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionContext {
     pub original_request: String,
-    pub files_read: std::collections::HashMap<PathBuf, String>,
-    pub files_written: std::collections::HashMap<PathBuf, String>,
+    pub files_read: HashMap<PathBuf, String>,
+    pub files_written: HashMap<PathBuf, String>,
     pub commands_run: Vec<CommandExecution>,
     pub findings: Vec<String>,
     pub errors: Vec<String>,
@@ -257,8 +259,8 @@ impl ExecutionContext {
     pub fn new(original_request: String) -> Self {
         Self {
             original_request,
-            files_read: std::collections::HashMap::new(),
-            files_written: std::collections::HashMap::new(),
+            files_read: HashMap::new(),
+            files_written: HashMap::new(),
             commands_run: Vec::new(),
             findings: Vec::new(),
             errors: Vec::new(),
@@ -327,6 +329,6 @@ pub struct CommandExecution {
     pub command: String,
     pub output: String,
     pub exit_code: i32,
-    #[serde(skip, default = "std::time::Instant::now")]
-    pub timestamp: std::time::Instant,
+    #[serde(skip, default = "Instant::now")]
+    pub timestamp: Instant,
 }

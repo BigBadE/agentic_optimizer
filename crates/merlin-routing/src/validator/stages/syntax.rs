@@ -116,9 +116,15 @@ impl ValidationStage for SyntaxValidationStage {
 mod tests {
     use super::*;
     use merlin_core::TokenUsage;
+    use crate::Result;
 
     #[tokio::test]
-    async fn test_syntax_validation_pass() {
+    /// # Errors
+    /// Returns an error if validation fails unexpectedly in the test harness.
+    ///
+    /// # Panics
+    /// Panics if the validation does not pass for syntactically valid code.
+    async fn test_syntax_validation_pass() -> Result<()> {
         let stage = SyntaxValidationStage::new();
         let response = Response {
             text: "fn main() { println!(\"Hello\"); }".to_owned(),
@@ -129,13 +135,19 @@ mod tests {
         };
         let task = Task::new("Test".to_owned());
         
-        let result = stage.validate(&response, &task).await.unwrap();
+        let result = stage.validate(&response, &task).await?;
         assert!(result.passed);
-        assert_eq!(result.score, 1.0);
+        assert!((result.score - 1.0).abs() < f64::EPSILON);
+        Ok(())
     }
     
     #[tokio::test]
-    async fn test_syntax_validation_fail() {
+    /// # Errors
+    /// Returns an error if validation fails unexpectedly in the test harness.
+    ///
+    /// # Panics
+    /// Panics if the validation incorrectly passes for syntactically invalid code.
+    async fn test_syntax_validation_fail() -> Result<()> {
         let stage = SyntaxValidationStage::new();
         let response = Response {
             text: "syntax error: unexpected token".to_owned(),
@@ -146,13 +158,19 @@ mod tests {
         };
         let task = Task::new("Test".to_owned());
         
-        let result = stage.validate(&response, &task).await.unwrap();
+        let result = stage.validate(&response, &task).await?;
         assert!(!result.passed);
-        assert_eq!(result.score, 0.0);
+        assert!(result.score.abs() < f64::EPSILON);
+        Ok(())
     }
     
     #[tokio::test]
-    async fn test_mismatched_braces() {
+    /// # Errors
+    /// Returns an error if validation fails unexpectedly in the test harness.
+    ///
+    /// # Panics
+    /// Panics if mismatched braces are not detected by the syntax checker.
+    async fn test_mismatched_braces() -> Result<()> {
         let stage = SyntaxValidationStage::new();
         let response = Response {
             text: "fn main() { println!(\"Hello\");".to_owned(),
@@ -163,9 +181,10 @@ mod tests {
         };
         let task = Task::new("Test".to_owned());
         
-        let result = stage.validate(&response, &task).await.unwrap();
+        let result = stage.validate(&response, &task).await?;
         assert!(!result.passed);
         assert!(result.score < 0.8);
+        Ok(())
     }
 }
 

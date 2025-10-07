@@ -62,14 +62,19 @@ mod tests {
     use crate::ContextRequirements;
 
     #[tokio::test]
+    /// # Panics
+    /// Panics if a premium tier is not selected for very large context tasks.
     async fn test_long_context_routing() {
         let strategy = LongContextStrategy::new(16000);
         
         let huge_context = Task::new("Huge context task".to_owned())
-            .with_context(ContextRequirements::new().with_estimated_tokens(150000));
+            .with_context(ContextRequirements::new().with_estimated_tokens(150_000));
         
         assert!(strategy.applies_to(&huge_context));
-        let tier = strategy.select_tier(&huge_context).await.unwrap();
+        let tier = match strategy.select_tier(&huge_context).await {
+            Ok(tier) => tier,
+            Err(error) => panic!("failed to select tier for huge context: {error}"),
+        };
         
         if let ModelTier::Premium { model_name, .. } = tier {
             assert!(model_name.contains("sonnet"));
@@ -79,6 +84,8 @@ mod tests {
     }
     
     #[tokio::test]
+    /// # Panics
+    /// Panics if a premium tier is not selected for medium-long context tasks.
     async fn test_medium_long_context() {
         let strategy = LongContextStrategy::new(16000);
         
@@ -86,11 +93,16 @@ mod tests {
             .with_context(ContextRequirements::new().with_estimated_tokens(50000));
         
         assert!(strategy.applies_to(&medium_context));
-        let tier = strategy.select_tier(&medium_context).await.unwrap();
+        let tier = match strategy.select_tier(&medium_context).await {
+            Ok(tier) => tier,
+            Err(error) => panic!("failed to select tier for medium context: {error}"),
+        };
         assert!(matches!(tier, ModelTier::Premium { .. }));
     }
     
     #[tokio::test]
+    /// # Panics
+    /// Panics if applicability check fails for tasks requiring full context.
     async fn test_requires_full_context() {
         let strategy = LongContextStrategy::new(16000);
         

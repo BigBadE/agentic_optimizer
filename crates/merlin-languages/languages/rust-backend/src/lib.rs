@@ -3,6 +3,7 @@
 //! This crate provides a concrete implementation of language analysis for Rust
 //! codebases using rust-analyzer's APIs.
 
+
 mod workspace;
 mod symbol_search;
 mod context_builder;

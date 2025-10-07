@@ -119,6 +119,7 @@ mod tests {
     use super::*;
     use crate::{Task, ValidationStageType as StageType};
     use merlin_core::{Response, TokenUsage};
+    use crate::Result;
 
     struct MockStage {
         name: &'static str,
@@ -150,7 +151,12 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_pipeline_all_pass() {
+    /// # Errors
+    /// Returns an error if pipeline validation returns an unexpected failure in the test harness.
+    ///
+    /// # Panics
+    /// Panics if pipeline does not pass when all stages pass.
+    async fn test_pipeline_all_pass() -> Result<()> {
         let stages: Vec<Arc<dyn ValidationStage>> = vec![
             Arc::new(MockStage { name: "Stage1", should_pass: true }),
             Arc::new(MockStage { name: "Stage2", should_pass: true }),
@@ -166,13 +172,19 @@ mod tests {
             latency_ms: 0,
         };
         
-        let result = pipeline.validate(&response, &task).await.unwrap();
+        let result = pipeline.validate(&response, &task).await?;
         assert!(result.passed);
         assert_eq!(result.stages.len(), 2);
+        Ok(())
     }
     
     #[tokio::test]
-    async fn test_pipeline_early_exit() {
+    /// # Errors
+    /// Returns an error if pipeline validation returns an unexpected failure in the test harness.
+    ///
+    /// # Panics
+    /// Panics if pipeline does not early-exit on first failing stage when configured.
+    async fn test_pipeline_early_exit() -> Result<()> {
         let stages: Vec<Arc<dyn ValidationStage>> = vec![
             Arc::new(MockStage { name: "Stage1", should_pass: false }),
             Arc::new(MockStage { name: "Stage2", should_pass: true }),
@@ -188,9 +200,10 @@ mod tests {
             latency_ms: 0,
         };
         
-        let result = pipeline.validate(&response, &task).await.unwrap();
+        let result = pipeline.validate(&response, &task).await?;
         assert!(!result.passed);
         assert_eq!(result.stages.len(), 1);
+        Ok(())
     }
 }
 

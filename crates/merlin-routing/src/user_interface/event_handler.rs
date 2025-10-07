@@ -74,7 +74,7 @@ impl<'handler> EventHandler<'handler> {
                 task_id,
                 tool,
                 result,
-            } => self.handle_tool_call_completed(task_id, &tool, result),
+            } => self.handle_tool_call_completed(task_id, &tool, &result),
 
             UiEvent::ThinkingUpdate { .. } | UiEvent::SubtaskSpawned { .. } => {
                 // Deprecated: handled by TaskStepStarted
@@ -219,7 +219,7 @@ impl<'handler> EventHandler<'handler> {
     fn handle_tool_call_started(_task_id: TaskId, _tool: String, _args: Value) {
     }
 
-    fn handle_tool_call_completed(&mut self, task_id: TaskId, tool: &str, result: Value) {
+    fn handle_tool_call_completed(&mut self, task_id: TaskId, tool: &str, result: &Value) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             task.output_tree.complete_tool_call(tool, result);
         }

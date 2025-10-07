@@ -1,3 +1,4 @@
+use std::cmp::Reverse;
 use std::sync::Arc;
 use crate::{ModelRouter, ModelTier, Result, RoutingDecision, RoutingError, Task};
 use super::strategy::RoutingStrategy;
@@ -14,6 +15,7 @@ impl AvailabilityChecker {
         Self {}
     }
     
+    #[must_use] 
     pub fn check(&self, _tier: &ModelTier) -> bool {
         // For now, assume all tiers are available
         // In production, this would check:
@@ -44,7 +46,7 @@ impl StrategyRouter {
     #[must_use]
     pub fn new(strategies: Vec<Arc<dyn RoutingStrategy>>) -> Self {
         let mut sorted_strategies = strategies;
-        sorted_strategies.sort_by_key(|s| std::cmp::Reverse(s.priority()));
+        sorted_strategies.sort_by_key(|strategy| Reverse(strategy.priority()));
         
         Self {
             strategies: sorted_strategies,
@@ -77,12 +79,11 @@ impl StrategyRouter {
         Self::new(strategies)
     }
     
-    fn estimate_cost(&self, tier: &ModelTier, task: &Task) -> f64 {
+    fn estimate_cost(tier: &ModelTier, task: &Task) -> f64 {
         let tokens = task.context_needs.estimated_tokens as f64;
         
         match tier {
-            ModelTier::Local { .. } => 0.0,
-            ModelTier::Groq { .. } => 0.0,
+            ModelTier::Local { .. } | ModelTier::Groq { .. } => 0.0,
             ModelTier::Premium { model_name, .. } => {
                 if model_name.contains("sonnet") {
                     tokens * 0.000_015
@@ -97,7 +98,7 @@ impl StrategyRouter {
         }
     }
     
-    fn estimate_latency(&self, tier: &ModelTier) -> u64 {
+    fn estimate_latency(tier: &ModelTier) -> u64 {
         match tier {
             ModelTier::Local { .. } => 100,
             ModelTier::Groq { .. } => 500,
@@ -127,8 +128,8 @@ impl ModelRouter for StrategyRouter {
             if tier_enabled && self.is_available(&tier).await {
                 return Ok(RoutingDecision {
                     tier: tier.clone(),
-                    estimated_cost: self.estimate_cost(&tier, task),
-                    estimated_latency_ms: self.estimate_latency(&tier),
+                    estimated_cost: Self::estimate_cost(&tier, task),
+                    estimated_latency_ms: Self::estimate_latency(&tier),
                     reasoning: format!("Selected by {} strategy", strategy.name()),
                 });
             }
@@ -169,59 +170,83 @@ impl ModelRouter for StrategyRouter {
 mod tests {
     use super::*;
     use crate::{Complexity, ContextRequirements, Priority};
+    use crate::Result;
 
     #[tokio::test]
-    async fn test_strategy_router_priority() {
+    /// # Errors
+    /// Returns an error if routing fails unexpectedly in the test harness.
+    ///
+    /// # Panics
+    /// Panics if premium tier is not selected for critical tasks.
+    async fn test_strategy_router_priority() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
         
         let critical_task = Task::new("Critical task".to_owned())
             .with_priority(Priority::Critical)
             .with_complexity(Complexity::Simple);
         
-        let decision = router.route(&critical_task).await.unwrap();
+        let decision = router.route(&critical_task).await?;
         
         if let ModelTier::Premium { provider, .. } = decision.tier {
             assert_eq!(provider, "anthropic");
-        } else {
-            panic!("Critical task should use premium tier");
-        }
+        } else { panic!("Critical task should use premium tier"); }
         
         assert!(decision.reasoning.contains("QualityCritical"));
+        Ok(())
     }
     
     #[tokio::test]
-    async fn test_long_context_strategy() {
+    /// # Errors
+    /// Returns an error if routing fails unexpectedly in the test harness.
+    ///
+    /// # Panics
+    /// Panics if long context strategy does not select a premium tier.
+    async fn test_long_context_strategy() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
         
         let long_context_task = Task::new("Long context task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(50000));
         
-        let decision = router.route(&long_context_task).await.unwrap();
+        let decision = router.route(&long_context_task).await?;
         assert!(matches!(decision.tier, ModelTier::Premium { .. }));
         assert!(decision.reasoning.contains("LongContext"));
+        Ok(())
     }
     
     #[tokio::test]
-    async fn test_cost_optimization() {
+    /// # Errors
+    /// Returns an error if routing fails unexpectedly in the test harness.
+    ///
+    /// # Panics
+    /// Panics if low-cost tier is not selected for cheap tasks.
+    async fn test_cost_optimization() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
         
         let cheap_task = Task::new("Cheap task".to_owned())
             .with_priority(Priority::Low)
             .with_context(ContextRequirements::new().with_estimated_tokens(2000));
         
-        let decision = router.route(&cheap_task).await.unwrap();
-        assert_eq!(decision.estimated_cost, 0.0);
+        let decision = router.route(&cheap_task).await?;
+        // Floating-point comparison: use epsilon to avoid pedantic float-cmp lint
+        assert!(decision.estimated_cost.abs() < f64::EPSILON);
+        Ok(())
     }
     
     #[tokio::test]
-    async fn test_complexity_fallback() {
+    /// # Errors
+    /// Returns an error if routing fails unexpectedly in the test harness.
+    ///
+    /// # Panics
+    /// Panics if router reasoning does not mention expected strategies for medium tasks.
+    async fn test_complexity_fallback() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
         
         let medium_task = Task::new("Medium task".to_owned())
             .with_complexity(Complexity::Medium)
             .with_priority(Priority::Medium);
         
-        let decision = router.route(&medium_task).await.unwrap();
+        let decision = router.route(&medium_task).await?;
         assert!(decision.reasoning.contains("Complexity") || decision.reasoning.contains("Cost"));
+        Ok(())
     }
 }

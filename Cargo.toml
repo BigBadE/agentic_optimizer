@@ -94,9 +94,6 @@ perf = "deny"
 style = "deny"
 suspicious = "deny"
 
-# Cargo
-multiple_crate_versions = { level = "deny", priority = 1 }
-
 # Nursery
 missing_const_for_fn = { level = "allow", priority = 1 }
 

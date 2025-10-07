@@ -73,11 +73,11 @@ impl FileChunk {
 }
 
 /// Chunk a file based on its extension
-#[must_use] 
+#[must_use]
 pub fn chunk_file(file_path: &Path, content: &str) -> Vec<FileChunk> {
     let path_str = file_path.display().to_string();
-    
-    if let Some(ext) = file_path.extension().and_then(|e| e.to_str()) {
+
+    if let Some(ext) = file_path.extension().and_then(|ext| ext.to_str()) {
         match ext {
             "rs" => chunk_rust(path_str, content),
             "md" | "markdown" => chunk_markdown(path_str, content),

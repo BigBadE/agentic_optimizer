@@ -1,11 +1,14 @@
 //! Caching and persistence for rust-analyzer state.
 
+
 use std::collections::HashMap;
 use std::fs::{self as filesystem, File};
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
+use bincode::{deserialize_from, serialize_into};
+use merlin_core::Error as CoreError;
 use serde::{Deserialize, Serialize};
 
 /// Cached metadata about the rust-analyzer workspace state
@@ -46,19 +49,19 @@ impl WorkspaceCache {
     ///
     /// Returns an error if the cache directory cannot be created, the cache file cannot be
     /// written, or serialization fails.
-    pub fn save(&self, project_root: &Path) -> Result<(), merlin_core::Error> {
+    pub fn save(&self, project_root: &Path) -> Result<(), CoreError> {
         let cache_path = Self::cache_path(project_root);
 
         if let Some(parent) = cache_path.parent() {
             filesystem::create_dir_all(parent)
-                .map_err(|error| merlin_core::Error::Other(format!("Failed to create cache directory: {error}")))?;
+                .map_err(|error| CoreError::Other(format!("Failed to create cache directory: {error}")))?;
         }
 
         let file = File::create(&cache_path)
-            .map_err(|error| merlin_core::Error::Other(format!("Failed to create cache file: {error}")))?;
+            .map_err(|error| CoreError::Other(format!("Failed to create cache file: {error}")))?;
         let writer = BufWriter::new(file);
-        bincode::serialize_into(writer, &self)
-            .map_err(|error| merlin_core::Error::Other(format!("Failed to serialize cache: {error}")))?;
+        serialize_into(writer, &self)
+            .map_err(|error| CoreError::Other(format!("Failed to serialize cache: {error}")))?;
 
         tracing::info!("Saved rust-analyzer cache to {}", cache_path.display());
         Ok(())
@@ -70,19 +73,19 @@ impl WorkspaceCache {
     ///
     /// Returns an error if the cache file does not exist, cannot be opened, or cannot be
     /// deserialized.
-    pub fn load(project_root: &Path) -> Result<Self, merlin_core::Error> {
+    pub fn load(project_root: &Path) -> Result<Self, CoreError> {
         let cache_path = Self::cache_path(project_root);
 
         if !cache_path.exists() {
-            return Err(merlin_core::Error::Other("Cache file does not exist".into()));
+            return Err(CoreError::Other("Cache file does not exist".into()));
         }
 
         let file = File::open(&cache_path)
-            .map_err(|error| merlin_core::Error::Other(format!("Failed to open cache file: {error}")))?;
+            .map_err(|error| CoreError::Other(format!("Failed to open cache file: {error}")))?;
 
         let reader = BufReader::new(file);
-        let cache: Self = bincode::deserialize_from(reader)
-            .map_err(|error| merlin_core::Error::Other(format!("Failed to deserialize cache: {error}")))?;
+        let cache: Self = deserialize_from(reader)
+            .map_err(|error| CoreError::Other(format!("Failed to deserialize cache: {error}")))?;
 
         tracing::info!("Loaded rust-analyzer cache from {}", cache_path.display());
         Ok(cache)
@@ -93,7 +96,7 @@ impl WorkspaceCache {
     /// # Errors
     ///
     /// Returns an error if file metadata cannot be read.
-    pub fn is_valid(&self, project_root: &Path) -> Result<bool, merlin_core::Error> {
+    pub fn is_valid(&self, project_root: &Path) -> Result<bool, CoreError> {
         if self.project_root != project_root {
             tracing::debug!("Cache invalid: project root mismatch");
             return Ok(false);
@@ -135,12 +138,12 @@ impl WorkspaceCache {
     /// # Errors
     ///
     /// Returns an error if the cache file cannot be deleted.
-    pub fn clear(project_root: &Path) -> Result<(), merlin_core::Error> {
+    pub fn clear(project_root: &Path) -> Result<(), CoreError> {
         let cache_path = Self::cache_path(project_root);
 
         if cache_path.exists() {
             filesystem::remove_file(&cache_path)
-                .map_err(|error| merlin_core::Error::Other(format!("Failed to delete cache: {error}")))?;
+                .map_err(|error| CoreError::Other(format!("Failed to delete cache: {error}")))?;
             tracing::info!("Cleared rust-analyzer cache");
         }
 

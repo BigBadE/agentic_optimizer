@@ -117,7 +117,7 @@ impl<'analysis> ContextBuilder<'analysis> {
     }
 
     /// Resolve a module path inside a crate starting from a base path.
-    #[allow(clippy::only_used_in_recursion)]
+    #[allow(clippy::only_used_in_recursion, reason = "Parameter is used in recursive calls through resolve_module_path")]
     fn resolve_crate_import(&self, parts: &[&str], base_path: &Path) -> Option<PathBuf> {
         if parts.is_empty() {
             return None;

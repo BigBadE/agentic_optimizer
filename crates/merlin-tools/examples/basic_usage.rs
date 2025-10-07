@@ -1,11 +1,14 @@
+use anyhow::Result;
 use merlin_tools::{BashTool, EditTool, ShowTool, Tool as _, ToolInput};
-use serde_json::json;
+use serde_json::{json, to_string};
 use std::io::stderr;
-use tracing::{info, subscriber::set_global_default};
+use tracing::info;
+use tracing::subscriber::set_global_default;
+use tracing_subscriber::fmt;
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
-    let subscriber = tracing_subscriber::fmt()
+async fn main() -> Result<()> {
+    let subscriber = fmt()
         .with_writer(stderr)
         .finish();
     set_global_default(subscriber)?;
@@ -28,7 +31,7 @@ async fn main() -> anyhow::Result<()> {
 
     info!("Executing bash tool...");
     let result = bash_tool.execute(bash_input).await?;
-    info!(result = %serde_json::to_string(&result)?, "Execution completed");
+    info!(result = %to_string(&result)?, "Execution completed");
 
     Ok(())
 }

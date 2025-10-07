@@ -1,3 +1,4 @@
+use std::path::PathBuf;
 use crate::{Complexity, ContextRequirements};
 use super::intent::{Action, Intent};
 
@@ -14,23 +15,23 @@ impl ComplexityEstimator {
     pub fn estimate(&self, intent: &Intent, request: &str) -> Complexity {
         let mut score = 0;
         
-        score += self.score_action(&intent.action);
-        score += self.score_scope(&intent.scope);
-        score += self.score_request_length(request);
-        score += self.score_keywords(request);
+        score += Self::score_action(&intent.action);
+        score += Self::score_scope(&intent.scope);
+        score += Self::score_request_length(request);
+        score += Self::score_keywords(request);
         
         if let Some(hint) = intent.complexity_hint {
-            score = usize::midpoint(score, self.complexity_to_score(hint));
+            score = usize::midpoint(score, Self::complexity_to_score(hint));
         }
         
-        self.score_to_complexity(score)
+        Self::score_to_complexity(score)
     }
     
     #[must_use]
     pub fn estimate_context_needs(&self, intent: &Intent, request: &str) -> ContextRequirements {
-        let estimated_tokens = self.estimate_token_count(request);
-        let required_files = self.extract_file_references(request);
-        let requires_full_context = self.needs_full_context(intent, request);
+        let estimated_tokens = Self::estimate_token_count(request);
+        let required_files = Self::extract_file_references(request);
+        let requires_full_context = Self::needs_full_context(intent, request);
         
         ContextRequirements::new()
             .with_estimated_tokens(estimated_tokens)
@@ -38,7 +39,7 @@ impl ComplexityEstimator {
             .with_full_context(requires_full_context)
     }
     
-    fn score_action(&self, action: &Action) -> usize {
+    fn score_action(action: &Action) -> usize {
         match action {
             Action::Create | Action::Delete | Action::Document => 1,
             Action::Modify | Action::Fix | Action::Test => 2,
@@ -47,7 +48,7 @@ impl ComplexityEstimator {
         }
     }
     
-    fn score_scope(&self, scope: &super::intent::Scope) -> usize {
+    fn score_scope(scope: &super::intent::Scope) -> usize {
         use super::intent::Scope;
         
         match scope {
@@ -59,7 +60,7 @@ impl ComplexityEstimator {
         }
     }
     
-    fn score_request_length(&self, request: &str) -> usize {
+    fn score_request_length(request: &str) -> usize {
         let word_count = request.split_whitespace().count();
         
         if word_count < 10 {
@@ -73,7 +74,7 @@ impl ComplexityEstimator {
         }
     }
     
-    fn score_keywords(&self, request: &str) -> usize {
+    fn score_keywords(request: &str) -> usize {
         let request_lower = request.to_lowercase();
         let mut score = 0;
         
@@ -91,7 +92,7 @@ impl ComplexityEstimator {
         score.min(3)
     }
     
-    fn complexity_to_score(&self, complexity: Complexity) -> usize {
+    fn complexity_to_score(complexity: Complexity) -> usize {
         match complexity {
             Complexity::Trivial => 0,
             Complexity::Simple => 2,
@@ -100,7 +101,7 @@ impl ComplexityEstimator {
         }
     }
 
-    fn score_to_complexity(&self, score: usize) -> Complexity {
+    fn score_to_complexity(score: usize) -> Complexity {
         match score {
             0..=2 => Complexity::Trivial,
             3..=5 => Complexity::Simple,
@@ -109,7 +110,7 @@ impl ComplexityEstimator {
         }
     }
     
-    fn estimate_token_count(&self, request: &str) -> usize {
+    fn estimate_token_count(request: &str) -> usize {
         let base_tokens = request.len() / 4;
         
         let file_count = request.matches(".rs").count() + request.matches(".toml").count();
@@ -126,15 +127,15 @@ impl ComplexityEstimator {
         (base_tokens + file_tokens) * context_multiplier
     }
     
-    fn extract_file_references(&self, request: &str) -> Vec<std::path::PathBuf> {
+    fn extract_file_references(request: &str) -> Vec<PathBuf> {
         request
             .split_whitespace()
             .filter(|word| word.contains(".rs") || word.contains(".toml"))
-            .map(|word| std::path::PathBuf::from(word.trim_matches(|c: char| !c.is_alphanumeric() && c != '.' && c != '/' && c != '_')))
+            .map(|word| PathBuf::from(word.trim_matches(|letter: char| !letter.is_alphanumeric() && letter != '.' && letter != '/' && letter != '_')))
             .collect()
     }
     
-    fn needs_full_context(&self, intent: &Intent, request: &str) -> bool {
+    fn needs_full_context(intent: &Intent, request: &str) -> bool {
         use super::intent::Scope;
         
         matches!(intent.scope, Scope::Project | Scope::Multiple(_))
@@ -156,6 +157,8 @@ mod tests {
     use super::super::intent::IntentExtractor;
 
     #[test]
+    /// # Panics
+    /// Panics if trivial/simple complexity mapping fails.
     fn test_trivial_complexity() {
         let estimator = ComplexityEstimator::new();
         let extractor = IntentExtractor::new();
@@ -167,6 +170,8 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if complex refactor is not mapped to Complex.
     fn test_complex_refactor() {
         let estimator = ComplexityEstimator::new();
         let extractor = IntentExtractor::new();
@@ -178,6 +183,8 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if context estimation yields unexpected values.
     fn test_context_estimation() {
         let estimator = ComplexityEstimator::new();
         let extractor = IntentExtractor::new();
@@ -190,6 +197,8 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if full context requirement is not detected.
     fn test_full_context_detection() {
         let estimator = ComplexityEstimator::new();
         let extractor = IntentExtractor::new();

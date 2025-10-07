@@ -3,6 +3,8 @@ use ratatui::{
     widgets::{Block, Borders},
 };
 use std::collections::HashSet;
+use std::borrow::Cow;
+use textwrap::{wrap, Options, WordSeparator};
 use tui_textarea::{CursorMove, TextArea};
 
 /// Manages input area state and text wrapping
@@ -51,8 +53,8 @@ impl InputManager {
         }
 
         let paragraphs = self.split_into_paragraphs(&lines);
-        let cursor_info = self.calculate_cursor_info(&paragraphs, cursor_row, cursor_col);
-        let wrapped_result = self.wrap_paragraphs(&paragraphs, max_line_width, &cursor_info);
+        let cursor_info = Self::calculate_cursor_info(&paragraphs, cursor_row, cursor_col);
+        let wrapped_result = Self::wrap_paragraphs(&paragraphs, max_line_width, &cursor_info);
 
         // Only update if content changed
         if wrapped_result.lines != lines {
@@ -102,7 +104,6 @@ impl InputManager {
     }
 
     fn calculate_cursor_info(
-        &self,
         paragraphs: &[Vec<String>],
         cursor_row: usize,
         cursor_col: usize,
@@ -126,9 +127,9 @@ impl InputManager {
             cursor_paragraph = para_idx;
             let line_in_para = cursor_row - line_count;
 
-            for i in 0..line_in_para {
-                pos_in_paragraph += para[i].len();
-                if i > 0 {
+            for (line_idx, line) in para.iter().enumerate().take(line_in_para) {
+                pos_in_paragraph += line.len();
+                if line_idx > 0 {
                     pos_in_paragraph += 1;
                 }
             }
@@ -143,7 +144,6 @@ impl InputManager {
     }
 
     fn wrap_paragraphs(
-        &self,
         paragraphs: &[Vec<String>],
         max_line_width: usize,
         cursor_info: &CursorInfo,
@@ -238,13 +238,13 @@ fn wrap_paragraph(para: &[String], max_line_width: usize) -> Vec<String> {
     let para_text = para.join(" ");
     let ends_with_space = para_text.ends_with(' ');
 
-    let options = textwrap::Options::new(max_line_width)
+    let options = Options::new(max_line_width)
         .break_words(true)
-        .word_separator(textwrap::WordSeparator::AsciiSpace);
+        .word_separator(WordSeparator::AsciiSpace);
 
-    let mut wrapped_lines: Vec<String> = textwrap::wrap(&para_text, options)
+    let mut wrapped_lines: Vec<String> = wrap(&para_text, options)
         .into_iter()
-        .map(std::borrow::Cow::into_owned)
+        .map(Cow::into_owned)
         .collect();
 
     if ends_with_space && !wrapped_lines.is_empty()

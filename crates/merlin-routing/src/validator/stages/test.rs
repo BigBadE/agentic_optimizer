@@ -124,9 +124,15 @@ impl ValidationStage for TestValidationStage {
 mod tests {
     use super::*;
     use merlin_core::TokenUsage;
+    use crate::Result;
 
     #[tokio::test]
-    async fn test_validation_skip_no_files() {
+    /// # Errors
+    /// Returns an error if validation returns an unexpected failure in the test harness.
+    ///
+    /// # Panics
+    /// Panics if the result is not marked as skipped when no files are modified.
+    async fn test_validation_skip_no_files() -> Result<()> {
         let stage = TestValidationStage::new();
         let response = Response {
             text: "test".to_owned(),
@@ -137,13 +143,19 @@ mod tests {
         };
         let task = Task::new("Test".to_owned());
         
-        let result = stage.validate(&response, &task).await.unwrap();
+        let result = stage.validate(&response, &task).await?;
         assert!(result.passed);
         assert!(result.details.contains("skipped"));
+        Ok(())
     }
     
     #[tokio::test]
-    async fn test_quick_check() {
+    /// # Errors
+    /// Returns an error if `quick_check` returns an unexpected failure in the test harness.
+    ///
+    /// # Panics
+    /// Panics if `quick_check` logic does not match expected patterns.
+    async fn test_quick_check() -> Result<()> {
         let stage = TestValidationStage::new();
         
         let good_response = Response {
@@ -153,7 +165,7 @@ mod tests {
             provider: "test".to_owned(),
             latency_ms: 0,
         };
-        assert!(stage.quick_check(&good_response).await.unwrap());
+        assert!(stage.quick_check(&good_response).await?);
         
         let bad_response = Response {
             text: "test result: FAILED. 2 passed; 3 failed".to_owned(),
@@ -162,7 +174,8 @@ mod tests {
             provider: "test".to_owned(),
             latency_ms: 0,
         };
-        assert!(!stage.quick_check(&bad_response).await.unwrap());
+        assert!(!stage.quick_check(&bad_response).await?);
+        Ok(())
     }
 }
 

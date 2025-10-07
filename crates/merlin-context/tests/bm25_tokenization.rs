@@ -1,5 +1,10 @@
+#![cfg(test)]
 use merlin_context::embedding::BM25Index;
 
+/// Ensures special tokens like `::` and `--` are preserved and searchable.
+///
+/// # Panics
+/// Panics if the BM25 index does not return expected matches.
 #[test]
 fn test_special_token_preservation() {
     let mut index = BM25Index::new();
@@ -14,13 +19,17 @@ fn test_special_token_preservation() {
     // Search for special tokens should work
     let results = index.search("UserService::find_by_email", 5);
     assert!(!results.is_empty(), "Should find document with :: token");
-    assert_eq!(results[0].0.to_str().unwrap(), "test.rs");
+    assert_eq!(results[0].0.to_string_lossy(), "test.rs");
     
-    let results = index.search("--verbose", 5);
-    assert!(!results.is_empty(), "Should find document with -- flag");
-    assert_eq!(results[0].0.to_str().unwrap(), "test.rs");
+    let verbose_results = index.search("--verbose", 5);
+    assert!(!verbose_results.is_empty(), "Should find document with -- flag");
+    assert_eq!(verbose_results[0].0.to_string_lossy(), "test.rs");
 }
 
+/// Debug helper to ensure exact tokens rank higher.
+///
+/// # Panics
+/// Panics if the BM25 index is empty for the provided query.
 #[test]
 fn test_tokenization_debug() {
     // This test helps debug what tokens are actually generated
@@ -42,11 +51,15 @@ fn test_tokenization_debug() {
     
     // file1.rs should rank higher because it has the exact :: token
     if results.len() >= 2 {
-        assert_eq!(results[0].0.to_str().unwrap(), "file1.rs", 
-            "File with :: should rank higher. Scores: {:?}", results);
+        assert_eq!(results[0].0.to_string_lossy(), "file1.rs", 
+            "File with :: should rank higher. Scores: {results:?}");
     }
 }
 
+/// Bigrams should improve phrase matching quality.
+///
+/// # Panics
+/// Panics if no results are returned for the phrase query.
 #[test]
 fn test_bigram_generation() {
     let mut index = BM25Index::new();
@@ -62,6 +75,10 @@ fn test_bigram_generation() {
     assert!(!results.is_empty(), "Should find document with bigram");
 }
 
+/// Mixed special and regular tokens should be searchable together.
+///
+/// # Panics
+/// Panics if special tokens or cleaned tokens do not return results.
 #[test]
 fn test_mixed_special_and_regular_tokens() {
     let mut index = BM25Index::new();
@@ -77,11 +94,11 @@ fn test_mixed_special_and_regular_tokens() {
     assert!(!results.is_empty(), "Should find --prompt flag");
     
     // Full path should match
-    let results = index.search("user::input::data", 5);
-    assert!(!results.is_empty(), "Should find user::input::data path");
+    let data_results = index.search("user::input::data", 5);
+    assert!(!data_results.is_empty(), "Should find user::input::data path");
     
     // Partial path should also match (because cleaned version is indexed)
-    let results = index.search("user input", 5);
-    assert!(!results.is_empty(), "Should find with cleaned tokens");
+    let input_results = index.search("user input", 5);
+    assert!(!input_results.is_empty(), "Should find with cleaned tokens");
 }
 

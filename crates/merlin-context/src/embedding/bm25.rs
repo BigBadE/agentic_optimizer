@@ -1,12 +1,13 @@
 //! BM25 keyword search implementation for file ranking.
 
+use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::collections::HashSet;
 use std::path::PathBuf;
 
 /// BM25 parameters
-const K1: f32 = 1.5;  // Term frequency saturation parameter
-const B: f32 = 0.75;  // Length normalization parameter
+const TERM_SATURATION_K1: f32 = 1.5;  // Term frequency saturation parameter
+const LENGTH_NORM_B: f32 = 0.75;  // Length normalization parameter
 
 /// Document in the BM25 index
 #[derive(Debug, Clone)]
@@ -79,7 +80,7 @@ impl BM25Index {
         }
 
         // Compute average document length
-        let total_length: usize = self.documents.iter().map(|d| d.length).sum();
+        let total_length: usize = self.documents.iter().map(|document| document.length).sum();
         self.avg_doc_length = total_length as f32 / self.documents.len() as f32;
 
         // Compute IDF for all terms
@@ -91,8 +92,8 @@ impl BM25Index {
         }
 
         let num_docs = self.documents.len() as f32;
-        for (term, df) in doc_freq {
-            let idf = ((num_docs - df as f32 + 0.5) / (df as f32 + 0.5)).ln_1p();
+        for (term, document_frequency) in doc_freq {
+            let idf = ((num_docs - document_frequency as f32 + 0.5) / (document_frequency as f32 + 0.5)).ln_1p();
             self.idf_cache.insert(term, idf);
         }
     }
@@ -111,7 +112,7 @@ impl BM25Index {
         }
 
         // Sort by score descending
-        scores.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap_or(std::cmp::Ordering::Equal));
+        scores.sort_by(|left_score, right_score| right_score.1.partial_cmp(&left_score.1).unwrap_or(Ordering::Equal));
         scores.truncate(top_k);
 
         scores
@@ -122,8 +123,8 @@ impl BM25Index {
         let mut score = 0.0;
 
         for term in query_terms {
-            let tf = *doc.terms.get(term).unwrap_or(&0) as f32;
-            if tf == 0.0 {
+            let term_freq = *doc.terms.get(term).unwrap_or(&0) as f32;
+            if term_freq == 0.0 {
                 continue;
             }
 
@@ -131,12 +132,21 @@ impl BM25Index {
             let doc_len_norm = doc.length as f32 / self.avg_doc_length;
             
             // BM25 formula
-            let numerator = tf * (K1 + 1.0);
-            let denominator = K1.mul_add(B.mul_add(doc_len_norm, 1.0 - B), tf);
+            let numerator = term_freq * (TERM_SATURATION_K1 + 1.0);
+            let denominator = TERM_SATURATION_K1.mul_add(LENGTH_NORM_B.mul_add(doc_len_norm, 1.0 - LENGTH_NORM_B), term_freq);
             
             score += idf * (numerator / denominator);
         }
         score
+    }
+
+    /// Extract path components from :: separated terms
+    fn extract_path_components(path: &str, stopwords: &HashSet<&str>, terms: &mut Vec<String>) {
+        for component in path.split("::") {
+            if component.len() > 2 && !stopwords.contains(component) {
+                terms.push(component.to_string());
+            }
+        }
     }
 
     /// Tokenize text into terms with special token preservation and bigrams
@@ -156,17 +166,13 @@ impl BM25Index {
                 terms.push(lower.clone());
 
                 if has_double_colon {
-                    for component in lower.split("::") {
-                        if component.len() > 2 && !stopwords.contains(component) {
-                            terms.push(component.to_string());
-                        }
-                    }
+                    Self::extract_path_components(&lower, stopwords, &mut terms);
                 }
             }
 
             let clean: String = lower
                 .chars()
-                .filter(|c| c.is_alphanumeric() || *c == '_')
+                .filter(|character| character.is_alphanumeric() || *character == '_')
                 .collect();
 
             if !clean.is_empty() && clean.len() > 2 && !stopwords.contains(clean.as_str())
@@ -176,11 +182,11 @@ impl BM25Index {
         }
 
         for window in words.windows(2) {
-            let w0 = window[0].to_lowercase();
-            let w1 = window[1].to_lowercase();
+            let first_word = window[0].to_lowercase();
+            let second_word = window[1].to_lowercase();
 
-            let clean0: String = w0.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
-            let clean1: String = w1.chars().filter(|c| c.is_alphanumeric() || *c == '_').collect();
+            let clean0: String = first_word.chars().filter(|character| character.is_alphanumeric() || *character == '_').collect();
+            let clean1: String = second_word.chars().filter(|character| character.is_alphanumeric() || *character == '_').collect();
 
             if clean0.len() > 2
                 && clean1.len() > 2

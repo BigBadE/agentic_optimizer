@@ -56,6 +56,7 @@ impl Default for TierConfig {
 
 /// Validation configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(clippy::struct_excessive_bools, reason = "Configuration struct can have more bools")]
 pub struct ValidationConfig {
     pub enabled: bool,
     pub early_exit: bool,
@@ -123,8 +124,11 @@ impl Default for WorkspaceConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use serde_json::{from_str, to_string};
 
     #[test]
+    /// # Panics
+    /// Panics if default config does not meet baseline expectations.
     fn test_default_config() {
         let config = RoutingConfig::default();
         assert!(config.tiers.local_enabled);
@@ -133,10 +137,18 @@ mod tests {
     }
     
     #[test]
+    /// # Panics
+    /// Panics if serialization or deserialization fails.
     fn test_serialization() {
         let config = RoutingConfig::default();
-        let json = serde_json::to_string(&config).unwrap();
-        let deserialized: RoutingConfig = serde_json::from_str(&json).unwrap();
+        let json = match to_string(&config) {
+            Ok(serialized_json) => serialized_json,
+            Err(error) => panic!("serialize failed: {error}"),
+        };
+        let deserialized: RoutingConfig = match from_str(&json) {
+            Ok(value) => value,
+            Err(error) => panic!("deserialize failed: {error}"),
+        };
         assert_eq!(config.tiers.local_model, deserialized.tiers.local_model);
     }
 }

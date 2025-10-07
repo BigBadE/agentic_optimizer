@@ -1,6 +1,8 @@
 //! Local context agent using Ollama.
 
+use std::env;
 use std::time::Instant;
+use serde_json::{from_str, from_value};
 
 use ollama_rs::{generation::chat::ChatMessage, Ollama};
 use merlin_core::{Error, Result};
@@ -20,7 +22,7 @@ impl LocalContextAgent {
     /// Creates a new local context agent.
     #[must_use]
     pub fn new() -> Self {
-        let host = std::env::var("OLLAMA_HOST")
+        let host = env::var("OLLAMA_HOST")
             .unwrap_or_else(|_| "http://localhost:11434".to_owned());
 
         Self {
@@ -37,6 +39,8 @@ impl LocalContextAgent {
     }
 
     /// Calls Ollama API using the ollama-rs crate.
+    /// # Errors
+    /// Returns an error when the Ollama request fails.
     async fn call_ollama_static(ollama: &Ollama, system: &str, user: &str, model: &str) -> Result<String> {
         use ollama_rs::generation::chat::request::ChatMessageRequest;
 
@@ -50,7 +54,7 @@ impl LocalContextAgent {
         let response = ollama
             .send_chat_messages(request)
             .await
-            .map_err(|e| Error::Other(format!("Ollama request failed: {e}")))?;
+            .map_err(|err| Error::Other(format!("Ollama request failed: {err}")))?;
 
         // Get the message content from the response
         // response.message is a ChatMessage struct with a content field
@@ -58,32 +62,26 @@ impl LocalContextAgent {
     }
 
     /// Parses the JSON response from the agent.
-    fn parse_plan(&self, response: &str) -> Result<ContextPlan> {
+    /// # Errors
+    /// Returns an error if the response cannot be parsed into a `ContextPlan`.
+    fn parse_plan(response: &str) -> Result<ContextPlan> {
         // Try to extract JSON from markdown code blocks if present
-        let json_str = if let Some(start) = response.find("```json") {
-            let after_start = &response[start + 7..];
-            if let Some(end) = after_start.find("```") {
-                after_start[..end].trim()
-            } else {
-                response.trim()
-            }
-        } else if let Some(start) = response.find('{') {
-            // Find the JSON object
-            &response[start..]
-        } else {
-            response.trim()
-        };
+        let json_str = response.find("```json").map_or_else(
+            || response.find('{').map_or_else(|| response.trim(), |start| &response[start..]),
+            |start| {
+                let after_start = &response[start + 7..];
+                after_start.find("```").map_or_else(|| response.trim(), |end| after_start[..end].trim())
+            },
+        );
 
         // First attempt strict parsing
-        match serde_json::from_str::<ContextPlan>(json_str) {
+        match from_str::<ContextPlan>(json_str) {
             Ok(plan) => Ok(plan),
             Err(first_err) => {
                 // Fallback: be lenient and normalize common schema mistakes
-                let mut value: Value = serde_json::from_str(json_str).map_err(|e| {
-                    Error::Other(format!(
-                        "Failed to parse context plan: {e}\nResponse: {json_str}"
-                    ))
-                })?;
+                let mut value: Value = from_str(json_str).map_err(|err| Error::Other(format!(
+                    "Failed to parse context plan: {err}\nResponse: {json_str}"
+                )))?;
 
                 // Normalize: strategy.Focused with `patterns` -> `symbols`
                 if let Some(strategy) = value.get_mut("strategy")
@@ -98,7 +96,7 @@ impl LocalContextAgent {
                 }
 
                 // Try deserializing again after normalization
-                serde_json::from_value::<ContextPlan>(value).map_err(|second_err| {
+                from_value::<ContextPlan>(value).map_err(|second_err| {
                     Error::Other(format!(
                         "Failed to parse context plan after normalization. First error: {first_err}. Second error: {second_err}\nResponse: {json_str}"
                     ))
@@ -137,7 +135,7 @@ impl LocalContextAgent {
         );
 
         tracing::info!("Parsing context plan...");
-        let plan = self.parse_plan(&response)?;
+        let plan = Self::parse_plan(&response)?;
         
         Ok(plan)
     }

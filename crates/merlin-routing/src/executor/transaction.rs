@@ -2,7 +2,7 @@ use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::Arc;
 use crate::{FileChange, Result, RoutingError, TaskId};
-use crate::error::ConflictReport as ErrorConflictReport;
+use crate::error::{ConflictReport as ErrorConflictReport, FileConflict as ErrorFileConflict};
 use super::isolation::{FileLockManager, WriteLockGuard};
 use super::state::{WorkspaceState, WorkspaceSnapshot};
 
@@ -22,6 +22,9 @@ pub enum FileState {
 
 impl TaskWorkspace {
     /// Create isolated workspace for task
+    ///
+    /// # Errors
+    /// Returns an error if acquiring file locks or creating the base snapshot fails.
     pub async fn new(
         task_id: TaskId,
         files_to_modify: Vec<PathBuf>,
@@ -72,6 +75,9 @@ impl TaskWorkspace {
     }
     
     /// Validate changes don't conflict with current global state
+    ///
+    /// # Errors
+    /// Returns an error if reading files or building the conflict report fails.
     pub async fn check_conflicts(
         &self,
         global_state: Arc<WorkspaceState>,
@@ -85,8 +91,8 @@ impl TaskWorkspace {
             if base_version != current_version {
                 conflicts.push(FileConflict {
                     path: path.clone(),
-                    base_hash: hash_content(&base_version),
-                    current_hash: hash_content(&current_version),
+                    base_hash: hash_content(base_version.as_ref()),
+                    current_hash: hash_content(current_version.as_ref()),
                 });
             }
         }
@@ -95,19 +101,23 @@ impl TaskWorkspace {
     }
     
     /// Commit changes to global state (atomic)
+    /// Commit changes to global state (atomic)
+    ///
+    /// # Errors
+    /// Returns an error if conflicts are detected or applying changes fails
     pub async fn commit(
         self,
         global_state: Arc<WorkspaceState>,
     ) -> Result<CommitResult> {
-        let conflict_report = self.check_conflicts(global_state.clone()).await?;
+        let conflict_report = self.check_conflicts(Arc::clone(&global_state)).await?;
         
         if !conflict_report.conflicts.is_empty() {
             let error_report = ErrorConflictReport {
-                conflicts: conflict_report.conflicts.iter().map(|c| {
-                    crate::error::FileConflict {
-                        path: c.path.clone(),
-                        base_hash: c.base_hash,
-                        current_hash: c.current_hash,
+                conflicts: conflict_report.conflicts.iter().map(|conflict| {
+                    ErrorFileConflict {
+                        path: conflict.path.clone(),
+                        base_hash: conflict.base_hash,
+                        current_hash: conflict.current_hash,
                     }
                 }).collect(),
             };
@@ -130,6 +140,9 @@ impl TaskWorkspace {
     }
     
     /// Abort changes (rollback)
+    ///
+    /// # Errors
+    /// Returns an error if rollback logic fails (currently infallible)
     pub fn rollback(self) -> Result<()> {
         Ok(())
     }
@@ -152,7 +165,7 @@ pub struct FileConflict {
     pub current_hash: u64,
 }
 
-fn hash_content(content: &Option<String>) -> u64 {
+fn hash_content(content: Option<&String>) -> u64 {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash as _, Hasher as _};
     
@@ -166,24 +179,31 @@ mod tests {
     use super::*;
 
     #[tokio::test]
+    /// # Panics
+    /// Panics if workspace operations fail in the test harness.
     async fn test_task_workspace_isolation() {
         let workspace = WorkspaceState::new(PathBuf::from("/tmp"));
         let lock_manager = FileLockManager::new();
         let task_id = TaskId::new();
         
-        workspace.apply_changes(&[
+        if let Err(error) = workspace.apply_changes(&[
             FileChange::Create {
                 path: PathBuf::from("test.rs"),
                 content: "original".to_owned(),
             }
-        ]).await.unwrap();
+        ]).await {
+            panic!("failed to apply initial change: {error}");
+        }
         
-        let mut task_workspace = TaskWorkspace::new(
+        let mut task_workspace = match TaskWorkspace::new(
             task_id,
             vec![PathBuf::from("test.rs")],
-            workspace.clone(),
+            Arc::clone(&workspace),
             lock_manager,
-        ).await.unwrap();
+        ).await {
+            Ok(workspace_isolated) => workspace_isolated,
+            Err(error) => panic!("failed to create task workspace: {error}"),
+        };
         
         task_workspace.modify_file(PathBuf::from("test.rs"), "modified".to_owned());
         
@@ -199,28 +219,37 @@ mod tests {
     }
     
     #[tokio::test]
+    /// # Panics
+    /// Panics if workspace operations fail in the test harness.
     async fn test_task_workspace_commit() {
         let workspace = WorkspaceState::new(PathBuf::from("/tmp"));
         let lock_manager = FileLockManager::new();
         let task_id = TaskId::new();
         
-        workspace.apply_changes(&[
+        if let Err(error) = workspace.apply_changes(&[
             FileChange::Create {
                 path: PathBuf::from("test.rs"),
                 content: "original".to_owned(),
             }
-        ]).await.unwrap();
+        ]).await {
+            panic!("failed to apply initial change: {error}");
+        }
         
-        let mut task_workspace = TaskWorkspace::new(
+        let mut task_workspace = match TaskWorkspace::new(
             task_id,
             vec![PathBuf::from("test.rs")],
-            workspace.clone(),
+            Arc::clone(&workspace),
             lock_manager,
-        ).await.unwrap();
+        ).await {
+            Ok(workspace_isolated) => workspace_isolated,
+            Err(error) => panic!("failed to create task workspace: {error}"),
+        };
         
         task_workspace.modify_file(PathBuf::from("test.rs"), "modified".to_owned());
         
-        task_workspace.commit(workspace.clone()).await.unwrap();
+        if let Err(error) = task_workspace.commit(Arc::clone(&workspace)).await {
+            panic!("commit failed: {error}");
+        }
         
         assert_eq!(
             workspace.read_file(&PathBuf::from("test.rs")).await,

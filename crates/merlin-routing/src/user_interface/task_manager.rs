@@ -28,36 +28,36 @@ pub struct TaskDisplay {
 /// Task step information
 #[derive(Clone)]
 pub struct TaskStepInfo {
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Field is part of public API for task step tracking")]
     pub step_id: String,
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Field is part of public API for task step tracking")]
     pub step_type: String,
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Field is part of public API for task step tracking")]
     pub content: String,
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Field is part of public API for task step tracking")]
     pub timestamp: Instant,
 }
 
 impl TaskStepInfo {
     /// Access `step_id`
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn step_id(&self) -> &str {
         &self.step_id
     }
 
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn step_type(&self) -> &str {
         &self.step_type
     }
 
     /// Access `content`
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn content(&self) -> &str {
         &self.content
     }
 
     /// Access `timestamp`
-    #[allow(dead_code)]
+    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn timestamp(&self) -> Instant {
         self.timestamp
     }
@@ -203,7 +203,7 @@ impl TaskManager {
         self.task_order.iter().any(|id| {
             self.tasks
                 .get(id)
-                .and_then(|t| t.parent_id)
+                .and_then(|task| task.parent_id)
                 == Some(task_id)
         })
     }
@@ -250,21 +250,21 @@ impl TaskManager {
 
     fn collect_descendants(&self, task_id: TaskId) -> Vec<TaskId> {
         let mut to_delete = vec![task_id];
-        let mut i = 0;
-        while i < to_delete.len() {
-            let current = to_delete[i];
+        let mut index = 0;
+        while index < to_delete.len() {
+            let current = to_delete[index];
             let children: Vec<TaskId> = self.task_order
                 .iter()
                 .filter(|&&id| {
                     self.tasks
                         .get(&id)
-                        .and_then(|t| t.parent_id)
+                        .and_then(|task| task.parent_id)
                         == Some(current)
                 })
                 .copied()
                 .collect();
             to_delete.extend(children);
-            i += 1;
+            index += 1;
         }
         to_delete
     }
@@ -289,12 +289,12 @@ impl TaskManager {
     fn is_root_task(&self, task_id: TaskId) -> bool {
         self.tasks
             .get(&task_id)
-            .is_some_and(|t| t.parent_id.is_none())
+            .is_some_and(|task| task.parent_id.is_none())
     }
 
     fn get_parent_id(&self, task_id: TaskId) -> Option<TaskId> {
-        let t = self.tasks.get(&task_id)?;
-        t.parent_id
+        let task = self.tasks.get(&task_id)?;
+        task.parent_id
     }
 
     fn is_hidden_by_collapse(&self, task_id: TaskId) -> bool {

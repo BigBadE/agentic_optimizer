@@ -1,3 +1,5 @@
+#![allow(clippy::multiple_crate_versions, reason = "Dependencies have conflicting version requirements that cannot be easily resolved")]
+
 pub mod agent;
 pub mod analyzer;
 pub mod config;

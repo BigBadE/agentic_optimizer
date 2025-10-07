@@ -60,7 +60,7 @@ impl Tool for RunCommandTool {
     
     async fn execute(&self, args: Value) -> Result<Value> {
         let command_str = args.get("command")
-            .and_then(|v| v.as_str())
+            .and_then(|value| value.as_str())
             .ok_or_else(|| RoutingError::Other("Missing 'command' argument".to_owned()))?;
         
         // Parse command into parts
@@ -88,7 +88,7 @@ impl Tool for RunCommandTool {
             .stderr(Stdio::piped())
             .output()
             .await
-            .map_err(|e| RoutingError::Other(format!("Failed to execute command: {e}")))?;
+            .map_err(|error| RoutingError::Other(format!("Failed to execute command: {error}")))?;
         
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -108,45 +108,73 @@ impl Tool for RunCommandTool {
 mod tests {
     use super::*;
     use tempfile::TempDir;
+    use crate::Result;
 
     #[tokio::test]
-    async fn test_run_command_tool() {
-        let temp_dir = TempDir::new().unwrap();
+    /// # Errors
+    /// Returns an error if tool execution fails in the test harness.
+    ///
+    /// # Panics
+    /// Panics if returned JSON is missing expected fields.
+    async fn test_run_command_tool() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         
         let tool = RunCommandTool::new(temp_dir.path().to_path_buf());
         
         // Test a safe command (cargo --version should work)
-        let result = tool.execute(json!({ "command": "cargo --version" })).await.unwrap();
+        let result = tool.execute(json!({ "command": "cargo --version" })).await?;
         
         assert_eq!(result["exit_code"], 0);
-        assert!(result["success"].as_bool().unwrap());
-        assert!(result["stdout"].as_str().unwrap().contains("cargo"));
+        assert_eq!(result["success"].as_bool(), Some(true));
+        if let Some(stdout_str) = result["stdout"].as_str() {
+            assert!(stdout_str.contains("cargo"));
+        } else {
+            panic!("stdout missing or not a string");
+        }
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_command_whitelist() {
-        let temp_dir = TempDir::new().unwrap();
+    /// # Errors
+    /// Returns an error if `TempDir` creation fails in the test harness.
+    ///
+    /// # Panics
+    /// Panics if a non-whitelisted command unexpectedly succeeds.
+    async fn test_command_whitelist() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         
         let tool = RunCommandTool::new(temp_dir.path().to_path_buf());
         
         // Test a non-whitelisted command
         let result = tool.execute(json!({ "command": "rm -rf /" })).await;
-        
-        assert!(result.is_err());
-        assert!(result.unwrap_err().to_string().contains("not in the whitelist"));
+        match result {
+            Ok(_) => panic!("expected whitelist failure"),
+            Err(error) => assert!(error.to_string().contains("not in the whitelist")),
+        }
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_custom_whitelist() {
-        let temp_dir = TempDir::new().unwrap();
+    /// # Errors
+    /// Returns an error if tool execution fails in the test harness.
+    ///
+    /// # Panics
+    /// Panics if returned JSON is missing expected fields.
+    async fn test_custom_whitelist() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         
         // Use a command that exists on all platforms
         let tool = RunCommandTool::new(temp_dir.path().to_path_buf())
             .with_allowed_commands(vec!["cargo".to_owned()]);
         
-        let result = tool.execute(json!({ "command": "cargo --version" })).await.unwrap();
+        let result = tool.execute(json!({ "command": "cargo --version" })).await?;
         
         assert_eq!(result["exit_code"], 0);
-        assert!(result["stdout"].as_str().unwrap().contains("cargo"));
+        if let Some(stdout_str) = result["stdout"].as_str() {
+            assert!(stdout_str.contains("cargo"));
+        } else {
+            panic!("stdout missing or not a string");
+        }
+        Ok(())
     }
 }

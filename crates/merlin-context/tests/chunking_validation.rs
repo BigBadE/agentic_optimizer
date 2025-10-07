@@ -1,22 +1,23 @@
+#![cfg(test)]
 //! Integration tests for chunking validation across the entire codebase.
 
 use std::fs;
+use std::env::current_dir;
+use std::path::{Path, PathBuf};
+use tracing::info;
 use merlin_context::embedding::chunking::{
     chunk_file, estimate_tokens, 
     MIN_CHUNK_TOKENS, MAX_CHUNK_TOKENS
 };
 
 /// Walk the codebase and collect all source files
-fn collect_all_source_files() -> Vec<std::path::PathBuf> {
+fn collect_all_source_files() -> Vec<PathBuf> {
     use ignore::WalkBuilder;
     
-    let project_root = std::env::current_dir()
-        .expect("Failed to get current directory")
-        .parent()
-        .expect("No parent directory")
-        .parent()
-        .expect("No grandparent directory")
-        .to_path_buf();
+    let project_root: PathBuf = current_dir()
+        .ok()
+        .and_then(|path| path.ancestors().nth(2).map(Path::to_path_buf))
+        .unwrap_or_else(|| PathBuf::from("."));
     
     let mut files = Vec::new();
     
@@ -29,8 +30,8 @@ fn collect_all_source_files() -> Vec<std::path::PathBuf> {
     for entry in walker.filter_map(Result::ok) {
         let path = entry.path();
         
-        if entry.file_type().map_or(false, |ft| ft.is_file()) {
-            if let Some(ext) = path.extension().and_then(|e| e.to_str()) {
+        if entry.file_type().is_some_and(|file_type| file_type.is_file())
+            && let Some(ext) = path.extension().and_then(|ext_str| ext_str.to_str()) {
                 match ext {
                     "rs" | "md" | "toml" | "txt" | "yaml" | "yml" | "json" => {
                         files.push(path.to_path_buf());
@@ -38,27 +39,27 @@ fn collect_all_source_files() -> Vec<std::path::PathBuf> {
                     _ => {}
                 }
             }
-        }
     }
     
     files
 }
 
+#[cfg(test)]
 #[test]
+/// # Panics
+///
+/// Panics if any chunk violates the minimum token constraint.
 fn test_all_chunks_respect_min_tokens() {
     let files = collect_all_source_files();
     
-    println!("Testing {} files for MIN_CHUNK_TOKENS compliance...", files.len());
+    info!("Testing {} files for MIN_CHUNK_TOKENS compliance...", files.len());
     
     let mut violations = Vec::new();
     let mut total_chunks = 0;
     let mut files_tested = 0;
     
     for file_path in files {
-        let content = match fs::read_to_string(&file_path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
+        let Ok(content) = fs::read_to_string(&file_path) else { continue };
         
         if content.trim().is_empty() {
             continue;
@@ -72,7 +73,7 @@ fn test_all_chunks_respect_min_tokens() {
         
         files_tested += 1;
         
-        for chunk in chunks.iter() {
+        for chunk in &chunks {
             total_chunks += 1;
             let tokens = estimate_tokens(&chunk.content);
             
@@ -108,37 +109,38 @@ fn test_all_chunks_respect_min_tokens() {
         }
     }
     
-    println!("Tested {} files, {} total chunks", files_tested, total_chunks);
+    info!("Tested {files_tested} files, {total_chunks} total chunks");
     
     if !violations.is_empty() {
-        println!("\n❌ Found {} violations:", violations.len());
-        for (i, violation) in violations.iter().enumerate().take(20) {
-            println!("  {}. {}", i + 1, violation);
+        info!("\n❌ Found {} violations:", violations.len());
+        for (index, violation) in violations.iter().enumerate().take(20) {
+            info!("  {}. {}", index + 1, violation);
         }
         if violations.len() > 20 {
-            println!("  ... and {} more", violations.len() - 20);
+            info!("  ... and {} more", violations.len() - 20);
         }
         panic!("❌ MIN_CHUNK_TOKENS validation failed with {} violations", violations.len());
     }
     
-    println!("✅ All chunks respect MIN_CHUNK_TOKENS");
+    info!("✅ All chunks respect MIN_CHUNK_TOKENS");
 }
 
+#[cfg(test)]
 #[test]
+/// # Panics
+///
+/// Panics if any chunk exceeds the maximum token constraint.
 fn test_all_chunks_respect_max_tokens() {
     let files = collect_all_source_files();
     
-    println!("Testing {} files for MAX_CHUNK_TOKENS compliance...", files.len());
+    info!("Testing {} files for MAX_CHUNK_TOKENS compliance...", files.len());
     
     let mut violations = Vec::new();
     let mut total_chunks = 0;
     let mut files_tested = 0;
     
     for file_path in files {
-        let content = match fs::read_to_string(&file_path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
+        let Ok(content) = fs::read_to_string(&file_path) else { continue };
         
         if content.trim().is_empty() {
             continue;
@@ -171,37 +173,38 @@ fn test_all_chunks_respect_max_tokens() {
         }
     }
     
-    println!("Tested {} files, {} total chunks", files_tested, total_chunks);
+    info!("Tested {files_tested} files, {total_chunks} total chunks");
     
     if !violations.is_empty() {
-        println!("\n⚠️  Found {} violations:", violations.len());
-        for (i, violation) in violations.iter().enumerate().take(20) {
-            println!("  {}. {}", i + 1, violation);
+        info!("\n⚠️  Found {} violations:", violations.len());
+        for (index, violation) in violations.iter().enumerate().take(20) {
+            info!("  {}. {}", index + 1, violation);
         }
         if violations.len() > 20 {
-            println!("  ... and {} more", violations.len() - 20);
+            info!("  ... and {} more", violations.len() - 20);
         }
         panic!("❌ MAX_CHUNK_TOKENS validation failed with {} violations", violations.len());
     }
     
-    println!("✅ All chunks respect MAX_CHUNK_TOKENS");
+    info!("✅ All chunks respect MAX_CHUNK_TOKENS");
 }
 
+#[cfg(test)]
 #[test]
+/// # Panics
+///
+/// Panics if any chunk has invalid line numbers.
 fn test_chunk_line_numbers_are_valid() {
     let files = collect_all_source_files();
     
-    println!("Testing {} files for valid line numbers...", files.len());
+    info!("Testing {} files for valid line numbers...", files.len());
     
     let mut violations = Vec::new();
     let mut total_chunks = 0;
     let mut files_tested = 0;
     
     for file_path in files {
-        let content = match fs::read_to_string(&file_path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
+        let Ok(content) = fs::read_to_string(&file_path) else { continue };
         
         if content.trim().is_empty() {
             continue;
@@ -256,38 +259,39 @@ fn test_chunk_line_numbers_are_valid() {
         }
     }
     
-    println!("Tested {} files, {} total chunks", files_tested, total_chunks);
+    info!("Tested {files_tested} files, {total_chunks} total chunks");
     
     if !violations.is_empty() {
-        println!("\n❌ Found {} violations:", violations.len());
-        for (i, violation) in violations.iter().enumerate().take(20) {
-            println!("  {}. {}", i + 1, violation);
+        info!("\n❌ Found {} violations:", violations.len());
+        for (index, violation) in violations.iter().enumerate().take(20) {
+            info!("  {}. {}", index + 1, violation);
         }
         if violations.len() > 20 {
-            println!("  ... and {} more", violations.len() - 20);
+            info!("  ... and {} more", violations.len() - 20);
         }
         panic!("❌ Line number validation failed with {} violations", violations.len());
     }
     
-    println!("✅ All chunks have valid line numbers");
+    info!("✅ All chunks have valid line numbers");
 }
 
+#[cfg(test)]
 #[test]
+/// # Panics
+///
+/// Panics if statistics calculations encounter unexpected empty state.
 fn test_chunk_statistics() {
     let files = collect_all_source_files();
     
-    println!("Gathering chunk statistics...");
+    info!("Gathering chunk statistics...");
     
     let mut total_files = 0;
     let mut total_chunks = 0;
     let mut token_counts = Vec::new();
-    let mut chunks_per_file = Vec::new();
+    
     
     for file_path in files {
-        let content = match fs::read_to_string(&file_path) {
-            Ok(c) => c,
-            Err(_) => continue,
-        };
+        let Ok(content) = fs::read_to_string(&file_path) else { continue };
         
         if content.trim().is_empty() {
             continue;
@@ -301,7 +305,6 @@ fn test_chunk_statistics() {
         
         total_files += 1;
         total_chunks += chunks.len();
-        chunks_per_file.push(chunks.len());
         
         // Only include multi-chunk files in statistics
         if chunks.len() > 1 {
@@ -313,37 +316,36 @@ fn test_chunk_statistics() {
     }
     
     if token_counts.is_empty() {
-        println!("No chunks found");
+        info!("No chunks found");
         return;
     }
     
     token_counts.sort_unstable();
-    chunks_per_file.sort_unstable();
     
-    let min_tokens = *token_counts.first().unwrap();
-    let max_tokens = *token_counts.last().unwrap();
+    let min_tokens = token_counts[0];
+    let max_tokens = token_counts[token_counts.len() - 1];
     let median_tokens = token_counts[token_counts.len() / 2];
     let avg_tokens: usize = token_counts.iter().sum::<usize>() / token_counts.len();
     
     let avg_chunks_per_file: f32 = total_chunks as f32 / total_files as f32;
     
-    println!("\n📊 Chunk Statistics (multi-chunk files only):");
-    println!("  Files processed: {}", total_files);
-    println!("  Total chunks: {}", total_chunks);
-    println!("  Chunks analyzed: {} (excluding single-chunk files)", token_counts.len());
-    println!("  Avg chunks/file: {:.1}", avg_chunks_per_file);
-    println!("\n  Token distribution:");
-    println!("    Min: {} tokens", min_tokens);
-    println!("    Median: {} tokens", median_tokens);
-    println!("    Average: {} tokens", avg_tokens);
-    println!("    Max: {} tokens", max_tokens);
-    println!("\n  Target range: {}-{} tokens", MIN_CHUNK_TOKENS, MAX_CHUNK_TOKENS);
+    info!("\n📊 Chunk Statistics (multi-chunk files only):");
+    info!("  Files processed: {total_files}");
+    info!("  Total chunks: {total_chunks}");
+    info!("  Chunks analyzed: {} (excluding single-chunk files)", token_counts.len());
+    info!("  Avg chunks/file: {avg_chunks_per_file:.1}");
+    info!("\n  Token distribution:");
+    info!("    Min: {min_tokens} tokens");
+    info!("    Median: {median_tokens} tokens");
+    info!("    Average: {avg_tokens} tokens");
+    info!("    Max: {max_tokens} tokens");
+    info!("\n  Target range: {MIN_CHUNK_TOKENS}-{MAX_CHUNK_TOKENS} tokens");
     
     let in_range = token_counts.iter()
-        .filter(|&&t| t >= MIN_CHUNK_TOKENS && t <= MAX_CHUNK_TOKENS)
+        .filter(|&tokens_ref| (MIN_CHUNK_TOKENS..=MAX_CHUNK_TOKENS).contains(tokens_ref))
         .count();
     let percentage = (in_range as f32 / token_counts.len() as f32) * 100.0;
     
-    println!("  In target range: {} ({:.1}%)", in_range, percentage);
+    info!("  In target range: {in_range} ({percentage:.1}%)");
 }
 

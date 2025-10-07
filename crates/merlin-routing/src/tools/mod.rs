@@ -1,5 +1,6 @@
 use async_trait::async_trait;
 use serde_json::Value;
+use std::convert::AsRef;
 use std::sync::Arc;
 use crate::Result;
 
@@ -22,8 +23,10 @@ pub trait Tool: Send + Sync {
 /// Registry for managing available tools
 #[derive(Clone)]
 pub struct ToolRegistry {
-    tools: Arc<Vec<Arc<dyn Tool>>>,
+    tools: ToolList,
 }
+
+type ToolList = Arc<Vec<Arc<dyn Tool>>>;
 
 impl ToolRegistry {
     #[must_use] 
@@ -41,12 +44,12 @@ impl ToolRegistry {
     
     #[must_use] 
     pub fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
-        self.tools.iter().find(|t| t.name() == name).cloned()
+        self.tools.iter().find(|tool_ref| tool_ref.name() == name).cloned()
     }
     
     #[must_use] 
     pub fn list_tools(&self) -> Vec<&dyn Tool> {
-        self.tools.iter().map(std::convert::AsRef::as_ref).collect()
+        self.tools.iter().map(AsRef::as_ref).collect()
     }
 }
 

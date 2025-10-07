@@ -60,26 +60,39 @@ mod tests {
     use crate::ContextRequirements;
 
     #[tokio::test]
+    /// # Panics
+    /// Panics if selected tiers do not match expected routing.
     async fn test_cost_optimization() {
         let strategy = CostOptimizationStrategy::new(4000);
         
         let small_task = Task::new("Small task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(2000));
-        let tier = strategy.select_tier(&small_task).await.unwrap();
-        assert!(matches!(tier, ModelTier::Local { .. }));
+        let tier_small = match strategy.select_tier(&small_task).await {
+            Ok(tier) => tier,
+            Err(error) => panic!("failed to select tier for small task: {error}"),
+        };
+        assert!(matches!(tier_small, ModelTier::Local { .. }));
         
         let medium_task = Task::new("Medium task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(6000));
-        let tier = strategy.select_tier(&medium_task).await.unwrap();
-        assert!(matches!(tier, ModelTier::Groq { .. }));
+        let tier_medium = match strategy.select_tier(&medium_task).await {
+            Ok(tier) => tier,
+            Err(error) => panic!("failed to select tier for medium task: {error}"),
+        };
+        assert!(matches!(tier_medium, ModelTier::Groq { .. }));
         
         let large_task = Task::new("Large task".to_owned())
             .with_context(ContextRequirements::new().with_estimated_tokens(10000));
-        let tier = strategy.select_tier(&large_task).await.unwrap();
-        assert!(matches!(tier, ModelTier::Premium { .. }));
+        let tier_large = match strategy.select_tier(&large_task).await {
+            Ok(tier) => tier,
+            Err(error) => panic!("failed to select tier for large task: {error}"),
+        };
+        assert!(matches!(tier_large, ModelTier::Premium { .. }));
     }
     
     #[tokio::test]
+    /// # Panics
+    /// Panics if applicability check fails unexpectedly.
     async fn test_critical_tasks_not_applicable() {
         let strategy = CostOptimizationStrategy::new(4000);
         

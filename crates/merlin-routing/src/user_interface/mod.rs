@@ -6,17 +6,18 @@ use crate::{TaskId, TaskResult};
 // Public modules
 pub mod events;
 mod text_width;
-mod output_tree;
 
-// New refactored modules
-mod task_manager;
-mod state;
+// Publicly exposed for testing
+pub mod output_tree;
+pub mod task_manager;
+pub mod state;
+pub mod renderer;
+pub mod theme;
+pub mod input;
+
+// Private modules
 mod persistence;
-mod input;
 mod event_handler;
-mod renderer;
-/// Theme configuration and persistence helpers
-mod theme;
 /// TUI application and main event loop
 mod app;
 

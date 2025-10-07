@@ -1,0 +1,14 @@
+version = 1
+
+test_patterns = ["test/**"]
+
+exclude_patterns = ["benchmarks/test_repositories"]
+
+[[analyzers]]
+name = "rust"
+
+[analyzers.meta]
+msrv = "nightly"
+
+[[transformers]]
+name = "rustfmt"

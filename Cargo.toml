@@ -83,6 +83,13 @@ lto = false
 opt-level = 3
 codegen-backend = "cranelift"
 
+[profile.coverage]
+inherits = "dev"
+
+[profile.coverage.package."*"]
+opt-level = 0
+# No cranelift backend for coverage - use LLVM for instrumentation
+
 [workspace.lints.rust]
 unsafe_code = "forbid"
 warnings = "deny"

@@ -9,6 +9,7 @@
     clippy::print_stdout,
     clippy::print_stderr,
     clippy::tests_outside_test_module,
+    missing_docs,
     reason = "Test allows"
 )]
 

@@ -38,30 +38,20 @@ jobs:
           profile: release
 
       - name: Run benchmarks
-        run: cargo bench --workspace --no-fail-fast --profile release -- --output-format bencher | tee output.txt
+        run: cargo bench --workspace --no-fail-fast --profile release
 
-      - name: Download previous benchmark results
-        uses: actions/cache@v3
-        with:
-          path: ./cache
-          key: ${{ runner.os }}-benchmark
-
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
+      - name: Commit results to gh-pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        with:
-          name: Merlin Performance Benchmarks
-          tool: 'cargo'
-          output-file-path: output.txt
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          # Alert if performance degrades by 115% (15% regression)
-          alert-threshold: '115%'
-          comment-on-alert: true
-          fail-on-alert: false
-          # Save results to gh-pages branch
-          gh-pages-branch: gh-pages
-          benchmark-data-dir-path: dev/bench
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git fetch origin gh-pages:gh-pages || git checkout --orphan gh-pages
+          git checkout gh-pages
+          mkdir -p perf-bench
+          cp -r target/criterion perf-bench/$(date +%Y-%m-%d-%H-%M-%S) || echo "No criterion results"
+          git add perf-bench/
+          git commit -m "Update performance benchmark results" || echo "No changes to commit"
+          git push origin gh-pages
 
       - name: Upload benchmark results
         uses: actions/upload-artifact@v4

@@ -1,0 +1,35 @@
+# Test Case: Logging System
+name = "Logging System"
+description = "Query about logging implementation and levels"
+query = "how does logging work"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/logging/src/lib.rs"
+priority = "critical"
+reason = "Main logging module"
+
+[[expected]]
+path = "crates/logging/src/logger.rs"
+priority = "critical"
+reason = "Logger implementation"
+
+[[expected]]
+path = "crates/logging/src/formatter.rs"
+priority = "high"
+reason = "Log formatting"
+
+[[expected]]
+path = "crates/core/src/log.rs"
+priority = "medium"
+reason = "Core logging utilities"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/renderer"
+reason = "Rendering, not logging"
+
+[[excluded]]
+path = "tests/"
+reason = "Test files"

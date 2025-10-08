@@ -1,8 +1,6 @@
 name: Style
 
 on:
-  schedule:
-    - cron: "0 0 * * *"
   push:
     branches: [ "master" ]
   pull_request:
@@ -18,21 +16,20 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
-  build-test:
+  style:
     runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          lfs: false
-          submodules: true
+          clean: true
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
           profile: dev
-          components: rustc-codegen-cranelift-preview, clippy
+          components: rustc-codegen-cranelift-preview, clippy, rustfmt
 
       - name: Run clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings

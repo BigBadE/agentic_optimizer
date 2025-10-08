@@ -1,0 +1,40 @@
+# Test Case: Database Operations
+name = "Database Operations"
+description = "Query about database queries and transactions"
+query = "how are database queries executed"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/database/src/lib.rs"
+priority = "critical"
+reason = "Database module"
+
+[[expected]]
+path = "crates/database/src/query.rs"
+priority = "critical"
+reason = "Query builder and execution"
+
+[[expected]]
+path = "crates/database/src/connection.rs"
+priority = "high"
+reason = "Database connection management"
+
+[[expected]]
+path = "crates/database/src/transaction.rs"
+priority = "high"
+reason = "Transaction handling"
+
+[[expected]]
+path = "crates/models/src/lib.rs"
+priority = "medium"
+reason = "Data models"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/renderer"
+reason = "Rendering, not database"
+
+[[excluded]]
+path = "crates/ui"
+reason = "UI components, not database"

@@ -19,7 +19,7 @@ env:
   RUST_BACKTRACE: 1
 
 jobs:
-  build-test:
+  test:
     permissions: write-all
     runs-on: ${{ matrix.os }}
     strategy:

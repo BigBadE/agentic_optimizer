@@ -1,0 +1,35 @@
+# Test Case: Configuration Management
+name = "Configuration Management"
+description = "Query about configuration loading and management"
+query = "how is configuration loaded and managed"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/config/src/lib.rs"
+priority = "critical"
+reason = "Configuration management module"
+
+[[expected]]
+path = "crates/config/src/loader.rs"
+priority = "critical"
+reason = "Configuration loading logic"
+
+[[expected]]
+path = "crates/config/src/validation.rs"
+priority = "high"
+reason = "Configuration validation"
+
+[[expected]]
+path = "crates/core/src/settings.rs"
+priority = "medium"
+reason = "Application settings"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/js"
+reason = "JavaScript engine, not configuration"
+
+[[excluded]]
+path = "examples/"
+reason = "Example code, not core implementation"

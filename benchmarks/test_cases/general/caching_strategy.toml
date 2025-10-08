@@ -1,0 +1,35 @@
+# Test Case: Caching Strategy
+name = "Caching Strategy"
+description = "Query about caching implementation and invalidation"
+query = "how does the caching system work"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/cache/src/lib.rs"
+priority = "critical"
+reason = "Cache module implementation"
+
+[[expected]]
+path = "crates/cache/src/strategy.rs"
+priority = "critical"
+reason = "Caching strategies"
+
+[[expected]]
+path = "crates/cache/src/invalidation.rs"
+priority = "high"
+reason = "Cache invalidation logic"
+
+[[expected]]
+path = "crates/storage/src/lib.rs"
+priority = "medium"
+reason = "Storage backend"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/network"
+reason = "Network layer, not caching"
+
+[[excluded]]
+path = "tests/"
+reason = "Test files"

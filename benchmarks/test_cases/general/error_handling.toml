@@ -1,0 +1,35 @@
+# Test Case: Error Handling Implementation
+name = "Error Handling Implementation"
+description = "Query about error handling and recovery mechanisms"
+query = "how are errors handled and propagated"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/core/src/error.rs"
+priority = "critical"
+reason = "Core error types and handling"
+
+[[expected]]
+path = "crates/core/src/result.rs"
+priority = "critical"
+reason = "Result type definitions"
+
+[[expected]]
+path = "crates/utils/src/error_recovery.rs"
+priority = "high"
+reason = "Error recovery strategies"
+
+[[expected]]
+path = "crates/logging/src/lib.rs"
+priority = "medium"
+reason = "Error logging"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/renderer"
+reason = "Rendering, not error handling"
+
+[[excluded]]
+path = "tests/"
+reason = "Test files, not implementation"

@@ -134,7 +134,10 @@ criterion_group! {
         .measurement_time(Duration::from_secs(10))
         .warm_up_time(Duration::from_secs(3))
         .sample_size(50);
-    targets = bench_request_analysis, bench_task_decomposition, bench_complexity_analysis, bench_task_graph
+    targets = bench_request_analysis,
+             bench_task_decomposition,
+             bench_complexity_analysis,
+             bench_task_graph
 }
 
 criterion_main!(benches);

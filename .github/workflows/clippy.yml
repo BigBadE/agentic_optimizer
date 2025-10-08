@@ -1,4 +1,4 @@
-name: Merlin-Build-Test
+name: Clippy
 
 on:
   schedule:
@@ -7,11 +7,6 @@ on:
     branches: [ "master" ]
   pull_request:
     branches: [ "master" ]
-
-# Cancel any other build tasks running
-concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
 
 env:
   CARGO_TERM_COLOR: always

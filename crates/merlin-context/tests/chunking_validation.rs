@@ -1,6 +1,7 @@
 //! Integration tests for chunking validation across the entire codebase.
 
 #![cfg(test)]
+#![allow(clippy::print_stderr, reason = "Test output requires stderr")]
 
 use merlin_context::embedding::chunking::{
     FileChunk, MAX_CHUNK_TOKENS, MIN_CHUNK_TOKENS, chunk_file, estimate_tokens,
@@ -215,12 +216,12 @@ fn test_all_chunks_respect_max_tokens() {
     info!("Tested {files_tested} files, {total_chunks} total chunks");
 
     if !violations.is_empty() {
-        info!("\n⚠️  Found {} violations:", violations.len());
+        eprintln!("\n⚠️  Found {} violations:", violations.len());
         for (index, violation) in violations.iter().enumerate().take(20) {
-            info!("  {}. {}", index + 1, violation);
+            eprintln!("  {}. {}", index + 1, violation);
         }
         if violations.len() > 20 {
-            info!("  ... and {} more", violations.len() - 20);
+            eprintln!("  ... and {} more", violations.len() - 20);
         }
         panic!(
             "❌ MAX_CHUNK_TOKENS validation failed with {} violations",
@@ -378,11 +379,7 @@ fn process_file_for_statistics(
 }
 
 /// Display chunk statistics
-fn display_chunk_statistics(
-    total_files: usize,
-    total_chunks: usize,
-    token_counts: &[usize],
-) {
+fn display_chunk_statistics(total_files: usize, total_chunks: usize, token_counts: &[usize]) {
     let min_tokens = token_counts[0];
     let max_tokens = token_counts[token_counts.len() - 1];
     let median_tokens = token_counts[token_counts.len() / 2];
@@ -428,7 +425,12 @@ fn test_chunk_statistics() {
     let mut token_counts = Vec::default();
 
     for file_path in files {
-        process_file_for_statistics(&file_path, &mut total_files, &mut total_chunks, &mut token_counts);
+        process_file_for_statistics(
+            &file_path,
+            &mut total_files,
+            &mut total_chunks,
+            &mut token_counts,
+        );
     }
 
     if token_counts.is_empty() {

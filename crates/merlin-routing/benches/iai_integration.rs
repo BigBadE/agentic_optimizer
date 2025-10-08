@@ -15,7 +15,7 @@ fn iai_e2e_simple_query() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
     let runtime = Runtime::new().unwrap();
-    
+
     runtime.block_on(async {
         let _result = orchestrator
             .analyze_request(black_box("What does the main function do?"))
@@ -28,7 +28,7 @@ fn iai_e2e_code_modification() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
     let runtime = Runtime::new().unwrap();
-    
+
     runtime.block_on(async {
         let _result = orchestrator
             .analyze_request(black_box("Add error handling to the parser module"))
@@ -41,7 +41,7 @@ fn iai_e2e_complex_refactor() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
     let runtime = Runtime::new().unwrap();
-    
+
     runtime.block_on(async {
         let _result = orchestrator
             .analyze_request(black_box(
@@ -56,13 +56,9 @@ fn iai_sequential_requests() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
     let runtime = Runtime::new().unwrap();
-    
-    let requests = vec![
-        "Add a comment",
-        "Fix the bug",
-        "Refactor the code",
-    ];
-    
+
+    let requests = vec!["Add a comment", "Fix the bug", "Refactor the code"];
+
     runtime.block_on(async {
         for request in &requests {
             let _result = orchestrator.analyze_request(black_box(request)).await;

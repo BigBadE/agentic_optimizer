@@ -33,15 +33,9 @@ pub fn chunk_rust(file_path: String, content: &str) -> Vec<FileChunk> {
         }
     }
 
-    // If no chunks or very few, return whole file
+    // If no chunks, fallback to generic chunking to respect MAX_CHUNK_TOKENS
     if chunks.is_empty() {
-        chunks.push(FileChunk::new(
-            file_path,
-            content.to_owned(),
-            String::from("file"),
-            1,
-            lines.len(),
-        ));
+        return super::chunk_generic_code(file_path, content);
     }
 
     chunks

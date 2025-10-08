@@ -404,32 +404,32 @@ impl ContextBuilder {
             return false;
         };
         ext.to_str().is_some_and(|ext| {
-                matches!(
-                    ext,
-                    "rs" | "py"
-                        | "js"
-                        | "ts"
-                        | "jsx"
-                        | "tsx"
-                        | "java"
-                        | "c"
-                        | "cpp"
-                        | "h"
-                        | "hpp"
-                        | "go"
-                        | "rb"
-                        | "php"
-                        | "cs"
-                        | "swift"
-                        | "kt"
-                        | "scala"
-                        | "toml"
-                        | "yaml"
-                        | "yml"
-                        | "json"
-                        | "xml"
-                )
-            })
+            matches!(
+                ext,
+                "rs" | "py"
+                    | "js"
+                    | "ts"
+                    | "jsx"
+                    | "tsx"
+                    | "java"
+                    | "c"
+                    | "cpp"
+                    | "h"
+                    | "hpp"
+                    | "go"
+                    | "rb"
+                    | "php"
+                    | "cs"
+                    | "swift"
+                    | "kt"
+                    | "scala"
+                    | "toml"
+                    | "yaml"
+                    | "yml"
+                    | "json"
+                    | "xml"
+            )
+        })
     }
 
     /// Check if a directory entry should be ignored

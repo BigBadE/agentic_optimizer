@@ -19,7 +19,7 @@ fn iai_analyze_simple_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
     let runtime = Runtime::new().unwrap();
-    
+
     runtime.block_on(async {
         let _result = orchestrator
             .analyze_request(black_box("Add a comment to main function"))
@@ -32,10 +32,12 @@ fn iai_analyze_medium_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
     let runtime = Runtime::new().unwrap();
-    
+
     runtime.block_on(async {
         let _result = orchestrator
-            .analyze_request(black_box("Refactor the parser module to use better error handling"))
+            .analyze_request(black_box(
+                "Refactor the parser module to use better error handling",
+            ))
             .await;
     });
 }
@@ -45,7 +47,7 @@ fn iai_analyze_complex_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
     let runtime = Runtime::new().unwrap();
-    
+
     runtime.block_on(async {
         let _result = orchestrator
             .analyze_request(black_box(

@@ -8,7 +8,7 @@ pub struct LongContextStrategy {
 }
 
 impl LongContextStrategy {
-    #[must_use]
+    /// Create a new long context strategy
     pub fn new(long_context_threshold: usize) -> Self {
         Self {
             long_context_threshold,
@@ -68,7 +68,7 @@ mod tests {
         let strategy = LongContextStrategy::new(16000);
 
         let huge_context = Task::new("Huge context task".to_owned())
-            .with_context(ContextRequirements::new().with_estimated_tokens(150_000));
+            .with_context(ContextRequirements::default().with_estimated_tokens(150_000));
 
         assert!(strategy.applies_to(&huge_context));
         let tier = match strategy.select_tier(&huge_context).await {
@@ -90,7 +90,7 @@ mod tests {
         let strategy = LongContextStrategy::new(16000);
 
         let medium_context = Task::new("Medium context task".to_owned())
-            .with_context(ContextRequirements::new().with_estimated_tokens(50000));
+            .with_context(ContextRequirements::default().with_estimated_tokens(50000));
 
         assert!(strategy.applies_to(&medium_context));
         let tier = match strategy.select_tier(&medium_context).await {
@@ -107,7 +107,7 @@ mod tests {
         let strategy = LongContextStrategy::new(16000);
 
         let full_context = Task::new("Full context task".to_owned()).with_context(
-            ContextRequirements::new()
+            ContextRequirements::default()
                 .with_estimated_tokens(10000)
                 .with_full_context(true),
         );

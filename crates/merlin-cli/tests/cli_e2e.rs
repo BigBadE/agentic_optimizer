@@ -1,10 +1,15 @@
-/// End-to-end CLI tests using assert_cmd
+//! End-to-end CLI tests using `assert_cmd`
+#![cfg(test)]
+#![allow(clippy::expect_used, reason = "Test code is allowed to use expect")]
+
 use assert_cmd::Command;
 use predicates::prelude::*;
 use std::fs;
 use tempfile::TempDir;
 
 #[test]
+/// # Panics
+/// Panics if the binary cannot be found or the command fails unexpectedly.
 fn test_cli_help() {
     Command::cargo_bin("merlin")
         .expect("Binary not found")
@@ -15,6 +20,8 @@ fn test_cli_help() {
 }
 
 #[test]
+/// # Panics
+/// Panics if the binary cannot be found or the command fails unexpectedly.
 fn test_cli_invalid_command() {
     Command::cargo_bin("merlin")
         .expect("Binary not found")
@@ -24,6 +31,8 @@ fn test_cli_invalid_command() {
 }
 
 #[test]
+/// # Panics
+/// Panics if the temp directory cannot be created, binary not found, or command fails.
 fn test_cli_in_empty_directory() {
     let temp = TempDir::new().expect("Failed to create temp dir");
 
@@ -36,6 +45,8 @@ fn test_cli_in_empty_directory() {
 }
 
 #[test]
+/// # Panics
+/// Panics if temp dir/file creation fails, binary not found, or command fails.
 fn test_cli_with_rust_project() {
     let temp = TempDir::new().expect("Failed to create temp dir");
 
@@ -67,6 +78,8 @@ edition = "2021"
 }
 
 #[test]
+/// # Panics
+/// Panics if temp dir/file creation fails, binary not found, or command fails.
 fn test_cli_reads_cargo_toml() {
     let temp = TempDir::new().expect("Failed to create temp dir");
 
@@ -90,6 +103,8 @@ edition = "2021"
 }
 
 #[test]
+/// # Panics
+/// Panics if temp dir creation fails, binary not found, or command fails.
 fn test_cli_handles_non_utf8_paths() {
     // This test ensures the CLI doesn't panic on edge cases
     let temp = TempDir::new().expect("Failed to create temp dir");
@@ -103,6 +118,8 @@ fn test_cli_handles_non_utf8_paths() {
 }
 
 #[test]
+/// # Panics
+/// Panics if the binary cannot be found or the command fails unexpectedly.
 fn test_cli_with_args() {
     Command::cargo_bin("merlin")
         .expect("Binary not found")

@@ -5,7 +5,6 @@ const SOURCE_EXTENSIONS: &[&str] = &[
     "c", "cpp", "h", "hpp",
 ];
 
-#[must_use]
 pub fn is_source_file(path: &Path) -> bool {
     path.extension()
         .and_then(|ext| ext.to_str())

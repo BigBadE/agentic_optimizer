@@ -8,12 +8,9 @@ pub struct StreamingChannel {
 }
 
 impl StreamingChannel {
-    #[must_use]
-    pub fn new() -> (Self, mpsc::UnboundedReceiver<StreamingEvent>) {
-        let (sender, receiver) = mpsc::unbounded_channel();
-        (Self { sender }, receiver)
-    }
-
+    /// Sends a streaming event through the channel.
+    ///
+    /// Events are dropped if the receiver has been closed.
     pub fn send(&self, event: StreamingEvent) {
         drop(self.sender.send(event));
     }
@@ -21,6 +18,7 @@ impl StreamingChannel {
 
 impl Default for StreamingChannel {
     fn default() -> Self {
-        Self::new().0
+        let (sender, _receiver) = mpsc::unbounded_channel();
+        Self { sender }
     }
 }

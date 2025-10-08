@@ -15,14 +15,6 @@ pub struct FileLockManager {
 }
 
 impl FileLockManager {
-    #[must_use]
-    pub fn new() -> Arc<Self> {
-        Arc::new(Self {
-            write_locks: RwLock::new(HashMap::new()),
-            read_locks: RwLock::new(HashMap::new()),
-        })
-    }
-
     /// Acquire write lock on files (exclusive access)
     ///
     /// # Errors
@@ -144,8 +136,8 @@ impl FileLockManager {
 impl Default for FileLockManager {
     fn default() -> Self {
         Self {
-            write_locks: RwLock::new(HashMap::new()),
-            read_locks: RwLock::new(HashMap::new()),
+            write_locks: RwLock::new(HashMap::default()),
+            read_locks: RwLock::new(HashMap::default()),
         }
     }
 }
@@ -197,9 +189,9 @@ mod tests {
     /// # Panics
     /// Panics if lock acquisition unexpectedly fails in the test harness.
     async fn test_write_lock_exclusive() {
-        let manager = FileLockManager::new();
-        let task_a = TaskId::new();
-        let task_b = TaskId::new();
+        let manager = Arc::new(FileLockManager::default());
+        let task_a = TaskId::default();
+        let task_b = TaskId::default();
         let file = PathBuf::from("test.rs");
 
         let _guard_a = match manager.acquire_write_locks(task_a, from_ref(&file)).await {
@@ -215,9 +207,9 @@ mod tests {
     /// # Panics
     /// Panics if lock acquisition unexpectedly fails in the test harness.
     async fn test_read_locks_shared() {
-        let manager = FileLockManager::new();
-        let task_a = TaskId::new();
-        let task_b = TaskId::new();
+        let manager = Arc::new(FileLockManager::default());
+        let task_a = TaskId::default();
+        let task_b = TaskId::default();
         let file = PathBuf::from("test.rs");
 
         let _guard_a = match manager.acquire_read_locks(task_a, from_ref(&file)).await {
@@ -234,9 +226,9 @@ mod tests {
     /// # Panics
     /// Panics if lock acquisition unexpectedly fails in the test harness.
     async fn test_write_blocks_read() {
-        let manager = FileLockManager::new();
-        let task_a = TaskId::new();
-        let task_b = TaskId::new();
+        let manager = Arc::new(FileLockManager::default());
+        let task_a = TaskId::default();
+        let task_b = TaskId::default();
         let file = PathBuf::from("test.rs");
 
         let _guard_a = match manager.acquire_write_locks(task_a, from_ref(&file)).await {

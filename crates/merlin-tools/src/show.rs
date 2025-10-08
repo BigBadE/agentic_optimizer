@@ -25,11 +25,6 @@ struct ShowParams {
 pub struct ShowTool;
 
 impl ShowTool {
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Load the requested file segment and format it for display.
     ///
     /// # Errors
@@ -49,7 +44,7 @@ impl ShowTool {
         let content = read_to_string(&params.file_path).await?;
         let lines: Vec<&str> = content.lines().collect();
 
-        let start = params.start_line.unwrap_or(1).saturating_sub(1);
+        let start = params.start_line.unwrap_or(1) - 1;
         let end = params.end_line.unwrap_or(lines.len()).min(lines.len());
 
         if start >= lines.len() {
@@ -82,7 +77,7 @@ impl ShowTool {
 
 impl Default for ShowTool {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 

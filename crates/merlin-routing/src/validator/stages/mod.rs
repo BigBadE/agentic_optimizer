@@ -1,6 +1,10 @@
+/// Build validation stage
 pub mod build;
+/// Lint validation stage
 pub mod lint;
+/// Syntax validation stage
 pub mod syntax;
+/// Test validation stage
 pub mod test;
 
 pub use build::BuildValidationStage;

@@ -1,9 +1,18 @@
-/// Tests for TUI rendering components
+//! Tests for TUI rendering components
+#![cfg(test)]
+#![allow(
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::absolute_paths,
+    reason = "Test code is allowed to use expect/unwrap and absolute paths"
+)]
+
 mod common;
 
 use common::*;
 use merlin_routing::TaskId;
 use merlin_routing::user_interface::{
+    input::InputManager,
     renderer::{FocusedPane, RenderCtx, Renderer, UiCtx},
     state::UiState,
     task_manager::TaskManager,
@@ -13,6 +22,8 @@ use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_renderer_creation() {
     let renderer = Renderer::new(Theme::default());
     // Default theme is Tokyo Night
@@ -20,6 +31,8 @@ fn test_renderer_creation() {
 }
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_theme_cycling() {
     let mut renderer = Renderer::new(Theme::default());
 
@@ -31,13 +44,15 @@ fn test_theme_cycling() {
 }
 
 #[test]
+/// # Panics
+/// Panics if terminal creation or rendering fails.
 fn test_render_empty_state() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");
 
-    let manager = TaskManager::new();
+    let manager = TaskManager::default();
     let state = UiState::default();
-    let input = merlin_routing::user_interface::input::InputManager::new();
+    let input = InputManager::default();
     let renderer = Renderer::new(Theme::default());
 
     let result = terminal.draw(|frame| {
@@ -52,23 +67,27 @@ fn test_render_empty_state() {
         renderer.render(frame, &ctx);
     });
 
-    assert!(result.is_ok());
+    result.unwrap();
 }
 
 #[test]
+/// # Panics
+/// Panics if terminal creation or rendering fails.
 fn test_render_with_tasks() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");
 
-    let mut manager = TaskManager::new();
-    let task_id = TaskId::new();
+    let mut manager = TaskManager::default();
+    let task_id = TaskId::default();
     manager.add_task(task_id, create_test_task("Test task"));
 
-    let mut state = UiState::default();
-    state.active_task_id = Some(task_id);
-    state.selected_task_index = 0;
+    let state = UiState {
+        active_task_id: Some(task_id),
+        selected_task_index: 0,
+        ..Default::default()
+    };
 
-    let input = merlin_routing::user_interface::input::InputManager::new();
+    let input = InputManager::default();
     let renderer = Renderer::new(Theme::default());
 
     let result = terminal.draw(|frame| {
@@ -83,27 +102,35 @@ fn test_render_with_tasks() {
         renderer.render(frame, &ctx);
     });
 
-    assert!(result.is_ok());
+    result.unwrap();
 
     // Check that the buffer contains our task
     let buffer = terminal.backend().buffer();
-    let content: String = buffer.content().iter().map(|c| c.symbol()).collect();
+    let content: String = buffer
+        .content()
+        .iter()
+        .map(ratatui::buffer::Cell::symbol)
+        .collect();
     assert!(content.contains("Test task") || content.contains("Test"));
 }
 
 #[test]
+/// # Panics
+/// Panics if terminal creation or rendering fails for any pane.
 fn test_render_all_panes() {
     let backend = TestBackend::new(120, 40);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");
 
-    let mut manager = TaskManager::new();
-    let task_id = TaskId::new();
+    let mut manager = TaskManager::default();
+    let task_id = TaskId::default();
     manager.add_task(task_id, create_test_task("Test"));
 
-    let mut state = UiState::default();
-    state.active_task_id = Some(task_id);
+    let state = UiState {
+        active_task_id: Some(task_id),
+        ..Default::default()
+    };
 
-    let input = merlin_routing::user_interface::input::InputManager::new();
+    let input = InputManager::default();
     let renderer = Renderer::new(Theme::default());
 
     // Test rendering each focused pane
@@ -120,21 +147,23 @@ fn test_render_all_panes() {
             renderer.render(frame, &ctx);
         });
 
-        assert!(result.is_ok(), "Rendering failed for pane: {focused:?}");
+        result.unwrap_or_else(|_| panic!("Rendering failed for pane: {focused:?}"));
     }
 }
 
 #[test]
+/// # Panics
+/// Panics if terminal creation or rendering fails.
 fn test_render_with_completed_task() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");
 
-    let mut manager = TaskManager::new();
-    let task_id = TaskId::new();
+    let mut manager = TaskManager::default();
+    let task_id = TaskId::default();
     manager.add_task(task_id, create_completed_task("Completed task"));
 
     let state = UiState::default();
-    let input = merlin_routing::user_interface::input::InputManager::new();
+    let input = InputManager::default();
     let renderer = Renderer::new(Theme::default());
 
     let result = terminal.draw(|frame| {
@@ -149,20 +178,22 @@ fn test_render_with_completed_task() {
         renderer.render(frame, &ctx);
     });
 
-    assert!(result.is_ok());
+    result.unwrap();
 }
 
 #[test]
+/// # Panics
+/// Panics if terminal creation or rendering fails.
 fn test_render_with_failed_task() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");
 
-    let mut manager = TaskManager::new();
-    let task_id = TaskId::new();
+    let mut manager = TaskManager::default();
+    let task_id = TaskId::default();
     manager.add_task(task_id, create_failed_task("Failed task"));
 
     let state = UiState::default();
-    let input = merlin_routing::user_interface::input::InputManager::new();
+    let input = InputManager::default();
     let renderer = Renderer::new(Theme::default());
 
     let result = terminal.draw(|frame| {
@@ -177,17 +208,19 @@ fn test_render_with_failed_task() {
         renderer.render(frame, &ctx);
     });
 
-    assert!(result.is_ok());
+    result.unwrap();
 }
 
 #[test]
+/// # Panics
+/// Panics if terminal creation or rendering fails for any theme.
 fn test_all_themes_render() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");
 
-    let manager = TaskManager::new();
+    let manager = TaskManager::default();
     let state = UiState::default();
-    let input = merlin_routing::user_interface::input::InputManager::new();
+    let input = InputManager::default();
 
     // Test all available themes
     let mut theme = Theme::default();
@@ -209,7 +242,7 @@ fn test_all_themes_render() {
             renderer.render(frame, &ctx);
         });
 
-        assert!(result.is_ok(), "Theme {} failed to render", theme.name());
+        result.unwrap_or_else(|_| panic!("Theme {} failed to render", theme.name()));
 
         let next = theme.next();
         if next.name() == start_theme_name {

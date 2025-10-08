@@ -322,7 +322,7 @@ This crate is used by:
 use agentic_core::{ModelProvider, Query, Context};
 use agentic_providers::GroqProvider;
 
-let provider = GroqProvider::new()?;
+let provider = GroqProvider::default()?;
 let query = Query::new("Explain this code");
 let context = Context::new("You are a coding assistant");
 

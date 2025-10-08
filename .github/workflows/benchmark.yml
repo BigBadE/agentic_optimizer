@@ -1,0 +1,70 @@
+name: Continuous Benchmarking
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  deployments: write
+  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  benchmark:
+    name: Run Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # Need full history for comparison
+
+      - name: Install Rust nightly
+        uses: dtolnay/rust-toolchain@nightly
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          cache-on-failure: true
+
+      - name: Run benchmarks
+        run: cargo bench --workspace -- --output-format bencher | tee benchmark_results.txt
+
+      - name: Download previous benchmark results
+        uses: actions/cache@v3
+        with:
+          path: ./cache
+          key: ${{ runner.os }}-benchmark
+
+      - name: Store benchmark result
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          name: Merlin Performance Benchmarks
+          tool: 'cargo'
+          output-file-path: benchmark_results.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+          # Alert if performance degrades by 115% (15% regression)
+          alert-threshold: '115%'
+          comment-on-alert: true
+          fail-on-alert: true
+          # Save results to gh-pages branch
+          gh-pages-branch: gh-pages
+          benchmark-data-dir-path: dev/bench
+
+      - name: Upload benchmark results
+        uses: actions/upload-artifact@v4
+        with:
+          name: benchmark-results
+          path: |
+            benchmark_results.txt
+            target/criterion/
+          retention-days: 365

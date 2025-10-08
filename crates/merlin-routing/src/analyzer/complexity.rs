@@ -3,15 +3,11 @@ use crate::{Complexity, ContextRequirements};
 use std::path::PathBuf;
 
 /// Estimates task complexity based on multiple factors
+#[derive(Default)]
 pub struct ComplexityEstimator;
 
 impl ComplexityEstimator {
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-
-    #[must_use]
+    /// Estimate task complexity
     pub fn estimate(&self, intent: &Intent, request: &str) -> Complexity {
         let mut score = 0;
 
@@ -27,13 +23,13 @@ impl ComplexityEstimator {
         Self::score_to_complexity(score)
     }
 
-    #[must_use]
+    /// Estimate context requirements for a task
     pub fn estimate_context_needs(&self, intent: &Intent, request: &str) -> ContextRequirements {
         let estimated_tokens = Self::estimate_token_count(request);
         let required_files = Self::extract_file_references(request);
         let requires_full_context = Self::needs_full_context(intent, request);
 
-        ContextRequirements::new()
+        ContextRequirements::default()
             .with_estimated_tokens(estimated_tokens)
             .with_files(required_files)
             .with_full_context(requires_full_context)
@@ -157,12 +153,6 @@ impl ComplexityEstimator {
     }
 }
 
-impl Default for ComplexityEstimator {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::super::intent::IntentExtractor;
@@ -172,8 +162,8 @@ mod tests {
     /// # Panics
     /// Panics if trivial/simple complexity mapping fails.
     fn test_trivial_complexity() {
-        let estimator = ComplexityEstimator::new();
-        let extractor = IntentExtractor::new();
+        let estimator = ComplexityEstimator;
+        let extractor = IntentExtractor;
 
         let intent = extractor.extract("Add a comment");
         let complexity = estimator.estimate(&intent, "Add a comment");
@@ -188,8 +178,8 @@ mod tests {
     /// # Panics
     /// Panics if complex refactor is not mapped to Complex.
     fn test_complex_refactor() {
-        let estimator = ComplexityEstimator::new();
-        let extractor = IntentExtractor::new();
+        let estimator = ComplexityEstimator;
+        let extractor = IntentExtractor;
 
         let intent = extractor.extract("Refactor the entire architecture to use async patterns");
         let complexity = estimator.estimate(
@@ -204,8 +194,8 @@ mod tests {
     /// # Panics
     /// Panics if context estimation yields unexpected values.
     fn test_context_estimation() {
-        let estimator = ComplexityEstimator::new();
-        let extractor = IntentExtractor::new();
+        let estimator = ComplexityEstimator;
+        let extractor = IntentExtractor;
 
         let intent = extractor.extract("Modify test.rs and main.rs");
         let context = estimator.estimate_context_needs(&intent, "Modify test.rs and main.rs");
@@ -218,8 +208,8 @@ mod tests {
     /// # Panics
     /// Panics if full context requirement is not detected.
     fn test_full_context_detection() {
-        let estimator = ComplexityEstimator::new();
-        let extractor = IntentExtractor::new();
+        let estimator = ComplexityEstimator;
+        let extractor = IntentExtractor;
 
         let intent = extractor.extract("Analyze the entire codebase");
         let context = estimator.estimate_context_needs(&intent, "Analyze the entire codebase");

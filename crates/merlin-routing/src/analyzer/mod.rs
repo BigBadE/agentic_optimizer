@@ -1,6 +1,15 @@
+//! Task analysis and complexity estimation.
+//!
+//! This module provides tools for analyzing user requests, estimating complexity,
+//! extracting intent, and decomposing tasks into subtasks.
+
+/// Complexity estimation for tasks
 pub mod complexity;
+/// Task decomposition into subtasks
 pub mod decompose;
+/// Intent extraction from user requests
 pub mod intent;
+/// Local task analyzer implementation
 pub mod local;
 
 use crate::{Complexity, Result, TaskAnalysis};

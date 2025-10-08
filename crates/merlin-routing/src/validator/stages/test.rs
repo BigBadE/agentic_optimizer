@@ -17,27 +17,21 @@ pub struct TestValidationStage {
 }
 
 impl TestValidationStage {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            timeout_seconds: 300,
-            workspace: None,
-            min_pass_rate: 1.0,
-        }
-    }
-
+    /// Set timeout for test validation
     #[must_use]
     pub fn with_timeout(mut self, timeout_seconds: u64) -> Self {
         self.timeout_seconds = timeout_seconds;
         self
     }
 
+    /// Set workspace for test validation
     #[must_use]
     pub fn with_workspace(mut self, workspace: Arc<WorkspaceState>) -> Self {
         self.workspace = Some(workspace);
         self
     }
 
+    /// Set minimum pass rate
     #[must_use]
     pub fn with_min_pass_rate(mut self, min_pass_rate: f64) -> Self {
         self.min_pass_rate = min_pass_rate;
@@ -47,7 +41,11 @@ impl TestValidationStage {
 
 impl Default for TestValidationStage {
     fn default() -> Self {
-        Self::new()
+        Self {
+            timeout_seconds: 300,
+            workspace: None,
+            min_pass_rate: 1.0,
+        }
     }
 }
 
@@ -139,7 +137,7 @@ mod tests {
     /// # Panics
     /// Panics if the result is not marked as skipped when no files are modified.
     async fn test_validation_skip_no_files() -> Result<()> {
-        let stage = TestValidationStage::new();
+        let stage = TestValidationStage::default();
         let response = Response {
             text: "test".to_owned(),
             confidence: 1.0,
@@ -162,7 +160,7 @@ mod tests {
     /// # Panics
     /// Panics if `quick_check` logic does not match expected patterns.
     async fn test_quick_check() -> Result<()> {
-        let stage = TestValidationStage::new();
+        let stage = TestValidationStage::default();
 
         let good_response = Response {
             text: "test result: ok. 5 passed".to_owned(),

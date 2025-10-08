@@ -12,6 +12,8 @@ use merlin_core::{Context, Error, ModelProvider, Query, Response, Result, TokenU
 const OPENROUTER_API_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
 /// Default model for `OpenRouter`.
 const DEFAULT_MODEL: &str = "anthropic/claude-sonnet-4-20250514";
+/// Env var key for `OpenRouter` API key.
+const ENV_OPENROUTER_API_KEY: &str = "OPENROUTER_API_KEY";
 
 /// Provider implementation for `OpenRouter` API.
 pub struct OpenRouterProvider {
@@ -30,11 +32,11 @@ impl OpenRouterProvider {
     /// Returns an error if the provided API key is empty.
     pub fn new(api_key: String) -> Result<Self> {
         if api_key.is_empty() {
-            return Err(Error::MissingApiKey("OPENROUTER_API_KEY".to_owned()));
+            return Err(Error::MissingApiKey(ENV_OPENROUTER_API_KEY.to_owned()));
         }
 
         Ok(Self {
-            client: Client::new(),
+            client: Client::default(),
             api_key,
             model: DEFAULT_MODEL.to_owned(),
         })
@@ -45,8 +47,8 @@ impl OpenRouterProvider {
     /// # Errors
     /// Returns an error if the env var is missing.
     pub fn from_env() -> Result<Self> {
-        let api_key = env::var("OPENROUTER_API_KEY")
-            .map_err(|_| Error::MissingApiKey("OPENROUTER_API_KEY".to_owned()))?;
+        let api_key = env::var(ENV_OPENROUTER_API_KEY)
+            .map_err(|_| Error::MissingApiKey(ENV_OPENROUTER_API_KEY.to_owned()))?;
         Self::new(api_key)
     }
 
@@ -56,9 +58,11 @@ impl OpenRouterProvider {
     /// Returns an error if the API key is not provided.
     pub fn from_config_or_env(config_key: Option<String>) -> Result<Self> {
         let api_key = config_key
-            .or_else(|| env::var("OPENROUTER_API_KEY").ok())
+            .or_else(|| env::var(ENV_OPENROUTER_API_KEY).ok())
             .ok_or_else(|| {
-                Error::MissingApiKey("OPENROUTER_API_KEY or config.toml openrouter_key".to_owned())
+                Error::MissingApiKey(format!(
+                    "{ENV_OPENROUTER_API_KEY} or config.toml openrouter_key"
+                ))
             })?;
         Self::new(api_key)
     }
@@ -191,7 +195,7 @@ impl ModelProvider for OpenRouterProvider {
                 .map_or(0, |details| details.cached_tokens);
 
             TokenUsage {
-                input: usage.prompt_tokens.saturating_sub(cache_read),
+                input: usage.prompt_tokens - cache_read,
                 output: usage.completion_tokens,
                 cache_read,
                 cache_write: 0,

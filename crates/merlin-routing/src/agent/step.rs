@@ -5,27 +5,23 @@ use crate::{
 use std::collections::HashMap;
 
 /// Tracks execution steps for tasks
+#[derive(Default)]
 pub struct StepTracker {
     steps: HashMap<TaskId, Vec<TaskStep>>,
 }
 
 impl StepTracker {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            steps: HashMap::new(),
-        }
-    }
-
+    /// Add a step to the tracker
     pub fn add_step(&mut self, step: TaskStep) {
         self.steps.entry(step.task_id).or_default().push(step);
     }
 
-    #[must_use]
+    /// Get steps for a task
     pub fn get_steps(&self, task_id: &TaskId) -> Option<&Vec<TaskStep>> {
         self.steps.get(task_id)
     }
 
+    /// Create and track a new step
     pub fn create_step(
         &mut self,
         task_id: TaskId,
@@ -35,11 +31,5 @@ impl StepTracker {
         let step = TaskStep::new(task_id, step_type, content);
         self.add_step(step.clone());
         step
-    }
-}
-
-impl Default for StepTracker {
-    fn default() -> Self {
-        Self::new()
     }
 }

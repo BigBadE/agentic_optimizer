@@ -5,36 +5,49 @@ use serde::{Deserialize, Serialize};
 use serde_json::{Error as SerdeJsonError, Value};
 use thiserror::Error;
 
+/// Errors that can occur during tool execution.
 #[derive(Debug, Error)]
 pub enum ToolError {
+    /// An I/O operation failed.
     #[error("IO error: {0}")]
     Io(#[from] IoError),
 
+    /// The provided input parameters were invalid or malformed.
     #[error("Invalid input: {0}")]
     InvalidInput(String),
 
+    /// The tool failed to execute its operation.
     #[error("Tool execution failed: {0}")]
     ExecutionFailed(String),
 
+    /// Failed to serialize or deserialize data.
     #[error("Serialization error: {0}")]
     Serialization(#[from] SerdeJsonError),
 }
 
+/// Result type for tool operations.
 pub type ToolResult<T> = Result<T, ToolError>;
 
+/// Input parameters provided to a tool for execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolInput {
+    /// JSON value containing the tool-specific parameters.
     pub params: Value,
 }
 
+/// Output returned by a tool after execution.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ToolOutput {
+    /// Whether the tool execution succeeded.
     pub success: bool,
+    /// Human-readable message describing the result.
     pub message: String,
+    /// Optional JSON data containing tool-specific output.
     pub data: Option<Value>,
 }
 
 impl ToolOutput {
+    /// Creates a successful output with the given message and no data.
     pub fn success<T: Into<String>>(message: T) -> Self {
         Self {
             success: true,
@@ -43,6 +56,7 @@ impl ToolOutput {
         }
     }
 
+    /// Creates a successful output with the given message and associated data.
     pub fn success_with_data<T: Into<String>>(message: T, data: Value) -> Self {
         Self {
             success: true,
@@ -51,6 +65,7 @@ impl ToolOutput {
         }
     }
 
+    /// Creates an error output with the given message.
     pub fn error<T: Into<String>>(message: T) -> Self {
         Self {
             success: false,
@@ -60,11 +75,19 @@ impl ToolOutput {
     }
 }
 
+/// Trait for implementing executable tools that can be invoked by the system.
 #[async_trait]
 pub trait Tool: Send + Sync {
+    /// Returns the unique identifier for this tool.
     fn name(&self) -> &'static str;
 
+    /// Returns a human-readable description of what this tool does and its parameters.
     fn description(&self) -> &'static str;
 
+    /// Executes the tool with the provided input parameters.
+    ///
+    /// # Errors
+    ///
+    /// Returns a `ToolError` if the input is invalid or execution fails.
     async fn execute(&self, input: ToolInput) -> ToolResult<ToolOutput>;
 }

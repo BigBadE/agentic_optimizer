@@ -26,6 +26,11 @@ unicode-width.workspace = true
 
 [dev-dependencies]
 tokio-test.workspace = true
+criterion = { version = "0.5", features = ["html_reports", "async_tokio"] }
+
+[[bench]]
+name = "routing_benchmarks"
+harness = false
 
 [lints]
 workspace = true

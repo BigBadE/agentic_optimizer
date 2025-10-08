@@ -79,15 +79,15 @@ pub struct ContextPlan {
 impl Default for ContextPlan {
     fn default() -> Self {
         Self {
-            keywords: Vec::new(),
-            symbols: Vec::new(),
-            file_patterns: Vec::new(),
+            keywords: Vec::default(),
+            symbols: Vec::default(),
+            file_patterns: Vec::default(),
             include_tests: false,
             max_depth: 2,
             strategy: ExpansionStrategy::Focused {
-                symbols: Vec::new(),
+                symbols: Vec::default(),
             },
-            reasoning: String::new(),
+            reasoning: String::default(),
         }
     }
 }
@@ -121,7 +121,6 @@ pub enum ExpansionStrategy {
 
 impl ContextPlan {
     /// Create a new context plan
-    #[must_use]
     pub fn new(strategy: ExpansionStrategy) -> Self {
         Self {
             strategy,

@@ -7,24 +7,9 @@ use merlin_core::{FileContext, Result};
 use rust_backend::{RustBackend, SearchQuery as RustSearchQuery, SymbolKind as RustSymbolKind};
 
 /// Wrapper for `RustBackend` that implements `LanguageProvider`
+#[derive(Default)]
 pub struct RustBackendWrapper {
     backend: RustBackend,
-}
-
-impl RustBackendWrapper {
-    /// Create a new Rust backend wrapper
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            backend: RustBackend::new(),
-        }
-    }
-}
-
-impl Default for RustBackendWrapper {
-    fn default() -> Self {
-        Self::new()
-    }
 }
 
 impl LanguageProvider for RustBackendWrapper {

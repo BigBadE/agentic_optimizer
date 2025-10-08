@@ -22,17 +22,15 @@ pub struct ContextManager {
 
 impl ContextManager {
     /// Create a new context manager
-    #[must_use]
     pub fn new(max_tokens: usize) -> Self {
         Self {
-            files: Vec::new(),
+            files: Vec::default(),
             token_count: 0,
             max_tokens,
         }
     }
 
     /// Estimate tokens in text (rough approximation: ~4 chars per token)
-    #[must_use]
     pub fn estimate_tokens(text: &str) -> usize {
         // More accurate: count words and punctuation
         let chars = text.len();
@@ -88,37 +86,31 @@ impl ContextManager {
     }
 
     /// Get current token count
-    #[must_use]
     pub fn token_count(&self) -> usize {
         self.token_count
     }
 
     /// Get remaining tokens
-    #[must_use]
     pub fn remaining_tokens(&self) -> usize {
-        self.max_tokens.saturating_sub(self.token_count)
+        self.max_tokens - self.token_count
     }
 
     /// Get number of files
-    #[must_use]
     pub fn file_count(&self) -> usize {
         self.files.len()
     }
 
     /// Check if context is full
-    #[must_use]
     pub fn is_full(&self) -> bool {
         self.token_count >= self.max_tokens
     }
 
     /// Consume and return the files
-    #[must_use]
     pub fn into_files(self) -> Vec<FileContext> {
         self.files
     }
 
     /// Get files reference
-    #[must_use]
     pub fn files(&self) -> &[FileContext] {
         &self.files
     }
@@ -156,7 +148,6 @@ pub struct PrioritizedFile {
 
 impl PrioritizedFile {
     /// Create a new prioritized file
-    #[must_use]
     pub fn new(file: FileContext, priority: FilePriority) -> Self {
         Self {
             file,
@@ -166,7 +157,6 @@ impl PrioritizedFile {
     }
 
     /// Create with score
-    #[must_use]
     pub fn with_score(file: FileContext, priority: FilePriority, score: f32) -> Self {
         Self {
             file,

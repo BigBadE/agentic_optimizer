@@ -11,15 +11,18 @@ use toml::from_str as toml_from_str;
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize, Serialize)]
 #[serde(rename_all = "lowercase")]
 pub enum Priority {
+    /// Must appear in top 3 results.
     Critical,
+    /// Should appear in top 5 results.
     High,
+    /// Should appear in top 10 results.
     Medium,
+    /// Should appear in top 20 results.
     Low,
 }
 
 impl Priority {
     /// Get weight for NDCG calculation
-    #[must_use]
     pub fn weight(self) -> f32 {
         match self {
             Self::Critical => 1.0,
@@ -30,7 +33,6 @@ impl Priority {
     }
 
     /// Get expected rank range
-    #[must_use]
     pub fn expected_rank(self) -> usize {
         match self {
             Self::Critical => 3,
@@ -44,72 +46,101 @@ impl Priority {
 /// Expected file in benchmark
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExpectedFile {
+    /// File path relative to project root.
     pub path: String,
+    /// Priority level for this file.
     pub priority: Priority,
+    /// Explanation of why this file is expected.
     pub reason: String,
 }
 
 /// Excluded file that should not appear
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct ExcludedFile {
+    /// File path that should not be in results.
     pub path: String,
+    /// Explanation of why this file should be excluded.
     pub reason: String,
 }
 
 /// Test case definition
 #[derive(Debug, Clone, Deserialize, Serialize)]
 pub struct TestCase {
+    /// Name of the test case.
     pub name: String,
+    /// Description of what this test evaluates.
     pub description: String,
+    /// User query to test.
     pub query: String,
+    /// Optional project root override.
     #[serde(default)]
     pub project_root: Option<String>,
+    /// Files expected to appear in results.
     pub expected: Vec<ExpectedFile>,
+    /// Files that should not appear in results.
     pub excluded: Vec<ExcludedFile>,
 }
 
 /// Result of a single file in the ranking
 #[derive(Debug, Clone)]
 pub struct RankedFile {
+    /// Path to the file.
     pub path: PathBuf,
+    /// Position in the ranking (1-indexed).
     pub rank: usize,
+    /// Relevance score.
     pub score: f32,
 }
 
 /// Benchmark metrics
 #[derive(Debug, Clone, Serialize)]
 pub struct BenchmarkMetrics {
+    /// Precision at rank 3 (fraction of top 3 that are expected).
     pub precision_at_3: f32,
+    /// Precision at rank 5 (fraction of top 5 that are expected).
     pub precision_at_5: f32,
+    /// Precision at rank 10 (fraction of top 10 that are expected).
     pub precision_at_10: f32,
+    /// Recall at rank 10 (fraction of expected files in top 10).
     pub recall_at_10: f32,
+    /// Recall at rank 20 (fraction of expected files in top 20).
     pub recall_at_20: f32,
+    /// Mean Reciprocal Rank.
     pub mrr: f32,
+    /// Normalized Discounted Cumulative Gain at rank 10.
     pub ndcg_at_10: f32,
+    /// Fraction of excluded files that appeared in results.
     pub exclusion_rate: f32,
+    /// Fraction of critical files in top 3.
     pub critical_in_top_3: f32,
+    /// Fraction of high-priority files in top 5.
     pub high_in_top_5: f32,
 }
 
 /// Detailed result for a test case
 #[derive(Debug, Clone)]
 pub struct BenchmarkResult {
+    /// The test case that was executed
     pub test_case: TestCase,
+    /// Performance metrics for this test case
     pub metrics: BenchmarkMetrics,
+    /// All ranked files returned by the search
     pub ranked_files: Vec<RankedFile>,
+    /// Expected files that were found (rank, file)
     pub found_expected: Vec<(usize, ExpectedFile)>,
+    /// Expected files that were not found
     pub missing_expected: Vec<ExpectedFile>,
+    /// Excluded files that were incorrectly found (rank, file)
     pub found_excluded: Vec<(usize, ExcludedFile)>,
 }
 
 impl BenchmarkResult {
     /// Create result from test case and ranked files
-    #[must_use]
     pub fn new(test_case: TestCase, ranked_files: Vec<RankedFile>) -> Self {
         let metrics = Self::calculate_metrics(&test_case, &ranked_files);
 
-        let mut found_expected = Vec::new();
-        let mut missing_expected = Vec::new();
+        let mut found_expected = Vec::default();
+        let mut missing_expected = Vec::default();
 
         for expected in &test_case.expected {
             if let Some(rank) = Self::find_file_rank(&ranked_files, &expected.path) {
@@ -119,7 +150,7 @@ impl BenchmarkResult {
             }
         }
 
-        let mut found_excluded = Vec::new();
+        let mut found_excluded = Vec::default();
         for excluded in &test_case.excluded {
             if let Some(rank) = Self::find_file_rank(&ranked_files, &excluded.path)
                 && rank <= 20
@@ -366,10 +397,13 @@ impl BenchmarkResult {
     }
 
     /// Format result as human-readable text
-    #[must_use]
     #[allow(clippy::unused_io_amount, reason = "Writing to String never fails")]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Report formatting requires detailed output"
+    )]
     pub fn format_report(&self) -> String {
-        let mut report = String::new();
+        let mut report = String::default();
 
         {
             write!(report, "# Benchmark: {}\n\n", self.test_case.name).unwrap_or(());
@@ -515,7 +549,7 @@ pub fn load_test_case(path: &Path) -> Result<TestCase> {
 /// Returns an error if the directory cannot be read
 pub fn load_test_cases(dir: &Path) -> Result<TestCaseCollection> {
     use std::fs::read_dir;
-    let mut test_cases = Vec::new();
+    let mut test_cases = Vec::default();
 
     for entry in read_dir(dir)? {
         let entry = entry?;
@@ -525,7 +559,7 @@ pub fn load_test_cases(dir: &Path) -> Result<TestCaseCollection> {
             match load_test_case(&path) {
                 Ok(test_case) => test_cases.push((path, test_case)),
                 Err(error) => {
-                    tracing::warn!("Warning: Failed to load {}: {}", path.display(), error)
+                    tracing::warn!("Warning: Failed to load {}: {}", path.display(), error);
                 }
             }
         }

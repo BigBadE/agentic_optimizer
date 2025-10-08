@@ -1,4 +1,11 @@
+//! Multi-stage validation pipeline for code generation.
+//!
+//! This module provides a validation framework with multiple stages
+//! (syntax, lint, test, build) that can be run sequentially or with early exit.
+
+/// Validation pipeline implementation
 pub mod pipeline;
+/// Individual validation stages
 pub mod stages;
 
 use crate::{Result, Task, ValidationResult};

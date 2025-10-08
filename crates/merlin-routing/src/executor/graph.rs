@@ -11,7 +11,7 @@ pub struct TaskGraph {
 }
 
 impl TaskGraph {
-    #[must_use]
+    /// Create a task graph from tasks
     pub fn from_tasks(tasks: &[Task]) -> Self {
         let mut graph = DiGraph::new();
         let mut node_map = HashMap::new();
@@ -34,7 +34,6 @@ impl TaskGraph {
     }
 
     /// Get tasks ready to execute (no pending dependencies)
-    #[must_use]
     pub fn ready_tasks(&self, completed: &HashSet<TaskId>) -> Vec<Task> {
         self.graph
             .node_indices()
@@ -59,25 +58,21 @@ impl TaskGraph {
     }
 
     /// Check if all tasks completed
-    #[must_use]
     pub fn is_complete(&self, completed: &HashSet<TaskId>) -> bool {
         self.graph.node_count() == completed.len()
     }
 
     /// Detect cycles (invalid graph)
-    #[must_use]
     pub fn has_cycles(&self) -> bool {
         algo::is_cyclic_directed(&self.graph)
     }
 
     /// Get total task count
-    #[must_use]
     pub fn task_count(&self) -> usize {
         self.graph.node_count()
     }
 
     /// Get all tasks
-    #[must_use]
     pub fn tasks(&self) -> Vec<Task> {
         self.graph.node_weights().cloned().collect()
     }
@@ -97,7 +92,7 @@ mod tests {
         let task_b = Task::new("Task B".to_owned()).with_dependencies(vec![task_a.id]);
 
         let graph = TaskGraph::from_tasks(&[task_a.clone(), task_b.clone()]);
-        let mut completed = HashSet::new();
+        let mut completed = HashSet::default();
 
         let ready = graph.ready_tasks(&completed);
         assert_eq!(ready.len(), 1);

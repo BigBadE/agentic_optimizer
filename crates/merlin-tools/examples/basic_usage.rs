@@ -1,3 +1,5 @@
+//! Example demonstrating basic usage of merlin-tools.
+
 use anyhow::Result;
 use merlin_tools::{BashTool, EditTool, ShowTool, Tool as _, ToolInput};
 use serde_json::{json, to_string};
@@ -11,9 +13,9 @@ async fn main() -> Result<()> {
     let subscriber = fmt().with_writer(stderr).finish();
     set_global_default(subscriber)?;
 
-    let show_tool = ShowTool::new();
-    let edit_tool = EditTool::new();
-    let bash_tool = BashTool::new();
+    let show_tool = ShowTool;
+    let edit_tool = EditTool;
+    let bash_tool = BashTool;
 
     info!("Available tools:");
     info!(tool = %show_tool.name(), description = %show_tool.description(), "Tool available");

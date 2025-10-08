@@ -7,21 +7,40 @@ use merlin_core::Response;
 use std::sync::Arc;
 use std::time::Instant;
 
-/// Individual validation stage trait
+/// Individual validation stage trait.
 #[async_trait]
 pub trait ValidationStage: Send + Sync {
+    /// Validates a response against a task.
+    ///
+    /// # Errors
+    /// Returns an error if validation cannot be performed.
     async fn validate(&self, response: &Response, task: &Task) -> Result<StageResult>;
+
+    /// Performs a quick pre-flight check of the response.
+    ///
+    /// # Errors
+    /// Returns an error if the quick check cannot be performed.
     async fn quick_check(&self, response: &Response) -> Result<bool>;
+
+    /// Returns the human-readable name of this stage.
     fn name(&self) -> &'static str;
+
+    /// Returns the stage type identifier.
     fn stage_type(&self) -> StageType;
 }
 
+/// Internal validation stage result (different from public `StageResult`).
 #[derive(Debug, Clone)]
 pub struct StageResult {
+    /// Which validation stage this result is for
     pub stage: StageType,
+    /// Whether this stage passed
     pub passed: bool,
+    /// Duration in milliseconds
     pub duration_ms: u64,
+    /// Detailed information about the result
     pub details: String,
+    /// Quality score for this stage (0.0 to 1.0)
     pub score: f64,
 }
 
@@ -34,7 +53,7 @@ pub struct ValidationPipeline {
 }
 
 impl ValidationPipeline {
-    #[must_use]
+    /// Creates a new validation pipeline with the given stages.
     pub fn new(stages: Vec<Arc<dyn ValidationStage>>) -> Self {
         Self {
             stages,
@@ -42,23 +61,26 @@ impl ValidationPipeline {
         }
     }
 
+    /// Configures whether to exit early on first failure.
     #[must_use]
     pub fn with_early_exit(mut self, early_exit: bool) -> Self {
         self.early_exit = early_exit;
         self
     }
 
-    #[must_use]
+    /// Creates a pipeline with the default validation stages.
+    ///
+    /// Includes: Syntax, Build, Test, and Lint stages (in that order).
     pub fn with_default_stages() -> Self {
         use super::stages::{
             BuildValidationStage, LintValidationStage, SyntaxValidationStage, TestValidationStage,
         };
 
         let stages: Vec<Arc<dyn ValidationStage>> = vec![
-            Arc::new(SyntaxValidationStage::new()),
-            Arc::new(BuildValidationStage::new()),
-            Arc::new(TestValidationStage::new()),
-            Arc::new(LintValidationStage::new()),
+            Arc::new(SyntaxValidationStage::default()),
+            Arc::new(BuildValidationStage::default()),
+            Arc::new(TestValidationStage::default()),
+            Arc::new(LintValidationStage::default()),
         ];
 
         Self::new(stages)
@@ -71,9 +93,9 @@ impl Validator for ValidationPipeline {
         let mut result = ValidationResult {
             passed: true,
             score: 1.0,
-            errors: Vec::new(),
-            warnings: Vec::new(),
-            stages: Vec::new(),
+            errors: Vec::default(),
+            warnings: Vec::default(),
+            stages: Vec::default(),
         };
 
         for stage in &self.stages {

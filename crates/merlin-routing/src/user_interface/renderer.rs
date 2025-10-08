@@ -42,13 +42,19 @@ struct TaskEnv<'env> {
 
 /// Shared UI context used to reduce argument count for render helpers
 pub struct UiCtx<'ctx> {
+    /// Task manager reference
     pub task_manager: &'ctx TaskManager,
+    /// UI state reference
     pub state: &'ctx UiState,
 }
 
+/// Rendering context with all necessary references
 pub struct RenderCtx<'ctx> {
+    /// UI context
     pub ui_ctx: UiCtx<'ctx>,
+    /// Input manager reference
     pub input: &'ctx InputManager,
+    /// Currently focused pane
     pub focused: FocusedPane,
 }
 
@@ -290,7 +296,7 @@ impl Renderer {
         let visible_items: Vec<ListItem> = task_items
             .into_iter()
             .skip(scroll_offset)
-            .take(area.height.saturating_sub(2) as usize)
+            .take((area.height.saturating_sub(2)) as usize)
             .collect();
 
         let list = List::new(visible_items)
@@ -373,7 +379,7 @@ impl Renderer {
         );
         let prefix_width = line_prefix.len();
 
-        let content_width = params.available_width.saturating_sub(prefix_width);
+        let content_width = params.available_width - prefix_width;
         if content_width < 20 {
             return vec![format!("{}{}", line_prefix, params.content)];
         }
@@ -478,7 +484,7 @@ impl Renderer {
     /// Returns a collapse/expand indicator for a task if it has children
     fn get_collapse_indicator(task_id: TaskId, task_manager: &TaskManager) -> String {
         if !task_manager.has_children(task_id) {
-            return String::new();
+            return String::default();
         }
 
         if task_manager.is_collapsed(task_id) {
@@ -561,15 +567,15 @@ impl Renderer {
         }
 
         if active_task_id.is_none() {
-            return total_items.saturating_sub(list_height);
+            return total_items - list_height;
         }
 
         if selected_index < list_height / 2 {
             0
-        } else if selected_index >= total_items.saturating_sub(list_height / 2) {
-            total_items.saturating_sub(list_height)
+        } else if selected_index >= total_items - list_height / 2 {
+            total_items - list_height
         } else {
-            selected_index.saturating_sub(list_height / 2)
+            selected_index - list_height / 2
         }
     }
 
@@ -650,17 +656,17 @@ fn wrap_tree_content(
 /// Builds the textual tree prefix (e.g., │, ├─, └─) for a task based on ancestry and position
 fn build_task_tree_prefix(task_id: TaskId, idx: usize, task_manager: &TaskManager) -> String {
     let Some(task) = task_manager.get_task(task_id) else {
-        return String::new();
+        return String::default();
     };
 
     if task.parent_id.is_none() {
-        return String::new();
+        return String::default();
     }
 
     let mut ancestors = collect_ancestors(task_id, task_manager);
     ancestors.reverse();
 
-    let mut prefix = String::new();
+    let mut prefix = String::default();
 
     for (level, &ancestor_id) in ancestors.iter().enumerate() {
         let has_more_siblings = check_more_siblings(ancestor_id, task_manager);
@@ -678,7 +684,7 @@ fn build_task_tree_prefix(task_id: TaskId, idx: usize, task_manager: &TaskManage
 
 /// Collects up to a limited number of ancestor task IDs for the given task
 fn collect_ancestors(task_id: TaskId, task_manager: &TaskManager) -> Vec<TaskId> {
-    let mut ancestors = Vec::new();
+    let mut ancestors = Vec::default();
     let mut current_parent = task_manager
         .get_task(task_id)
         .and_then(|task_item| task_item.parent_id);

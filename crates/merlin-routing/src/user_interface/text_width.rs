@@ -19,7 +19,6 @@ impl Default for EmojiMode {
 }
 
 /// Calculate the display width of a string, handling emojis and grapheme clusters correctly
-#[must_use]
 pub fn calculate_width(text: &str, mode: EmojiMode) -> usize {
     text.graphemes(true)
         .map(|grapheme| grapheme_width(grapheme, mode))
@@ -87,9 +86,8 @@ fn is_zwj_sequence(grapheme: &str) -> bool {
 }
 
 /// Truncate text to fit within a maximum width, respecting grapheme boundaries
-#[must_use]
 pub fn truncate_to_width(text: &str, max_width: usize, mode: EmojiMode) -> String {
-    let mut result = String::new();
+    let mut result = String::default();
     let mut current_width = 0;
 
     for grapheme in text.graphemes(true) {
@@ -107,7 +105,6 @@ pub fn truncate_to_width(text: &str, max_width: usize, mode: EmojiMode) -> Strin
 }
 
 /// Strip emojis from text, replacing with safe fallback
-#[must_use]
 pub fn strip_emojis(text: &str, fallback: &str) -> String {
     text.graphemes(true)
         .map(|grapheme| {
@@ -121,10 +118,9 @@ pub fn strip_emojis(text: &str, fallback: &str) -> String {
 }
 
 /// Wrap text to fit within a maximum width, respecting grapheme boundaries
-#[must_use]
 pub fn wrap_text(text: &str, max_width: usize, mode: EmojiMode) -> Vec<String> {
-    let mut lines = Vec::new();
-    let mut current_line = String::new();
+    let mut lines = Vec::default();
+    let mut current_line = String::default();
     let mut current_width = 0;
 
     for grapheme in text.graphemes(true) {
@@ -133,7 +129,7 @@ pub fn wrap_text(text: &str, max_width: usize, mode: EmojiMode) -> Vec<String> {
         // Handle newlines
         if grapheme == "\n" {
             lines.push(current_line);
-            current_line = String::new();
+            current_line = String::default();
             current_width = 0;
             continue;
         }
@@ -141,7 +137,7 @@ pub fn wrap_text(text: &str, max_width: usize, mode: EmojiMode) -> Vec<String> {
         // Check if adding this grapheme would exceed max width
         if current_width + grapheme_w > max_width && !current_line.is_empty() {
             lines.push(current_line);
-            current_line = String::new();
+            current_line = String::default();
             current_width = 0;
         }
 

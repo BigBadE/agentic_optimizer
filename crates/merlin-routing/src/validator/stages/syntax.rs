@@ -12,13 +12,7 @@ pub struct SyntaxValidationStage {
 }
 
 impl SyntaxValidationStage {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            min_score_threshold: 0.8,
-        }
-    }
-
+    /// Set minimum score threshold
     #[must_use]
     pub fn with_threshold(mut self, threshold: f64) -> Self {
         self.min_score_threshold = threshold;
@@ -28,7 +22,7 @@ impl SyntaxValidationStage {
     /// Heuristically checks for syntax issues and returns (passed, score, details)
     fn check_syntax_errors(&self, text: &str) -> (bool, f64, String) {
         let mut score = 1.0;
-        let mut issues = Vec::new();
+        let mut issues = Vec::default();
 
         if text.contains("syntax error") || text.contains("SyntaxError") {
             score *= 0.0;
@@ -79,7 +73,9 @@ impl SyntaxValidationStage {
 
 impl Default for SyntaxValidationStage {
     fn default() -> Self {
-        Self::new()
+        Self {
+            min_score_threshold: 0.8,
+        }
     }
 }
 
@@ -125,7 +121,7 @@ mod tests {
     /// # Panics
     /// Panics if the validation does not pass for syntactically valid code.
     async fn test_syntax_validation_pass() -> Result<()> {
-        let stage = SyntaxValidationStage::new();
+        let stage = SyntaxValidationStage::default();
         let response = Response {
             text: "fn main() { println!(\"Hello\"); }".to_owned(),
             confidence: 1.0,
@@ -148,7 +144,7 @@ mod tests {
     /// # Panics
     /// Panics if the validation incorrectly passes for syntactically invalid code.
     async fn test_syntax_validation_fail() -> Result<()> {
-        let stage = SyntaxValidationStage::new();
+        let stage = SyntaxValidationStage::default();
         let response = Response {
             text: "syntax error: unexpected token".to_owned(),
             confidence: 1.0,
@@ -171,7 +167,7 @@ mod tests {
     /// # Panics
     /// Panics if mismatched braces are not detected by the syntax checker.
     async fn test_mismatched_braces() -> Result<()> {
-        let stage = SyntaxValidationStage::new();
+        let stage = SyntaxValidationStage::default();
         let response = Response {
             text: "fn main() { println!(\"Hello\");".to_owned(),
             confidence: 1.0,

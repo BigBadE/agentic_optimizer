@@ -8,7 +8,7 @@ pub struct CostOptimizationStrategy {
 }
 
 impl CostOptimizationStrategy {
-    #[must_use]
+    /// Create a new cost optimization strategy
     pub fn new(max_tokens_for_local: usize) -> Self {
         Self {
             max_tokens_for_local,
@@ -66,7 +66,7 @@ mod tests {
         let strategy = CostOptimizationStrategy::new(4000);
 
         let small_task = Task::new("Small task".to_owned())
-            .with_context(ContextRequirements::new().with_estimated_tokens(2000));
+            .with_context(ContextRequirements::default().with_estimated_tokens(2000));
         let tier_small = match strategy.select_tier(&small_task).await {
             Ok(tier) => tier,
             Err(error) => panic!("failed to select tier for small task: {error}"),
@@ -74,7 +74,7 @@ mod tests {
         assert!(matches!(tier_small, ModelTier::Local { .. }));
 
         let medium_task = Task::new("Medium task".to_owned())
-            .with_context(ContextRequirements::new().with_estimated_tokens(6000));
+            .with_context(ContextRequirements::default().with_estimated_tokens(6000));
         let tier_medium = match strategy.select_tier(&medium_task).await {
             Ok(tier) => tier,
             Err(error) => panic!("failed to select tier for medium task: {error}"),
@@ -82,7 +82,7 @@ mod tests {
         assert!(matches!(tier_medium, ModelTier::Groq { .. }));
 
         let large_task = Task::new("Large task".to_owned())
-            .with_context(ContextRequirements::new().with_estimated_tokens(10000));
+            .with_context(ContextRequirements::default().with_estimated_tokens(10000));
         let tier_large = match strategy.select_tier(&large_task).await {
             Ok(tier) => tier,
             Err(error) => panic!("failed to select tier for large task: {error}"),

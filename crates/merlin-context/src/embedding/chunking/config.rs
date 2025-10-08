@@ -4,12 +4,11 @@ use super::{FileChunk, MIN_CHUNK_TOKENS, estimate_tokens};
 use std::mem::take;
 
 /// Chunk config files by top-level sections with token limits
-#[must_use]
 pub fn chunk_config(file_path: String, content: &str) -> Vec<FileChunk> {
     let lines: Vec<&str> = content.lines().collect();
-    let mut chunks = Vec::new();
+    let mut chunks = Vec::default();
     let mut current_chunk_start = 0;
-    let mut buffer = String::new();
+    let mut buffer = String::default();
     let mut current_section = String::from("root");
     let mut line_count = 0;
 

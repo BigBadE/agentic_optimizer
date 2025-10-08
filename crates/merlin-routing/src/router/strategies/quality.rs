@@ -3,20 +3,10 @@ use crate::{ModelTier, Priority, Result, Task};
 use async_trait::async_trait;
 
 /// Routes quality-critical tasks to premium models
+#[derive(Default)]
 pub struct QualityCriticalStrategy;
 
-impl QualityCriticalStrategy {
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for QualityCriticalStrategy {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+impl QualityCriticalStrategy {}
 
 #[async_trait]
 impl RoutingStrategy for QualityCriticalStrategy {
@@ -55,7 +45,7 @@ mod tests {
     /// # Panics
     /// Panics if a premium tier is not selected for critical tasks.
     async fn test_quality_critical_routing() {
-        let strategy = QualityCriticalStrategy::new();
+        let strategy = QualityCriticalStrategy;
 
         let critical_task = Task::new("Critical task".to_owned()).with_priority(Priority::Critical);
 
@@ -81,7 +71,7 @@ mod tests {
     /// # Panics
     /// Panics if a premium tier is not selected for high priority tasks.
     async fn test_high_priority_routing() {
-        let strategy = QualityCriticalStrategy::new();
+        let strategy = QualityCriticalStrategy;
 
         let high_task = Task::new("High priority task".to_owned()).with_priority(Priority::High);
 
@@ -97,7 +87,7 @@ mod tests {
     /// # Panics
     /// Panics if applicability check fails unexpectedly.
     async fn test_low_priority_not_applicable() {
-        let strategy = QualityCriticalStrategy::new();
+        let strategy = QualityCriticalStrategy;
 
         let low_task = Task::new("Low priority task".to_owned()).with_priority(Priority::Low);
 

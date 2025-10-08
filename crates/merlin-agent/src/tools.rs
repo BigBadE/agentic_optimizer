@@ -5,36 +5,25 @@ use anyhow::Result;
 use merlin_tools::{BashTool, EditTool, ShowTool, Tool, ToolInput, ToolOutput};
 use tracing::info;
 
+/// Registry for managing and executing tools available to the agent
 pub struct ToolRegistry {
     tools: HashMap<String, Arc<dyn Tool>>,
 }
 
 impl ToolRegistry {
-    #[must_use]
-    pub fn new() -> Self {
-        let mut registry = Self {
-            tools: HashMap::new(),
-        };
-
-        registry.register(Arc::new(EditTool::new()));
-        registry.register(Arc::new(ShowTool::new()));
-        registry.register(Arc::new(BashTool::new()));
-
-        registry
-    }
-
+    /// Register a tool by name
     pub fn register(&mut self, tool: Arc<dyn Tool>) {
         let name = tool.name().to_owned();
         info!("Registering tool: {}", name);
         self.tools.insert(name, tool);
     }
 
-    #[must_use]
+    /// Get a tool by name
     pub fn get(&self, name: &str) -> Option<&Arc<dyn Tool>> {
         self.tools.get(name)
     }
 
-    #[must_use]
+    /// List all registered tools with their descriptions
     pub fn list_tools(&self) -> Vec<(&str, &str)> {
         self.tools
             .values()
@@ -58,6 +47,14 @@ impl ToolRegistry {
 
 impl Default for ToolRegistry {
     fn default() -> Self {
-        Self::new()
+        let mut registry = Self {
+            tools: HashMap::default(),
+        };
+
+        registry.register(Arc::new(EditTool));
+        registry.register(Arc::new(ShowTool));
+        registry.register(Arc::new(BashTool));
+
+        registry
     }
 }

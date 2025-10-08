@@ -41,6 +41,15 @@ struct CachedEmbedding {
     modified: SystemTime,
 }
 
+impl Default for VectorCache {
+    fn default() -> Self {
+        Self {
+            version: Self::VERSION,
+            embeddings: Vec::default(),
+        }
+    }
+}
+
 /// Cached vector database
 #[derive(Debug, Serialize, Deserialize)]
 struct VectorCache {
@@ -52,13 +61,6 @@ struct VectorCache {
 
 impl VectorCache {
     const VERSION: u32 = 3; // Bumped for normalized relative paths
-
-    fn new() -> Self {
-        Self {
-            version: Self::VERSION,
-            embeddings: Vec::new(),
-        }
-    }
 
     fn is_valid(&self) -> bool {
         self.version == Self::VERSION
@@ -83,15 +85,14 @@ pub struct VectorSearchManager {
 
 impl VectorSearchManager {
     /// Create a new vector search manager
-    #[must_use]
     pub fn new(project_root: PathBuf) -> Self {
         let cache_path = project_root.join("..merlin").join("embeddings.bin");
 
         Self {
-            store: VectorStore::new(),
-            bm25: BM25Index::new(),
-            file_times: HashMap::new(),
-            client: EmbeddingClient::new(),
+            store: VectorStore::default(),
+            bm25: BM25Index::default(),
+            file_times: HashMap::default(),
+            client: EmbeddingClient::default(),
             project_root,
             cache_path,
         }
@@ -101,6 +102,10 @@ impl VectorSearchManager {
     ///
     /// # Errors
     /// Returns an error if embedding model is unavailable or embedding/cache IO fails
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Complex initialization with caching and progress"
+    )]
     pub async fn initialize(&mut self) -> Result<()> {
         let spinner = ProgressBar::new_spinner();
         spinner.set_style(
@@ -247,7 +252,7 @@ impl VectorSearchManager {
 
         if self.store.is_empty() {
             warn!("  Vector store is empty - no results");
-            return Ok(Vec::new());
+            return Ok(Vec::default());
         }
 
         // Run BM25 keyword search
@@ -509,13 +514,13 @@ impl VectorSearchManager {
     /// Currently returns an empty graph when rust-analyzer backend is not available.
     fn build_import_graph(_files: &[PathBuf]) -> HashMap<PathBuf, Vec<PathBuf>> {
         // Graph ranking is an enhancement; safe to return empty graph.
-        HashMap::new()
+        HashMap::default()
     }
 
     /// Apply graph-based boost to results
     fn apply_graph_boost(results: &mut [SearchResult], graph: &HashMap<PathBuf, Vec<PathBuf>>) {
         // Build reverse graph (who imports this file)
-        let mut reverse_graph: HashMap<PathBuf, Vec<PathBuf>> = HashMap::new();
+        let mut reverse_graph: HashMap<PathBuf, Vec<PathBuf>> = HashMap::default();
         for (file, imports) in graph {
             for imported in imports {
                 reverse_graph
@@ -659,6 +664,7 @@ impl VectorSearchManager {
     }
 
     /// Combine BM25 keyword scores with vector semantic scores using weighted normalization
+    #[allow(clippy::too_many_lines, reason = "Complex ranking fusion algorithm")]
     fn reciprocal_rank_fusion(
         query: &str,
         bm25_results: &[(PathBuf, f32)],
@@ -667,10 +673,10 @@ impl VectorSearchManager {
     ) -> Vec<SearchResult> {
         let (bm25_weight, vector_weight) = Self::calculate_adaptive_weights(query);
 
-        let mut bm25_scores: HashMap<PathBuf, f32> = HashMap::new();
-        let mut vector_scores: HashMap<PathBuf, f32> = HashMap::new();
-        let mut previews: HashMap<PathBuf, String> = HashMap::new();
-        let mut paths: HashSet<PathBuf> = HashSet::new();
+        let mut bm25_scores: HashMap<PathBuf, f32> = HashMap::default();
+        let mut vector_scores: HashMap<PathBuf, f32> = HashMap::default();
+        let mut previews: HashMap<PathBuf, String> = HashMap::default();
+        let mut paths: HashSet<PathBuf> = HashSet::default();
 
         let mut max_bm25 = 0.0f32;
         for (path, score) in bm25_results {
@@ -780,7 +786,7 @@ impl VectorSearchManager {
     fn collect_source_files(&self) -> Vec<PathBuf> {
         use ignore::WalkBuilder;
 
-        let mut files = Vec::new();
+        let mut files = Vec::default();
 
         let walker = WalkBuilder::new(&self.project_root)
             .max_depth(None)
@@ -810,7 +816,7 @@ impl VectorSearchManager {
 
     /// Embed a single file and return chunks with embeddings
     async fn embed_single_file(relative_path: PathBuf, absolute_path: PathBuf) -> Vec<ChunkResult> {
-        let client = EmbeddingClient::new();
+        let client = EmbeddingClient::default();
 
         let content = match fs::read_to_string(&absolute_path) {
             Ok(content) => content,
@@ -819,18 +825,18 @@ impl VectorSearchManager {
                     "Warning: Failed to read {}: {error}",
                     relative_path.display()
                 );
-                return Vec::new();
+                return Vec::default();
             }
         };
 
         // Skip empty files
         if content.trim().is_empty() {
-            return Vec::new();
+            return Vec::default();
         }
 
         // Chunk the file
         let chunks = chunk_file(&relative_path, &content);
-        let mut chunk_results: Vec<ChunkResult> = Vec::new();
+        let mut chunk_results: Vec<ChunkResult> = Vec::default();
 
         for chunk in chunks {
             let preview = generate_preview(&chunk.content, 200);
@@ -890,7 +896,7 @@ impl VectorSearchManager {
         let mut total_chunks = 0;
 
         for file_batch in files.chunks(BATCH_SIZE) {
-            let mut tasks = JoinSet::new();
+            let mut tasks = JoinSet::default();
 
             for file_path in file_batch {
                 let relative_path = file_path.clone();
@@ -927,8 +933,8 @@ impl VectorSearchManager {
         &self,
         entries: &[CachedEmbedding],
     ) -> (Vec<CachedEmbedding>, Vec<PathBuf>) {
-        let mut valid = Vec::new();
-        let mut invalid = Vec::new();
+        let mut valid = Vec::default();
+        let mut invalid = Vec::default();
 
         for entry in entries {
             let absolute_path = self.project_root.join(&entry.path);
@@ -983,7 +989,7 @@ impl VectorSearchManager {
             })?;
         }
 
-        let cache = VectorCache::new();
+        let cache = VectorCache::default();
 
         let data = bincode_serialize(&cache)
             .map_err(|error| Error::Other(format!("Failed to serialize cache: {error}")))?;
@@ -993,13 +999,11 @@ impl VectorSearchManager {
     }
 
     /// Get the number of indexed files
-    #[must_use]
     pub fn len(&self) -> usize {
         self.store.len()
     }
 
     /// Check if the store is empty
-    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.store.is_empty()
     }

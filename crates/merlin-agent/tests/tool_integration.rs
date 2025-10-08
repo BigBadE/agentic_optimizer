@@ -1,3 +1,5 @@
+//! Integration tests for tool execution within the agent
+
 #![cfg(test)]
 
 mod tests {

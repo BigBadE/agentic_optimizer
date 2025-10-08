@@ -5,12 +5,7 @@ use crate::{Complexity, Task};
 pub struct TaskDecomposer;
 
 impl TaskDecomposer {
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-
-    #[must_use]
+    /// Decompose a request into tasks
     pub fn decompose(&self, intent: &Intent, request: &str) -> Vec<Task> {
         match &intent.action {
             Action::Refactor => Self::decompose_refactor(intent, request),
@@ -23,7 +18,7 @@ impl TaskDecomposer {
     }
 
     fn decompose_refactor(intent: &Intent, request: &str) -> Vec<Task> {
-        let mut tasks = Vec::new();
+        let mut tasks = Vec::default();
 
         let analyze_task = Task::new(format!("Analyze current structure: {request}"))
             .with_complexity(Complexity::Medium)
@@ -46,7 +41,7 @@ impl TaskDecomposer {
     }
 
     fn decompose_creation(intent: &Intent, request: &str) -> Vec<Task> {
-        let mut tasks = Vec::new();
+        let mut tasks = Vec::default();
 
         let design_task = Task::new(format!("Design structure: {request}"))
             .with_complexity(Complexity::Simple)
@@ -69,7 +64,7 @@ impl TaskDecomposer {
     }
 
     fn decompose_fix(intent: &Intent, request: &str) -> Vec<Task> {
-        let mut tasks = Vec::new();
+        let mut tasks = Vec::default();
 
         let diagnose_task = Task::new(format!("Diagnose issue: {request}"))
             .with_complexity(Complexity::Medium)
@@ -118,7 +113,7 @@ impl TaskDecomposer {
 
 impl Default for TaskDecomposer {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -131,8 +126,8 @@ mod tests {
     /// # Panics
     /// Panics if decompose logic returns unexpected number of tasks.
     fn test_simple_task_no_decomposition() {
-        let decomposer = TaskDecomposer::new();
-        let extractor = IntentExtractor::new();
+        let decomposer = TaskDecomposer;
+        let extractor = IntentExtractor;
 
         let intent = extractor.extract("Add a comment to main.rs");
         let tasks = decomposer.decompose(&intent, "Add a comment to main.rs");
@@ -144,8 +139,8 @@ mod tests {
     /// # Panics
     /// Panics if refactor decomposition does not produce analyze/refactor/test sequence.
     fn test_refactor_decomposition() {
-        let decomposer = TaskDecomposer::new();
-        let extractor = IntentExtractor::new();
+        let decomposer = TaskDecomposer;
+        let extractor = IntentExtractor;
 
         let intent = extractor.extract("Refactor the parser module");
         let tasks = decomposer.decompose(&intent, "Refactor the parser module");
@@ -163,8 +158,8 @@ mod tests {
     /// # Panics
     /// Panics if complex creation does not produce design/implement/test sequence.
     fn test_complex_creation_decomposition() {
-        let decomposer = TaskDecomposer::new();
-        let extractor = IntentExtractor::new();
+        let decomposer = TaskDecomposer;
+        let extractor = IntentExtractor;
 
         let intent = extractor.extract("Create a new module for handling authentication");
         let tasks =
@@ -180,8 +175,8 @@ mod tests {
     /// # Panics
     /// Panics if fix path does not produce diagnose/fix/verify tasks.
     fn test_fix_with_analysis() {
-        let decomposer = TaskDecomposer::new();
-        let extractor = IntentExtractor::new();
+        let decomposer = TaskDecomposer;
+        let extractor = IntentExtractor;
 
         let intent = extractor.extract("Fix the complex bug in the parser");
         let tasks = decomposer.decompose(&intent, "Fix the complex bug in the parser");

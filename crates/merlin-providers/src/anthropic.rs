@@ -13,6 +13,8 @@ const ANTHROPIC_API_URL: &str = "https://api.anthropic.com/v1/messages";
 const MODEL: &str = "claude-sonnet-4-20250514";
 /// Anthropic API version header value.
 const API_VERSION: &str = "2023-06-01";
+/// Env var key for Anthropic API key.
+const ENV_ANTHROPIC_API_KEY: &str = "ANTHROPIC_API_KEY";
 
 /// Provider implementation for Anthropic's Claude API.
 pub struct AnthropicProvider {
@@ -29,11 +31,11 @@ impl AnthropicProvider {
     /// Returns an error if the provided API key is empty.
     pub fn new(api_key: String) -> Result<Self> {
         if api_key.is_empty() {
-            return Err(Error::MissingApiKey("ANTHROPIC_API_KEY".to_owned()));
+            return Err(Error::MissingApiKey(ENV_ANTHROPIC_API_KEY.to_owned()));
         }
 
         Ok(Self {
-            client: Client::new(),
+            client: Client::default(),
             api_key,
         })
     }
@@ -43,8 +45,8 @@ impl AnthropicProvider {
     /// # Errors
     /// Returns an error if the env var is missing.
     pub fn from_env() -> Result<Self> {
-        let api_key = env::var("ANTHROPIC_API_KEY")
-            .map_err(|_| Error::MissingApiKey("ANTHROPIC_API_KEY".to_owned()))?;
+        let api_key = env::var(ENV_ANTHROPIC_API_KEY)
+            .map_err(|_| Error::MissingApiKey(ENV_ANTHROPIC_API_KEY.to_owned()))?;
         Self::new(api_key)
     }
 }

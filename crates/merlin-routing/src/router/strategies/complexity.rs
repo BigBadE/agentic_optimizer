@@ -3,20 +3,10 @@ use crate::{Complexity, ModelTier, Result, Task};
 use async_trait::async_trait;
 
 /// Routes tasks based on complexity level
+#[derive(Default)]
 pub struct ComplexityBasedStrategy;
 
-impl ComplexityBasedStrategy {
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-}
-
-impl Default for ComplexityBasedStrategy {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+impl ComplexityBasedStrategy {}
 
 #[async_trait]
 impl RoutingStrategy for ComplexityBasedStrategy {
@@ -56,7 +46,7 @@ mod tests {
     /// # Panics
     /// Panics if selected tiers do not match expected routing by complexity.
     async fn test_complexity_routing() {
-        let strategy = ComplexityBasedStrategy::new();
+        let strategy = ComplexityBasedStrategy;
 
         let simple_task = Task::new("Simple task".to_owned()).with_complexity(Complexity::Simple);
         let tier_simple = match strategy.select_tier(&simple_task).await {

@@ -122,7 +122,7 @@ pub async fn ensure_available() -> Result<()> {
         term.write_line("")?;
         term.write_line(&format!("{}", style("Ollama is not running").yellow()))?;
         
-        let should_start = Confirm::new()
+        let should_start = Confirm::default()
             .with_prompt("Would you like to start Ollama now?")
             .default(true)
             .interact()?;
@@ -172,7 +172,7 @@ async fn ensure_model_available() -> Result<()> {
         term.write_line("")?;
         term.write_line(&format!("{}", style(format!("Model '{}' not found", model)).yellow()))?;
         
-        let should_download = Confirm::new()
+        let should_download = Confirm::default()
             .with_prompt(format!("Would you like to download {} now? (This may take a few minutes)", model))
             .default(true)
             .interact()?;

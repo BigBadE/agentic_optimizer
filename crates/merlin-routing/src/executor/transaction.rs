@@ -13,10 +13,14 @@ pub struct TaskWorkspace {
     _lock_guard: WriteLockGuard,
 }
 
+/// State of a file in the task workspace
 #[derive(Debug, Clone)]
 pub enum FileState {
+    /// File was created with content
     Created(String),
+    /// File was modified with new content
     Modified(String),
+    /// File was deleted
     Deleted,
 }
 
@@ -39,7 +43,7 @@ impl TaskWorkspace {
 
         Ok(Self {
             base_snapshot,
-            pending_changes: HashMap::new(),
+            pending_changes: HashMap::default(),
             _lock_guard: lock_guard,
         })
     }
@@ -62,7 +66,6 @@ impl TaskWorkspace {
     }
 
     /// Read file (sees pending changes + base snapshot)
-    #[must_use]
     pub fn read_file(&self, path: &PathBuf) -> Option<String> {
         if let Some(state) = self.pending_changes.get(path) {
             return match state {
@@ -82,7 +85,7 @@ impl TaskWorkspace {
         &self,
         global_state: Arc<WorkspaceState>,
     ) -> Result<ConflictReport> {
-        let mut conflicts = Vec::new();
+        let mut conflicts = Vec::default();
 
         for path in self.pending_changes.keys() {
             let base_version = self.base_snapshot.get(path);
@@ -148,20 +151,28 @@ impl TaskWorkspace {
     }
 }
 
+/// Result of committing changes to global state
 #[derive(Debug, Clone)]
 pub struct CommitResult {
+    /// Number of files that were changed
     pub files_changed: usize,
 }
 
+/// Report of file conflicts detected during validation
 #[derive(Debug, Clone)]
 pub struct ConflictReport {
+    /// List of files with conflicts
     pub conflicts: Vec<FileConflict>,
 }
 
+/// Information about a single file conflict
 #[derive(Debug, Clone)]
 pub struct FileConflict {
+    /// Path to the conflicting file
     pub path: PathBuf,
+    /// Hash of the base version
     pub base_hash: u64,
+    /// Hash of the current version
     pub current_hash: u64,
 }
 
@@ -169,22 +180,25 @@ fn hash_content(content: Option<&String>) -> u64 {
     use std::collections::hash_map::DefaultHasher;
     use std::hash::{Hash as _, Hasher as _};
 
-    let mut hasher = DefaultHasher::new();
+    let mut hasher = DefaultHasher::default();
     content.hash(&mut hasher);
     hasher.finish()
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, reason = "Test code is allowed to use expect")]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[tokio::test]
     /// # Panics
     /// Panics if workspace operations fail in the test harness.
     async fn test_task_workspace_isolation() {
-        let workspace = WorkspaceState::new(PathBuf::from("/tmp"));
-        let lock_manager = FileLockManager::new();
-        let task_id = TaskId::new();
+        let tmp_dir = TempDir::new().expect("create temp dir");
+        let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
+        let lock_manager = Arc::new(FileLockManager::default());
+        let task_id = TaskId::default();
 
         if let Err(error) = workspace
             .apply_changes(&[FileChange::Create {
@@ -225,9 +239,10 @@ mod tests {
     /// # Panics
     /// Panics if workspace operations fail in the test harness.
     async fn test_task_workspace_commit() {
-        let workspace = WorkspaceState::new(PathBuf::from("/tmp"));
-        let lock_manager = FileLockManager::new();
-        let task_id = TaskId::new();
+        let tmp_dir = TempDir::new().expect("create temp dir");
+        let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
+        let lock_manager = Arc::new(FileLockManager::default());
+        let task_id = TaskId::default();
 
         if let Err(error) = workspace
             .apply_changes(&[FileChange::Create {

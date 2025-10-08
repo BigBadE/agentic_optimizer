@@ -4,15 +4,22 @@ use crate::{TaskId, TaskResult};
 use tokio::sync::mpsc;
 
 // Public modules
+/// Event types for UI updates
 pub mod events;
 mod text_width;
 
 // Publicly exposed for testing
+/// Input management
 pub mod input;
+/// Output tree structure for hierarchical display
 pub mod output_tree;
+/// Rendering components
 pub mod renderer;
+/// UI state management
 pub mod state;
+/// Task management
 pub mod task_manager;
+/// Theme definitions
 pub mod theme;
 
 // Private modules

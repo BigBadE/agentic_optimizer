@@ -10,9 +10,9 @@ pub struct ConflictAwareTaskGraph {
 }
 
 impl ConflictAwareTaskGraph {
-    #[must_use]
+    /// Create a conflict-aware task graph from tasks
     pub fn from_tasks(tasks: &[Task]) -> Self {
-        let mut file_access_map: HashMap<PathBuf, Vec<TaskId>> = HashMap::new();
+        let mut file_access_map: HashMap<PathBuf, Vec<TaskId>> = HashMap::default();
 
         for task in tasks {
             for file in &task.context_needs.required_files {
@@ -32,7 +32,6 @@ impl ConflictAwareTaskGraph {
     }
 
     /// Get ready tasks that don't conflict with running tasks
-    #[must_use]
     pub fn ready_non_conflicting_tasks(
         &self,
         completed: &HashSet<TaskId>,
@@ -63,19 +62,16 @@ impl ConflictAwareTaskGraph {
     }
 
     /// Check if all tasks completed
-    #[must_use]
     pub fn is_complete(&self, completed: &HashSet<TaskId>) -> bool {
         self.graph.is_complete(completed)
     }
 
     /// Detect cycles
-    #[must_use]
     pub fn has_cycles(&self) -> bool {
         self.graph.has_cycles()
     }
 
     /// Get total task count
-    #[must_use]
     pub fn task_count(&self) -> usize {
         self.graph.task_count()
     }
@@ -93,15 +89,15 @@ mod tests {
         let file = PathBuf::from("test.rs");
 
         let task_a = Task::new("Task A".to_owned())
-            .with_context(ContextRequirements::new().with_files(vec![file.clone()]));
+            .with_context(ContextRequirements::default().with_files(vec![file.clone()]));
 
         let task_b = Task::new("Task B".to_owned())
-            .with_context(ContextRequirements::new().with_files(vec![file]));
+            .with_context(ContextRequirements::default().with_files(vec![file]));
 
         let graph = ConflictAwareTaskGraph::from_tasks(&[task_a.clone(), task_b]);
 
-        let completed = HashSet::new();
-        let running = HashSet::new();
+        let completed = HashSet::default();
+        let running = HashSet::default();
 
         // When nothing is running, both tasks are ready (no conflicts with running tasks)
         let ready = graph.ready_non_conflicting_tasks(&completed, &running);
@@ -112,7 +108,7 @@ mod tests {
         );
 
         // Mark first task as running
-        let mut running_after = HashSet::new();
+        let mut running_after = HashSet::default();
         running_after.insert(task_a.id);
         let ready_after = graph.ready_non_conflicting_tasks(&completed, &running_after);
         // Task A is running, Task B accesses the same file and should be blocked
@@ -129,15 +125,15 @@ mod tests {
     /// Panics if non-conflicting tasks are incorrectly blocked.
     fn test_no_conflict_different_files() {
         let task_a = Task::new("Task A".to_owned())
-            .with_context(ContextRequirements::new().with_files(vec![PathBuf::from("a.rs")]));
+            .with_context(ContextRequirements::default().with_files(vec![PathBuf::from("a.rs")]));
 
         let task_b = Task::new("Task B".to_owned())
-            .with_context(ContextRequirements::new().with_files(vec![PathBuf::from("b.rs")]));
+            .with_context(ContextRequirements::default().with_files(vec![PathBuf::from("b.rs")]));
 
         let graph = ConflictAwareTaskGraph::from_tasks(&[task_a.clone(), task_b]);
 
-        let completed = HashSet::new();
-        let mut running = HashSet::new();
+        let completed = HashSet::default();
+        let mut running = HashSet::default();
         running.insert(task_a.id);
 
         let ready = graph.ready_non_conflicting_tasks(&completed, &running);

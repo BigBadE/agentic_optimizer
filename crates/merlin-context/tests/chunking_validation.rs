@@ -1,5 +1,6 @@
-#![cfg(test)]
 //! Integration tests for chunking validation across the entire codebase.
+
+#![cfg(test)]
 
 use merlin_context::embedding::chunking::{
     MAX_CHUNK_TOKENS, MIN_CHUNK_TOKENS, chunk_file, estimate_tokens,
@@ -18,7 +19,7 @@ fn collect_all_source_files() -> Vec<PathBuf> {
         .and_then(|path| path.ancestors().nth(2).map(Path::to_path_buf))
         .unwrap_or_else(|| PathBuf::from("."));
 
-    let mut files = Vec::new();
+    let mut files = Vec::default();
 
     let walker = WalkBuilder::new(&project_root)
         .max_depth(None)
@@ -59,7 +60,7 @@ fn test_all_chunks_respect_min_tokens() {
         files.len()
     );
 
-    let mut violations = Vec::new();
+    let mut violations = Vec::default();
     let mut total_chunks = 0;
     let mut files_tested = 0;
 
@@ -148,7 +149,7 @@ fn test_all_chunks_respect_max_tokens() {
         files.len()
     );
 
-    let mut violations = Vec::new();
+    let mut violations = Vec::default();
     let mut total_chunks = 0;
     let mut files_tested = 0;
 
@@ -217,7 +218,7 @@ fn test_chunk_line_numbers_are_valid() {
 
     info!("Testing {} files for valid line numbers...", files.len());
 
-    let mut violations = Vec::new();
+    let mut violations = Vec::default();
     let mut total_chunks = 0;
     let mut files_tested = 0;
 
@@ -310,7 +311,7 @@ fn test_chunk_statistics() {
 
     let mut total_files = 0;
     let mut total_chunks = 0;
-    let mut token_counts = Vec::new();
+    let mut token_counts = Vec::default();
 
     for file_path in files {
         let Ok(content) = fs::read_to_string(&file_path) else {

@@ -94,7 +94,7 @@ async fn main() -> Result<()> {
         args.project
     );
 
-    let mut all_results = Vec::new();
+    let mut all_results = Vec::default();
 
     for (_test_path, test_case) in filtered_cases {
         info!("{banner}", banner = "\u{2550}".repeat(59));
@@ -228,8 +228,12 @@ fn print_summary(results: &[BenchmarkResult]) {
 ///
 /// # Errors
 /// Returns an error if writing the report fails.
+#[allow(
+    clippy::too_many_lines,
+    reason = "Report generation requires comprehensive formatting"
+)]
 fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
-    let mut report = String::new();
+    let mut report = String::default();
 
     report.push_str("# Context Fetching Benchmark Report\n\n");
     write!(

@@ -11,14 +11,7 @@ pub struct OllamaManager {
 }
 
 impl OllamaManager {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            client: Client::new(),
-            base_url: "http://localhost:11434".to_owned(),
-        }
-    }
-
+    /// Sets a custom URL for the Ollama service.
     #[must_use]
     pub fn with_url(mut self, url: String) -> Self {
         self.base_url = url;
@@ -103,7 +96,6 @@ impl OllamaManager {
     }
 
     /// Get recommended models for code tasks
-    #[must_use]
     pub fn recommended_models() -> Vec<ModelInfo> {
         vec![
             ModelInfo::qwen_coder_7b(),
@@ -115,7 +107,10 @@ impl OllamaManager {
 
 impl Default for OllamaManager {
     fn default() -> Self {
-        Self::new()
+        Self {
+            client: Client::default(),
+            base_url: "http://localhost:11434".to_owned(),
+        }
     }
 }
 
@@ -127,7 +122,7 @@ mod tests {
     /// Panics if manager base URL doesn't match expected default.
     #[tokio::test]
     async fn ollama_manager_creation() {
-        let manager = OllamaManager::new();
+        let manager = OllamaManager::default();
         assert_eq!(manager.base_url, "http://localhost:11434");
     }
 
@@ -135,7 +130,7 @@ mod tests {
     /// Panics if manager base URL doesn't match custom URL.
     #[tokio::test]
     async fn custom_url() {
-        let manager = OllamaManager::new().with_url("http://custom:8080".to_owned());
+        let manager = OllamaManager::default().with_url("http://custom:8080".to_owned());
         assert_eq!(manager.base_url, "http://custom:8080");
     }
 

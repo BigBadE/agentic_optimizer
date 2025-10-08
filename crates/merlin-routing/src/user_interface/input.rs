@@ -14,18 +14,6 @@ pub struct InputManager {
 }
 
 impl InputManager {
-    /// Creates a new `InputManager` with default styling
-    pub fn new() -> Self {
-        let mut input_area = TextArea::default();
-        input_area.set_block(Block::default().borders(Borders::ALL).title("Input"));
-        input_area.set_cursor_line_style(Style::default());
-
-        Self {
-            input_area,
-            manual_newlines: HashSet::new(),
-        }
-    }
-
     /// Gets a reference to the input area
     pub fn input_area(&self) -> &TextArea<'static> {
         &self.input_area
@@ -76,22 +64,22 @@ impl InputManager {
     // Private helper methods
 
     fn split_into_paragraphs(&self, lines: &[String]) -> Vec<Vec<String>> {
-        let mut paragraphs: Vec<Vec<String>> = Vec::new();
-        let mut current_para: Vec<String> = Vec::new();
+        let mut paragraphs: Vec<Vec<String>> = Vec::default();
+        let mut current_para: Vec<String> = Vec::default();
 
         for (idx, line) in lines.iter().enumerate() {
             if line.is_empty() {
                 if !current_para.is_empty() {
                     paragraphs.push(current_para);
-                    current_para = Vec::new();
+                    current_para = Vec::default();
                 }
-                paragraphs.push(vec![String::new()]);
+                paragraphs.push(vec![String::default()]);
             } else {
                 current_para.push(line.clone());
 
                 if self.manual_newlines.contains(&idx) {
                     paragraphs.push(current_para);
-                    current_para = Vec::new();
+                    current_para = Vec::default();
                 }
             }
         }
@@ -148,15 +136,15 @@ impl InputManager {
         max_line_width: usize,
         cursor_info: &CursorInfo,
     ) -> WrappedResult {
-        let mut new_lines: Vec<String> = Vec::new();
+        let mut new_lines: Vec<String> = Vec::default();
         let mut new_cursor_row = 0;
         let mut new_cursor_col = 0;
         let mut found_cursor = false;
-        let mut new_manual_newlines = HashSet::new();
+        let mut new_manual_newlines = HashSet::default();
 
         for (para_idx, para) in paragraphs.iter().enumerate() {
             if para.len() == 1 && para[0].is_empty() {
-                new_lines.push(String::new());
+                new_lines.push(String::default());
                 if para_idx < cursor_info.paragraph {
                     new_cursor_row += 1;
                 }
@@ -210,7 +198,14 @@ impl InputManager {
 
 impl Default for InputManager {
     fn default() -> Self {
-        Self::new()
+        let mut input_area = TextArea::default();
+        input_area.set_block(Block::default().borders(Borders::ALL).title("Input"));
+        input_area.set_cursor_line_style(Style::default());
+
+        Self {
+            input_area,
+            manual_newlines: HashSet::default(),
+        }
     }
 }
 

@@ -1,4 +1,7 @@
 # Merlin 
+[![DeepSource](https://app.deepsource.com/gh/BigBadE/agentic_optimizer.svg/?label=active+issues&show_trend=true&token=wViZ5mQV5zbj5EQV4856JR3g)](https://app.deepsource.com/gh/BigBadE/agentic_optimizer/)
+[![CodeScene Average Code Health](https://codescene.io/projects/72070/status-badges/average-code-health)](https://codescene.io/projects/72070)
+
 An intelligent AI coding assistant with multi-model routing, automatic task decomposition, and comprehensive validation. Named after the Merlin falcon, known for its speed, precision, and adaptability.
 
 ## Current Status: Production Ready
@@ -232,9 +235,9 @@ RoutingConfig {
 - **[merlin-providers](crates/merlin-providers/README.md)** - External providers (Groq, OpenRouter, Anthropic)
 - **[merlin-core](crates/merlin-core/README.md)** - Core types and traits
 
-## Testing
+## Testing & Benchmarking
 
-### Unit Tests
+### Running Tests
 
 Run all tests across the workspace:
 ```bash
@@ -320,6 +323,30 @@ cargo test --test integration_tests -- --nocapture
   - Integration tests: 19 tests (tests/ folders)
   - TUI tests: 12 tests (TaskManager)
   - CLI E2E tests: 7 tests
+
+### Performance Benchmarking
+
+Merlin includes comprehensive benchmarks with historical tracking:
+
+```bash
+# Run all benchmarks
+cargo bench --workspace
+
+# Compare against baseline
+./scripts/benchmark_compare.sh --run --compare main
+
+# View HTML reports
+open target/criterion/report/index.html
+```
+
+**Features**:
+- ✅ Criterion.rs-based benchmarks for accurate measurements
+- ✅ Historical tracking and trend visualization
+- ✅ Automatic regression detection (25% threshold)
+- ✅ CI integration with GitHub Actions
+- ✅ Local comparison scripts for development
+
+See **[BENCHMARKING.md](docs/BENCHMARKING.md)** for detailed guide.
 
 ## Development
 

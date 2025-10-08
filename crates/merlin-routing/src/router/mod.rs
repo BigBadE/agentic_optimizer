@@ -1,5 +1,13 @@
+//! Model routing and tier selection.
+//!
+//! This module handles intelligent routing of tasks to appropriate model tiers
+//! based on complexity, cost, quality requirements, and context size.
+
+/// Concrete routing strategy implementations
 pub mod strategies;
+/// Base routing strategy trait
 pub mod strategy;
+/// Tier management and availability checking
 pub mod tiers;
 
 use crate::{Result, Task};
@@ -13,24 +21,32 @@ pub use strategies::{
 pub use strategy::RoutingStrategy;
 pub use tiers::{AvailabilityChecker, StrategyRouter};
 
-/// Model tier selection
+/// Model tier selection for routing tasks to appropriate models.
+///
+/// Tiers are ordered from cheapest/fastest (Local) to most expensive/capable (Premium).
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ModelTier {
+    /// Local model running on user's machine (e.g., Ollama)
     Local {
+        /// Name of the local model
         model_name: String,
     },
+    /// Fast cloud model via Groq
     Groq {
+        /// Name of the Groq model
         model_name: String,
     },
+    /// Premium cloud model (e.g., Claude, GPT-4)
     Premium {
+        /// Provider name (e.g., "anthropic", "openrouter")
         provider: String,
+        /// Name of the premium model
         model_name: String,
     },
 }
 
 impl ModelTier {
     /// Get next higher tier for escalation
-    #[must_use]
     pub fn escalate(&self) -> Option<Self> {
         match self {
             Self::Local { .. } => Some(Self::Groq {
@@ -70,12 +86,16 @@ impl Display for ModelTier {
     }
 }
 
-/// Routing decision with rationale
+/// Routing decision with rationale and cost estimates.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoutingDecision {
+    /// Selected model tier for this task
     pub tier: ModelTier,
+    /// Estimated cost in USD
     pub estimated_cost: f64,
+    /// Estimated latency in milliseconds
     pub estimated_latency_ms: u64,
+    /// Explanation of why this tier was chosen
     pub reasoning: String,
 }
 

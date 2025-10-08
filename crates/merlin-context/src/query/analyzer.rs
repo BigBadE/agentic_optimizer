@@ -6,14 +6,9 @@ use super::types::{Action, Complexity, QueryIntent, Scope};
 pub struct QueryAnalyzer;
 
 impl QueryAnalyzer {
-    /// Create a new query analyzer
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-
+    /// Create a query analyzer using defaults
+    /// Prefer `Default::default()`.
     /// Analyze a query string and extract intent
-    #[must_use]
     pub fn analyze(&self, query: &str) -> QueryIntent {
         let query_lower = query.to_lowercase();
 
@@ -43,7 +38,8 @@ impl QueryAnalyzer {
             "generate",
             "new",
         ];
-        const MODIFY_KEYWORDS: &[&str] = &["modify", "change", "update", "edit", "alter"];
+        // Unused, usually assumed.
+        const _MODIFY_KEYWORDS: &[&str] = &["modify", "change", "update", "edit", "alter"];
         const DEBUG_KEYWORDS: &[&str] =
             &["fix", "debug", "bug", "error", "issue", "problem", "broken"];
         const EXPLAIN_KEYWORDS: &[&str] =
@@ -57,33 +53,17 @@ impl QueryAnalyzer {
         ];
         const SEARCH_KEYWORDS: &[&str] = &["find", "search", "locate", "where"];
 
-        if CREATE_KEYWORDS
-            .iter()
-            .any(|keyword| query.contains(keyword))
-        {
+        let matches = |keywords: &[&str]| keywords.iter().any(|keyword| query.contains(keyword));
+        if matches(CREATE_KEYWORDS) {
             Action::Create
-        } else if DEBUG_KEYWORDS.iter().any(|keyword| query.contains(keyword)) {
+        } else if matches(DEBUG_KEYWORDS) {
             Action::Debug
-        } else if REFACTOR_KEYWORDS
-            .iter()
-            .any(|keyword| query.contains(keyword))
-        {
+        } else if matches(REFACTOR_KEYWORDS) {
             Action::Refactor
-        } else if EXPLAIN_KEYWORDS
-            .iter()
-            .any(|keyword| query.contains(keyword))
-        {
+        } else if matches(EXPLAIN_KEYWORDS) {
             Action::Explain
-        } else if SEARCH_KEYWORDS
-            .iter()
-            .any(|keyword| query.contains(keyword))
-        {
+        } else if matches(SEARCH_KEYWORDS) {
             Action::Search
-        } else if MODIFY_KEYWORDS
-            .iter()
-            .any(|keyword| query.contains(keyword))
-        {
-            Action::Modify
         } else {
             // Default to modify for ambiguous queries
             Action::Modify
@@ -190,7 +170,7 @@ impl QueryAnalyzer {
 
 impl Default for QueryAnalyzer {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 
@@ -202,7 +182,7 @@ mod tests {
     /// # Panics
     /// Panics if create action is not detected.
     fn test_detect_create_action() {
-        let analyzer = QueryAnalyzer::new();
+        let analyzer = QueryAnalyzer;
         let intent = analyzer.analyze("Create a new authentication module");
         assert!(matches!(intent.action, Action::Create));
     }
@@ -211,7 +191,7 @@ mod tests {
     /// # Panics
     /// Panics if debug action is not detected.
     fn test_detect_debug_action() {
-        let analyzer = QueryAnalyzer::new();
+        let analyzer = QueryAnalyzer;
         let intent = analyzer.analyze("Fix the bug in UserService");
         assert!(matches!(intent.action, Action::Debug));
     }
@@ -220,7 +200,7 @@ mod tests {
     /// # Panics
     /// Panics if expected keywords are not extracted.
     fn test_extract_keywords() {
-        let analyzer = QueryAnalyzer::new();
+        let analyzer = QueryAnalyzer;
         let intent = analyzer.analyze("Implement authentication for the user service");
         assert!(intent.keywords.contains(&"authentication".to_string()));
         assert!(intent.keywords.contains(&"user".to_string()));
@@ -231,7 +211,7 @@ mod tests {
     /// # Panics
     /// Panics if expected entities are not extracted.
     fn test_extract_entities() {
-        let analyzer = QueryAnalyzer::new();
+        let analyzer = QueryAnalyzer;
         let intent = analyzer.analyze("Fix UserService::find_by_email method");
         assert!(
             intent
@@ -244,7 +224,7 @@ mod tests {
     /// # Panics
     /// Panics if complexity estimation fails to categorize as expected.
     fn test_complexity_estimation() {
-        let analyzer = QueryAnalyzer::new();
+        let analyzer = QueryAnalyzer;
 
         let simple = analyzer.analyze("Find the User struct");
         assert!(matches!(simple.complexity, Complexity::Simple));

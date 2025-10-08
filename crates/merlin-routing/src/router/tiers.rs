@@ -5,17 +5,19 @@ use std::cmp::Reverse;
 use std::sync::Arc;
 
 /// Availability checker for model tiers
+#[derive(Default)]
 pub struct AvailabilityChecker {
     // In a real implementation, this would track quotas, rate limits, etc.
 }
 
 impl AvailabilityChecker {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {}
-    }
-
-    #[must_use]
+    /// Checks if a model tier is available for use.
+    ///
+    /// Currently always returns true. In production, this would check:
+    /// - API key presence
+    /// - Rate limit status
+    /// - Quota remaining
+    /// - Service health
     pub fn check(&self, _tier: &ModelTier) -> bool {
         // For now, assume all tiers are available
         // In production, this would check:
@@ -27,11 +29,7 @@ impl AvailabilityChecker {
     }
 }
 
-impl Default for AvailabilityChecker {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// Default derived above
 
 /// Strategy-based router implementation
 pub struct StrategyRouter {
@@ -43,20 +41,23 @@ pub struct StrategyRouter {
 }
 
 impl StrategyRouter {
-    #[must_use]
+    /// Creates a new strategy router with the given strategies.
+    ///
+    /// Strategies are sorted by priority (highest first).
     pub fn new(strategies: Vec<Arc<dyn RoutingStrategy>>) -> Self {
         let mut sorted_strategies = strategies;
         sorted_strategies.sort_by_key(|strategy| Reverse(strategy.priority()));
 
         Self {
             strategies: sorted_strategies,
-            availability_checker: Arc::new(AvailabilityChecker::new()),
+            availability_checker: Arc::new(AvailabilityChecker::default()),
             local_enabled: true,
             groq_enabled: true,
             premium_enabled: true,
         }
     }
 
+    /// Configures which model tiers are enabled.
     #[must_use]
     pub fn with_tier_config(mut self, local: bool, groq: bool, premium: bool) -> Self {
         self.local_enabled = local;
@@ -65,7 +66,9 @@ impl StrategyRouter {
         self
     }
 
-    #[must_use]
+    /// Creates a router with the default set of routing strategies.
+    ///
+    /// Includes: `QualityCritical`, `LongContext`, `CostOptimization`, and `ComplexityBased` strategies.
     pub fn with_default_strategies() -> Self {
         use super::strategies::{
             ComplexityBasedStrategy, CostOptimizationStrategy, LongContextStrategy,
@@ -73,10 +76,10 @@ impl StrategyRouter {
         };
 
         let strategies: Vec<Arc<dyn RoutingStrategy>> = vec![
-            Arc::new(QualityCriticalStrategy::new()),
+            Arc::new(QualityCriticalStrategy),
             Arc::new(LongContextStrategy::default()),
             Arc::new(CostOptimizationStrategy::default()),
-            Arc::new(ComplexityBasedStrategy::new()),
+            Arc::new(ComplexityBasedStrategy),
         ];
 
         Self::new(strategies)
@@ -210,7 +213,7 @@ mod tests {
         let router = StrategyRouter::with_default_strategies();
 
         let long_context_task = Task::new("Long context task".to_owned())
-            .with_context(ContextRequirements::new().with_estimated_tokens(50000));
+            .with_context(ContextRequirements::default().with_estimated_tokens(50000));
 
         let decision = router.route(&long_context_task).await?;
         assert!(matches!(decision.tier, ModelTier::Premium { .. }));
@@ -229,7 +232,7 @@ mod tests {
 
         let cheap_task = Task::new("Cheap task".to_owned())
             .with_priority(Priority::Low)
-            .with_context(ContextRequirements::new().with_estimated_tokens(2000));
+            .with_context(ContextRequirements::default().with_estimated_tokens(2000));
 
         let decision = router.route(&cheap_task).await?;
         // Floating-point comparison: use epsilon to avoid pedantic float-cmp lint

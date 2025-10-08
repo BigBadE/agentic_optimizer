@@ -24,6 +24,7 @@ pub enum Theme {
 
 impl Theme {
     /// Gets the next theme in sequence
+    #[must_use]
     pub fn next(self) -> Self {
         match self {
             Self::Nord => Self::Dracula,

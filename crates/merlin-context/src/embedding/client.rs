@@ -28,6 +28,7 @@ pub struct SearchResult {
 }
 
 /// In-memory vector database for code files
+#[derive(Default)]
 pub struct VectorStore {
     /// File path to embedding mapping
     embeddings: HashMap<PathBuf, Embedding>,
@@ -47,15 +48,6 @@ pub struct VectorEntry {
 }
 
 impl VectorStore {
-    /// Create a new empty vector store
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            embeddings: HashMap::new(),
-            previews: HashMap::new(),
-        }
-    }
-
     /// Add a file embedding to the store
     pub fn add(&mut self, path: PathBuf, embedding: Embedding, preview: String) {
         self.embeddings.insert(path.clone(), embedding);
@@ -63,7 +55,6 @@ impl VectorStore {
     }
 
     /// Search for similar files
-    #[must_use]
     pub fn search(&self, query_embedding: &[f32], top_k: usize) -> Vec<SearchResult> {
         let mut scores: Vec<(PathBuf, f32)> = self
             .embeddings
@@ -92,13 +83,11 @@ impl VectorStore {
     }
 
     /// Get number of stored embeddings
-    #[must_use]
     pub fn len(&self) -> usize {
         self.embeddings.len()
     }
 
     /// Check if store is empty
-    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.embeddings.is_empty()
     }
@@ -122,18 +111,7 @@ pub struct EmbeddingClient {
 }
 
 impl EmbeddingClient {
-    /// Create a new embedding client
-    #[must_use]
-    pub fn new() -> Self {
-        let host = env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".to_string());
-
-        let config = ModelConfig::from_env();
-
-        Self {
-            ollama: Ollama::new(host, 11434),
-            model: config.embedding,
-        }
-    }
+    // Use Default instead of a no-arg constructor
 
     /// Ensure the embedding model is available
     ///
@@ -221,7 +199,7 @@ impl EmbeddingClient {
     /// # Errors
     /// Returns an error if any embedding generation fails
     pub async fn embed_batch(&self, texts: Vec<String>) -> Result<Vec<Embedding>> {
-        let mut embeddings = Vec::new();
+        let mut embeddings = Vec::default();
 
         for text in texts {
             embeddings.push(self.embed(&text).await?);
@@ -253,7 +231,6 @@ fn cosine_similarity(vector_a: &[f32], vector_b: &[f32]) -> f32 {
 }
 
 /// Generate a preview from file content (first few lines or summary)
-#[must_use]
 pub fn generate_preview(content: &str, max_chars: usize) -> String {
     let lines: Vec<&str> = content.lines().take(10).collect();
     let preview = lines.join("\n");
@@ -267,14 +244,13 @@ pub fn generate_preview(content: &str, max_chars: usize) -> String {
     }
 }
 
-impl Default for VectorStore {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl Default for EmbeddingClient {
     fn default() -> Self {
-        Self::new()
+        let host = env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".to_string());
+        let config = ModelConfig::from_env();
+        Self {
+            ollama: Ollama::new(host, 11434),
+            model: config.embedding,
+        }
     }
 }

@@ -3,7 +3,6 @@
 use crate::query::QueryIntent;
 
 /// Generate a system prompt for the context planning agent
-#[must_use]
 pub fn system_prompt() -> String {
     r#"You are a context planning assistant. Analyze the user query and generate a plan for gathering relevant code files.
 
@@ -54,7 +53,6 @@ JSON SCHEMA:
 }
 
 /// Generate a user prompt for the context planning agent
-#[must_use]
 pub fn user_prompt(query_text: &str, intent: &QueryIntent, file_tree: &str) -> String {
     format!(
         r#"User Query: \"{}\"

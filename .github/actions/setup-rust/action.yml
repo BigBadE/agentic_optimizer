@@ -31,9 +31,10 @@ runs:
       uses: actions/cache@v4
       with:
         path: |
-          target/
-          ~/.rustup
-          ~/.cargo/bin
+          ~/.rustup/toolchains
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
         key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain.toml') }}
 
     - uses: taiki-e/install-action@v2
@@ -47,15 +48,11 @@ runs:
     - name: Cache dependencies
       uses: actions/cache@v4
       with:
-        path: |
-          target/
-          ~/.cargo/registry/index
-          ~/.cargo/registry/cache
-          ~/.cargo/git/db
-        key: ${{ runner.os }}-${{ inputs.profile }}-${{ hashFiles('recipe.json') }}
+        path: target/${{ inputs.profile }}/deps
+        key: ${{ runner.os }}-cargo-${{ inputs.profile }}-${{ hashFiles('recipe.json') }}
         restore-keys: |
-          ${{ runner.os }}-${{ inputs.profile }}-
-          ${{ runner.os }}-
+          ${{ runner.os }}-cargo-${{ inputs.profile }}-
+          ${{ runner.os }}-cargo
     
     - name: Cook dependencies
       shell: bash

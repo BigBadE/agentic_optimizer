@@ -37,8 +37,25 @@ jobs:
         with:
           profile: release
 
-      - name: Run benchmarks
-        run: cargo bench --workspace --no-fail-fast --profile release
+      - name: Inspect bench targets
+        run: |
+          set -e
+          echo "Workspace members:" && cargo metadata --no-deps --format-version=1 | jq -r '.packages[].name' | sort
+          echo "Routing benches directory:" && ls -la crates/merlin-routing/benches || true
+
+      - name: Run routing benches explicitly
+        env:
+          RUST_BACKTRACE: 1
+        run: |
+          cargo bench -p merlin-routing --benches --no-fail-fast --profile release --verbose
+
+      - name: Assert Criterion results exist
+        run: |
+          if [ ! -d target/criterion ]; then
+            echo "ERROR: target/criterion not found; benches likely did not run" >&2
+            exit 1
+          fi
+          find target/criterion -maxdepth 2 -type d -print | sed -n '1,100p'
 
       - name: Prepare gh-pages workspace
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'

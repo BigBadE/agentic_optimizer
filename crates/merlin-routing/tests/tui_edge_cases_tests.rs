@@ -9,6 +9,7 @@ use merlin_routing::TaskId;
 use merlin_routing::user_interface::input::InputManager;
 use merlin_routing::user_interface::output_tree::{OutputTree, StepType};
 use merlin_routing::user_interface::task_manager::TaskManager;
+use merlin_routing::user_interface::{EmojiMode, calculate_width as ui_calculate_width};
 use tui_textarea::Input;
 
 #[test]
@@ -282,7 +283,7 @@ fn test_input_manager_very_long_line() {
     }
 
     let lines = manager.input_area().lines();
-    let total_chars: usize = lines.iter().map(|line| line.len()).sum();
+    let total_chars: usize = lines.iter().map(String::len).sum();
     assert_eq!(total_chars, 1000);
 }
 
@@ -512,7 +513,7 @@ fn test_zero_width_terminal_handling() {
     let _manager = InputManager::default();
 
     // Wrapping to 0 width should not panic
-    let _ = calculate_width("", merlin_routing::user_interface::EmojiMode::Permissive);
+    let _ = calculate_width("", EmojiMode::Permissive);
 }
 
 #[test]
@@ -535,6 +536,6 @@ fn test_special_control_characters() {
 }
 
 /// Helper function imported from the module
-fn calculate_width(text: &str, mode: merlin_routing::user_interface::EmojiMode) -> usize {
-    merlin_routing::user_interface::calculate_width(text, mode)
+fn calculate_width(text: &str, mode: EmojiMode) -> usize {
+    ui_calculate_width(text, mode)
 }

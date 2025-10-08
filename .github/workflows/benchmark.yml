@@ -47,7 +47,7 @@ jobs:
         env:
           RUST_BACKTRACE: 1
         run: |
-          cargo bench -p merlin-routing --benches --no-fail-fast -- --verbose
+          cargo bench -p merlin-routing --benches --no-fail-fast
 
       - name: Assert Criterion results exist
         run: |

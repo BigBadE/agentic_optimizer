@@ -1,10 +1,18 @@
-#![allow(dead_code, reason = "Test utilities used across multiple test files")]
 //! Common test utilities and helpers for merlin-routing tests
 
-use merlin_routing::TaskId;
+use merlin_core::{Response, TokenUsage};
 use merlin_routing::user_interface::output_tree::OutputTree;
 use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskStatus};
+use merlin_routing::{TaskId, TaskResult, ValidationResult};
 use std::time::Instant;
+
+// Reference all helper functions to prevent dead code warnings
+const _: fn() = || {
+    let _ = create_child_task;
+    let _ = create_completed_task;
+    let _ = create_failed_task;
+    let _ = create_test_task_result;
+};
 
 /// Create a basic test task with sensible defaults
 pub fn create_test_task(desc: &str) -> TaskDisplay {
@@ -70,5 +78,39 @@ pub fn create_failed_task(desc: &str) -> TaskDisplay {
         output_lines: vec![],
         output_tree: OutputTree::default(),
         steps: vec![],
+    }
+}
+
+/// Create a test task result
+pub fn create_test_task_result(task_id: TaskId, text: &str) -> TaskResult {
+    TaskResult {
+        task_id,
+        response: Response {
+            text: text.to_string(),
+            confidence: 0.95,
+            tokens_used: TokenUsage {
+                input: 100,
+                output: 50,
+                cache_read: 0,
+                cache_write: 0,
+            },
+            provider: "test".to_string(),
+            latency_ms: 1000,
+        },
+        tier_used: "local".to_string(),
+        tokens_used: TokenUsage {
+            input: 100,
+            output: 50,
+            cache_read: 0,
+            cache_write: 0,
+        },
+        validation: ValidationResult {
+            passed: true,
+            score: 1.0,
+            errors: vec![],
+            warnings: vec![],
+            stages: vec![],
+        },
+        duration_ms: 1000,
     }
 }

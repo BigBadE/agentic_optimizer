@@ -65,3 +65,76 @@ impl Error {
         matches!(self, Self::Request(_) | Self::Provider(_))
     }
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::missing_panics_doc,
+    clippy::absolute_paths,
+    clippy::missing_errors_doc,
+    clippy::unnecessary_wraps,
+    clippy::assertions_on_result_states,
+    reason = "Test code is allowed to use unwrap and has different conventions"
+)]
+mod tests {
+    use super::*;
+    use serde_json::{Value as JsonValue, from_str};
+    use std::io;
+
+    #[test]
+    fn test_error_display() {
+        let error1 = Error::Config("invalid config".to_owned());
+        assert_eq!(error1.to_string(), "Configuration error: invalid config");
+
+        let error2 = Error::Provider("model failed".to_owned());
+        assert_eq!(error2.to_string(), "Provider error: model failed");
+
+        let error3 = Error::MissingApiKey("OPENAI_API_KEY".to_owned());
+        assert_eq!(error3.to_string(), "API key not found: OPENAI_API_KEY");
+    }
+
+    #[test]
+    fn test_error_is_retryable() {
+        // Retryable errors
+        let error1 = Error::Provider("timeout".to_owned());
+        assert!(error1.is_retryable());
+
+        // Non-retryable errors
+        let error2 = Error::Config("bad config".to_owned());
+        assert!(!error2.is_retryable());
+
+        let error3 = Error::MissingApiKey("KEY".to_owned());
+        assert!(!error3.is_retryable());
+
+        let error4 = Error::FileNotFound("test.txt".to_owned());
+        assert!(!error4.is_retryable());
+    }
+
+    #[test]
+    fn test_error_from_io() {
+        let io_error = io::Error::new(io::ErrorKind::NotFound, "file not found");
+        let error: Error = io_error.into();
+        assert!(matches!(error, Error::Io(_)));
+    }
+
+    #[test]
+    fn test_error_from_json() {
+        let json_error = from_str::<JsonValue>("invalid json").unwrap_err();
+        let error: Error = json_error.into();
+        assert!(matches!(error, Error::Json(_)));
+    }
+
+    #[test]
+    fn test_result_type() {
+        fn returns_result() -> Result<String> {
+            Ok("success".to_owned())
+        }
+
+        fn returns_error() -> Result<String> {
+            Err(Error::Other("failed".to_owned()))
+        }
+
+        assert!(returns_result().is_ok());
+        assert!(returns_error().is_err());
+    }
+}

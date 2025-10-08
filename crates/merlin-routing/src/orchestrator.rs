@@ -395,6 +395,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Requires GROQ_API_KEY environment variable"]
     async fn test_process_simple_request() {
         let config = RoutingConfig::default();
         let orchestrator = RoutingOrchestrator::new(config);

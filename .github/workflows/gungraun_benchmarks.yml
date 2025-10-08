@@ -1,4 +1,4 @@
-name: IAI-Callgrind Benchmarks
+name: Gungraun Benchmarks
 
 on:
   push:
@@ -20,8 +20,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  iai-callgrind-benchmark:
-    name: Run IAI-Callgrind Benchmarks
+  gungraun-benchmark:
+    name: Run Gungraun Benchmarks
     runs-on: ubuntu-latest
 
     steps:
@@ -40,22 +40,27 @@ jobs:
         with:
           profile: release
 
-      - name: Run IAI-Callgrind benchmarks
+      - name: Install gungraun-runner
         run: |
-          cargo run --profile ci-release --bin perf-bench -- --iai --output iai-results.md
-          echo " IAI-Callgrind benchmarks completed"
-          if [ -f iai-results.md ]; then
-            head -30 iai-results.md
+          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
+          cargo binstall --no-confirm gungraun-runner@0.17.0
+
+      - name: Run Gungraun benchmarks
+        run: |
+          cargo run --profile ci-release --bin perf-bench -- --gungraun --output gungraun-results.md
+          echo " Gungraun benchmarks completed"
+          if [ -f gungraun-results.md ]; then
+            head -30 gungraun-results.md
           else
-            echo " Warning: iai-results.md not found"
+            echo " Warning: gungraun-results.md not found"
           fi
 
       - name: Upload results artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: iai-callgrind-benchmark-results
-          path: iai-results.md
+          name: gungraun-benchmark-results
+          path: gungraun-results.md
           retention-days: 90
           if-no-files-found: warn
 
@@ -67,17 +72,17 @@ jobs:
           path: gh-pages
           fetch-depth: 0
 
-      - name: Publish IAI-Callgrind results to gh-pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('iai-results.md') != ''
+      - name: Publish Gungraun results to gh-pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('gungraun-results.md') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
-          mkdir -p gh-pages/iai-callgrind-bench
-          cp iai-results.md gh-pages/iai-callgrind-bench/latest.md
-          cp iai-results.md "gh-pages/iai-callgrind-bench/${ts}.md"
+          mkdir -p gh-pages/gungraun-bench
+          cp gungraun-results.md gh-pages/gungraun-bench/latest.md
+          cp gungraun-results.md "gh-pages/gungraun-bench/${ts}.md"
           cd gh-pages
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add iai-callgrind-bench/
-          git commit -m "Update IAI-Callgrind benchmark results: ${ts}" || echo "No changes to commit"
+          git add gungraun-bench/
+          git commit -m "Update Gungraun benchmark results: ${ts}" || echo "No changes to commit"
           git push origin gh-pages

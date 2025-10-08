@@ -1,4 +1,4 @@
-//! IAI-Callgrind integration benchmarks for end-to-end performance.
+//! Gungraun integration benchmarks for end-to-end performance.
 #![allow(
     dead_code,
     clippy::expect_used,
@@ -13,7 +13,7 @@
     reason = "Test allows"
 )]
 
-use iai_callgrind::{library_benchmark, library_benchmark_group, main};
+use gungraun::{benchmark, benchmark_group, main};
 use merlin_routing::{RoutingConfig, RoutingOrchestrator};
 use std::hint::black_box;
 use tokio::runtime::Runtime;
@@ -23,8 +23,8 @@ fn create_runtime() -> Runtime {
 }
 
 // Benchmark end-to-end simple query
-#[library_benchmark]
-fn iai_e2e_simple_query() {
+#[benchmark]
+fn gungraun_e2e_simple_query() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
     let runtime = create_runtime();
@@ -37,11 +37,11 @@ fn iai_e2e_simple_query() {
 }
 
 // Benchmark end-to-end code modification
-#[library_benchmark]
-fn iai_e2e_code_modification() {
+#[benchmark]
+fn gungraun_e2e_code_modification() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
-    let runtime = Runtime::new().unwrap();
+    let runtime = create_runtime();
 
     runtime.block_on(async {
         let _result = orchestrator
@@ -51,11 +51,11 @@ fn iai_e2e_code_modification() {
 }
 
 // Benchmark end-to-end complex refactor
-#[library_benchmark]
-fn iai_e2e_complex_refactor() {
+#[benchmark]
+fn gungraun_e2e_complex_refactor() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
-    let runtime = Runtime::new().unwrap();
+    let runtime = create_runtime();
 
     runtime.block_on(async {
         let _result = orchestrator
@@ -67,11 +67,11 @@ fn iai_e2e_complex_refactor() {
 }
 
 // Benchmark multiple sequential requests
-#[library_benchmark]
-fn iai_sequential_requests() {
+#[benchmark]
+fn gungraun_sequential_requests() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
-    let runtime = Runtime::new().unwrap();
+    let runtime = create_runtime();
 
     let requests = vec!["Add a comment", "Fix the bug", "Refactor the code"];
 
@@ -82,13 +82,13 @@ fn iai_sequential_requests() {
     });
 }
 
-library_benchmark_group!(
+benchmark_group!(
     name = integration_group;
     benchmarks =
-        iai_e2e_simple_query,
-        iai_e2e_code_modification,
-        iai_e2e_complex_refactor,
-        iai_sequential_requests
+        gungraun_e2e_simple_query,
+        gungraun_e2e_code_modification,
+        gungraun_e2e_complex_refactor,
+        gungraun_sequential_requests
 );
 
-main!(library_benchmark_groups = integration_group);
+main!(benchmark_groups = integration_group);

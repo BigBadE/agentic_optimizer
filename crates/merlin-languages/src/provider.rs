@@ -123,3 +123,97 @@ pub trait LanguageProvider: Send + Sync {
     /// Returns an error if the file cannot be analyzed
     fn list_symbols_in_file(&self, file: &Path) -> Result<Vec<SymbolInfo>>;
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::missing_panics_doc,
+    clippy::redundant_clone,
+    clippy::uninlined_format_args,
+    reason = "Test code is allowed to use unwrap and has different conventions"
+)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_symbol_kind_equality() {
+        assert_eq!(SymbolKind::Function, SymbolKind::Function);
+        assert_ne!(SymbolKind::Function, SymbolKind::Struct);
+        assert_eq!(SymbolKind::Method, SymbolKind::Method);
+    }
+
+    #[test]
+    fn test_symbol_info_creation() {
+        let symbol = SymbolInfo {
+            name: "test_function".to_owned(),
+            kind: SymbolKind::Function,
+            file_path: PathBuf::from("src/lib.rs"),
+            line: 42,
+            documentation: Some("Test documentation".to_owned()),
+        };
+
+        assert_eq!(symbol.name, "test_function");
+        assert_eq!(symbol.kind, SymbolKind::Function);
+        assert_eq!(symbol.line, 42);
+        assert!(symbol.documentation.is_some());
+    }
+
+    #[test]
+    fn test_search_query_default() {
+        let query = SearchQuery::default();
+        assert!(query.symbol_name.is_none());
+        assert!(!query.include_references);
+        assert!(!query.include_implementations);
+        assert_eq!(query.max_results, 50);
+    }
+
+    #[test]
+    fn test_search_query_with_name() {
+        let query = SearchQuery {
+            symbol_name: Some("MyStruct".to_owned()),
+            include_references: true,
+            include_implementations: false,
+            max_results: 10,
+        };
+
+        assert_eq!(query.symbol_name, Some("MyStruct".to_owned()));
+        assert!(query.include_references);
+        assert_eq!(query.max_results, 10);
+    }
+
+    #[test]
+    fn test_search_result_creation() {
+        let symbols = vec![
+            SymbolInfo {
+                name: "func1".to_owned(),
+                kind: SymbolKind::Function,
+                file_path: PathBuf::from("src/lib.rs"),
+                line: 10,
+                documentation: None,
+            },
+            SymbolInfo {
+                name: "MyStruct".to_owned(),
+                kind: SymbolKind::Struct,
+                file_path: PathBuf::from("src/types.rs"),
+                line: 20,
+                documentation: Some("A struct".to_owned()),
+            },
+        ];
+
+        let result = SearchResult {
+            symbols: symbols.clone(),
+            related_files: vec![],
+        };
+
+        assert_eq!(result.symbols.len(), 2);
+        assert_eq!(result.symbols[0].name, "func1");
+        assert_eq!(result.symbols[1].kind, SymbolKind::Struct);
+        assert!(result.related_files.is_empty());
+    }
+
+    #[test]
+    fn test_symbol_kind_debug() {
+        let kind = SymbolKind::Function;
+        let debug_str = format!("{:?}", kind);
+        assert_eq!(debug_str, "Function");
+    }
+}

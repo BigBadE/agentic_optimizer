@@ -136,3 +136,150 @@ impl FileContext {
         Self { path, content }
     }
 }
+
+#[cfg(test)]
+#[allow(
+    clippy::unwrap_used,
+    clippy::absolute_paths,
+    clippy::missing_panics_doc,
+    clippy::float_cmp,
+    clippy::redundant_clone,
+    reason = "Test code is allowed to use unwrap and has different conventions"
+)]
+mod tests {
+    use super::*;
+    use serde_json::{from_str, to_string};
+    use std::fs::write;
+    use tempfile::TempDir;
+
+    #[test]
+    fn test_query_new() {
+        let query = Query::new("test query");
+        assert_eq!(query.text, "test query");
+        assert!(query.conversation_id.is_none());
+        assert!(query.files_context.is_empty());
+    }
+
+    #[test]
+    fn test_query_with_files() {
+        let files = vec![PathBuf::from("file1.rs"), PathBuf::from("file2.rs")];
+        let query = Query::new("test").with_files(files.clone());
+        assert_eq!(query.files_context, files);
+    }
+
+    #[test]
+    fn test_query_serialization() {
+        let query = Query::new("test query").with_files(vec![PathBuf::from("test.rs")]);
+        let json = to_string(&query).unwrap();
+        let deserialized: Query = from_str(&json).unwrap();
+        assert_eq!(query.text, deserialized.text);
+        assert_eq!(query.files_context, deserialized.files_context);
+    }
+
+    #[test]
+    fn test_token_usage_total() {
+        let usage = TokenUsage {
+            input: 100,
+            output: 50,
+            cache_read: 20,
+            cache_write: 10,
+        };
+        assert_eq!(usage.total(), 180);
+    }
+
+    #[test]
+    fn test_token_usage_default() {
+        let usage = TokenUsage::default();
+        assert_eq!(usage.total(), 0);
+        assert_eq!(usage.input, 0);
+        assert_eq!(usage.output, 0);
+    }
+
+    #[test]
+    fn test_context_new() {
+        let context = Context::new("system prompt");
+        assert_eq!(context.system_prompt, "system prompt");
+        assert!(context.files.is_empty());
+    }
+
+    #[test]
+    fn test_context_with_files() {
+        let files = vec![FileContext::new(
+            PathBuf::from("test.rs"),
+            "content".to_owned(),
+        )];
+        let context = Context::new("prompt").with_files(files.clone());
+        assert_eq!(context.files.len(), 1);
+        assert_eq!(context.files[0].path, PathBuf::from("test.rs"));
+    }
+
+    #[test]
+    fn test_context_files_to_string() {
+        let files = vec![
+            FileContext::new(PathBuf::from("file1.rs"), "content1".to_owned()),
+            FileContext::new(PathBuf::from("file2.rs"), "content2".to_owned()),
+        ];
+        let context = Context::new("prompt").with_files(files);
+        let result = context.files_to_string();
+        assert!(result.contains("// File: file1.rs"));
+        assert!(result.contains("content1"));
+        assert!(result.contains("// File: file2.rs"));
+        assert!(result.contains("content2"));
+    }
+
+    #[test]
+    fn test_context_token_estimate() {
+        let files = vec![FileContext::new(PathBuf::from("test.rs"), "a".repeat(100))];
+        let context = Context::new("prompt").with_files(files);
+        // (6 + 100) / 4 = 26
+        assert_eq!(context.token_estimate(), 26);
+    }
+
+    #[test]
+    fn test_file_context_new() {
+        let file = FileContext::new(PathBuf::from("test.rs"), "content".to_owned());
+        assert_eq!(file.path, PathBuf::from("test.rs"));
+        assert_eq!(file.content, "content");
+    }
+
+    #[test]
+    fn test_file_context_from_path() {
+        let temp_dir = TempDir::new().unwrap();
+        let file_path = temp_dir.path().join("test.txt");
+        write(&file_path, "test content").unwrap();
+
+        let file_context = FileContext::from_path(&file_path).unwrap();
+        assert_eq!(file_context.path, file_path);
+        assert_eq!(file_context.content, "test content");
+    }
+
+    #[test]
+    fn test_file_context_from_path_not_found() {
+        let path = PathBuf::from("nonexistent.txt");
+        let result = FileContext::from_path(&path);
+        assert!(result.is_err());
+        assert!(matches!(result.unwrap_err(), Error::FileNotFound(_)));
+    }
+
+    #[test]
+    fn test_response_serialization() {
+        let response = Response {
+            text: "response text".to_owned(),
+            confidence: 0.95,
+            tokens_used: TokenUsage {
+                input: 100,
+                output: 50,
+                cache_read: 0,
+                cache_write: 0,
+            },
+            provider: "test-provider".to_owned(),
+            latency_ms: 250,
+        };
+
+        let json = to_string(&response).unwrap();
+        let deserialized: Response = from_str(&json).unwrap();
+        assert_eq!(response.text, deserialized.text);
+        assert_eq!(response.confidence, deserialized.confidence);
+        assert_eq!(response.provider, deserialized.provider);
+    }
+}

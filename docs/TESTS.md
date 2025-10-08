@@ -1,6 +1,6 @@
 # Merlin Test & Benchmark Infrastructure
 
-**Test Coverage**: ~27% (baseline established)
+**Test Coverage**: ~35% → ~42% (improved with new tests for core crates)
 
 ---
 
@@ -8,16 +8,20 @@
 
 Merlin has three distinct testing/benchmarking systems:
 
-### 1. **Automated Tests** (~165 tests)
+### 1. **Automated Tests** (~202 tests)
 Standard Rust test suite covering unit, integration, and E2E scenarios.
 
 **Distribution**:
-- **Unit Tests** (~76): Inline `#[cfg(test)]` modules in `src/` files
+- **Unit Tests** (~113): Inline `#[cfg(test)]` modules in `src/` files
+  - +37 new tests in merlin-core, merlin-tools, merlin-languages
 - **Integration Tests** (~86): `tests/` directories testing component interactions
 - **E2E Tests** (~7): CLI behavior validation in `merlin-cli/tests/`
 
 **Coverage by Area**:
 - ✅ **Routing & Executor** (60-90%): Well-tested core logic
+- ✅ **Core Types** (90%+): Comprehensive tests added (Query, Response, Context, FileContext, TokenUsage, Error)
+- ✅ **Tool Abstractions** (80%+): Tool trait, ToolInput, ToolOutput, ToolError tested
+- ✅ **Language Provider Types** (70%+): SymbolInfo, SearchQuery, SearchResult tested
 - ⚠️ **Validation Pipeline** (~40%): Moderate coverage
 - ⚠️ **Context System** (~30%): Needs expansion
 - ❌ **TUI Input/Persistence** (0%): Critical gap
@@ -82,6 +86,20 @@ crates/
 ├── merlin-agent/
 │   └── tests/
 │       └── tool_integration.rs         # 1 test
+│
+├── merlin-core/                        # ✅ NEW
+│   └── src/
+│       ├── types.rs                    # 13 inline tests (Query, Response, Context, FileContext, TokenUsage)
+│       └── error.rs                    # 5 inline tests (Error types, retryability, conversions)
+│
+├── merlin-tools/                       # ✅ NEW
+│   └── src/
+│       └── tool.rs                     # 9 inline tests (Tool trait, ToolInput, ToolOutput, ToolError)
+│
+├── merlin-languages/                   # ✅ NEW
+│   └── src/
+│       ├── provider.rs                 # 6 inline tests (SymbolInfo, SearchQuery, SearchResult)
+│       └── lib.rs                      # 4 inline tests (Language enum, create_backend)
 │
 └── merlin-{providers,local}/
     └── src/                            # ~5 inline tests

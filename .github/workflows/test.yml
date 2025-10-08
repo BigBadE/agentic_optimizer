@@ -8,14 +8,20 @@ on:
   pull_request:
     branches: [ "master" ]
 
+# Cancel in-progress runs when a new run is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
+  RUST_BACKTRACE: 1
 
 jobs:
   build-test:
     permissions: write-all
-    runs-on: ${{ matrix.os }}
+    runs-on: ubuntu-latest
     strategy:
       fail-fast: false
       matrix:
@@ -32,17 +38,27 @@ jobs:
         with:
           components: llvm-tools-preview
 
+      - name: Install mold linker (Linux)
+        if: matrix.os == 'ubuntu-latest'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold clang
+
+      - name: Setup fast cargo config
+        run: |
+          cp .cargo/fast_config.toml .cargo/config.toml
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+          shared-key: ${{ matrix.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           cache-on-failure: true
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Run tests with coverage
-        run: cargo llvm-cov --lcov --output-path coverage.info --workspace --ignore-filename-regex "test_repositories|benchmarks" --release --verbose -- --nocapture
+        run: cargo llvm-cov --lcov --output-path coverage.info --workspace --ignore-filename-regex "test_repositories|benchmarks" --release -- --nocapture
 
       - name: Upload coverage to Codecov
         if: github.event_name == 'push' && matrix.os == 'ubuntu-latest'

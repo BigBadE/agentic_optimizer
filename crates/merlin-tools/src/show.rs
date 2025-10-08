@@ -45,10 +45,7 @@ impl ShowTool {
         let lines: Vec<&str> = content.lines().collect();
 
         let start = params.start_line.unwrap_or(1) - 1;
-        let end = params
-            .end_line
-            .unwrap_or_else(|| lines.len())
-            .min(lines.len());
+        let end = params.end_line.unwrap_or(lines.len()).min(lines.len());
 
         if start >= lines.len() {
             return Err(ToolError::InvalidInput(format!(

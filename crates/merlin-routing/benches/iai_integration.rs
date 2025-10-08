@@ -21,7 +21,7 @@ fn create_runtime() -> Runtime {
     Runtime::new().unwrap_or_else(|err| panic!("Failed to create runtime: {err}"))
 }
 
-/// Benchmark end-to-end simple query
+// Benchmark end-to-end simple query
 #[library_benchmark]
 fn iai_e2e_simple_query() {
     let config = RoutingConfig::default();
@@ -35,7 +35,7 @@ fn iai_e2e_simple_query() {
     });
 }
 
-/// Benchmark end-to-end code modification
+// Benchmark end-to-end code modification
 #[library_benchmark]
 fn iai_e2e_code_modification() {
     let config = RoutingConfig::default();
@@ -49,7 +49,7 @@ fn iai_e2e_code_modification() {
     });
 }
 
-/// Benchmark end-to-end complex refactor
+// Benchmark end-to-end complex refactor
 #[library_benchmark]
 fn iai_e2e_complex_refactor() {
     let config = RoutingConfig::default();
@@ -65,7 +65,7 @@ fn iai_e2e_complex_refactor() {
     });
 }
 
-/// Benchmark multiple sequential requests
+// Benchmark multiple sequential requests
 #[library_benchmark]
 fn iai_sequential_requests() {
     let config = RoutingConfig::default();

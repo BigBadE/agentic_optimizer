@@ -19,7 +19,6 @@ env:
 
 jobs:
   build-test:
-    permissions: write-all
     runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
@@ -43,17 +42,5 @@ jobs:
           shared-key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
           cache-on-failure: true
 
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-
-      - name: Run tests with coverage
-        run: cargo llvm-cov --lcov --output-path coverage.info --workspace --ignore-filename-regex "test_repositories|benchmarks" --release --verbose -- --nocapture
-
-      - name: Upload coverage to Codecov
-        if: github.event_name == 'push' && matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.info
-          verbose: true
-          fail_ci_if_error: false
+      - name: Run clippy
+        run: cargo clippy --release --all-targets --all-features -- -D warnings

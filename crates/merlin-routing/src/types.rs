@@ -349,9 +349,10 @@ impl ExecutionContext {
 }
 
 /// Task lifecycle state.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum TaskState {
     /// Task has been created but not started
+    #[default]
     Created,
     /// Task is performing self-assessment
     Assessing,
@@ -363,12 +364,6 @@ pub enum TaskState {
     Completed,
     /// Task failed
     Failed,
-}
-
-impl Default for TaskState {
-    fn default() -> Self {
-        Self::Created
-    }
 }
 
 /// Decision made by a task during self-assessment.

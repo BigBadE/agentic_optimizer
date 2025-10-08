@@ -2,20 +2,15 @@ use unicode_segmentation::UnicodeSegmentation as _;
 use unicode_width::UnicodeWidthStr;
 
 /// Configuration for text width calculation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq)]
 pub enum EmojiMode {
     /// Strip all emojis and replace with safe fallback
     Strict,
     /// Allow emojis with best-effort width calculation
+    #[default]
     Permissive,
     /// Replace emojis with text representations (e.g., :smile:)
     TextFallback,
-}
-
-impl Default for EmojiMode {
-    fn default() -> Self {
-        Self::Permissive
-    }
 }
 
 /// Calculate the display width of a string, handling emojis and grapheme clusters correctly

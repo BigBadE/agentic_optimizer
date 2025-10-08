@@ -21,16 +21,27 @@ Benchmarks for evaluating context retrieval quality using hybrid BM25 + vector s
 
 ## Quick Start
 
+**⚠️ Prerequisites**: Benchmarks require Ollama running locally. See `RUNNING_BENCHMARKS.md` for setup.
+
 ```bash
-# Run all benchmarks
-cargo run --bin benchmark
+# Run all quality benchmarks
+cargo run --release --bin quality-bench -- --output quality-results.md
 
-# Generate report
-cargo run --bin benchmark --report benchmarks/results.md
+# Run with verbose output
+cargo run --release --bin quality-bench -- --output quality-results.md --verbose
 
-# Run specific test
-cargo run --bin benchmark --test css_parsing
+# Run specific test case
+cargo run --release --bin quality-bench -- --name "CSS Parsing" --output quality-results.md
 ```
+
+**After running**: 
+```bash
+git add -f quality-results.md  # Force add (it's in .gitignore)
+git commit -m "Update quality benchmark results"
+git push  # CI will publish to gh-pages and remove from repo
+```
+
+See `RUNNING_BENCHMARKS.md` for detailed instructions.
 
 ## Structure
 

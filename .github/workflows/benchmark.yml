@@ -35,7 +35,7 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
-          profile: release
+          profile: bench
 
       - name: Inspect bench targets
         run: |
@@ -47,7 +47,7 @@ jobs:
         env:
           RUST_BACKTRACE: 1
         run: |
-          cargo bench -p merlin-routing --benches --no-fail-fast --profile release --verbose
+          cargo bench -p merlin-routing --benches --no-fail-fast -- --verbose
 
       - name: Assert Criterion results exist
         run: |

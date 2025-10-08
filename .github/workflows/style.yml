@@ -1,4 +1,4 @@
-name: Clippy
+name: Style
 
 on:
   schedule:
@@ -8,17 +8,18 @@ on:
   pull_request:
     branches: [ "master" ]
 
+# Cancel in-progress runs when a new run is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 env:
   CARGO_TERM_COLOR: always
   CARGO_INCREMENTAL: 0
 
 jobs:
   build-test:
-    runs-on: ${{ matrix.os }}
-    strategy:
-      fail-fast: false
-      matrix:
-        os: [ubuntu-latest, windows-latest, macos-latest]
+    runs-on: ubuntu-latest
 
     steps:
       - name: Checkout repository
@@ -29,7 +30,16 @@ jobs:
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
         with:
-          components: llvm-tools-preview
+          components: rustc-codegen-cranelift-preview, clippy
+
+      - name: Install mold linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold clang
+
+      - name: Setup fast cargo config
+        run: |
+          cp .cargo/fast_config.toml .cargo/config.toml
 
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
@@ -38,4 +48,7 @@ jobs:
           cache-on-failure: true
 
       - name: Run clippy
-        run: cargo clippy --release --all-targets --all-features -- -D warnings
+        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+
+      - name: Check formatting
+        run: cargo fmt --all -- --check

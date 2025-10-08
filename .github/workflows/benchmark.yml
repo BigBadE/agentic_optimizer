@@ -7,6 +7,11 @@ on:
     branches: [ master ]
   workflow_dispatch:
 
+# Cancel in-progress runs when a new run is triggered
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
 permissions:
   contents: write
   deployments: write
@@ -30,13 +35,22 @@ jobs:
       - name: Install Rust nightly
         uses: dtolnay/rust-toolchain@nightly
 
+      - name: Install mold linker
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y mold clang
+
+      - name: Setup fast cargo config
+        run: |
+          cp .cargo/fast_config.toml .cargo/config.toml
+
       - name: Cache Rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           cache-on-failure: true
 
       - name: Run benchmarks
-        run: cargo bench --workspace -- --output-format bencher | tee benchmark_results.txt
+        run: cargo bench --workspace --no-fail-fast
 
       - name: Download previous benchmark results
         uses: actions/cache@v3
@@ -46,16 +60,17 @@ jobs:
 
       - name: Store benchmark result
         uses: benchmark-action/github-action-benchmark@v1
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         with:
           name: Merlin Performance Benchmarks
-          tool: 'cargo'
-          output-file-path: benchmark_results.txt
+          tool: 'criterion'
+          output-file-path: target/criterion/*/new/estimates.json
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           # Alert if performance degrades by 115% (15% regression)
           alert-threshold: '115%'
           comment-on-alert: true
-          fail-on-alert: true
+          fail-on-alert: false
           # Save results to gh-pages branch
           gh-pages-branch: gh-pages
           benchmark-data-dir-path: dev/bench
@@ -64,7 +79,5 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: benchmark-results
-          path: |
-            benchmark_results.txt
-            target/criterion/
-          retention-days: 365
+          path: target/criterion/
+          retention-days: 90

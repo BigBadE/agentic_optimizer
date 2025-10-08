@@ -80,13 +80,12 @@ lto = false
 
 [profile.dev.package."*"]
 opt-level = 3
-codegen-backend = "cranelift"
+#codegen-backend = "cranelift"
 
 [profile.release]
 codegen-units = 1
 lto = "thin"
 panic = "abort"
-incremental = false
 overflow-checks = false
 strip = "symbols"
 

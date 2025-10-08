@@ -6,7 +6,7 @@ use std::io;
 use std::path::Path;
 
 /// UI theme configuration
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 pub enum Theme {
     /// Nord color palette
     Nord,
@@ -15,6 +15,7 @@ pub enum Theme {
     /// Gruvbox color palette
     Gruvbox,
     /// Tokyo Night color palette
+    #[default]
     TokyoNight,
     /// Catppuccin color palette
     Catppuccin,
@@ -163,11 +164,5 @@ impl Theme {
             to_string(&self).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
 
         write_file(theme_file, json)
-    }
-}
-
-impl Default for Theme {
-    fn default() -> Self {
-        Self::TokyoNight
     }
 }

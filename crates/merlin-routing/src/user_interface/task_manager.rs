@@ -222,9 +222,11 @@ impl TaskManager {
 
     /// Checks if a task has children
     pub fn has_children(&self, task_id: TaskId) -> bool {
-        self.task_order
-            .iter()
-            .any(|id| self.tasks.get(id).is_some_and(|task| task.parent_id == Some(task_id)))
+        self.task_order.iter().any(|id| {
+            self.tasks
+                .get(id)
+                .is_some_and(|task| task.parent_id == Some(task_id))
+        })
     }
 
     /// Iterates over all tasks
@@ -275,7 +277,11 @@ impl TaskManager {
             let children: Vec<TaskId> = self
                 .task_order
                 .iter()
-                .filter(|&&id| self.tasks.get(&id).is_some_and(|task| task.parent_id == Some(current)))
+                .filter(|&&id| {
+                    self.tasks
+                        .get(&id)
+                        .is_some_and(|task| task.parent_id == Some(current))
+                })
                 .copied()
                 .collect();
             to_delete.extend(children);

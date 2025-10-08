@@ -269,8 +269,7 @@ impl VectorSearchManager {
                 invalid_count + new_count
             ));
         } else if new_count > 0 {
-            spinner
-                .finish_with_message(format!("✓ Loaded cache + added {new_count} new files"));
+            spinner.finish_with_message(format!("✓ Loaded cache + added {new_count} new files"));
         } else {
             spinner.finish_with_message(format!(
                 "✓ Loaded {} embeddings from cache",

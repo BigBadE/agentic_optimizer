@@ -85,7 +85,7 @@ pub fn chunk_file(file_path: &Path, content: &str) -> Vec<FileChunk> {
     if let Some(ext) = extension.to_str() {
         match ext {
             "rs" => chunk_rust(path_str, content),
-            "md" | "markdown" => chunk_markdown(path_str, content),
+            "md" | "markdown" => chunk_markdown(&path_str, content),
             "txt" | "log" => chunk_text(path_str, content),
             "toml" | "yaml" | "yml" | "json" => chunk_config(path_str, content),
             _ => chunk_generic_code(path_str, content),

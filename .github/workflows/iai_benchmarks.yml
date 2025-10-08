@@ -45,14 +45,20 @@ jobs:
         run: |
           cargo run --release --bin perf-bench -- --iai --output iai-results.md
           echo "✅ IAI benchmarks completed"
-          head -30 iai-results.md
+          if [ -f iai-results.md ]; then
+            head -30 iai-results.md
+          else
+            echo "⚠️ Warning: iai-results.md not found"
+          fi
 
       - name: Upload results artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: iai-benchmark-results
           path: iai-results.md
           retention-days: 90
+          if-no-files-found: warn
 
       - name: Prepare gh-pages workspace
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -63,7 +69,7 @@ jobs:
           fetch-depth: 0
 
       - name: Publish IAI results to gh-pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('iai-results.md') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)

@@ -74,9 +74,10 @@ async fn main() -> Result<()> {
         test_cases
             .into_iter()
             .filter(|(path, _)| {
-                path.file_stem()
-                    .and_then(|stem| stem.to_str())
-                    .is_some_and(|name| name == test_name)
+                let Some(stem) = path.file_stem() else {
+                    return false;
+                };
+                stem.to_str().is_some_and(|name| name == test_name)
             })
             .collect()
     } else {

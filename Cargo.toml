@@ -60,6 +60,7 @@ tempfile = "3.23"
 
 # Testing dependencies
 criterion= { version = "0.7", features = ["html_reports", "async_tokio"] }
+iai = "0.1"
 assert_cmd = "2.0"
 predicates = "3.1"
 

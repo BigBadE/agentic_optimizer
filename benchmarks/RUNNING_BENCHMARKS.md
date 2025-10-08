@@ -1,38 +1,103 @@
-# Running Quality Benchmarks Locally
+# Running Benchmarks Locally
+
+This guide covers both quality benchmarks and performance benchmarks.
+
+## Performance Benchmarks
+
+Performance benchmarks measure the speed and efficiency of core routing operations. We support two types:
+
+1. **Criterion Benchmarks** - Statistical benchmarks with warm-up, multiple iterations, and HTML reports
+2. **IAI Benchmarks** - Single-shot benchmarks using Cachegrind for precise, deterministic measurements
+
+### Running Criterion Benchmarks
+
+```bash
+# Run all Criterion benchmarks and save results
+cargo run --release --bin perf-bench -- --output perf-results.md
+
+# Run with verbose output
+cargo run --release --bin perf-bench -- --output perf-results.md --verbose
+
+# Run specific benchmark
+cargo run --release --bin perf-bench -- --output perf-results.md --name "request_analysis"
+```
+
+### Running IAI Benchmarks
+
+**Prerequisites**: IAI requires [Valgrind](https://www.valgrind.org) to be installed. IAI is not available on Windows.
+
+**IAI benchmarks run automatically in CI** on every push and pull request. You can also run them locally:
+
+```bash
+# Run all IAI benchmarks and save results
+cargo run --release --bin perf-bench -- --iai --output iai-results.md
+
+# Run with verbose output
+cargo run --release --bin perf-bench -- --iai --output iai-results.md --verbose
+
+# Run specific IAI benchmark
+cargo run --release --bin perf-bench -- --iai --output iai-results.md --name "iai_routing"
+```
+
+**IAI Benefits**:
+- **Precision**: Detects very small performance changes
+- **Consistency**: Works reliably in CI environments
+- **Profiling**: Generates Cachegrind profiles for detailed analysis
+- **Speed**: Faster than statistical benchmarks (single execution)
+
+### Committing Performance Results
+
+**For Criterion benchmarks** (manual upload):
+1. Run benchmarks locally
+2. Review the generated `perf-results.md`
+3. Force-add it (it's in .gitignore) and commit:
+   ```bash
+   git add -f perf-results.md
+   git commit -m "Update performance benchmark results"
+   git push
+   ```
+4. CI will publish results to gh-pages and remove the file from repo
+
+**For IAI benchmarks** (automatic in CI):
+- IAI benchmarks run automatically in CI on every push/PR
+- Results are published to gh-pages automatically
+- No manual upload needed
+
+## Quality Benchmarks
 
 Quality benchmarks require **Ollama** to be running locally because they use the actual context retrieval system with embeddings and BM25 search.
 
-## Prerequisites
+### Prerequisites for Quality Benchmarks
 
 1. **Install Ollama**: https://ollama.ai/
 2. **Start Ollama**: `ollama serve`
 3. **Pull required model**: `ollama pull nomic-embed-text`
 
-## Running Benchmarks
+### Running Quality Benchmarks
 
-### Quick Run
+#### Quick Run
 
 ```bash
 cargo run --release --bin quality-bench -- --output quality-results.md
 ```
 
-### With Verbose Output
+#### With Verbose Output
 
 ```bash
 cargo run --release --bin quality-bench -- --output quality-results.md --verbose
 ```
 
-### Run Specific Test Case
+#### Run Specific Test Case
 
 ```bash
 cargo run --release --bin quality-bench -- --output quality-results.md --name "CSS Parsing"
 ```
 
-## Test Repositories
+### Test Repositories
 
-Benchmarks run against test repositories in `benchmarks/test_repositories/`. The main test repository is **Valor Browser Engine**.
+Quality benchmarks run against test repositories in `benchmarks/test_repositories/`. The main test repository is **Valor Browser Engine**.
 
-### Setting Up Test Repositories
+#### Setting Up Test Repositories
 
 ```bash
 # Clone Valor (if not already present)
@@ -43,9 +108,9 @@ cd benchmarks/test_repositories/valor
 git reset --hard 367ecde76cfe1a587256f9c6f318a56afee5ac17
 ```
 
-## Committing Results
+### Committing Quality Results
 
-After running benchmarks locally:
+After running quality benchmarks locally:
 
 1. Review the generated `quality-results.md`
 2. Force-add it (it's in .gitignore) and commit:
@@ -58,23 +123,33 @@ After running benchmarks locally:
    - Publish results to gh-pages
    - Remove `quality-results.md` from the repo (keeps repo clean)
 
-## CI Workflow
+### CI Workflow
 
-The CI workflow **does not run benchmarks**. It:
-1. Checks that `quality-results.md` exists
-2. Publishes it to gh-pages for historical tracking
-3. Uploads it as an artifact
-4. Removes `quality-results.md` from the repo (keeps repo clean)
+**Three separate workflows**:
 
-This is because:
-- Benchmarks require Ollama (not available on GitHub Actions runners)
-- Benchmarks can take several minutes to run
-- Results should be reviewed before committing
-- Results are stored on gh-pages, not in the main repo
+1. **`quality_benchmarks.yml`** - Quality benchmark results (manual upload)
+   - Checks for uploaded `quality-results.md`
+   - Publishes to gh-pages
+   - Removes file from repo
+   - *Reason*: Requires Ollama (not available on GitHub Actions)
 
-## Understanding Results
+2. **`benchmark.yml`** - Criterion performance benchmarks (manual upload)
+   - Checks for uploaded `perf-results.md`
+   - Publishes to gh-pages
+   - Removes file from repo
+   - *Reason*: Statistical benchmarks take time; run locally for consistency
 
-### Metrics
+3. **`iai_benchmarks.yml`** - IAI benchmarks (automatic execution)
+   - **Runs automatically** on every push/PR
+   - Installs Valgrind on Ubuntu runner
+   - Executes IAI benchmarks
+   - Publishes results to gh-pages
+   - Uploads artifacts
+   - *Reason*: Fast single-shot benchmarks; deterministic in CI
+
+## Understanding Quality Benchmark Results
+
+### Quality Metrics
 
 - **Precision@3**: % of top 3 results that are relevant
 - **Precision@10**: % of top 10 results that are relevant

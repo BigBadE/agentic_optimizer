@@ -7,6 +7,10 @@ edition.workspace = true
 name = "quality-bench"
 path = "src/main.rs"
 
+[[bin]]
+name = "perf-bench"
+path = "src/perf_bench.rs"
+
 [dependencies]
 merlin-context.workspace = true
 merlin-core.workspace = true
@@ -16,6 +20,7 @@ toml.workspace = true
 walkdir.workspace = true
 clap.workspace = true
 tokio.workspace = true
+chrono.workspace = true
 
 [lints]
 workspace = true

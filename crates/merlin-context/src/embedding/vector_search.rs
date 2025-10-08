@@ -108,13 +108,7 @@ impl VectorSearchManager {
         reason = "Complex initialization with caching and progress"
     )]
     pub async fn initialize(&mut self) -> Result<()> {
-        let spinner = ProgressBar::new_spinner();
-        spinner.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.cyan} {msg}")
-                .unwrap_or_else(|_| ProgressStyle::default_spinner()),
-        );
-        spinner.enable_steady_tick(Duration::from_millis(100));
+        let spinner = Self::create_spinner();
 
         // Check if embedding model is available
         spinner.set_message("Checking embedding model availability...");
@@ -126,105 +120,179 @@ impl VectorSearchManager {
         spinner.set_message("Loading embedding cache...");
 
         // Try to load from cache first
-        if let Ok(cache) = self.load_cache() {
-            info!(
-                "  Cache file found with {} embeddings (version: {})",
-                cache.embeddings.len(),
-                cache.version
-            );
-
-            if cache.embeddings.is_empty() {
-                warn!("  Cache is empty - will rebuild index");
-            }
-
-            if cache.is_valid() && !cache.embeddings.is_empty() {
-                spinner.set_message(format!(
-                    "Validating {} cached embeddings...",
-                    cache.embeddings.len()
-                ));
-
-                let (valid, invalid) = self.validate_cache_entries(&cache.embeddings);
-
-                // Add valid entries to store and BM25 index
-                for entry in &valid {
-                    let chunk_path = format!(
-                        "{}:{}-{}",
-                        entry.path.display(),
-                        entry.start_line,
-                        entry.end_line
-                    );
-                    self.file_times.insert(entry.path.clone(), entry.modified);
-                    self.store.add(
-                        PathBuf::from(&chunk_path),
-                        entry.embedding.clone(),
-                        entry.preview.clone(),
-                    );
-
-                    // Rebuild BM25 index from preview (approximation)
-                    self.bm25
-                        .add_document(PathBuf::from(chunk_path), &entry.preview);
-                }
-
-                // Finalize BM25 index
-                self.bm25.finalize();
-                info!("  BM25 index built with {} documents", self.bm25.len());
-
-                info!("  Total embeddings in store: {}", self.store.len());
-
-                // Check for new files not in cache
-                let all_files = self.collect_source_files();
-                let cached_paths: HashSet<_> =
-                    cache.embeddings.iter().map(|entry| &entry.path).collect();
-                let new_files: Vec<_> = all_files
-                    .into_iter()
-                    .filter(|f| !cached_paths.contains(f))
-                    .collect();
-
-                let new_count = new_files.len();
-                let invalid_count = invalid.len();
-
-                if !new_files.is_empty() {
-                    info!("  Found {new_count} new files to embed");
-                    spinner.set_message(format!("Embedding {new_count} new files..."));
-                    self.embed_files(new_files, &spinner).await?;
-                }
-
-                if !invalid.is_empty() {
-                    // Re-embed invalid files
-                    spinner.set_message(format!("Re-embedding {invalid_count} modified files..."));
-                    self.embed_files(invalid, &spinner).await?;
-
-                    spinner.finish_with_message(format!(
-                        "✓ Loaded cache + updated {} files",
-                        invalid_count + new_count
-                    ));
-                } else if new_count > 0 {
-                    spinner.finish_with_message(format!(
-                        "✓ Loaded cache + added {new_count} new files"
-                    ));
-                } else {
-                    spinner.finish_with_message(format!(
-                        "✓ Loaded {} embeddings from cache",
-                        cache.embeddings.len()
-                    ));
-                }
-
-                self.save_cache()?;
-                return Ok(());
-            }
-
-            // Cache is valid but empty - fall through to rebuild
-            info!("  Cache is empty - falling through to rebuild");
+        if let Ok(cache) = self.load_cache()
+            && self.try_initialize_from_cache(cache, &spinner).await?
+        {
+            return Ok(());
         }
 
         // No valid cache - embed entire codebase
+        self.initialize_from_scratch(&spinner).await?;
+
+        Ok(())
+    }
+
+    /// Create a configured progress spinner
+    fn create_spinner() -> ProgressBar {
+        let spinner = ProgressBar::new_spinner();
+        spinner.set_style(
+            ProgressStyle::default_spinner()
+                .template("{spinner:.cyan} {msg}")
+                .unwrap_or_else(|_| ProgressStyle::default_spinner()),
+        );
+        spinner.enable_steady_tick(Duration::from_millis(100));
+        spinner
+    }
+
+    /// Try to initialize from cached embeddings
+    ///
+    /// # Errors
+    /// Returns an error if embedding operations fail
+    async fn try_initialize_from_cache(
+        &mut self,
+        cache: VectorCache,
+        spinner: &ProgressBar,
+    ) -> Result<bool> {
+        info!(
+            "  Cache file found with {} embeddings (version: {})",
+            cache.embeddings.len(),
+            cache.version
+        );
+
+        if cache.embeddings.is_empty() {
+            warn!("  Cache is empty - will rebuild index");
+            return Ok(false);
+        }
+
+        if !cache.is_valid() {
+            return Ok(false);
+        }
+
+        spinner.set_message(format!(
+            "Validating {} cached embeddings...",
+            cache.embeddings.len()
+        ));
+
+        self.process_cached_embeddings(&cache, spinner).await?;
+
+        Ok(true)
+    }
+
+    /// Process and validate cached embeddings
+    ///
+    /// # Errors
+    /// Returns an error if embedding operations fail
+    async fn process_cached_embeddings(
+        &mut self,
+        cache: &VectorCache,
+        spinner: &ProgressBar,
+    ) -> Result<()> {
+        let (valid, invalid) = self.validate_cache_entries(&cache.embeddings);
+
+        // Add valid entries to store and BM25 index
+        self.load_valid_entries(&valid);
+
+        // Finalize BM25 index
+        self.bm25.finalize();
+        info!("  BM25 index built with {} documents", self.bm25.len());
+        info!("  Total embeddings in store: {}", self.store.len());
+
+        // Handle new and invalid files
+        let (new_files, _new_count, _invalid_count) = self.identify_new_files(cache);
+
+        self.update_cache_with_changes(new_files, invalid, spinner, cache)
+            .await?;
+
+        self.save_cache()?;
+        Ok(())
+    }
+
+    /// Load valid cache entries into the store
+    fn load_valid_entries(&mut self, valid: &[CachedEmbedding]) {
+        for entry in valid {
+            let chunk_path = format!(
+                "{}:{}-{}",
+                entry.path.display(),
+                entry.start_line,
+                entry.end_line
+            );
+            self.file_times.insert(entry.path.clone(), entry.modified);
+            self.store.add(
+                PathBuf::from(&chunk_path),
+                entry.embedding.clone(),
+                entry.preview.clone(),
+            );
+
+            // Rebuild BM25 index from preview (approximation)
+            self.bm25
+                .add_document(PathBuf::from(chunk_path), &entry.preview);
+        }
+    }
+
+    /// Identify new files that need embedding
+    fn identify_new_files(&self, cache: &VectorCache) -> (Vec<PathBuf>, usize, usize) {
+        let all_files = self.collect_source_files();
+        let cached_paths: HashSet<_> = cache.embeddings.iter().map(|entry| &entry.path).collect();
+        let new_files: Vec<_> = all_files
+            .into_iter()
+            .filter(|f| !cached_paths.contains(f))
+            .collect();
+        let new_count = new_files.len();
+        (new_files, new_count, 0)
+    }
+
+    /// Update cache with new and modified files
+    ///
+    /// # Errors
+    /// Returns an error if embedding operations fail
+    async fn update_cache_with_changes(
+        &mut self,
+        new_files: Vec<PathBuf>,
+        invalid: Vec<PathBuf>,
+        spinner: &ProgressBar,
+        cache: &VectorCache,
+    ) -> Result<()> {
+        let new_count = new_files.len();
+        let invalid_count = invalid.len();
+
+        if !new_files.is_empty() {
+            info!("  Found {new_count} new files to embed");
+            spinner.set_message(format!("Embedding {new_count} new files..."));
+            self.embed_files(new_files, spinner).await?;
+        }
+
+        if !invalid.is_empty() {
+            spinner.set_message(format!("Re-embedding {invalid_count} modified files..."));
+            self.embed_files(invalid, spinner).await?;
+            spinner.finish_with_message(format!(
+                "✓ Loaded cache + updated {} files",
+                invalid_count + new_count
+            ));
+        } else if new_count > 0 {
+            spinner
+                .finish_with_message(format!("✓ Loaded cache + added {new_count} new files"));
+        } else {
+            spinner.finish_with_message(format!(
+                "✓ Loaded {} embeddings from cache",
+                cache.embeddings.len()
+            ));
+        }
+
+        Ok(())
+    }
+
+    /// Initialize from scratch by embedding entire codebase
+    ///
+    /// # Errors
+    /// Returns an error if embedding operations fail
+    async fn initialize_from_scratch(&mut self, spinner: &ProgressBar) -> Result<()> {
         info!("  No valid cache found - building from scratch");
         spinner.set_message("Building embedding index for codebase...");
         let files = self.collect_source_files();
 
         info!("  Found {} source files to embed", files.len());
         spinner.set_message(format!("Embedding {} source files...", files.len()));
-        self.embed_files(files, &spinner).await?;
+        self.embed_files(files, spinner).await?;
 
         info!("  Embedded {} files total", self.store.len());
         spinner.finish_with_message(format!(

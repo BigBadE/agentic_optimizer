@@ -6,11 +6,12 @@ const SOURCE_EXTENSIONS: &[&str] = &[
 ];
 
 pub fn is_source_file(path: &Path) -> bool {
-    path.extension()
-        .and_then(|ext| ext.to_str())
-        .is_some_and(|ext| {
-            SOURCE_EXTENSIONS
-                .iter()
-                .any(|allowed| ext.eq_ignore_ascii_case(allowed))
-        })
+    let Some(extension) = path.extension() else {
+        return false;
+    };
+    extension.to_str().is_some_and(|ext| {
+        SOURCE_EXTENSIONS
+            .iter()
+            .any(|allowed| ext.eq_ignore_ascii_case(allowed))
+    })
 }

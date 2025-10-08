@@ -13,6 +13,7 @@
     clippy::print_stdout,
     clippy::print_stderr,
     clippy::tests_outside_test_module,
+    missing_docs,
     reason = "Test allows"
 )]
 
@@ -21,12 +22,12 @@ use merlin_routing::{RoutingConfig, RoutingOrchestrator};
 use std::hint::black_box;
 use tokio::runtime::Runtime;
 
-/// Helper to create runtime or panic (benchmarks expect setup to succeed)
+// Helper to create runtime or panic (benchmarks expect setup to succeed)
 fn create_runtime() -> Runtime {
     Runtime::new().unwrap_or_else(|err| panic!("Failed to create runtime: {err}"))
 }
 
-/// Benchmark simple request analysis
+// Benchmark simple request analysis
 #[library_benchmark]
 fn iai_analyze_simple_request() {
     let config = RoutingConfig::default();
@@ -40,7 +41,7 @@ fn iai_analyze_simple_request() {
     });
 }
 
-/// Benchmark medium complexity request
+// Benchmark medium complexity request
 #[library_benchmark]
 fn iai_analyze_medium_request() {
     let config = RoutingConfig::default();
@@ -56,7 +57,7 @@ fn iai_analyze_medium_request() {
     });
 }
 
-/// Benchmark complex request analysis
+// Benchmark complex request analysis
 #[library_benchmark]
 fn iai_analyze_complex_request() {
     let config = RoutingConfig::default();
@@ -72,14 +73,14 @@ fn iai_analyze_complex_request() {
     });
 }
 
-/// Benchmark Orchestrator creation overhead
+// Benchmark Orchestrator creation overhead
 #[library_benchmark]
 fn iai_create_orchestrator() {
     let config = RoutingConfig::default();
     let _orchestrator = black_box(RoutingOrchestrator::new(config));
 }
 
-/// Benchmark config creation
+// Benchmark config creation
 #[library_benchmark]
 fn iai_create_config() {
     let _config = black_box(RoutingConfig::default());

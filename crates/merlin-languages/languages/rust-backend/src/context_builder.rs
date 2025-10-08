@@ -93,21 +93,21 @@ impl<'analysis> ContextBuilder<'analysis> {
 
         if parts[0] == "crate" {
             let project_src = self.backend.project_root.join("src");
-            return self.resolve_crate_import(&parts[1..], &project_src);
+            return Self::resolve_crate_import(&parts[1..], &project_src);
         }
 
         if parts[0] == "super" {
             if let Some(parent) = current_file.parent()
                 && let Some(grandparent) = parent.parent()
             {
-                return self.resolve_crate_import(&parts[1..], grandparent);
+                return Self::resolve_crate_import(&parts[1..], grandparent);
             }
             return None;
         }
 
         if parts[0] == "self" {
             if let Some(parent) = current_file.parent() {
-                return self.resolve_crate_import(&parts[1..], parent);
+                return Self::resolve_crate_import(&parts[1..], parent);
             }
             return None;
         }
@@ -116,7 +116,7 @@ impl<'analysis> ContextBuilder<'analysis> {
     }
 
     /// Resolve a module path inside a crate starting from a base path.
-    fn resolve_crate_import(&self, parts: &[&str], base_path: &Path) -> Option<PathBuf> {
+    fn resolve_crate_import(parts: &[&str], base_path: &Path) -> Option<PathBuf> {
         if parts.is_empty() {
             return None;
         }
@@ -134,7 +134,7 @@ impl<'analysis> ContextBuilder<'analysis> {
                 return Some(module_dir);
             }
 
-            return self.resolve_crate_import(&parts[1..], &base_path.join(module_name));
+            return Self::resolve_crate_import(&parts[1..], &base_path.join(module_name));
         }
 
         None

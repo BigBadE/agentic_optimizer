@@ -16,6 +16,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  CARGO_PROFILE_DEV_CODEGEN_BACKEND: llvm
 
 jobs:
   test:

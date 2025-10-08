@@ -20,23 +20,23 @@ runs:
         override: true
         components: ${{ inputs.components }}
     
-    #- name: Setup fast cargo config
-    #  shell: bash
-    #  run: |
-    #    if [ -f .cargo/fast_config.toml ]; then
-    #      cp .cargo/fast_config.toml .cargo/config.toml
-    #    fi
-    #
-    #- name: Cache toolchain
-    #  uses: actions/cache@v4
-    #  with:
-    #    path: |
-    #      ~/.rustup/toolchains
-    #      ~/.cargo/registry/index
-    #      ~/.cargo/registry/cache
-    #      ~/.cargo/git/db
-    #    key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain.toml') }}
-    #
+    - name: Setup fast cargo config
+      shell: bash
+      run: |
+        if [ -f .cargo/fast_config.toml ]; then
+          cp .cargo/fast_config.toml .cargo/config.toml
+        fi
+
+    - name: Cache toolchain
+      uses: actions/cache@v4
+      with:
+        path: |
+          ~/.rustup/toolchains
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain.toml') }}
+
     #- uses: taiki-e/install-action@v2
     #  with:
     #    tool: cargo-chef

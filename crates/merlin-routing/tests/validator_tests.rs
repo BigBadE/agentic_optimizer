@@ -494,7 +494,7 @@ async fn test_empty_response_validation() {
     let pipeline = ValidationPipeline::new(stages);
     let task = Task::new("Test task".to_owned());
     let empty_response = Response {
-        text: String::new(),
+        text: String::default(),
         confidence: 0.0,
         tokens_used: TokenUsage::default(),
         provider: "test".to_owned(),

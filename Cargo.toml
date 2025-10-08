@@ -62,9 +62,6 @@ tempfile = "3.23"
 criterion= { version = "0.7", features = ["html_reports", "async_tokio"] }
 assert_cmd = "2.0"
 predicates = "3.1"
-serial_test = "3.2"
-insta = "1.43"
-tokio-test = "0.4"
 
 # Rust analyzer integration
 ra_ap_ide = "0.0"

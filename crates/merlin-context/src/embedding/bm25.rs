@@ -246,8 +246,8 @@ impl BM25Index {
             }
 
             let clean: String = lower
-                .chars()
-                .filter(|character| character.is_alphanumeric() || *character == '_')
+                .as_str()
+                .matches(|character: char| character.is_alphanumeric() || character == '_')
                 .collect();
 
             if !clean.is_empty()
@@ -264,12 +264,10 @@ impl BM25Index {
             let second_word = window[1].to_lowercase();
 
             let clean0: String = first_word
-                .chars()
-                .filter(|character| character.is_alphanumeric() || *character == '_')
+                .matches(|character: char| character.is_alphanumeric() || character == '_')
                 .collect();
             let clean1: String = second_word
-                .chars()
-                .filter(|character| character.is_alphanumeric() || *character == '_')
+                .matches(|character: char| character.is_alphanumeric() || character == '_')
                 .collect();
 
             if clean0.len() > 2

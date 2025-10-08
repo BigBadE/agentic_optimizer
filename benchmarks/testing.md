@@ -1,1 +1,0 @@
-- [] Tool calls work - LLM must provide full relative paths, no ambiguity

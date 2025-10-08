@@ -5,7 +5,6 @@ edition.workspace = true
 
 [dependencies]
 merlin-core.workspace = true
-merlin-providers.workspace = true
 merlin-context.workspace = true
 merlin-languages.workspace = true
 merlin-tools.workspace = true

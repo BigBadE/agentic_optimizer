@@ -1,0 +1,3 @@
+[submodule "benchmarks/test_repositories/valor"]
+	path = benchmarks/test_repositories/valor
+	url = git@github.com:BigBadE/valor.git

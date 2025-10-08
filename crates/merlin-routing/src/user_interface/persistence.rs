@@ -5,6 +5,7 @@ use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
 use std::collections::HashMap;
+use std::ffi::OsStr;
 use std::fs::{self as filesystem, File};
 use std::io::{self, Read as _, Write as _};
 use std::path::{Path, PathBuf};
@@ -128,7 +129,7 @@ impl TaskPersistence {
 // Helper functions
 /// Checks if a path is a compressed task file
 fn is_compressed_task_file(path: &Path) -> bool {
-    path.extension().and_then(|ext| ext.to_str()) == Some("gz")
+    path.extension().and_then(OsStr::to_str) == Some("gz")
 }
 
 type LoadedTask = Option<(TaskId, TaskDisplay)>;
@@ -229,9 +230,8 @@ fn task_status_to_string(status: TaskStatus) -> &'static str {
 /// This function may panic if the `TaskId` format changes unexpectedly
 fn extract_task_id_string(task_id: TaskId) -> String {
     let task_id_str = format!("{task_id:?}");
-    task_id_str
-        .strip_prefix("TaskId(")
-        .and_then(|stripped| stripped.strip_suffix(")"))
-        .unwrap_or(&task_id_str)
-        .to_string()
+    let Some(stripped) = task_id_str.strip_prefix("TaskId(") else {
+        return task_id_str;
+    };
+    stripped.strip_suffix(")").unwrap_or(stripped).to_owned()
 }

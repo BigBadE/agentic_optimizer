@@ -5,7 +5,7 @@ use console::{Term, style};
 use dialoguer::Input;
 use merlin_agent::{Agent, AgentConfig, AgentExecutor, AgentRequest};
 use merlin_context::ContextBuilder;
-use merlin_core::{ModelProvider, Query, TokenUsage};
+use merlin_core::{Context, ModelProvider, Query, Response, TokenUsage};
 use merlin_languages::{Language, create_backend};
 use merlin_providers::OpenRouterProvider;
 use merlin_routing::{
@@ -132,25 +132,29 @@ async fn handle_chat(project: PathBuf, model: Option<String>) -> Result<()> {
     chat_loop(&term, &mut executor, &project).await
 }
 
-/// Handle the query command by building context and sending to provider.
+/// Setup provider from configuration
 ///
 /// # Errors
-/// Returns an error if configuration loading, context building, or provider request fails.
-async fn handle_query(
-    query_text: String,
-    project: PathBuf,
-    files: Vec<PathBuf>,
-    max_files: Option<usize>,
-) -> Result<()> {
-    tracing::info!("Processing query: {}", query_text);
-
-    let config = Config::load_from_project(&project);
-
+/// Returns an error if provider configuration is invalid or missing
+fn setup_provider(project: &Path) -> Result<OpenRouterProvider> {
+    let config = Config::load_from_project(project);
     let mut provider = OpenRouterProvider::from_config_or_env(config.providers.openrouter_key)?;
     if let Some(model_name) = config.providers.high_model {
         provider = provider.with_model(model_name);
     }
+    Ok(provider)
+}
 
+/// Build context for query
+///
+/// # Errors
+/// Returns an error if context building fails
+async fn build_query_context(
+    project: PathBuf,
+    query_text: String,
+    files: Vec<PathBuf>,
+    max_files: Option<usize>,
+) -> Result<(Query, Context)> {
     let mut builder = ContextBuilder::new(project);
     if let Some(max) = max_files {
         builder = builder.with_max_files(max);
@@ -166,12 +170,11 @@ async fn handle_query(
         context.token_estimate()
     );
 
-    let estimated_cost = provider.estimate_cost(&context);
-    tracing::info!("Estimated cost: ${:.4}", estimated_cost);
+    Ok((query, context))
+}
 
-    tracing::info!("Sending request to {}...", provider.name());
-    let response = provider.generate(&query, &context).await?;
-
+/// Display response metrics
+fn display_response_metrics(response: &Response) {
     tracing::info!("\n{sep}\n", sep = "=".repeat(80));
     tracing::info!("{text}", text = response.text);
     tracing::info!("{sep}", sep = "=".repeat(80));
@@ -198,6 +201,30 @@ async fn handle_query(
 
     let actual_cost = calculate_cost(&response.tokens_used);
     tracing::info!("  Cost: ${actual_cost:.4}");
+}
+
+/// Handle the query command by building context and sending to provider.
+///
+/// # Errors
+/// Returns an error if configuration loading, context building, or provider request fails.
+async fn handle_query(
+    query_text: String,
+    project: PathBuf,
+    files: Vec<PathBuf>,
+    max_files: Option<usize>,
+) -> Result<()> {
+    tracing::info!("Processing query: {}", query_text);
+
+    let provider = setup_provider(&project)?;
+    let (query, context) = build_query_context(project, query_text, files, max_files).await?;
+
+    let estimated_cost = provider.estimate_cost(&context);
+    tracing::info!("Estimated cost: ${:.4}", estimated_cost);
+
+    tracing::info!("Sending request to {}...", provider.name());
+    let response = provider.generate(&query, &context).await?;
+
+    display_response_metrics(&response);
 
     Ok(())
 }

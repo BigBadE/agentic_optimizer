@@ -23,6 +23,8 @@ metrics.json
 
 # Benchmark results
 /target/criterion/
+/target/iai/
 /benchmark_results/
 benchmark_results.txt
 quality-results.md
+perf-results.md

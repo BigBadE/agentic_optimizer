@@ -1,8 +1,56 @@
-# Context Fetching Benchmarks
+# Benchmarks
 
-Benchmarks for evaluating context retrieval quality using hybrid BM25 + vector search.
+This directory contains two types of benchmarks:
 
-## Current Performance (Phase 5 - Graph Ranking)
+1. **Quality Benchmarks** - Evaluate context retrieval quality using hybrid BM25 + vector search
+2. **Performance Benchmarks** - Measure speed and efficiency of core routing operations
+
+Quality and Criterion benchmarks use a local-run, upload-results workflow. IAI benchmarks run automatically in CI.
+
+## Quick Start
+
+### Performance Benchmarks
+
+We support two types of performance benchmarks:
+
+**Criterion (Statistical)** - Manual upload:
+```bash
+# Run Criterion benchmarks locally
+cargo run --release --bin perf-bench -- --output perf-results.md
+
+# Upload results
+git add -f perf-results.md
+git commit -m "Update performance benchmark results"
+git push  # CI will publish to gh-pages and remove from repo
+```
+
+**IAI (Cachegrind-based)** - Automatic in CI:
+- **Runs automatically** on every push and pull request
+- No manual upload needed
+- Results published to gh-pages automatically
+
+To run locally (requires Valgrind, not available on Windows):
+```bash
+cargo run --release --bin perf-bench -- --iai --output iai-results.md
+```
+
+### Quality Benchmarks
+
+**⚠️ Prerequisites**: Requires Ollama running locally. See `RUNNING_BENCHMARKS.md` for setup.
+
+```bash
+# Run all quality benchmarks
+cargo run --release --bin quality-bench -- --output quality-results.md
+
+# Upload results
+git add -f quality-results.md
+git commit -m "Update quality benchmark results"
+git push  # CI will publish to gh-pages and remove from repo
+```
+
+See `RUNNING_BENCHMARKS.md` for detailed instructions.
+
+## Quality Benchmark Performance (Phase 5 - Graph Ranking)
 
 | Metric | Current | Target (Industry) | Gap | Status |
 |--------|---------|------------------|-----|--------|
@@ -18,30 +66,6 @@ Benchmarks for evaluating context retrieval quality using hybrid BM25 + vector s
 **Test Suite**: 20 diverse test cases covering real-world coding agent scenarios
 
 *Targets set to estimated Cursor/GitHub Copilot performance levels. See `SOLVING_DOC_DOMINANCE.md` for fundamental solutions.*
-
-## Quick Start
-
-**⚠️ Prerequisites**: Benchmarks require Ollama running locally. See `RUNNING_BENCHMARKS.md` for setup.
-
-```bash
-# Run all quality benchmarks
-cargo run --release --bin quality-bench -- --output quality-results.md
-
-# Run with verbose output
-cargo run --release --bin quality-bench -- --output quality-results.md --verbose
-
-# Run specific test case
-cargo run --release --bin quality-bench -- --name "CSS Parsing" --output quality-results.md
-```
-
-**After running**: 
-```bash
-git add -f quality-results.md  # Force add (it's in .gitignore)
-git commit -m "Update quality benchmark results"
-git push  # CI will publish to gh-pages and remove from repo
-```
-
-See `RUNNING_BENCHMARKS.md` for detailed instructions.
 
 ## Structure
 

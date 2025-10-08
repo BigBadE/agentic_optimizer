@@ -3,7 +3,7 @@
 #![cfg(test)]
 
 use merlin_context::embedding::chunking::{
-    MAX_CHUNK_TOKENS, MIN_CHUNK_TOKENS, chunk_file, estimate_tokens,
+    FileChunk, MAX_CHUNK_TOKENS, MIN_CHUNK_TOKENS, chunk_file, estimate_tokens,
 };
 use std::env::current_dir;
 use std::fs;
@@ -47,6 +47,76 @@ fn collect_all_source_files() -> Vec<PathBuf> {
     files
 }
 
+/// Validate a single chunk for minimum token compliance
+fn validate_chunk_min_tokens(
+    chunk: &FileChunk,
+    file_path: &Path,
+    is_single_chunk: bool,
+    violations: &mut Vec<String>,
+) {
+    let tokens = estimate_tokens(&chunk.content);
+
+    // Allow first chunk to be below minimum if it's the only chunk
+    if is_single_chunk && tokens < MIN_CHUNK_TOKENS {
+        // This is acceptable - single small file
+        return;
+    }
+
+    // Check for zero-line chunks (CRITICAL - must never happen)
+    if chunk.content.trim().is_empty() {
+        violations.push(format!(
+            "EMPTY CHUNK: {}:{}-{} [{}] - content is empty!",
+            file_path.display(),
+            chunk.start_line,
+            chunk.end_line,
+            chunk.identifier
+        ));
+    }
+
+    // Check minimum token requirement (strict enforcement)
+    if tokens < MIN_CHUNK_TOKENS {
+        violations.push(format!(
+            "BELOW MIN: {}:{}-{} [{}] - {} tokens (min: {})",
+            file_path.display(),
+            chunk.start_line,
+            chunk.end_line,
+            chunk.identifier,
+            tokens,
+            MIN_CHUNK_TOKENS
+        ));
+    }
+}
+
+/// Process a single file for minimum token validation
+fn process_file_for_min_tokens(
+    file_path: &Path,
+    violations: &mut Vec<String>,
+    total_chunks: &mut usize,
+) -> bool {
+    let Ok(content) = fs::read_to_string(file_path) else {
+        return false;
+    };
+
+    if content.trim().is_empty() {
+        return false;
+    }
+
+    let chunks = chunk_file(file_path, &content);
+
+    if chunks.is_empty() {
+        return false;
+    }
+
+    let is_single_chunk = chunks.len() == 1;
+
+    for chunk in &chunks {
+        *total_chunks += 1;
+        validate_chunk_min_tokens(chunk, file_path, is_single_chunk, violations);
+    }
+
+    true
+}
+
 #[cfg(test)]
 #[test]
 /// # Panics
@@ -65,55 +135,8 @@ fn test_all_chunks_respect_min_tokens() {
     let mut files_tested = 0;
 
     for file_path in files {
-        let Ok(content) = fs::read_to_string(&file_path) else {
-            continue;
-        };
-
-        if content.trim().is_empty() {
-            continue;
-        }
-
-        let chunks = chunk_file(&file_path, &content);
-
-        if chunks.is_empty() {
-            continue;
-        }
-
-        files_tested += 1;
-
-        for chunk in &chunks {
-            total_chunks += 1;
-            let tokens = estimate_tokens(&chunk.content);
-
-            // Allow first chunk to be below minimum if it's the only chunk
-            if chunks.len() == 1 && tokens < MIN_CHUNK_TOKENS {
-                // This is acceptable - single small file
-                continue;
-            }
-
-            // Check for zero-line chunks (CRITICAL - must never happen)
-            if chunk.content.trim().is_empty() {
-                violations.push(format!(
-                    "EMPTY CHUNK: {}:{}-{} [{}] - content is empty!",
-                    file_path.display(),
-                    chunk.start_line,
-                    chunk.end_line,
-                    chunk.identifier
-                ));
-            }
-
-            // Check minimum token requirement (strict enforcement)
-            if tokens < MIN_CHUNK_TOKENS {
-                violations.push(format!(
-                    "BELOW MIN: {}:{}-{} [{}] - {} tokens (min: {})",
-                    file_path.display(),
-                    chunk.start_line,
-                    chunk.end_line,
-                    chunk.identifier,
-                    tokens,
-                    MIN_CHUNK_TOKENS
-                ));
-            }
+        if process_file_for_min_tokens(&file_path, &mut violations, &mut total_chunks) {
+            files_tested += 1;
         }
     }
 
@@ -208,6 +231,78 @@ fn test_all_chunks_respect_max_tokens() {
     info!("✅ All chunks respect MAX_CHUNK_TOKENS");
 }
 
+/// Validate chunk line numbers
+fn validate_chunk_line_numbers(
+    chunk: &FileChunk,
+    file_path: &Path,
+    line_count: usize,
+    violations: &mut Vec<String>,
+) {
+    // Check start line is valid
+    if chunk.start_line == 0 {
+        violations.push(format!(
+            "INVALID START: {}:{}-{} [{}] - start_line is 0 (should be 1-indexed)",
+            file_path.display(),
+            chunk.start_line,
+            chunk.end_line,
+            chunk.identifier
+        ));
+    }
+
+    // Check end line is valid
+    if chunk.end_line > line_count {
+        violations.push(format!(
+            "INVALID END: {}:{}-{} [{}] - end_line {} exceeds file length {}",
+            file_path.display(),
+            chunk.start_line,
+            chunk.end_line,
+            chunk.identifier,
+            chunk.end_line,
+            line_count
+        ));
+    }
+
+    // Check start <= end
+    if chunk.start_line > chunk.end_line {
+        violations.push(format!(
+            "INVALID RANGE: {}:{}-{} [{}] - start_line > end_line",
+            file_path.display(),
+            chunk.start_line,
+            chunk.end_line,
+            chunk.identifier
+        ));
+    }
+}
+
+/// Process a single file for line number validation
+fn process_file_for_line_numbers(
+    file_path: &Path,
+    violations: &mut Vec<String>,
+    total_chunks: &mut usize,
+) -> bool {
+    let Ok(content) = fs::read_to_string(file_path) else {
+        return false;
+    };
+
+    if content.trim().is_empty() {
+        return false;
+    }
+
+    let line_count = content.lines().count();
+    let chunks = chunk_file(file_path, &content);
+
+    if chunks.is_empty() {
+        return false;
+    }
+
+    for chunk in chunks {
+        *total_chunks += 1;
+        validate_chunk_line_numbers(&chunk, file_path, line_count, violations);
+    }
+
+    true
+}
+
 #[cfg(test)]
 #[test]
 /// # Panics
@@ -223,60 +318,8 @@ fn test_chunk_line_numbers_are_valid() {
     let mut files_tested = 0;
 
     for file_path in files {
-        let Ok(content) = fs::read_to_string(&file_path) else {
-            continue;
-        };
-
-        if content.trim().is_empty() {
-            continue;
-        }
-
-        let line_count = content.lines().count();
-        let chunks = chunk_file(&file_path, &content);
-
-        if chunks.is_empty() {
-            continue;
-        }
-
-        files_tested += 1;
-
-        for chunk in chunks {
-            total_chunks += 1;
-
-            // Check start line is valid
-            if chunk.start_line == 0 {
-                violations.push(format!(
-                    "INVALID START: {}:{}-{} [{}] - start_line is 0 (should be 1-indexed)",
-                    file_path.display(),
-                    chunk.start_line,
-                    chunk.end_line,
-                    chunk.identifier
-                ));
-            }
-
-            // Check end line is valid
-            if chunk.end_line > line_count {
-                violations.push(format!(
-                    "INVALID END: {}:{}-{} [{}] - end_line {} exceeds file length {}",
-                    file_path.display(),
-                    chunk.start_line,
-                    chunk.end_line,
-                    chunk.identifier,
-                    chunk.end_line,
-                    line_count
-                ));
-            }
-
-            // Check start <= end
-            if chunk.start_line > chunk.end_line {
-                violations.push(format!(
-                    "INVALID RANGE: {}:{}-{} [{}] - start_line > end_line",
-                    file_path.display(),
-                    chunk.start_line,
-                    chunk.end_line,
-                    chunk.identifier
-                ));
-            }
+        if process_file_for_line_numbers(&file_path, &mut violations, &mut total_chunks) {
+            files_tested += 1;
         }
     }
 
@@ -299,59 +342,51 @@ fn test_chunk_line_numbers_are_valid() {
     info!("✅ All chunks have valid line numbers");
 }
 
-#[cfg(test)]
-#[test]
-/// # Panics
-///
-/// Panics if statistics calculations encounter unexpected empty state.
-fn test_chunk_statistics() {
-    let files = collect_all_source_files();
+/// Process a single file for statistics
+fn process_file_for_statistics(
+    file_path: &Path,
+    total_files: &mut usize,
+    total_chunks: &mut usize,
+    token_counts: &mut Vec<usize>,
+) -> bool {
+    let Ok(content) = fs::read_to_string(file_path) else {
+        return false;
+    };
 
-    info!("Gathering chunk statistics...");
+    if content.trim().is_empty() {
+        return false;
+    }
 
-    let mut total_files = 0;
-    let mut total_chunks = 0;
-    let mut token_counts = Vec::default();
+    let chunks = chunk_file(file_path, &content);
 
-    for file_path in files {
-        let Ok(content) = fs::read_to_string(&file_path) else {
-            continue;
-        };
+    if chunks.is_empty() {
+        return false;
+    }
 
-        if content.trim().is_empty() {
-            continue;
-        }
+    *total_files += 1;
+    *total_chunks += chunks.len();
 
-        let chunks = chunk_file(&file_path, &content);
-
-        if chunks.is_empty() {
-            continue;
-        }
-
-        total_files += 1;
-        total_chunks += chunks.len();
-
-        // Only include multi-chunk files in statistics
-        if chunks.len() > 1 {
-            for chunk in chunks {
-                let tokens = estimate_tokens(&chunk.content);
-                token_counts.push(tokens);
-            }
+    // Only include multi-chunk files in statistics
+    if chunks.len() > 1 {
+        for chunk in chunks {
+            let tokens = estimate_tokens(&chunk.content);
+            token_counts.push(tokens);
         }
     }
 
-    if token_counts.is_empty() {
-        info!("No chunks found");
-        return;
-    }
+    true
+}
 
-    token_counts.sort_unstable();
-
+/// Display chunk statistics
+fn display_chunk_statistics(
+    total_files: usize,
+    total_chunks: usize,
+    token_counts: &[usize],
+) {
     let min_tokens = token_counts[0];
     let max_tokens = token_counts[token_counts.len() - 1];
     let median_tokens = token_counts[token_counts.len() / 2];
     let avg_tokens: usize = token_counts.iter().sum::<usize>() / token_counts.len();
-
     let avg_chunks_per_file: f32 = total_chunks as f32 / total_files as f32;
 
     info!("\n📊 Chunk Statistics (multi-chunk files only):");
@@ -376,4 +411,32 @@ fn test_chunk_statistics() {
     let percentage = (in_range as f32 / token_counts.len() as f32) * 100.0;
 
     info!("  In target range: {in_range} ({percentage:.1}%)");
+}
+
+#[cfg(test)]
+#[test]
+/// # Panics
+///
+/// Panics if statistics calculations encounter unexpected empty state.
+fn test_chunk_statistics() {
+    let files = collect_all_source_files();
+
+    info!("Gathering chunk statistics...");
+
+    let mut total_files = 0;
+    let mut total_chunks = 0;
+    let mut token_counts = Vec::default();
+
+    for file_path in files {
+        process_file_for_statistics(&file_path, &mut total_files, &mut total_chunks, &mut token_counts);
+    }
+
+    if token_counts.is_empty() {
+        info!("No chunks found");
+        return;
+    }
+
+    token_counts.sort_unstable();
+
+    display_chunk_statistics(total_files, total_chunks, &token_counts);
 }

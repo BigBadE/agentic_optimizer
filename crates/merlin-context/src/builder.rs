@@ -400,9 +400,10 @@ impl ContextBuilder {
 
     /// Check if a file is a code file (not documentation/text)
     fn is_code_file(path: &Path) -> bool {
-        path.extension()
-            .and_then(|ext| ext.to_str())
-            .is_some_and(|ext| {
+        let Some(ext) = path.extension() else {
+            return false;
+        };
+        ext.to_str().is_some_and(|ext| {
                 matches!(
                     ext,
                     "rs" | "py"
@@ -707,18 +708,14 @@ impl ContextBuilder {
         let file_scores: Vec<FileScoreInfo> = filtered_matches
             .iter()
             .filter_map(|result| {
-                result
-                    .file_path
-                    .to_str()
-                    .and_then(|path_str| path_str.rsplit_once(':'))
-                    .map(|(file_part, _)| {
-                        (
-                            PathBuf::from(file_part),
-                            result.score,
-                            result.bm25_score,
-                            result.vector_score,
-                        )
-                    })
+                let path_str = result.file_path.to_str()?;
+                let (file_part, _) = path_str.rsplit_once(':')?;
+                Some((
+                    PathBuf::from(file_part),
+                    result.score,
+                    result.bm25_score,
+                    result.vector_score,
+                ))
             })
             .collect();
 

@@ -79,7 +79,10 @@ impl FileChunk {
 pub fn chunk_file(file_path: &Path, content: &str) -> Vec<FileChunk> {
     let path_str = file_path.display().to_string();
 
-    if let Some(ext) = file_path.extension().and_then(|ext| ext.to_str()) {
+    let Some(extension) = file_path.extension() else {
+        return chunk_generic_code(path_str, content);
+    };
+    if let Some(ext) = extension.to_str() {
         match ext {
             "rs" => chunk_rust(path_str, content),
             "md" | "markdown" => chunk_markdown(path_str, content),

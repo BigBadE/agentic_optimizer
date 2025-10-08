@@ -253,6 +253,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Requires Ollama running locally"]
     async fn test_executor_pool_basic() {
         let router = Arc::new(MockRouter);
         let validator = Arc::new(MockValidator);

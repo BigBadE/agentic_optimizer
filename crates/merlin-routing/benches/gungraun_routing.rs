@@ -1,8 +1,8 @@
-//! IAI benchmarks for routing performance using Cachegrind.
+//! Gungraun benchmarks for routing performance using Cachegrind.
 //!
 //! These benchmarks provide precise, single-shot measurements of instruction counts,
 //! cache accesses, and estimated cycles. Unlike Criterion benchmarks which use
-//! statistical analysis, IAI uses Valgrind's Cachegrind to get deterministic results.
+//! statistical analysis, Gungraun uses Valgrind's Cachegrind to get deterministic results.
 #![allow(
     dead_code,
     clippy::expect_used,
@@ -17,7 +17,7 @@
     reason = "Test allows"
 )]
 
-use iai_callgrind::{library_benchmark, library_benchmark_group, main};
+use gungraun::{benchmark, benchmark_group, main};
 use merlin_routing::{RoutingConfig, RoutingOrchestrator};
 use std::hint::black_box;
 use tokio::runtime::Runtime;
@@ -28,8 +28,8 @@ fn create_runtime() -> Runtime {
 }
 
 // Benchmark simple request analysis
-#[library_benchmark]
-fn iai_analyze_simple_request() {
+#[benchmark]
+fn gungraun_analyze_simple_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
     let runtime = create_runtime();
@@ -42,8 +42,8 @@ fn iai_analyze_simple_request() {
 }
 
 // Benchmark medium complexity request
-#[library_benchmark]
-fn iai_analyze_medium_request() {
+#[benchmark]
+fn gungraun_analyze_medium_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
     let runtime = create_runtime();
@@ -58,8 +58,8 @@ fn iai_analyze_medium_request() {
 }
 
 // Benchmark complex request analysis
-#[library_benchmark]
-fn iai_analyze_complex_request() {
+#[benchmark]
+fn gungraun_analyze_complex_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
     let runtime = create_runtime();
@@ -74,26 +74,26 @@ fn iai_analyze_complex_request() {
 }
 
 // Benchmark Orchestrator creation overhead
-#[library_benchmark]
-fn iai_create_orchestrator() {
+#[benchmark]
+fn gungraun_create_orchestrator() {
     let config = RoutingConfig::default();
     let _orchestrator = black_box(RoutingOrchestrator::new(config));
 }
 
 // Benchmark config creation
-#[library_benchmark]
-fn iai_create_config() {
+#[benchmark]
+fn gungraun_create_config() {
     let _config = black_box(RoutingConfig::default());
 }
 
-library_benchmark_group!(
+benchmark_group!(
     name = routing_group;
     benchmarks =
-        iai_analyze_simple_request,
-        iai_analyze_medium_request,
-        iai_analyze_complex_request,
-        iai_create_orchestrator,
-        iai_create_config
+        gungraun_analyze_simple_request,
+        gungraun_analyze_medium_request,
+        gungraun_analyze_complex_request,
+        gungraun_create_orchestrator,
+        gungraun_create_config
 );
 
-main!(library_benchmark_groups = routing_group);
+main!(benchmark_groups = routing_group);

@@ -25,7 +25,7 @@ unicode-width.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
-iai-callgrind.workspace = true
+gungraun.workspace = true
 
 [[bench]]
 name = "routing_benchmarks"
@@ -36,11 +36,11 @@ name = "integration_benchmarks"
 harness = false
 
 [[bench]]
-name = "iai_routing"
+name = "gungraun_routing"
 harness = false
 
 [[bench]]
-name = "iai_integration"
+name = "gungraun_integration"
 harness = false
 
 [lints]

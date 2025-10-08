@@ -21,7 +21,7 @@ env:
 jobs:
   build-test:
     permissions: write-all
-    runs-on: ubuntu-latest
+    runs-on: ${{ matrix.os }}
     strategy:
       fail-fast: false
       matrix:
@@ -33,38 +33,21 @@ jobs:
         with:
           submodules: true
 
-      - name: Install Rust nightly
-        uses: dtolnay/rust-toolchain@nightly
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
         with:
-          components: llvm-tools-preview
-
-      - name: Install mold linker (Linux)
-        if: matrix.os == 'ubuntu-latest'
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y mold clang
-
-      - name: Setup fast cargo config
-        run: |
-          cp .cargo/fast_config.toml .cargo/config.toml
-
-      - name: Cache Rust dependencies
-        uses: Swatinem/rust-cache@v2
-        with:
-          shared-key: ${{ matrix.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-          cache-on-failure: true
+          profile: ci-release
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Run tests with coverage
-        run: cargo llvm-cov --lcov --output-path coverage.info --workspace --ignore-filename-regex "test_repositories|benchmarks" --release -- --nocapture
+        run: cargo llvm-cov --lcov --output-path coverage.info --ignore-filename-regex "test_repositories|benchmarks" --profile ci-release --workspace --no-fail-fast --lib --bins --tests -- --nocapture
 
       - name: Upload coverage to Codecov
         if: github.event_name == 'push' && matrix.os == 'ubuntu-latest'
         uses: codecov/codecov-action@v4
         with:
-          token: ${{ secrets.CODECOV_TOKEN }}
           files: ./coverage.info
           verbose: true
           fail_ci_if_error: false

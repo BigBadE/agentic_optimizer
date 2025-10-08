@@ -6,12 +6,13 @@ use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use bincode::{deserialize_from, serialize_into};
+use bincode::config::standard as bincode_config;
+use bincode::{Decode, Encode, decode_from_std_read, encode_into_std_write};
 use merlin_core::Error as CoreError;
 use serde::{Deserialize, Serialize};
 
 /// Cached metadata about the rust-analyzer workspace state
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 pub struct WorkspaceCache {
     /// Timestamp when the cache was created
     pub timestamp: SystemTime,
@@ -60,8 +61,8 @@ impl WorkspaceCache {
 
         let file = File::create(&cache_path)
             .map_err(|error| CoreError::Other(format!("Failed to create cache file: {error}")))?;
-        let writer = BufWriter::new(file);
-        serialize_into(writer, &self)
+        let mut writer = BufWriter::new(file);
+        encode_into_std_write(self, &mut writer, bincode_config())
             .map_err(|error| CoreError::Other(format!("Failed to serialize cache: {error}")))?;
 
         tracing::info!("Saved rust-analyzer cache to {}", cache_path.display());
@@ -84,8 +85,8 @@ impl WorkspaceCache {
         let file = File::open(&cache_path)
             .map_err(|error| CoreError::Other(format!("Failed to open cache file: {error}")))?;
 
-        let reader = BufReader::new(file);
-        let cache: Self = deserialize_from(reader)
+        let mut reader = BufReader::new(file);
+        let (cache, _): (Self, usize) = decode_from_std_read(&mut reader, bincode_config())
             .map_err(|error| CoreError::Other(format!("Failed to deserialize cache: {error}")))?;
 
         tracing::info!("Loaded rust-analyzer cache from {}", cache_path.display());

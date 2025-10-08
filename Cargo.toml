@@ -32,47 +32,48 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 walkdir = "2.5"
 serde = { version = "1.0", features = ["derive"] }
 serde_json = "1.0"
-bincode = "1.3"
-toml = "0.8"
-clap = { version = "4", features = ["derive"] }
-tokio = { version = "1", features = ["full"] }
+bincode = "2.0"
+toml = "0.9"
+clap = { version = "4.5", features = ["derive"] }
+tokio = { version = "1.47", features = ["full"] }
 reqwest = { version = "0.12", features = ["json", "blocking"] }
-indicatif = "0.17"
-ollama-rs = "0.2"
-console = "0.15"
-dialoguer = "0.11"
+indicatif = "0.18"
+ollama-rs = "0.3"
+console = "0.16"
+dialoguer = "0.12"
 ignore = "0.4"
 chrono = "0.4"
-uuid = { version = "1.11", features = ["v4", "serde"] }
-petgraph = "0.6"
-ratatui = "0.28"
+uuid = { version = "1.18", features = ["v4", "serde"] }
+petgraph = "0.8"
+
+# Still using older versions for tui-textarea support
+ratatui = "0.29"
 crossterm = "0.28"
-tui-textarea = "0.6"
+tui-textarea = "0.7"
 textwrap = "0.16"
-flate2 = "1.0"
-tempfile = "3.14"
-tokio-test = "0.4"
 unicode-segmentation = "1.12"
 unicode-width = "0.2"
 
+flate2 = "1.1"
+tempfile = "3.23"
+
 # Testing dependencies
+criterion= { version = "0.7", features = ["html_reports", "async_tokio"] }
 assert_cmd = "2.0"
-predicates = "3.0"
-wiremock = "0.6"
-mockall = "0.13"
-proptest = "1.5"
-serial_test = "3.1"
-insta = "1.40"
+predicates = "3.1"
+serial_test = "3.2"
+insta = "1.43"
+tokio-test = "0.4"
 
 # Rust analyzer integration
-ra_ap_ide = "0.0.231"
-ra_ap_ide_db = "0.0.231"
-ra_ap_hir = "0.0.231"
-ra_ap_syntax = "0.0.231"
-ra_ap_vfs = "0.0.231"
-ra_ap_paths = "0.0.231"
-ra_ap_project_model = "0.0.231"
-ra_ap_load-cargo = "0.0.231"
+ra_ap_ide = "0.0"
+ra_ap_ide_db = "0.0"
+ra_ap_hir = "0.0"
+ra_ap_syntax = "0.0"
+ra_ap_vfs = "0.0"
+ra_ap_paths = "0.0"
+ra_ap_project_model = "0.0"
+ra_ap_load-cargo = "0.0"
 
 
 [profile.dev]
@@ -83,11 +84,18 @@ lto = false
 opt-level = 3
 codegen-backend = "cranelift"
 
-[profile.coverage]
-inherits = "dev"
+[profile.release]
+codegen-units = 1
+lto = "thin"
+panic = "abort"
+incremental = false
+overflow-checks = false
+strip = "symbols"
 
-[profile.coverage.package."*"]
-opt-level = 0
+[profile.ci-release]
+inherits = "release"
+codegen-units = 16
+strip = "debuginfo"
 
 [workspace.lints.rust]
 unsafe_code = "forbid"

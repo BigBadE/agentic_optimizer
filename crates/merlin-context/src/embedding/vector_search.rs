@@ -15,7 +15,8 @@ use crate::context_inclusion::MIN_SIMILARITY_SCORE;
 use crate::embedding::chunking::{FileChunk, chunk_file};
 use crate::embedding::{BM25Index, EmbeddingClient, SearchResult, VectorStore, generate_preview};
 use crate::fs_utils::is_source_file;
-use bincode::{deserialize as bincode_deserialize, serialize as bincode_serialize};
+use bincode::config::standard as bincode_config;
+use bincode::{Decode, Encode, decode_from_slice, encode_to_vec};
 use merlin_core::{Error, Result};
 
 type ChunkResult = (PathBuf, FileChunk, Vec<f32>, String);
@@ -23,7 +24,7 @@ type ChunkResult = (PathBuf, FileChunk, Vec<f32>, String);
 // Removed feature-gated import to avoid unexpected-cfg; we fall back to an empty graph instead.
 
 /// Cache entry for a chunk embedding
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
 struct CachedEmbedding {
     /// File path
     path: PathBuf,
@@ -51,7 +52,7 @@ impl Default for VectorCache {
 }
 
 /// Cached vector database
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Serialize, Deserialize, Encode, Decode)]
 struct VectorCache {
     /// Version identifier for cache invalidation
     version: u32,
@@ -972,8 +973,9 @@ impl VectorSearchManager {
         let data = fs::read(&self.cache_path)
             .map_err(|error| Error::Other(format!("Failed to read cache: {error}")))?;
 
-        let cache: VectorCache = bincode_deserialize(&data)
-            .map_err(|error| Error::Other(format!("Failed to deserialize cache: {error}")))?;
+        let cache: VectorCache = decode_from_slice(&data, bincode_config())
+            .map_err(|error| Error::Other(format!("Failed to deserialize cache: {error}")))?
+            .0;
         Ok(cache)
     }
 
@@ -991,7 +993,7 @@ impl VectorSearchManager {
 
         let cache = VectorCache::default();
 
-        let data = bincode_serialize(&cache)
+        let data = encode_to_vec(&cache, bincode_config())
             .map_err(|error| Error::Other(format!("Failed to serialize cache: {error}")))?;
         fs::write(&self.cache_path, data)
             .map_err(|error| Error::Other(format!("Failed to write cache: {error}")))?;

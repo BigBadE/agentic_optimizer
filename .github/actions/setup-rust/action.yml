@@ -1,0 +1,49 @@
+name: "Setup Rust"
+description: "Installs Rust, caches deps, runs cargo-chef"
+inputs:
+  profile:
+    description: "Cargo profile to use (dev, ci-release, release)"
+    required: false
+    default: "dev"
+  components:
+    description: "Additional Rust components to install"
+    required: false
+    default: ""
+runs:
+  using: "composite"
+  steps:
+    - uses: dtolnay/rust-toolchain@nightly
+      with:
+        components: ${{ inputs.components }}
+    
+    - name: Setup fast cargo config
+      shell: bash
+      run: |
+        if [ -f .cargo/fast_config.toml ]; then
+          cp .cargo/fast_config.toml .cargo/config.toml
+        fi
+    
+    - uses: taiki-e/install-action@v2
+      with:
+        tool: cargo-chef
+    
+    - name: Prepare chef recipe
+      shell: bash
+      run: cargo chef prepare --recipe-path recipe.json
+    
+    - name: Cache dependencies
+      uses: actions/cache@v4
+      with:
+        path: |
+          target
+          ~/.cargo/registry/index
+          ~/.cargo/registry/cache
+          ~/.cargo/git/db
+        key: ${{ runner.os }}-${{ inputs.profile }}-${{ hashFiles('recipe.json') }}
+        restore-keys: |
+          ${{ runner.os }}-${{ inputs.profile }}-
+          ${{ runner.os }}-
+    
+    - name: Cook dependencies
+      shell: bash
+      run: cargo chef cook --profile ${{ inputs.profile }} --recipe-path recipe.json

@@ -7,10 +7,13 @@
     clippy::used_underscore_binding,
     clippy::uninlined_format_args,
     clippy::missing_panics_doc,
+    deprecated,
     reason = "Benchmark code has different conventions"
 )]
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use std::hint::black_box;
+
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use merlin_routing::{RoutingConfig, RoutingOrchestrator};
 use std::time::Duration;
 

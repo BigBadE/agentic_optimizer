@@ -372,8 +372,6 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if default configuration does not have local tier enabled.
     async fn test_orchestrator_creation() {
         let config = RoutingConfig::default();
         let orchestrator = RoutingOrchestrator::new(config);
@@ -382,8 +380,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if `analyze_request` returns an error in the test harness.
     async fn test_analyze_request() {
         let config = RoutingConfig::default();
         let orchestrator = RoutingOrchestrator::new(config);
@@ -399,9 +395,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "Requires actual provider instances"]
-    /// # Panics
-    /// Panics if `process_request` returns an error in the test harness.
     async fn test_process_simple_request() {
         let config = RoutingConfig::default();
         let orchestrator = RoutingOrchestrator::new(config);

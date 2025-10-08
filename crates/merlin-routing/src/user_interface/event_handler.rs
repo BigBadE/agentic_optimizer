@@ -204,7 +204,7 @@ impl<'handler> EventHandler<'handler> {
                 timestamp: Instant::now(),
             });
 
-            let step_type_enum = StepType::from_str(step_type);
+            let step_type_enum = StepType::from_string(step_type);
             task.output_tree.add_step(step_id, step_type_enum, content);
         }
     }

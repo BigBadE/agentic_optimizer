@@ -5,7 +5,7 @@ This directory contains two types of benchmarks:
 1. **Quality Benchmarks** - Evaluate context retrieval quality using hybrid BM25 + vector search
 2. **Performance Benchmarks** - Measure speed and efficiency of core routing operations
 
-Quality and Criterion benchmarks use a local-run, upload-results workflow. IAI benchmarks run automatically in CI.
+Quality and Criterion benchmarks use a local-run, upload-results workflow. IAI-Callgrind benchmarks run automatically in CI.
 
 ## Quick Start
 
@@ -24,7 +24,7 @@ git commit -m "Update performance benchmark results"
 git push  # CI will publish to gh-pages and remove from repo
 ```
 
-**IAI (Cachegrind-based)** - Automatic in CI:
+**IAI-Callgrind (Callgrind-based)** - Automatic in CI:
 - **Runs automatically** on every push and pull request
 - No manual upload needed
 - Results published to gh-pages automatically

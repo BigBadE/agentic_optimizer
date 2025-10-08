@@ -1,12 +1,23 @@
 //! Tests for BM25 tokenization and special token handling.
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
+)]
 
-#![cfg(test)]
 use merlin_context::embedding::BM25Index;
 
 /// Ensures special tokens like `::` and `--` are preserved and searchable.
-///
-/// # Panics
-/// Panics if the BM25 index does not return expected matches.
 #[test]
 fn test_special_token_preservation() {
     let mut index = BM25Index::default();
@@ -32,9 +43,6 @@ fn test_special_token_preservation() {
 }
 
 /// Debug helper to ensure exact tokens rank higher.
-///
-/// # Panics
-/// Panics if the BM25 index is empty for the provided query.
 #[test]
 fn test_tokenization_debug() {
     // This test helps debug what tokens are actually generated
@@ -59,9 +67,6 @@ fn test_tokenization_debug() {
 }
 
 /// Bigrams should improve phrase matching quality.
-///
-/// # Panics
-/// Panics if no results are returned for the phrase query.
 #[test]
 fn test_bigram_generation() {
     let mut index = BM25Index::default();
@@ -75,9 +80,6 @@ fn test_bigram_generation() {
 }
 
 /// Mixed special and regular tokens should be searchable together.
-///
-/// # Panics
-/// Panics if special tokens or cleaned tokens do not return results.
 #[test]
 fn test_mixed_special_and_regular_tokens() {
     let mut index = BM25Index::default();

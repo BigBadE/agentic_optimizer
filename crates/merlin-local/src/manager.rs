@@ -118,24 +118,18 @@ impl Default for OllamaManager {
 mod tests {
     use super::*;
 
-    /// # Panics
-    /// Panics if manager base URL doesn't match expected default.
     #[tokio::test]
     async fn ollama_manager_creation() {
         let manager = OllamaManager::default();
         assert_eq!(manager.base_url, "http://localhost:11434");
     }
 
-    /// # Panics
-    /// Panics if manager base URL doesn't match custom URL.
     #[tokio::test]
     async fn custom_url() {
         let manager = OllamaManager::default().with_url("http://custom:8080".to_owned());
         assert_eq!(manager.base_url, "http://custom:8080");
     }
 
-    /// # Panics
-    /// Panics if recommended models list is empty or doesn't contain expected models.
     #[test]
     fn recommended_models() {
         let models = OllamaManager::recommended_models();

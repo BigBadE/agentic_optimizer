@@ -127,11 +127,6 @@ mod tests {
     use merlin_core::TokenUsage;
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if stage result does not indicate skip when no files are modified.
-    ///
-    /// # Errors
-    /// Returns an error if validation returns an unexpected failure in the test harness.
     async fn test_lint_validation_skip_no_files() -> Result<()> {
         let stage = LintValidationStage::default();
         let response = Response {
@@ -150,11 +145,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if `quick_check` logic does not match expected patterns.
-    ///
-    /// # Errors
-    /// Returns an error if `quick_check` returns an unexpected failure in the test harness.
     async fn test_quick_check() -> Result<()> {
         let stage = LintValidationStage::default();
 

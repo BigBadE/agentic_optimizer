@@ -1,9 +1,15 @@
 //! Quality benchmark CLI for context retrieval system.
 #![allow(
-    clippy::print_stdout,
-    clippy::missing_errors_doc,
+    dead_code,
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::panic,
     clippy::missing_panics_doc,
-    reason = "CLI binary uses stdout for output"
+    clippy::missing_errors_doc,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::tests_outside_test_module,
+    reason = "Test allows"
 )]
 
 use anyhow::{Context as _, Result};

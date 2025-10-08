@@ -1,6 +1,24 @@
 //! Integration tests for the routing system
 //!
 //! These tests verify end-to-end functionality of the routing architecture.
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
+)]
+
+use merlin_routing::{RoutingConfig, RoutingOrchestrator};
+
 // They use the valor crate for comprehensive testing scenarios.
 //
 // TODO: Implement full integration tests
@@ -63,27 +81,20 @@
 //     assert!(results[0].success);
 // }
 // ```
+mod common;
 
-#[cfg(test)]
-mod tests {
-    use merlin_routing::*;
+#[tokio::test]
+async fn test_orchestrator_basic() {
+    let config = RoutingConfig::default();
+    let orchestrator = RoutingOrchestrator::new(config);
 
-    #[tokio::test]
-    /// # Panics
-    ///
-    /// Panics if the analysis result is an error.
-    async fn test_orchestrator_basic() {
-        let config = RoutingConfig::default();
-        let orchestrator = RoutingOrchestrator::new(config);
-
-        let analysis_result = orchestrator.analyze_request("Add a comment").await;
-        assert!(
-            analysis_result.is_ok(),
-            "analysis error: {:?}",
-            analysis_result.as_ref().err()
-        );
-    }
-
-    // TODO: Add comprehensive integration tests
-    // See documentation above for recommended test scenarios
+    let analysis_result = orchestrator.analyze_request("Add a comment").await;
+    assert!(
+        analysis_result.is_ok(),
+        "analysis error: {:?}",
+        analysis_result.as_ref().err()
+    );
 }
+
+// TODO: Add comprehensive integration tests
+// See documentation above for recommended test scenarios

@@ -175,11 +175,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if pipeline validation returns an unexpected failure in the test harness.
-    ///
-    /// # Panics
-    /// Panics if pipeline does not pass when all stages pass.
     async fn test_pipeline_all_pass() -> Result<()> {
         let stages: Vec<Arc<dyn ValidationStage>> = vec![
             Arc::new(MockStage {
@@ -209,11 +204,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if pipeline validation returns an unexpected failure in the test harness.
-    ///
-    /// # Panics
-    /// Panics if pipeline does not early-exit on first failing stage when configured.
     async fn test_pipeline_early_exit() -> Result<()> {
         let stages: Vec<Arc<dyn ValidationStage>> = vec![
             Arc::new(MockStage {

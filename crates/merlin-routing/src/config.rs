@@ -49,25 +49,67 @@ impl Default for TierConfig {
     }
 }
 
+/// Types of validation checks that can be performed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ValidationCheckType {
+    /// Syntax validation
+    Syntax,
+    /// Build validation
+    Build,
+    /// Test validation
+    Test,
+    /// Lint validation
+    Lint,
+}
+
+/// Validation checks to perform.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ValidationChecks {
+    /// Set of checks to perform
+    pub enabled_checks: Vec<ValidationCheckType>,
+}
+
+impl ValidationChecks {
+    /// Check if a specific validation type is enabled.
+    pub fn is_enabled(&self, check_type: ValidationCheckType) -> bool {
+        self.enabled_checks.contains(&check_type)
+    }
+
+    /// Enable all validation checks.
+    pub fn all() -> Self {
+        Self {
+            enabled_checks: vec![
+                ValidationCheckType::Syntax,
+                ValidationCheckType::Build,
+                ValidationCheckType::Test,
+                ValidationCheckType::Lint,
+            ],
+        }
+    }
+
+    /// Disable all validation checks.
+    pub fn none() -> Self {
+        Self {
+            enabled_checks: vec![],
+        }
+    }
+}
+
+impl Default for ValidationChecks {
+    fn default() -> Self {
+        Self::all()
+    }
+}
+
 /// Validation configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "Configuration struct can have more bools"
-)]
 pub struct ValidationConfig {
     /// Whether validation is enabled
     pub enabled: bool,
     /// Whether to stop on first validation failure
     pub early_exit: bool,
-    /// Whether to check syntax
-    pub syntax_check: bool,
-    /// Whether to check build
-    pub build_check: bool,
-    /// Whether to run tests
-    pub test_check: bool,
-    /// Whether to run linting
-    pub lint_check: bool,
+    /// Checks to perform during validation
+    pub checks: ValidationChecks,
     /// Timeout in seconds for build operations
     pub build_timeout_seconds: u64,
     /// Timeout in seconds for test operations
@@ -79,10 +121,7 @@ impl Default for ValidationConfig {
         Self {
             enabled: true,
             early_exit: true,
-            syntax_check: true,
-            build_check: true,
-            test_check: true,
-            lint_check: true,
+            checks: ValidationChecks::default(),
             build_timeout_seconds: 60,
             test_timeout_seconds: 300,
         }
@@ -140,8 +179,6 @@ mod tests {
     use serde_json::{from_str, to_string};
 
     #[test]
-    /// # Panics
-    /// Panics if default config does not meet baseline expectations.
     fn test_default_config() {
         let config = RoutingConfig::default();
         assert!(config.tiers.local_enabled);
@@ -150,8 +187,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if serialization or deserialization fails.
     fn test_serialization() {
         let config = RoutingConfig::default();
         let json = match to_string(&config) {

@@ -42,52 +42,32 @@ pub struct TaskDisplay {
 #[derive(Clone)]
 pub struct TaskStepInfo {
     /// Unique identifier for this step
-    #[allow(
-        dead_code,
-        reason = "Field is part of public API for task step tracking"
-    )]
     pub step_id: String,
     /// Type of step (e.g., `thinking`, `tool_call`)
-    #[allow(
-        dead_code,
-        reason = "Field is part of public API for task step tracking"
-    )]
     pub step_type: String,
     /// Content of the step
-    #[allow(
-        dead_code,
-        reason = "Field is part of public API for task step tracking"
-    )]
     pub content: String,
     /// When this step occurred
-    #[allow(
-        dead_code,
-        reason = "Field is part of public API for task step tracking"
-    )]
     pub timestamp: Instant,
 }
 
 impl TaskStepInfo {
     /// Access `step_id`
-    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn step_id(&self) -> &str {
         &self.step_id
     }
 
     /// Access `step_type`
-    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn step_type(&self) -> &str {
         &self.step_type
     }
 
     /// Access `content`
-    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn content(&self) -> &str {
         &self.content
     }
 
     /// Access `timestamp`
-    #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn timestamp(&self) -> Instant {
         self.timestamp
     }

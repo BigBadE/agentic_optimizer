@@ -27,98 +27,65 @@ pub struct BM25Index {
 
 impl BM25Index {
     /// Common stop words that should not influence scoring
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Comprehensive stopword list required"
-    )]
     fn stopwords() -> &'static HashSet<&'static str> {
         use std::sync::OnceLock;
 
         static STOPWORDS: OnceLock<HashSet<&'static str>> = OnceLock::new();
-        STOPWORDS.get_or_init(|| {
-            [
-                "the",
-                "and",
-                "for",
-                "with",
-                "that",
-                "from",
-                "this",
-                "have",
-                "will",
-                "into",
-                "when",
-                "where",
-                "what",
-                "your",
-                "their",
-                "about",
-                "which",
-                "there",
-                "been",
-                "while",
-                "without",
-                "should",
-                "could",
-                "would",
-                "using",
-                "used",
-                "they",
-                "them",
-                "then",
-                "than",
-                "only",
-                "also",
-                "over",
-                "under",
-                "after",
-                "before",
-                "each",
-                "every",
-                "more",
-                "most",
-                "some",
-                "such",
-                "within",
-                "between",
-                "because",
-                "again",
-                "almost",
-                "always",
-                "never",
-                "being",
-                "having",
-                "through",
-                "across",
-                "please",
-                "however",
-                "though",
-                "whereas",
-                "among",
-                "amongst",
-                "whose",
-                "ourselves",
-                "yourselves",
-                "themselves",
-                "itself",
-                "hers",
-                "his",
-                "herself",
-                "himself",
-                "it",
-                "its",
-                "you",
-                "we",
-                "our",
-                "ours",
-                "can",
-                "cannot",
-                "can't",
-                "cant",
-            ]
-            .into_iter()
+        STOPWORDS.get_or_init(Self::build_stopwords_set)
+    }
+
+    /// Build the stopwords set from predefined lists
+    fn build_stopwords_set() -> HashSet<&'static str> {
+        const COMMON_WORDS: &[&str] = &[
+            "the", "and", "for", "with", "that", "from", "this", "have", "will", "into", "when",
+            "where", "what", "your", "their", "about", "which", "there", "been",
+        ];
+        const TEMPORAL_WORDS: &[&str] = &[
+            "while", "without", "after", "before", "then", "again", "always", "never",
+        ];
+        const MODAL_WORDS: &[&str] =
+            &["should", "could", "would", "can", "cannot", "can't", "cant"];
+        const COMPARATIVE_WORDS: &[&str] = &[
+            "only", "also", "over", "under", "each", "every", "more", "most", "some", "such",
+            "than",
+        ];
+        const POSITIONAL_WORDS: &[&str] =
+            &["within", "between", "through", "across", "among", "amongst"];
+        const CONJUNCTIONS: &[&str] = &["because", "however", "though", "whereas"];
+        const VERB_FORMS: &[&str] = &["using", "used", "being", "having"];
+        const PRONOUNS: &[&str] = &[
+            "they",
+            "them",
+            "whose",
+            "ourselves",
+            "yourselves",
+            "themselves",
+            "itself",
+            "hers",
+            "his",
+            "herself",
+            "himself",
+            "it",
+            "its",
+            "you",
+            "we",
+            "our",
+            "ours",
+        ];
+        const COURTESY: &[&str] = &["please"];
+
+        COMMON_WORDS
+            .iter()
+            .chain(TEMPORAL_WORDS)
+            .chain(MODAL_WORDS)
+            .chain(COMPARATIVE_WORDS)
+            .chain(POSITIONAL_WORDS)
+            .chain(CONJUNCTIONS)
+            .chain(VERB_FORMS)
+            .chain(PRONOUNS)
+            .chain(COURTESY)
+            .copied()
             .collect()
-        })
     }
 
     // Use Default instead of a no-arg constructor

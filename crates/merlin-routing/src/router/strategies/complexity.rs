@@ -43,8 +43,6 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if selected tiers do not match expected routing by complexity.
     async fn test_complexity_routing() {
         let strategy = ComplexityBasedStrategy;
 

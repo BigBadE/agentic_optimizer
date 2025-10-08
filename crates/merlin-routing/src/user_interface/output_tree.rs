@@ -15,10 +15,6 @@ pub enum OutputNode {
         /// Child nodes
         children: Vec<OutputNode>,
     },
-    #[allow(
-        dead_code,
-        reason = "ToolCall variant is part of public API for future use"
-    )]
     /// A tool invocation
     ToolCall {
         /// Tool call identifier
@@ -58,12 +54,8 @@ pub enum StepType {
 }
 
 impl StepType {
-    /// Parse step type from string
-    #[allow(
-        clippy::should_implement_trait,
-        reason = "Simple string parsing, not implementing FromStr trait"
-    )]
-    pub fn from_str(text: &str) -> Self {
+    /// Parse step type from string, returning Output for unknown types
+    pub fn from_string(text: &str) -> Self {
         match text {
             "Thinking" => Self::Thinking,
             "ToolCall" => Self::ToolCall,
@@ -118,27 +110,6 @@ impl OutputTree {
         // Auto-collapse "analysis" steps when they complete
         if step_id == "analysis" {
             self.collapsed_nodes.insert(step_id.to_string());
-        }
-    }
-
-    /// Add a tool call
-    #[allow(dead_code, reason = "Method is part of public API for future use")]
-    pub fn add_tool_call(&mut self, tool_name: String, _args: Value) {
-        let id = format!("tool_{}", self.root.len());
-        let node = OutputNode::ToolCall {
-            id,
-            tool_name,
-            result: None,
-        };
-
-        if let Some(parent_id) = self.current_step_stack.last().cloned() {
-            if let Some(parent) = self.find_node_mut(&parent_id)
-                && let OutputNode::Step { children, .. } = parent
-            {
-                children.push(node);
-            }
-        } else {
-            self.root.push(node);
         }
     }
 

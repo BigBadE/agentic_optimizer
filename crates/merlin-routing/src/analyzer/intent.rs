@@ -163,8 +163,6 @@ mod tests {
     use super::*;
 
     #[test]
-    /// # Panics
-    /// Panics if action detection fails for create.
     fn test_create_action() {
         let extractor = IntentExtractor;
         let intent = extractor.extract("Create a new file test.rs");
@@ -172,8 +170,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if action detection fails for fix.
     fn test_fix_action() {
         let extractor = IntentExtractor;
         let intent = extractor.extract("Fix the bug in parser.rs");
@@ -181,8 +177,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if action detection fails for refactor.
     fn test_refactor_action() {
         let extractor = IntentExtractor;
         let intent = extractor.extract("Refactor the entire module");
@@ -190,8 +184,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if file scope detection fails.
     fn test_file_scope() {
         let extractor = IntentExtractor;
         let intent = extractor.extract("Modify test.rs");
@@ -199,8 +191,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if priority detection fails.
     fn test_critical_priority() {
         let extractor = IntentExtractor;
         let intent = extractor.extract("Critical bug fix needed");
@@ -208,8 +198,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if complexity estimation mapping fails.
     fn test_complexity_estimation() {
         let extractor = IntentExtractor;
 

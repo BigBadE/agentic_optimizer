@@ -1,5 +1,20 @@
 //! Comprehensive tests for `InputManager` - text input, wrapping, commands, and edge cases
-#![cfg(test)]
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
+)]
+mod common;
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use merlin_routing::user_interface::input::InputManager;
@@ -39,8 +54,6 @@ fn move_cursor(manager: &mut InputManager, movement: CursorMove) {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_input_manager_creation() {
     let manager = InputManager::default();
     assert_eq!(manager.input_area().lines().len(), 1);
@@ -48,8 +61,6 @@ fn test_input_manager_creation() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_simple_text_input() {
     let mut manager = InputManager::default();
     input_string(&mut manager, "Hello, World!");
@@ -60,8 +71,6 @@ fn test_simple_text_input() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_multiline_input_with_enter() {
     let mut manager = InputManager::default();
 
@@ -76,8 +85,6 @@ fn test_multiline_input_with_enter() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_backspace_deletes_character() {
     let mut manager = InputManager::default();
 
@@ -89,8 +96,6 @@ fn test_backspace_deletes_character() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_backspace_at_line_start_merges_lines() {
     let mut manager = InputManager::default();
 
@@ -108,8 +113,6 @@ fn test_backspace_at_line_start_merges_lines() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_cursor_movement() {
     let mut manager = InputManager::default();
     input_string(&mut manager, "Hello");
@@ -128,8 +131,6 @@ fn test_cursor_movement() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_clear_empties_input() {
     let mut manager = InputManager::default();
 
@@ -142,8 +143,6 @@ fn test_clear_empties_input() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_auto_wrap_long_line() {
     let mut manager = InputManager::default();
 
@@ -165,8 +164,6 @@ fn test_auto_wrap_long_line() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_auto_wrap_preserves_manual_newlines() {
     let mut manager = InputManager::default();
 
@@ -187,8 +184,6 @@ fn test_auto_wrap_preserves_manual_newlines() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_auto_wrap_does_not_wrap_short_text() {
     let mut manager = InputManager::default();
 
@@ -201,8 +196,6 @@ fn test_auto_wrap_does_not_wrap_short_text() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_unicode_input() {
     let mut manager = InputManager::default();
 
@@ -213,8 +206,6 @@ fn test_unicode_input() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_emoji_input() {
     let mut manager = InputManager::default();
 
@@ -225,8 +216,6 @@ fn test_emoji_input() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_special_characters() {
     let mut manager = InputManager::default();
 
@@ -237,8 +226,6 @@ fn test_special_characters() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_input_with_spaces() {
     let mut manager = InputManager::default();
 
@@ -249,8 +236,6 @@ fn test_input_with_spaces() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_input_with_tabs() {
     let mut manager = InputManager::default();
 
@@ -262,8 +247,6 @@ fn test_input_with_tabs() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_cursor_position_after_input() {
     let mut manager = InputManager::default();
 
@@ -275,8 +258,6 @@ fn test_cursor_position_after_input() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_cursor_position_after_newline() {
     let mut manager = InputManager::default();
 
@@ -289,8 +270,6 @@ fn test_cursor_position_after_newline() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_insert_in_middle_of_text() {
     let mut manager = InputManager::default();
 
@@ -305,8 +284,6 @@ fn test_insert_in_middle_of_text() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_delete_from_middle() {
     let mut manager = InputManager::default();
 
@@ -322,8 +299,6 @@ fn test_delete_from_middle() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_empty_line_between_text() {
     let mut manager = InputManager::default();
 
@@ -340,8 +315,6 @@ fn test_empty_line_between_text() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_word_wrapping_at_space() {
     let mut manager = InputManager::default();
 
@@ -356,8 +329,6 @@ fn test_word_wrapping_at_space() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_very_long_single_word() {
     let mut manager = InputManager::default();
 
@@ -371,8 +342,6 @@ fn test_very_long_single_word() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_ctrl_combinations() {
     let mut manager = InputManager::default();
 
@@ -388,8 +357,6 @@ fn test_ctrl_combinations() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_clear_preserves_state() {
     let mut manager = InputManager::default();
 
@@ -403,8 +370,6 @@ fn test_clear_preserves_state() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_multiple_wraps() {
     let mut manager = InputManager::default();
 
@@ -422,8 +387,6 @@ fn test_multiple_wraps() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_wrap_with_cursor_position() {
     let mut manager = InputManager::default();
 

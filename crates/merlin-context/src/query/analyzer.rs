@@ -179,8 +179,6 @@ mod tests {
     use super::*;
 
     #[test]
-    /// # Panics
-    /// Panics if create action is not detected.
     fn test_detect_create_action() {
         let analyzer = QueryAnalyzer;
         let intent = analyzer.analyze("Create a new authentication module");
@@ -188,8 +186,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if debug action is not detected.
     fn test_detect_debug_action() {
         let analyzer = QueryAnalyzer;
         let intent = analyzer.analyze("Fix the bug in UserService");
@@ -197,8 +193,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if expected keywords are not extracted.
     fn test_extract_keywords() {
         let analyzer = QueryAnalyzer;
         let intent = analyzer.analyze("Implement authentication for the user service");
@@ -208,8 +202,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if expected entities are not extracted.
     fn test_extract_entities() {
         let analyzer = QueryAnalyzer;
         let intent = analyzer.analyze("Fix UserService::find_by_email method");
@@ -221,8 +213,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if complexity estimation fails to categorize as expected.
     fn test_complexity_estimation() {
         let analyzer = QueryAnalyzer;
 

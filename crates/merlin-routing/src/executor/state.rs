@@ -85,14 +85,11 @@ impl WorkspaceSnapshot {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, reason = "Test code is allowed to use expect")]
 mod tests {
     use super::*;
     use tempfile::TempDir;
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if workspace operations fail in the test harness.
     async fn test_workspace_concurrent_reads() {
         let tmp_dir = TempDir::new().expect("create temp dir");
         let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
@@ -116,8 +113,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if workspace operations fail in the test harness.
     async fn test_workspace_snapshot() {
         let tmp_dir = TempDir::new().expect("create temp dir");
         let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());

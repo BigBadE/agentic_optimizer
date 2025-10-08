@@ -21,6 +21,24 @@ use merlin_core::{Error, Result};
 
 type ChunkResult = (PathBuf, FileChunk, Vec<f32>, String);
 
+/// Helper struct to hold vector score data
+struct VectorScoreData {
+    scores: HashMap<PathBuf, f32>,
+    previews: HashMap<PathBuf, String>,
+    max_score: f32,
+}
+
+/// Parameters for computing combined scores
+struct ScoreComputationParams<'score> {
+    bm25_scores: &'score HashMap<PathBuf, f32>,
+    vector_scores: &'score HashMap<PathBuf, f32>,
+    previews: &'score HashMap<PathBuf, String>,
+    max_bm25: f32,
+    max_vector: f32,
+    bm25_weight: f32,
+    vector_weight: f32,
+}
+
 // Removed feature-gated import to avoid unexpected-cfg; we fall back to an empty graph instead.
 
 /// Cache entry for a chunk embedding
@@ -103,10 +121,6 @@ impl VectorSearchManager {
     ///
     /// # Errors
     /// Returns an error if embedding model is unavailable or embedding/cache IO fails
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Complex initialization with caching and progress"
-    )]
     pub async fn initialize(&mut self) -> Result<()> {
         let spinner = Self::create_spinner();
 
@@ -731,8 +745,107 @@ impl VectorSearchManager {
         bm25_contribution
     }
 
+    /// Collect BM25 scores into a map and find max score
+    fn collect_bm25_scores(
+        bm25_results: &[(PathBuf, f32)],
+        paths: &mut HashSet<PathBuf>,
+    ) -> (HashMap<PathBuf, f32>, f32) {
+        let mut bm25_scores = HashMap::default();
+        let mut max_bm25 = 0.0f32;
+
+        for (path, score) in bm25_results {
+            if *score > 0.0 {
+                bm25_scores.insert(path.clone(), *score);
+                max_bm25 = max_bm25.max(*score);
+                paths.insert(path.clone());
+            }
+        }
+        (bm25_scores, max_bm25)
+    }
+
+    /// Collect vector scores and previews into maps and find max score
+    fn collect_vector_scores(
+        vector_results: &[SearchResult],
+        paths: &mut HashSet<PathBuf>,
+    ) -> VectorScoreData {
+        let mut vector_scores = HashMap::default();
+        let mut previews = HashMap::default();
+        let mut max_vector = 0.0f32;
+
+        for result in vector_results {
+            if result.score > 0.0 {
+                vector_scores.insert(result.file_path.clone(), result.score);
+                max_vector = max_vector.max(result.score);
+                paths.insert(result.file_path.clone());
+            }
+            previews.insert(result.file_path.clone(), result.preview.clone());
+        }
+        VectorScoreData {
+            scores: vector_scores,
+            previews,
+            max_score: max_vector,
+        }
+    }
+
+    /// Compute the final combined score for a search result
+    fn compute_combined_score(
+        path: &PathBuf,
+        query: &str,
+        score_params: &ScoreComputationParams<'_>,
+    ) -> SearchResult {
+        let bm25_scores = score_params.bm25_scores;
+        let vector_scores = score_params.vector_scores;
+        let previews = score_params.previews;
+        let max_bm25 = score_params.max_bm25;
+        let max_vector = score_params.max_vector;
+        let bm25_weight = score_params.bm25_weight;
+        let vector_weight = score_params.vector_weight;
+        let bm25_raw = bm25_scores.get(path).copied().unwrap_or(0.0);
+        let vector_raw = vector_scores.get(path).copied().unwrap_or(0.0);
+
+        let bm25_normalized = if max_bm25 > 0.0 {
+            bm25_raw / max_bm25
+        } else {
+            0.0
+        };
+        let vector_normalized = if max_vector > 0.0 {
+            vector_raw / max_vector
+        } else {
+            0.0
+        };
+
+        // Apply minimum BM25 threshold - weak matches don't contribute (tuned: 0.75)
+        let mut bm25_contribution = if bm25_raw >= 0.75 {
+            bm25_normalized * bm25_weight
+        } else {
+            0.0
+        };
+
+        bm25_contribution =
+            Self::apply_exact_match_bonus(bm25_contribution, query, previews.get(path));
+        let vector_contribution = vector_normalized * vector_weight;
+
+        let preview = previews.get(path).cloned().unwrap_or_default();
+        let file_boost = Self::calculate_file_boost(path);
+        let query_alignment = Self::calculate_query_file_alignment(query, path, &preview);
+        let pattern_boost = Self::calculate_pattern_boost(&preview);
+        let chunk_quality = Self::calculate_chunk_quality(&preview);
+        let combined_score = (bm25_contribution + vector_contribution)
+            * file_boost
+            * query_alignment
+            * pattern_boost
+            * chunk_quality;
+
+        SearchResult {
+            file_path: path.clone(),
+            score: combined_score,
+            preview,
+            bm25_score: (bm25_contribution > 0.0).then_some(bm25_contribution),
+            vector_score: (vector_contribution > 0.0).then_some(vector_contribution),
+        }
+    }
+
     /// Combine BM25 keyword scores with vector semantic scores using weighted normalization
-    #[allow(clippy::too_many_lines, reason = "Complex ranking fusion algorithm")]
     fn reciprocal_rank_fusion(
         query: &str,
         bm25_results: &[(PathBuf, f32)],
@@ -740,85 +853,24 @@ impl VectorSearchManager {
         top_k: usize,
     ) -> Vec<SearchResult> {
         let (bm25_weight, vector_weight) = Self::calculate_adaptive_weights(query);
+        let mut paths = HashSet::default();
 
-        let mut bm25_scores: HashMap<PathBuf, f32> = HashMap::default();
-        let mut vector_scores: HashMap<PathBuf, f32> = HashMap::default();
-        let mut previews: HashMap<PathBuf, String> = HashMap::default();
-        let mut paths: HashSet<PathBuf> = HashSet::default();
+        let (bm25_scores, max_bm25) = Self::collect_bm25_scores(bm25_results, &mut paths);
+        let vector_data = Self::collect_vector_scores(vector_results, &mut paths);
 
-        let mut max_bm25 = 0.0f32;
-        for (path, score) in bm25_results {
-            if *score > 0.0 {
-                bm25_scores.insert(path.clone(), *score);
-                if *score > max_bm25 {
-                    max_bm25 = *score;
-                }
-                paths.insert(path.clone());
-            }
-        }
-
-        let mut max_vector = 0.0f32;
-        for result in vector_results {
-            if result.score > 0.0 {
-                vector_scores.insert(result.file_path.clone(), result.score);
-                if result.score > max_vector {
-                    max_vector = result.score;
-                }
-                paths.insert(result.file_path.clone());
-            }
-            previews.insert(result.file_path.clone(), result.preview.clone());
-        }
+        let score_params = ScoreComputationParams {
+            bm25_scores: &bm25_scores,
+            vector_scores: &vector_data.scores,
+            previews: &vector_data.previews,
+            max_bm25,
+            max_vector: vector_data.max_score,
+            bm25_weight,
+            vector_weight,
+        };
 
         let mut combined: Vec<SearchResult> = paths
             .into_iter()
-            .map(|path| {
-                let bm25_raw = bm25_scores.get(&path).copied().unwrap_or(0.0);
-                let vector_raw = vector_scores.get(&path).copied().unwrap_or(0.0);
-
-                let bm25_normalized = if max_bm25 > 0.0 {
-                    bm25_raw / max_bm25
-                } else {
-                    0.0
-                };
-                let vector_normalized = if max_vector > 0.0 {
-                    vector_raw / max_vector
-                } else {
-                    0.0
-                };
-
-                // Apply minimum BM25 threshold - weak matches don't contribute
-                // Tuned threshold: 0.75 balances precision and recall
-                let mut bm25_contribution = if bm25_raw >= 0.75 {
-                    bm25_normalized * bm25_weight
-                } else {
-                    0.0
-                };
-
-                // Exact match bonus: check if preview contains exact query terms
-                bm25_contribution =
-                    Self::apply_exact_match_bonus(bm25_contribution, query, previews.get(&path));
-
-                let vector_contribution = vector_normalized * vector_weight;
-
-                let preview = previews.get(&path).cloned().unwrap_or_default();
-                let file_boost = Self::calculate_file_boost(&path);
-                let query_alignment = Self::calculate_query_file_alignment(query, &path, &preview);
-                let pattern_boost = Self::calculate_pattern_boost(&preview);
-                let chunk_quality = Self::calculate_chunk_quality(&preview);
-                let combined_score = (bm25_contribution + vector_contribution)
-                    * file_boost
-                    * query_alignment
-                    * pattern_boost
-                    * chunk_quality;
-
-                SearchResult {
-                    file_path: path,
-                    score: combined_score,
-                    preview,
-                    bm25_score: (bm25_contribution > 0.0).then_some(bm25_contribution),
-                    vector_score: (vector_contribution > 0.0).then_some(vector_contribution),
-                }
-            })
+            .map(|path| Self::compute_combined_score(&path, query, &score_params))
             .collect();
 
         combined.sort_by(|result_a, result_b| {

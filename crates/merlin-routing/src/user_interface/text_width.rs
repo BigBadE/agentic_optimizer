@@ -152,16 +152,12 @@ mod tests {
     use super::*;
 
     #[test]
-    /// # Panics
-    /// Panics if width calculation does not match expected ASCII widths.
     fn test_ascii_width() {
         assert_eq!(calculate_width("hello", EmojiMode::Permissive), 5);
         assert_eq!(calculate_width("test", EmojiMode::Strict), 4);
     }
 
     #[test]
-    /// # Panics
-    /// Panics if emoji width calculation does not match expected values.
     fn test_emoji_width() {
         // Single emoji
         assert_eq!(calculate_width("💭", EmojiMode::Permissive), 2);
@@ -172,16 +168,12 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if mixed content width is unexpectedly small.
     fn test_mixed_content() {
         let text = "💭 Thinking";
         assert!(calculate_width(text, EmojiMode::Permissive) >= 10);
     }
 
     #[test]
-    /// # Panics
-    /// Panics if truncation fails to respect width or grapheme boundaries.
     fn test_truncate() {
         let text = "Hello World";
         assert_eq!(truncate_to_width(text, 5, EmojiMode::Permissive), "Hello");
@@ -192,16 +184,12 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if stripping emojis does not produce expected fallback text.
     fn test_strip_emojis() {
         assert_eq!(strip_emojis("💭 Hello", "?"), "? Hello");
         assert_eq!(strip_emojis("Test 🔧 Tool", "*"), "Test * Tool");
     }
 
     #[test]
-    /// # Panics
-    /// Panics if wrapping fails to respect maximum width.
     fn test_wrap_text() {
         let text = "Hello World Test";
         let wrapped = wrap_text(text, 10, EmojiMode::Permissive);
@@ -213,8 +201,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if emoji detection misclassifies basic cases.
     fn test_emoji_detection() {
         assert!(is_emoji_grapheme("💭"));
         assert!(is_emoji_grapheme("🔧"));

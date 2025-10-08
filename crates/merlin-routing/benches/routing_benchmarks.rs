@@ -1,14 +1,16 @@
 //! Benchmarks for routing performance and task analysis.
 #![allow(
+    dead_code,
     missing_docs,
+    clippy::expect_used,
     clippy::unwrap_used,
-    clippy::absolute_paths,
-    clippy::min_ident_chars,
-    clippy::used_underscore_binding,
-    clippy::uninlined_format_args,
+    clippy::panic,
     clippy::missing_panics_doc,
-    deprecated,
-    reason = "Benchmark code has different conventions"
+    clippy::missing_errors_doc,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::tests_outside_test_module,
+    reason = "Test allows"
 )]
 
 use std::hint::black_box;
@@ -16,10 +18,16 @@ use std::hint::black_box;
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use merlin_routing::{RoutingConfig, RoutingOrchestrator};
 use std::time::Duration;
+use tokio::runtime::Runtime;
+
+/// Helper to create runtime or panic (benchmarks expect setup to succeed)
+fn create_runtime() -> Runtime {
+    Runtime::new().unwrap_or_else(|err| panic!("Failed to create runtime: {err}"))
+}
 
 /// Benchmark request analysis performance
-fn bench_request_analysis(c: &mut Criterion) {
-    let mut group = c.benchmark_group("request_analysis");
+fn bench_request_analysis(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("request_analysis");
 
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
@@ -41,10 +49,11 @@ fn bench_request_analysis(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::from_parameter(name),
             &request,
-            |b, &request| {
-                b.iter(|| {
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on(async { orchestrator.analyze_request(black_box(request)).await })
+            |bencher, &request| {
+                bencher.iter(|| {
+                    let runtime = create_runtime();
+                    runtime
+                        .block_on(async { orchestrator.analyze_request(black_box(request)).await })
                 });
             },
         );
@@ -54,8 +63,8 @@ fn bench_request_analysis(c: &mut Criterion) {
 }
 
 /// Benchmark task decomposition
-fn bench_task_decomposition(c: &mut Criterion) {
-    let mut group = c.benchmark_group("task_decomposition");
+fn bench_task_decomposition(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("task_decomposition");
 
     let requests = vec![
         "Add error handling",
@@ -64,13 +73,13 @@ fn bench_task_decomposition(c: &mut Criterion) {
     ];
 
     for request in requests {
-        group.bench_function(request, |b| {
+        group.bench_function(request, |bencher| {
             let config = RoutingConfig::default();
             let orchestrator = RoutingOrchestrator::new(config);
 
-            b.iter(|| {
-                let rt = tokio::runtime::Runtime::new().unwrap();
-                rt.block_on(async { orchestrator.analyze_request(black_box(request)).await })
+            bencher.iter(|| {
+                let runtime = create_runtime();
+                runtime.block_on(async { orchestrator.analyze_request(black_box(request)).await })
             });
         });
     }
@@ -79,8 +88,8 @@ fn bench_task_decomposition(c: &mut Criterion) {
 }
 
 /// Benchmark complexity analysis (synchronous operation)
-fn bench_complexity_analysis(c: &mut Criterion) {
-    let mut group = c.benchmark_group("complexity_analysis");
+fn bench_complexity_analysis(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("complexity_analysis");
 
     let test_cases = vec![
         ("simple", "Add a comment"),
@@ -89,38 +98,42 @@ fn bench_complexity_analysis(c: &mut Criterion) {
     ];
 
     for (name, query) in test_cases {
-        group.bench_with_input(BenchmarkId::from_parameter(name), &query, |b, &query| {
-            b.iter(|| {
-                // Analyze complexity of the query
-                let _chars = query.chars().count();
-                let _words = query.split_whitespace().count();
-                // Simplified complexity check
-                black_box(_words)
-            });
-        });
+        group.bench_with_input(
+            BenchmarkId::from_parameter(name),
+            &query,
+            |bencher, &query| {
+                bencher.iter(|| {
+                    // Analyze complexity of the query
+                    let char_count = query.chars().count();
+                    let word_count = query.split_whitespace().count();
+                    // Simplified complexity check
+                    black_box((char_count, word_count))
+                });
+            },
+        );
     }
 
     group.finish();
 }
 
 /// Benchmark task graph construction
-fn bench_task_graph(c: &mut Criterion) {
+fn bench_task_graph(criterion: &mut Criterion) {
     use merlin_routing::{Task, executor::graph::TaskGraph};
 
-    let mut group = c.benchmark_group("task_graph");
+    let mut group = criterion.benchmark_group("task_graph");
 
     let task_counts = vec![5, 10, 20, 50];
 
     for count in task_counts {
         group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}_tasks", count)),
+            BenchmarkId::from_parameter(format!("{count}_tasks")),
             &count,
-            |b, &count| {
+            |bencher, &count| {
                 let tasks: Vec<Task> = (0..count)
-                    .map(|i| Task::new(format!("Task {}", i)))
+                    .map(|idx| Task::new(format!("Task {idx}")))
                     .collect();
 
-                b.iter(|| TaskGraph::from_tasks(black_box(&tasks)));
+                bencher.iter(|| TaskGraph::from_tasks(black_box(&tasks)));
             },
         );
     }

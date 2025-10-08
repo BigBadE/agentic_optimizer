@@ -62,8 +62,6 @@ mod tests {
     use crate::ContextRequirements;
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if a premium tier is not selected for very large context tasks.
     async fn test_long_context_routing() {
         let strategy = LongContextStrategy::new(16000);
 
@@ -84,8 +82,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if a premium tier is not selected for medium-long context tasks.
     async fn test_medium_long_context() {
         let strategy = LongContextStrategy::new(16000);
 
@@ -101,8 +97,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if applicability check fails for tasks requiring full context.
     async fn test_requires_full_context() {
         let strategy = LongContextStrategy::new(16000);
 

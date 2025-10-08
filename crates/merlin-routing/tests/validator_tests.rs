@@ -1,22 +1,29 @@
 //! Comprehensive tests for validation pipeline and stages
-#![cfg(test)]
-#![allow(
-    clippy::expect_used,
-    clippy::min_ident_chars,
-    clippy::absolute_paths,
-    clippy::single_call_fn,
-    clippy::float_cmp,
-    clippy::unused_trait_names,
-    reason = "Test code prioritizes clarity and uses traits anonymously"
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
 )]
+mod common;
 
 use async_trait::async_trait;
 use merlin_core::{Response, TokenUsage};
 use merlin_routing::{
     Result, Severity, Task, ValidationStageType as StageType,
-    validator::{ValidationPipeline, ValidationStage, Validator, pipeline::StageResult},
+    validator::{ValidationPipeline, ValidationStage, Validator as _, pipeline::StageResult},
 };
 use std::sync::Arc;
+use tokio::spawn;
 
 // Mock validation stage for testing
 struct MockValidationStage {
@@ -88,8 +95,6 @@ fn create_test_response() -> Response {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if pipeline with all passing stages fails.
 async fn test_pipeline_all_stages_pass() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![
         Arc::new(MockValidationStage::new("Syntax", StageType::Syntax, true)),
@@ -109,13 +114,14 @@ async fn test_pipeline_all_stages_pass() {
 
     assert!(result.passed, "All stages passed, result should be passing");
     assert_eq!(result.stages.len(), 4, "Should run all 4 stages");
-    assert_eq!(result.score, 1.0, "Perfect score when all pass");
+    assert!(
+        (result.score - 1.0).abs() < f64::EPSILON,
+        "Perfect score when all pass"
+    );
     assert!(result.errors.is_empty(), "No errors when all pass");
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if pipeline early exit doesn't work correctly.
 async fn test_pipeline_early_exit_on_failure() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![
         Arc::new(MockValidationStage::new("Syntax", StageType::Syntax, true)),
@@ -146,8 +152,6 @@ async fn test_pipeline_early_exit_on_failure() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if pipeline without early exit doesn't run all stages.
 async fn test_pipeline_no_early_exit() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![
         Arc::new(MockValidationStage::new("Syntax", StageType::Syntax, false)),
@@ -179,9 +183,11 @@ async fn test_pipeline_no_early_exit() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if score calculation is incorrect.
 async fn test_pipeline_score_calculation() {
+    // Score should be product of all stage scores: 1.0 * 0.9 * 0.8 = 0.72
+    const EXPECTED_SCORE: f64 = 0.72;
+    const TOLERANCE: f64 = 0.01;
+
     let stages: Vec<Arc<dyn ValidationStage>> = vec![
         Arc::new(MockValidationStage::new("Syntax", StageType::Syntax, true).with_score(1.0)),
         Arc::new(MockValidationStage::new("Build", StageType::Build, true).with_score(0.9)),
@@ -197,13 +203,13 @@ async fn test_pipeline_score_calculation() {
         .await
         .expect("validation should succeed");
 
-    // Score should be product of all stage scores: 1.0 * 0.9 * 0.8 = 0.72
-    assert!((result.score - 0.72).abs() < 0.01, "Score should be ~0.72");
+    assert!(
+        (result.score - EXPECTED_SCORE).abs() < TOLERANCE,
+        "Score should be ~0.72"
+    );
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if quick validation doesn't use first stage.
 async fn test_pipeline_quick_validate() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![
         Arc::new(
@@ -224,8 +230,6 @@ async fn test_pipeline_quick_validate() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if quick validation with failing first stage doesn't fail.
 async fn test_pipeline_quick_validate_fails() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![
         Arc::new(
@@ -246,8 +250,6 @@ async fn test_pipeline_quick_validate_fails() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if empty pipeline doesn't handle gracefully.
 async fn test_pipeline_empty_stages() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![];
 
@@ -262,15 +264,13 @@ async fn test_pipeline_empty_stages() {
 
     assert!(result.passed, "Empty pipeline should pass");
     assert_eq!(result.stages.len(), 0, "No stages should run");
-    assert_eq!(
-        result.score, 1.0,
+    assert!(
+        (result.score - 1.0).abs() < f64::EPSILON,
         "Empty pipeline should have perfect score"
     );
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if single stage pipeline doesn't work.
 async fn test_pipeline_single_stage() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![Arc::new(MockValidationStage::new(
         "Syntax",
@@ -292,8 +292,6 @@ async fn test_pipeline_single_stage() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if validation result structure is incorrect.
 async fn test_validation_result_structure() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![Arc::new(MockValidationStage::new(
         "Syntax",
@@ -322,8 +320,6 @@ async fn test_validation_result_structure() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if stage details aren't preserved.
 async fn test_stage_details_preservation() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![Arc::new(MockValidationStage::new(
         "CustomStage",
@@ -349,8 +345,6 @@ async fn test_stage_details_preservation() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if default pipeline creation fails.
 async fn test_default_pipeline_creation() {
     let pipeline = ValidationPipeline::with_default_stages();
     let task = Task::new("Test task".to_owned());
@@ -361,8 +355,6 @@ async fn test_default_pipeline_creation() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if mixed stage results aren't handled correctly.
 async fn test_mixed_stage_results() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![
         Arc::new(MockValidationStage::new("Stage1", StageType::Syntax, true).with_score(1.0)),
@@ -386,8 +378,6 @@ async fn test_mixed_stage_results() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if warnings tracking fails.
 async fn test_validation_warnings() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![Arc::new(MockValidationStage::new(
         "Syntax",
@@ -409,17 +399,15 @@ async fn test_validation_warnings() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if concurrent validation fails.
 async fn test_concurrent_validation() {
     let pipeline = Arc::new(ValidationPipeline::with_default_stages());
 
     let mut handles = vec![];
 
-    for i in 0..10 {
+    for task_num in 0..10 {
         let pipeline_clone = Arc::clone(&pipeline);
-        let handle = tokio::spawn(async move {
-            let task = Task::new(format!("Task {i}"));
+        let handle = spawn(async move {
+            let task = Task::new(format!("Task {task_num}"));
             let response = create_test_response();
             pipeline_clone.validate(&response, &task).await
         });
@@ -432,8 +420,6 @@ async fn test_concurrent_validation() {
 }
 
 #[test]
-/// # Panics
-/// Panics if stage type enum doesn't work correctly.
 fn test_stage_type_enum() {
     let syntax = StageType::Syntax;
     let build = StageType::Build;
@@ -446,8 +432,6 @@ fn test_stage_type_enum() {
 }
 
 #[test]
-/// # Panics
-/// Panics if severity enum doesn't work correctly.
 fn test_severity_enum() {
     let error = Severity::Error;
     let warning = Severity::Warning;
@@ -456,8 +440,6 @@ fn test_severity_enum() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if large response validation fails.
 async fn test_large_response_validation() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![Arc::new(MockValidationStage::new(
         "Syntax",
@@ -482,8 +464,6 @@ async fn test_large_response_validation() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if empty response validation fails.
 async fn test_empty_response_validation() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![Arc::new(MockValidationStage::new(
         "Syntax",
@@ -508,8 +488,6 @@ async fn test_empty_response_validation() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if stage ordering isn't preserved.
 async fn test_stage_execution_order() {
     let stages: Vec<Arc<dyn ValidationStage>> = vec![
         Arc::new(MockValidationStage::new("First", StageType::Syntax, true)),

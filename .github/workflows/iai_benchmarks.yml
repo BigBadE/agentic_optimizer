@@ -1,4 +1,4 @@
-name: IAI Benchmarks
+name: IAI-Callgrind Benchmarks
 
 on:
   push:
@@ -20,8 +20,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  iai-benchmark:
-    name: Run IAI Benchmarks
+  iai-callgrind-benchmark:
+    name: Run IAI-Callgrind Benchmarks
     runs-on: ubuntu-latest
 
     steps:
@@ -40,21 +40,21 @@ jobs:
         with:
           profile: release
 
-      - name: Run IAI benchmarks
+      - name: Run IAI-Callgrind benchmarks
         run: |
-          cargo run --release --bin perf-bench -- --iai --output iai-results.md
-          echo "✅ IAI benchmarks completed"
+          cargo run --profile ci-release --bin perf-bench -- --iai --output iai-results.md
+          echo " IAI-Callgrind benchmarks completed"
           if [ -f iai-results.md ]; then
             head -30 iai-results.md
           else
-            echo "⚠️ Warning: iai-results.md not found"
+            echo " Warning: iai-results.md not found"
           fi
 
       - name: Upload results artifact
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: iai-benchmark-results
+          name: iai-callgrind-benchmark-results
           path: iai-results.md
           retention-days: 90
           if-no-files-found: warn
@@ -67,18 +67,17 @@ jobs:
           path: gh-pages
           fetch-depth: 0
 
-      - name: Publish IAI results to gh-pages
+      - name: Publish IAI-Callgrind results to gh-pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('iai-results.md') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
-          mkdir -p gh-pages/iai-bench
-          cp iai-results.md gh-pages/iai-bench/latest.md
-          cp iai-results.md "gh-pages/iai-bench/${ts}.md"
+          mkdir -p gh-pages/iai-callgrind-bench
+          cp iai-results.md gh-pages/iai-callgrind-bench/latest.md
+          cp iai-results.md "gh-pages/iai-callgrind-bench/${ts}.md"
           cd gh-pages
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add iai-bench/
-          git commit -m "Update IAI benchmark results: ${ts}" || echo "No changes to commit"
+          git add iai-callgrind-bench/
+          git commit -m "Update IAI-Callgrind benchmark results: ${ts}" || echo "No changes to commit"
           git push origin gh-pages
-

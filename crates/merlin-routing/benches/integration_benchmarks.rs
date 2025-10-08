@@ -1,24 +1,33 @@
 //! Integration benchmarks for end-to-end performance and resource usage.
 #![allow(
+    dead_code,
     missing_docs,
+    clippy::expect_used,
     clippy::unwrap_used,
-    clippy::absolute_paths,
-    clippy::min_ident_chars,
-    clippy::used_underscore_binding,
-    clippy::uninlined_format_args,
+    clippy::panic,
     clippy::missing_panics_doc,
-    clippy::excessive_nesting,
-    deprecated,
-    reason = "Benchmark code has different conventions"
+    clippy::missing_errors_doc,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::tests_outside_test_module,
+    reason = "Test allows"
 )]
 
-use criterion::{BenchmarkId, Criterion, Throughput, black_box, criterion_group, criterion_main};
+use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use std::hint::black_box;
+use tokio::runtime::Runtime;
+use tokio::spawn;
+
+/// Helper to create runtime or panic (benchmarks expect setup to succeed)
+fn create_runtime() -> Runtime {
+    Runtime::new().unwrap_or_else(|err| panic!("Failed to create runtime: {err}"))
+}
 use merlin_routing::{RoutingConfig, RoutingOrchestrator};
 use std::time::Duration;
 
 /// Benchmark end-to-end request processing
-fn bench_end_to_end_request(c: &mut Criterion) {
-    let mut group = c.benchmark_group("end_to_end_request");
+fn bench_end_to_end_request(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("end_to_end_request");
 
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
@@ -40,10 +49,11 @@ fn bench_end_to_end_request(c: &mut Criterion) {
         group.bench_with_input(
             BenchmarkId::from_parameter(name),
             &request,
-            |b, &request| {
-                b.iter(|| {
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on(async { orchestrator.analyze_request(black_box(request)).await })
+            |bencher, &request| {
+                bencher.iter(|| {
+                    let runtime = create_runtime();
+                    runtime
+                        .block_on(async { orchestrator.analyze_request(black_box(request)).await })
                 });
             },
         );
@@ -53,17 +63,17 @@ fn bench_end_to_end_request(c: &mut Criterion) {
 }
 
 /// Benchmark memory usage patterns
-fn bench_memory_usage(c: &mut Criterion) {
-    let mut group = c.benchmark_group("memory_usage");
+fn bench_memory_usage(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("memory_usage");
 
-    group.bench_function("orchestrator_creation", |b| {
-        b.iter(|| {
+    group.bench_function("orchestrator_creation", |bencher| {
+        bencher.iter(|| {
             let config = RoutingConfig::default();
             black_box(RoutingOrchestrator::new(config))
         });
     });
 
-    group.bench_function("multiple_requests", |b| {
+    group.bench_function("multiple_requests", |bencher| {
         let config = RoutingConfig::default();
         let orchestrator = RoutingOrchestrator::new(config);
         let requests = vec![
@@ -74,10 +84,10 @@ fn bench_memory_usage(c: &mut Criterion) {
             "Update documentation",
         ];
 
-        b.iter(|| {
-            let rt = tokio::runtime::Runtime::new().unwrap();
+        bencher.iter(|| {
+            let runtime = create_runtime();
             for request in &requests {
-                rt.block_on(async {
+                runtime.block_on(async {
                     drop(orchestrator.analyze_request(black_box(request)).await);
                 });
             }
@@ -87,39 +97,42 @@ fn bench_memory_usage(c: &mut Criterion) {
     group.finish();
 }
 
+/// Helper function to process concurrent requests
+async fn process_concurrent_requests(requests: &[String]) {
+    let handles: Vec<_> = requests
+        .iter()
+        .map(|request| {
+            let req = request.clone();
+            spawn(async move {
+                // Simulate concurrent request processing
+                black_box(req.len())
+            })
+        })
+        .collect();
+
+    for handle in handles {
+        drop(handle.await);
+    }
+}
+
 /// Benchmark concurrent request handling
-fn bench_concurrent_requests(c: &mut Criterion) {
-    let mut group = c.benchmark_group("concurrent_requests");
+fn bench_concurrent_requests(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("concurrent_requests");
 
     let concurrency_levels = vec![1, 2, 4, 8];
 
     for level in concurrency_levels {
         group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}_concurrent", level)),
+            BenchmarkId::from_parameter(format!("{level}_concurrent")),
             &level,
-            |b, &level| {
+            |bencher, &level| {
                 let config = RoutingConfig::default();
                 let _orchestrator = RoutingOrchestrator::new(config);
-                let requests: Vec<_> = (0..level).map(|i| format!("Request {}", i)).collect();
+                let requests: Vec<_> = (0..level).map(|idx| format!("Request {idx}")).collect();
 
-                b.iter(|| {
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on(async {
-                        let handles: Vec<_> = requests
-                            .iter()
-                            .map(|request| {
-                                let req = request.clone();
-                                tokio::spawn(async move {
-                                    // Simulate concurrent request processing
-                                    black_box(req.len())
-                                })
-                            })
-                            .collect();
-
-                        for handle in handles {
-                            drop(handle.await);
-                        }
-                    });
+                bencher.iter(|| {
+                    let runtime = create_runtime();
+                    runtime.block_on(process_concurrent_requests(&requests));
                 });
             },
         );
@@ -128,29 +141,32 @@ fn bench_concurrent_requests(c: &mut Criterion) {
     group.finish();
 }
 
+/// Helper function to process requests sequentially
+async fn process_requests_sequentially(orchestrator: &RoutingOrchestrator, requests: &[String]) {
+    for request in requests {
+        drop(orchestrator.analyze_request(black_box(request)).await);
+    }
+}
+
 /// Benchmark request throughput
-fn bench_request_throughput(c: &mut Criterion) {
-    let mut group = c.benchmark_group("request_throughput");
+fn bench_request_throughput(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("request_throughput");
 
     let batch_sizes = vec![10, 50, 100];
 
     for size in batch_sizes {
         group.throughput(Throughput::Elements(size as u64));
         group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{}_requests", size)),
+            BenchmarkId::from_parameter(format!("{size}_requests")),
             &size,
-            |b, &size| {
+            |bencher, &size| {
                 let config = RoutingConfig::default();
                 let orchestrator = RoutingOrchestrator::new(config);
-                let requests: Vec<_> = (0..size).map(|i| format!("Add feature {}", i)).collect();
+                let requests: Vec<_> = (0..size).map(|idx| format!("Add feature {idx}")).collect();
 
-                b.iter(|| {
-                    let rt = tokio::runtime::Runtime::new().unwrap();
-                    rt.block_on(async {
-                        for request in &requests {
-                            drop(orchestrator.analyze_request(black_box(request)).await);
-                        }
-                    });
+                bencher.iter(|| {
+                    let runtime = create_runtime();
+                    runtime.block_on(process_requests_sequentially(&orchestrator, &requests));
                 });
             },
         );
@@ -160,15 +176,15 @@ fn bench_request_throughput(c: &mut Criterion) {
 }
 
 /// Benchmark configuration overhead
-fn bench_config_overhead(c: &mut Criterion) {
-    let mut group = c.benchmark_group("config_overhead");
+fn bench_config_overhead(criterion: &mut Criterion) {
+    let mut group = criterion.benchmark_group("config_overhead");
 
-    group.bench_function("default_config", |b| {
-        b.iter(|| black_box(RoutingConfig::default()));
+    group.bench_function("default_config", |bencher| {
+        bencher.iter(|| black_box(RoutingConfig::default()));
     });
 
-    group.bench_function("orchestrator_with_config", |b| {
-        b.iter(|| {
+    group.bench_function("orchestrator_with_config", |bencher| {
+        bencher.iter(|| {
             let config = RoutingConfig::default();
             black_box(RoutingOrchestrator::new(config))
         });

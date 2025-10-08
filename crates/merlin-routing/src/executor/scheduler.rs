@@ -83,8 +83,6 @@ mod tests {
     use crate::{ContextRequirements, Task};
 
     #[test]
-    /// # Panics
-    /// Panics if conflict detection results are not as expected.
     fn test_conflict_detection() {
         let file = PathBuf::from("test.rs");
 
@@ -121,8 +119,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if non-conflicting tasks are incorrectly blocked.
     fn test_no_conflict_different_files() {
         let task_a = Task::new("Task A".to_owned())
             .with_context(ContextRequirements::default().with_files(vec![PathBuf::from("a.rs")]));

@@ -210,7 +210,6 @@ impl ExecutorPool {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, reason = "Test code is allowed to use expect")]
 mod tests {
     use super::*;
     use async_trait::async_trait;
@@ -254,9 +253,6 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "Requires actual Ollama instance"]
-    /// # Panics
-    /// Panics if executing the graph returns an error in the test harness.
     async fn test_executor_pool_basic() {
         let router = Arc::new(MockRouter);
         let validator = Arc::new(MockValidator);

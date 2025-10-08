@@ -174,8 +174,6 @@ mod tests {
     use merlin_local::LocalModelProvider;
 
     #[test]
-    /// # Panics
-    /// Panics if the assessment prompt does not contain required markers.
     fn test_assessment_prompt_generation() {
         let provider: Arc<dyn ModelProvider> =
             Arc::new(LocalModelProvider::new("qwen2.5-coder:7b".to_string()));

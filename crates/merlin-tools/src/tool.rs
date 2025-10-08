@@ -93,13 +93,6 @@ pub trait Tool: Send + Sync {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::absolute_paths,
-    clippy::missing_panics_doc,
-    clippy::min_ident_chars,
-    reason = "Test code is allowed to use unwrap and has different conventions"
-)]
 mod tests {
     use super::*;
     use serde_json::{Value as JsonValue, from_str, json, to_string};
@@ -115,7 +108,9 @@ mod tests {
 
     #[test]
     fn test_tool_error_from_io() {
-        let io_error = std::io::Error::new(std::io::ErrorKind::NotFound, "not found");
+        use std::io::{Error as StdIoError, ErrorKind};
+
+        let io_error = StdIoError::new(ErrorKind::NotFound, "not found");
         let error: ToolError = io_error.into();
         assert!(matches!(error, ToolError::Io(_)));
     }

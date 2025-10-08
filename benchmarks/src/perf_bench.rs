@@ -43,7 +43,11 @@ struct Args {
 fn main() -> Result<()> {
     let args = Args::parse();
 
-    let bench_type = if args.iai { "IAI" } else { "Criterion" };
+    let bench_type = if args.iai {
+        "IAI-Callgrind"
+    } else {
+        "Criterion"
+    };
     println!("Running {bench_type} performance benchmarks...");
     println!("Package: {}", args.package);
     println!();
@@ -160,7 +164,7 @@ fn generate_criterion_report(criterion_dir: &PathBuf) -> Result<String> {
 }
 
 fn generate_iai_report(output: &Output) -> Result<String> {
-    let mut report = String::from("# IAI Performance Benchmark Results\n\n");
+    let mut report = String::from("# IAI-Callgrind Performance Benchmark Results\n\n");
     writeln!(
         &mut report,
         "**Date**: {}\n",
@@ -170,7 +174,7 @@ fn generate_iai_report(output: &Output) -> Result<String> {
 
     report.push_str("## Summary\n\n");
     report.push_str(
-        "IAI benchmarks use Cachegrind to provide precise, deterministic measurements.\n\n",
+        "IAI-Callgrind benchmarks use Valgrind's Callgrind to provide precise, deterministic measurements.\n\n",
     );
 
     report.push_str("## Benchmark Results\n\n");
@@ -186,8 +190,9 @@ fn generate_iai_report(output: &Output) -> Result<String> {
     report.push_str("- **Estimated Cycles**: Estimated CPU cycles (lower is better)\n\n");
 
     report.push_str("## Viewing Detailed Results\n\n");
-    report.push_str("Cachegrind output files are stored in `target/iai/`.\n");
-    report.push_str("You can analyze them with tools like `cg_annotate` or `kcachegrind`.\n");
+    report.push_str("Callgrind output files are stored in `target/iai/`.\n");
+    report
+        .push_str("You can analyze them with tools like `callgrind_annotate` or `kcachegrind`.\n");
 
     Ok(report)
 }

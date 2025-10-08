@@ -1,6 +1,19 @@
 //! Tests for UI event processing and state transitions
-#![cfg(test)]
-
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
+)]
 mod common;
 
 use common::*;
@@ -73,7 +86,7 @@ fn handle_task_steps(manager: &mut TaskManager, event: UiEvent) {
         } => {
             if let Some(task) = manager.get_task_mut(task_id) {
                 task.output_tree
-                    .add_step(step_id, StepType::from_str(&step_type), content);
+                    .add_step(step_id, StepType::from_string(&step_type), content);
             }
         }
         UiEvent::TaskStepCompleted { task_id, step_id } => {
@@ -128,8 +141,6 @@ fn process_event(manager: &mut TaskManager, event: UiEvent) {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_started_event() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -152,8 +163,6 @@ fn test_task_started_event() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_started_with_parent() {
     let mut manager = TaskManager::default();
     let parent_id = TaskId::default();
@@ -185,8 +194,6 @@ fn test_task_started_with_parent() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_progress_event() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -214,8 +221,6 @@ fn test_task_progress_event() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_output_event() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -247,8 +252,6 @@ fn test_task_output_event() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_completed_event() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -271,8 +274,6 @@ fn test_task_completed_event() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_failed_event() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -295,8 +296,6 @@ fn test_task_failed_event() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_step_started_event() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -321,8 +320,6 @@ fn test_task_step_started_event() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_step_completed_event() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -355,8 +352,6 @@ fn test_task_step_completed_event() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_tool_call_started_event() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -380,8 +375,6 @@ fn test_tool_call_started_event() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_tool_call_completed_event() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -413,8 +406,6 @@ fn test_tool_call_completed_event() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_thinking_update_event() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -437,8 +428,6 @@ fn test_thinking_update_event() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_subtask_spawned_event() {
     let mut manager = TaskManager::default();
     let parent_id = TaskId::default();
@@ -463,8 +452,6 @@ fn test_subtask_spawned_event() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_system_message_info() {
     let mut manager = TaskManager::default();
 
@@ -478,8 +465,6 @@ fn test_system_message_info() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_system_message_warning() {
     let mut manager = TaskManager::default();
 
@@ -493,8 +478,6 @@ fn test_system_message_warning() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_system_message_error() {
     let mut manager = TaskManager::default();
 
@@ -508,8 +491,6 @@ fn test_system_message_error() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_multiple_events_sequence() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -582,8 +563,6 @@ fn test_multiple_events_sequence() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_parallel_tasks_events() {
     let mut manager = TaskManager::default();
 
@@ -628,8 +607,6 @@ fn test_parallel_tasks_events() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_event_for_nonexistent_task() {
     let mut manager = TaskManager::default();
     let nonexistent_id = TaskId::default();
@@ -647,8 +624,6 @@ fn test_event_for_nonexistent_task() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_multiple_progress_updates() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();

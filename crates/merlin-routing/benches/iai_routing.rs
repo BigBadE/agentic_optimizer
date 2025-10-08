@@ -4,21 +4,34 @@
 //! cache accesses, and estimated cycles. Unlike Criterion benchmarks which use
 //! statistical analysis, IAI uses Valgrind's Cachegrind to get deterministic results.
 #![allow(
+    dead_code,
+    clippy::expect_used,
     clippy::unwrap_used,
-    clippy::absolute_paths,
+    clippy::panic,
     clippy::missing_panics_doc,
-    reason = "Benchmark code has different conventions"
+    clippy::missing_errors_doc,
+    clippy::print_stdout,
+    clippy::print_stderr,
+    clippy::tests_outside_test_module,
+    reason = "Test allows"
 )]
 
-use iai::black_box;
+use iai_callgrind::{library_benchmark, library_benchmark_group, main};
 use merlin_routing::{RoutingConfig, RoutingOrchestrator};
+use std::hint::black_box;
 use tokio::runtime::Runtime;
 
+/// Helper to create runtime or panic (benchmarks expect setup to succeed)
+fn create_runtime() -> Runtime {
+    Runtime::new().unwrap_or_else(|err| panic!("Failed to create runtime: {err}"))
+}
+
 /// Benchmark simple request analysis
+#[library_benchmark]
 fn iai_analyze_simple_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
-    let runtime = Runtime::new().unwrap();
+    let runtime = create_runtime();
 
     runtime.block_on(async {
         let _result = orchestrator
@@ -28,10 +41,11 @@ fn iai_analyze_simple_request() {
 }
 
 /// Benchmark medium complexity request
+#[library_benchmark]
 fn iai_analyze_medium_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
-    let runtime = Runtime::new().unwrap();
+    let runtime = create_runtime();
 
     runtime.block_on(async {
         let _result = orchestrator
@@ -43,10 +57,11 @@ fn iai_analyze_medium_request() {
 }
 
 /// Benchmark complex request analysis
+#[library_benchmark]
 fn iai_analyze_complex_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
-    let runtime = Runtime::new().unwrap();
+    let runtime = create_runtime();
 
     runtime.block_on(async {
         let _result = orchestrator
@@ -57,21 +72,27 @@ fn iai_analyze_complex_request() {
     });
 }
 
-/// Benchmark orchestrator creation overhead
+/// Benchmark Orchestrator creation overhead
+#[library_benchmark]
 fn iai_create_orchestrator() {
     let config = RoutingConfig::default();
     let _orchestrator = black_box(RoutingOrchestrator::new(config));
 }
 
 /// Benchmark config creation
+#[library_benchmark]
 fn iai_create_config() {
     let _config = black_box(RoutingConfig::default());
 }
 
-iai::main!(
-    iai_analyze_simple_request,
-    iai_analyze_medium_request,
-    iai_analyze_complex_request,
-    iai_create_orchestrator,
-    iai_create_config
+library_benchmark_group!(
+    name = routing_group;
+    benchmarks =
+        iai_analyze_simple_request,
+        iai_analyze_medium_request,
+        iai_analyze_complex_request,
+        iai_create_orchestrator,
+        iai_create_config
 );
+
+main!(library_benchmark_groups = routing_group);

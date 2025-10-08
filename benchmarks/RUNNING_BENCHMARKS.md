@@ -7,7 +7,7 @@ This guide covers both quality benchmarks and performance benchmarks.
 Performance benchmarks measure the speed and efficiency of core routing operations. We support two types:
 
 1. **Criterion Benchmarks** - Statistical benchmarks with warm-up, multiple iterations, and HTML reports
-2. **IAI Benchmarks** - Single-shot benchmarks using Cachegrind for precise, deterministic measurements
+2. **IAI-Callgrind Benchmarks** - Single-shot benchmarks using Valgrind's Callgrind for precise, deterministic measurements
 
 ### Running Criterion Benchmarks
 
@@ -22,27 +22,27 @@ cargo run --release --bin perf-bench -- --output perf-results.md --verbose
 cargo run --release --bin perf-bench -- --output perf-results.md --name "request_analysis"
 ```
 
-### Running IAI Benchmarks
+### Running IAI-Callgrind Benchmarks
 
-**Prerequisites**: IAI requires [Valgrind](https://www.valgrind.org) to be installed. IAI is not available on Windows.
+**Prerequisites**: IAI-Callgrind requires [Valgrind](https://www.valgrind.org) to be installed. IAI-Callgrind is not available on Windows.
 
-**IAI benchmarks run automatically in CI** on every push and pull request. You can also run them locally:
+**IAI-Callgrind benchmarks run automatically in CI** on every push and pull request. You can also run them locally:
 
 ```bash
-# Run all IAI benchmarks and save results
+# Run all IAI-Callgrind benchmarks and save results
 cargo run --release --bin perf-bench -- --iai --output iai-results.md
 
 # Run with verbose output
 cargo run --release --bin perf-bench -- --iai --output iai-results.md --verbose
 
-# Run specific IAI benchmark
+# Run specific IAI-Callgrind benchmark
 cargo run --release --bin perf-bench -- --iai --output iai-results.md --name "iai_routing"
 ```
 
-**IAI Benefits**:
+**IAI-Callgrind Benefits**:
 - **Precision**: Detects very small performance changes
 - **Consistency**: Works reliably in CI environments
-- **Profiling**: Generates Cachegrind profiles for detailed analysis
+- **Profiling**: Generates Callgrind profiles for detailed analysis
 - **Speed**: Faster than statistical benchmarks (single execution)
 
 ### Committing Performance Results
@@ -58,8 +58,8 @@ cargo run --release --bin perf-bench -- --iai --output iai-results.md --name "ia
    ```
 4. CI will publish results to gh-pages and remove the file from repo
 
-**For IAI benchmarks** (automatic in CI):
-- IAI benchmarks run automatically in CI on every push/PR
+**For IAI-Callgrind benchmarks** (automatic in CI):
+- IAI-Callgrind benchmarks run automatically in CI on every push/PR
 - Results are published to gh-pages automatically
 - No manual upload needed
 
@@ -139,10 +139,10 @@ After running quality benchmarks locally:
    - Removes file from repo
    - *Reason*: Statistical benchmarks take time; run locally for consistency
 
-3. **`iai_benchmarks.yml`** - IAI benchmarks (automatic execution)
+3. **`iai_benchmarks.yml`** - IAI-Callgrind benchmarks (automatic execution)
    - **Runs automatically** on every push/PR
    - Installs Valgrind on Ubuntu runner
-   - Executes IAI benchmarks
+   - Executes IAI-Callgrind benchmarks
    - Publishes results to gh-pages
    - Uploads artifacts
    - *Reason*: Fast single-shot benchmarks; deterministic in CI

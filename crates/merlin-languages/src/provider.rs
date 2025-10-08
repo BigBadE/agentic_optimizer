@@ -125,12 +125,6 @@ pub trait LanguageProvider: Send + Sync {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::missing_panics_doc,
-    clippy::redundant_clone,
-    clippy::uninlined_format_args,
-    reason = "Test code is allowed to use unwrap and has different conventions"
-)]
 mod tests {
     use super::*;
 
@@ -200,7 +194,7 @@ mod tests {
         ];
 
         let result = SearchResult {
-            symbols: symbols.clone(),
+            symbols,
             related_files: vec![],
         };
 
@@ -213,7 +207,7 @@ mod tests {
     #[test]
     fn test_symbol_kind_debug() {
         let kind = SymbolKind::Function;
-        let debug_str = format!("{:?}", kind);
+        let debug_str = format!("{kind:?}");
         assert_eq!(debug_str, "Function");
     }
 }

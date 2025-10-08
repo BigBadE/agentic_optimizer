@@ -1,0 +1,79 @@
+name: IAI Benchmarks
+
+on:
+  push:
+    branches: [ master ]
+  pull_request:
+    branches: [ master ]
+  workflow_dispatch:
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: write
+  deployments: write
+  pull-requests: write
+
+env:
+  CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  iai-benchmark:
+    name: Run IAI Benchmarks
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Install Valgrind
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y valgrind
+
+      - name: Setup Rust
+        uses: ./.github/actions/setup-rust
+        with:
+          profile: release
+
+      - name: Run IAI benchmarks
+        run: |
+          cargo run --release --bin perf-bench -- --iai --output iai-results.md
+          echo "✅ IAI benchmarks completed"
+          head -30 iai-results.md
+
+      - name: Upload results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iai-benchmark-results
+          path: iai-results.md
+          retention-days: 90
+
+      - name: Prepare gh-pages workspace
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+          fetch-depth: 0
+
+      - name: Publish IAI results to gh-pages
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          set -e
+          ts=$(date +%Y-%m-%d-%H-%M-%S)
+          mkdir -p gh-pages/iai-bench
+          cp iai-results.md gh-pages/iai-bench/latest.md
+          cp iai-results.md "gh-pages/iai-bench/${ts}.md"
+          cd gh-pages
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
+          git add iai-bench/
+          git commit -m "Update IAI benchmark results: ${ts}" || echo "No changes to commit"
+          git push origin gh-pages
+

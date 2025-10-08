@@ -31,6 +31,9 @@ jobs:
           profile: dev
           components: rustc-codegen-cranelift-preview, clippy, rustfmt
 
+      - name: Normalize line endings
+        run: find . -type f -name '*.rs' -exec dos2unix {} \;
+
       - name: Run clippy
         run: cargo clippy --workspace --all-targets --all-features -- -D warnings
 

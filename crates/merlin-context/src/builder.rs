@@ -369,7 +369,7 @@ impl ContextBuilder {
         let marker = if include_context && (context_start < start_line || context_end > end_line) {
             format!("\n\n--- Matched chunk: lines {start_line}-{end_line} ---\n")
         } else {
-            String::new()
+            String::default()
         };
 
         let final_content = if !marker.is_empty() {

@@ -79,7 +79,7 @@ fn mock_search(_query: &str) -> Vec<String> {
 pub fn generate_report(results: &[BenchmarkResult]) -> String {
     use std::fmt::Write as _;
 
-    let mut report = String::new();
+    let mut report = String::default();
 
     report.push_str("# Context Quality Benchmark Results\n\n");
 

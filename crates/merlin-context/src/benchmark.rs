@@ -406,14 +406,9 @@ impl BenchmarkResult {
         let mut report = String::default();
 
         {
-            write!(report, "# Benchmark: {}\n\n", self.test_case.name).unwrap_or(());
-            write!(report, "**Query**: \"{}\"\n\n", self.test_case.query).unwrap_or(());
-            write!(
-                report,
-                "**Description**: {}\n\n",
-                self.test_case.description
-            )
-            .unwrap_or(());
+            writeln!(report, "# Benchmark: {}\n", self.test_case.name).unwrap_or(());
+            writeln!(report, "**Query**: \"{}\"\n", self.test_case.query).unwrap_or(());
+            writeln!(report, "**Description**: {}\n", self.test_case.description).unwrap_or(());
 
             report.push_str("## Metrics\n\n");
             writeln!(

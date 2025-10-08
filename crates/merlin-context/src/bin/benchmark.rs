@@ -236,13 +236,13 @@ fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
     let mut report = String::default();
 
     report.push_str("# Context Fetching Benchmark Report\n\n");
-    write!(
+    writeln!(
         report,
-        "**Date**: {}\n\n",
+        "**Date**: {}\n",
         Local::now().format("%Y-%m-%d %H:%M:%S")
     )
     .map_err(|error| Error::Other(error.to_string()))?;
-    write!(report, "**Test Cases**: {}\n\n", results.len())
+    writeln!(report, "**Test Cases**: {}\n", results.len())
         .map_err(|error| Error::Other(error.to_string()))?;
 
     report.push_str("## Summary\n\n");

@@ -8,11 +8,8 @@ name = "quality-bench"
 path = "src/main.rs"
 
 [dependencies]
-merlin-context.workspace = true
-merlin-core.workspace = true
 anyhow.workspace = true
 serde.workspace = true
-serde_json.workspace = true
 toml.workspace = true
 walkdir.workspace = true
 clap.workspace = true

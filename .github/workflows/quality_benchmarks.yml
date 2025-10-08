@@ -50,18 +50,27 @@ jobs:
           path: quality-results.md
           retention-days: 90
 
-      - name: Commit results to gh-pages
+      - name: Prepare gh-pages workspace
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/checkout@v4
+        with:
+          ref: gh-pages
+          path: gh-pages
+          fetch-depth: 0
+
+      - name: Publish quality results to gh-pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git fetch origin gh-pages:gh-pages || git checkout --orphan gh-pages
-          git checkout gh-pages
-          mkdir -p quality-bench
-          cp quality-results.md quality-bench/latest.md
-          cp quality-results.md quality-bench/$(date +%Y-%m-%d-%H-%M-%S).md
+          set -e
+          ts=$(date +%Y-%m-%d-%H-%M-%S)
+          mkdir -p gh-pages/quality-bench
+          cp quality-results.md gh-pages/quality-bench/latest.md
+          cp quality-results.md "gh-pages/quality-bench/${ts}.md"
+          cd gh-pages
+          git config user.name 'github-actions[bot]'
+          git config user.email 'github-actions[bot]@users.noreply.github.com'
           git add quality-bench/
-          git commit -m "Update quality benchmark results" || echo "No changes to commit"
+          git commit -m "Update quality benchmark results: ${ts}" || echo "No changes to commit"
           git push origin gh-pages
 
       - name: Comment PR with results

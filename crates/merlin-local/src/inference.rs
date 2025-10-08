@@ -101,9 +101,9 @@ impl ModelProvider for LocalModelProvider {
             prompt.push_str("\n\nContext files:\n");
             for file_ctx in &context.files {
                 use std::fmt::Write as _;
-                if write!(
+                if writeln!(
                     prompt,
-                    "\n--- {} ---\n{}\n",
+                    "\n--- {} ---\n{}",
                     file_ctx.path.display(),
                     file_ctx.content
                 )

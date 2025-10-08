@@ -50,20 +50,19 @@ jobs:
           path: quality-results.md
           retention-days: 90
 
-      - name: Store benchmark result
-        uses: benchmark-action/github-action-benchmark@v1
+      - name: Commit results to gh-pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        with:
-          name: Context Quality Benchmarks
-          tool: 'customBiggerIsBetter'
-          output-file-path: quality-results.json
-          github-token: ${{ secrets.GITHUB_TOKEN }}
-          auto-push: true
-          alert-threshold: '110%'
-          comment-on-alert: true
-          fail-on-alert: false
-          gh-pages-branch: gh-pages
-          benchmark-data-dir-path: dev/quality-bench
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git fetch origin gh-pages:gh-pages || git checkout --orphan gh-pages
+          git checkout gh-pages
+          mkdir -p quality-bench
+          cp quality-results.md quality-bench/latest.md
+          cp quality-results.md quality-bench/$(date +%Y-%m-%d-%H-%M-%S).md
+          git add quality-bench/
+          git commit -m "Update quality benchmark results" || echo "No changes to commit"
+          git push origin gh-pages
 
       - name: Comment PR with results
         if: github.event_name == 'pull_request'

@@ -1,0 +1,35 @@
+# Test Case: State Management
+name = "State Management"
+description = "Query about application state and updates"
+query = "how is application state managed"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/state/src/lib.rs"
+priority = "critical"
+reason = "State management module"
+
+[[expected]]
+path = "crates/state/src/store.rs"
+priority = "critical"
+reason = "State store implementation"
+
+[[expected]]
+path = "crates/state/src/reducer.rs"
+priority = "high"
+reason = "State reducers"
+
+[[expected]]
+path = "crates/state/src/actions.rs"
+priority = "medium"
+reason = "State actions"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/renderer"
+reason = "Rendering, not state"
+
+[[excluded]]
+path = "crates/network"
+reason = "Networking, not state"

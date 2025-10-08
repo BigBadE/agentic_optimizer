@@ -1,0 +1,35 @@
+# Test Case: Networking Layer
+name = "Networking Layer"
+description = "Query about network requests and protocols"
+query = "how are network requests handled"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/network/src/lib.rs"
+priority = "critical"
+reason = "Network module"
+
+[[expected]]
+path = "crates/network/src/http.rs"
+priority = "critical"
+reason = "HTTP client implementation"
+
+[[expected]]
+path = "crates/network/src/connection.rs"
+priority = "high"
+reason = "Connection management"
+
+[[expected]]
+path = "crates/network/src/protocol.rs"
+priority = "medium"
+reason = "Protocol handling"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/css"
+reason = "CSS parsing, not networking"
+
+[[excluded]]
+path = "crates/dom"
+reason = "DOM tree, not networking"

@@ -1,0 +1,35 @@
+# Test Case: Authentication System Implementation
+name = "Authentication System Implementation"
+description = "Query about authentication and authorization logic"
+query = "how does user authentication work"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/auth/src/lib.rs"
+priority = "critical"
+reason = "Main authentication module"
+
+[[expected]]
+path = "crates/auth/src/session.rs"
+priority = "critical"
+reason = "Session management"
+
+[[expected]]
+path = "crates/auth/src/token.rs"
+priority = "high"
+reason = "Token generation and validation"
+
+[[expected]]
+path = "crates/security/src/lib.rs"
+priority = "medium"
+reason = "Security utilities"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/css"
+reason = "CSS parsing, not authentication"
+
+[[excluded]]
+path = "crates/html"
+reason = "HTML parsing, not authentication"

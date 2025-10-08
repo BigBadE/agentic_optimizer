@@ -1,0 +1,35 @@
+# Test Case: Testing Framework
+name = "Testing Framework"
+description = "Query about test utilities and helpers"
+query = "how are tests structured and run"
+project_root = "benchmarks/test_repositories/valor"
+
+# Expected relevant files
+[[expected]]
+path = "crates/test_utils/src/lib.rs"
+priority = "critical"
+reason = "Test utilities module"
+
+[[expected]]
+path = "crates/test_utils/src/fixtures.rs"
+priority = "high"
+reason = "Test fixtures"
+
+[[expected]]
+path = "crates/test_utils/src/mocks.rs"
+priority = "high"
+reason = "Mock implementations"
+
+[[expected]]
+path = "crates/core/src/test_helpers.rs"
+priority = "medium"
+reason = "Core test helpers"
+
+# Files that should NOT appear
+[[excluded]]
+path = "crates/renderer"
+reason = "Rendering, not testing"
+
+[[excluded]]
+path = "examples/"
+reason = "Examples, not test framework"

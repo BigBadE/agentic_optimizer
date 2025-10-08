@@ -12,8 +12,12 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - uses: dtolnay/rust-toolchain@nightly
+    - name: Install Rust toolchain
+      uses: actions-rs/toolchain@v1
       with:
+        toolchain: nightly
+        profile: minimal
+        override: true
         components: ${{ inputs.components }}
     
     - name: Setup fast cargo config
@@ -22,7 +26,16 @@ runs:
         if [ -f .cargo/fast_config.toml ]; then
           cp .cargo/fast_config.toml .cargo/config.toml
         fi
-    
+
+    - name: Cache toolchain
+      uses: actions/cache@v4
+      with:
+        path: |
+          target/
+          ~/.rustup
+          ~/.cargo/bin
+        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain.toml') }}
+
     - uses: taiki-e/install-action@v2
       with:
         tool: cargo-chef
@@ -35,7 +48,7 @@ runs:
       uses: actions/cache@v4
       with:
         path: |
-          target
+          target/
           ~/.cargo/registry/index
           ~/.cargo/registry/cache
           ~/.cargo/git/db

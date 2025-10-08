@@ -4,8 +4,8 @@ use std::fs::read_to_string;
 use std::path::Path;
 
 use ra_ap_ide::{
-    Analysis, FileId, FilePosition, LineCol, ReferenceSearchResult, StructureNodeKind,
-    SymbolKind as RaSymbolKind,
+    Analysis, FileId, FilePosition, FileStructureConfig, LineCol, ReferenceSearchResult,
+    StructureNodeKind, SymbolKind as RaSymbolKind,
 };
 use ra_ap_ide_db::symbol_index::Query;
 
@@ -234,9 +234,12 @@ impl<'analysis> SymbolSearcher<'analysis> {
     /// # Errors
     /// Returns an error if rust-analyzer queries fail.
     fn list_symbols_in_file_by_id(&self, file_id: FileId) -> Result<Vec<SymbolInfo>> {
+        let config = FileStructureConfig {
+            exclude_locals: false,
+        };
         let structure = self
             .analysis
-            .file_structure(file_id)
+            .file_structure(&config, file_id)
             .map_err(|error| Error::Other(error.to_string()))?;
 
         let path = self
@@ -343,6 +346,6 @@ fn convert_symbol_kind(kind: RaSymbolKind) -> SymbolKind {
 fn convert_structure_kind(kind: StructureNodeKind) -> SymbolKind {
     match kind {
         StructureNodeKind::SymbolKind(symbol_kind) => convert_symbol_kind(symbol_kind),
-        StructureNodeKind::Region => SymbolKind::Module,
+        StructureNodeKind::Region | StructureNodeKind::ExternBlock => SymbolKind::Module,
     }
 }

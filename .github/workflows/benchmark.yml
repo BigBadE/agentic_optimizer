@@ -38,7 +38,7 @@ jobs:
           profile: release
 
       - name: Run benchmarks
-        run: cargo bench --workspace --no-fail-fast --profile release
+        run: cargo bench --workspace --no-fail-fast --profile release -- --output-format bencher | tee output.txt
 
       - name: Download previous benchmark results
         uses: actions/cache@v3
@@ -52,7 +52,7 @@ jobs:
         with:
           name: Merlin Performance Benchmarks
           tool: 'cargo'
-          output-file-path: target/criterion/*/new/estimates.json
+          output-file-path: output.txt
           github-token: ${{ secrets.GITHUB_TOKEN }}
           auto-push: true
           # Alert if performance degrades by 115% (15% regression)

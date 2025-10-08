@@ -4,7 +4,8 @@ cargo-features = ["codegen-backend"]
 resolver = "3"
 members = [
     "crates/*",
-    "crates/merlin-languages/languages/*"
+    "crates/merlin-languages/languages/*",
+    "benchmarks"
 ]
 
 [workspace.package]

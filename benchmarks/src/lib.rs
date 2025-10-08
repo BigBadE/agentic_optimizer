@@ -4,6 +4,8 @@ pub mod metrics;
 pub mod test_case;
 
 use anyhow::{Context as _, Result};
+use merlin_context::ContextBuilder;
+use merlin_core::{FileContext, Query};
 use metrics::{AggregateMetrics, BenchmarkMetrics};
 use std::path::Path;
 use test_case::TestCase;
@@ -13,7 +15,7 @@ use walkdir::WalkDir;
 ///
 /// # Errors
 /// Returns error if test case files cannot be read or parsed
-pub fn run_benchmarks(test_cases_dir: &Path) -> Result<Vec<BenchmarkResult>> {
+pub async fn run_benchmarks_async(test_cases_dir: &Path) -> Result<Vec<BenchmarkResult>> {
     let mut results = Vec::new();
 
     for entry in WalkDir::new(test_cases_dir)
@@ -25,7 +27,7 @@ pub fn run_benchmarks(test_cases_dir: &Path) -> Result<Vec<BenchmarkResult>> {
             let test_case = TestCase::from_file(entry.path())
                 .with_context(|| format!("Failed to load test case: {}", entry.path().display()))?;
 
-            let result = run_single_benchmark(&test_case);
+            let result = run_single_benchmark_async(&test_case).await;
             results.push(result);
         }
     }
@@ -47,10 +49,11 @@ pub struct BenchmarkResult {
 }
 
 /// Run a single benchmark test case
-fn run_single_benchmark(test_case: &TestCase) -> BenchmarkResult {
-    // TODO: Integrate with actual context retrieval system
-    // For now, return mock results
-    let results = mock_search(&test_case.query);
+async fn run_single_benchmark_async(test_case: &TestCase) -> BenchmarkResult {
+    let project_path = Path::new(&test_case.project_root);
+    let results = perform_search_async(&test_case.query, project_path)
+        .await
+        .unwrap_or_default();
 
     let metrics = BenchmarkMetrics::calculate(&results, &test_case.expected);
 
@@ -62,7 +65,36 @@ fn run_single_benchmark(test_case: &TestCase) -> BenchmarkResult {
     }
 }
 
-/// Mock search function (replace with actual context retrieval)
+/// Perform actual context search using merlin-context
+///
+/// # Errors
+/// Returns error if context building fails
+async fn perform_search_async(query: &str, project_root: &Path) -> Result<Vec<String>> {
+    if !project_root.exists() {
+        return Ok(mock_search(query));
+    }
+
+    let mut builder = ContextBuilder::new(project_root.to_path_buf());
+    let query_obj = Query::new(query);
+
+    let context = builder.build_context(&query_obj).await?;
+
+    let paths: Vec<String> = context
+        .files
+        .iter()
+        .map(|file: &FileContext| {
+            file.path
+                .strip_prefix(project_root)
+                .unwrap_or(&file.path)
+                .to_string_lossy()
+                .to_string()
+        })
+        .collect();
+
+    Ok(paths)
+}
+
+/// Mock search fallback when project doesn't exist
 fn mock_search(_query: &str) -> Vec<String> {
     vec![
         "crates/css/modules/cascade/src/lib.rs".to_owned(),

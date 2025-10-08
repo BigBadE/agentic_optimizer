@@ -8,7 +8,7 @@
 
 use anyhow::{Context as _, Result};
 use clap::Parser;
-use merlin_benchmarks::{generate_report, run_benchmarks};
+use merlin_benchmarks::{generate_report, run_benchmarks_async};
 use std::fs::write;
 use std::path::PathBuf;
 
@@ -41,7 +41,9 @@ async fn main() -> Result<()> {
     println!("Test cases directory: {}", args.test_cases.display());
     println!();
 
-    let results = run_benchmarks(&args.test_cases).context("Failed to run benchmarks")?;
+    let results = run_benchmarks_async(&args.test_cases)
+        .await
+        .context("Failed to run benchmarks")?;
 
     if results.is_empty() {
         println!("No test cases found in {}", args.test_cases.display());

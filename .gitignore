@@ -25,3 +25,4 @@ metrics.json
 /target/criterion/
 /benchmark_results/
 benchmark_results.txt
+quality-results.md

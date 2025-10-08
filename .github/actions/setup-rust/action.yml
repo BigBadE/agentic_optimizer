@@ -20,40 +20,40 @@ runs:
         override: true
         components: ${{ inputs.components }}
     
-    - name: Setup fast cargo config
-      shell: bash
-      run: |
-        if [ -f .cargo/fast_config.toml ]; then
-          cp .cargo/fast_config.toml .cargo/config.toml
-        fi
-
-    - name: Cache toolchain
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.rustup/toolchains
-          ~/.cargo/registry/index
-          ~/.cargo/registry/cache
-          ~/.cargo/git/db
-        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain.toml') }}
-
-    - uses: taiki-e/install-action@v2
-      with:
-        tool: cargo-chef
-    
-    - name: Prepare chef recipe
-      shell: bash
-      run: cargo chef prepare --recipe-path recipe.json
-    
-    - name: Cache dependencies
-      uses: actions/cache@v4
-      with:
-        path: target/${{ inputs.profile }}/deps
-        key: ${{ runner.os }}-cargo-${{ inputs.profile }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-${{ inputs.profile }}-
-          ${{ runner.os }}-cargo
-    
-    - name: Cook dependencies
-      shell: bash
-      run: cargo chef cook --profile ${{ inputs.profile }} --recipe-path recipe.json
+    #- name: Setup fast cargo config
+    #  shell: bash
+    #  run: |
+    #    if [ -f .cargo/fast_config.toml ]; then
+    #      cp .cargo/fast_config.toml .cargo/config.toml
+    #    fi
+    #
+    #- name: Cache toolchain
+    #  uses: actions/cache@v4
+    #  with:
+    #    path: |
+    #      ~/.rustup/toolchains
+    #      ~/.cargo/registry/index
+    #      ~/.cargo/registry/cache
+    #      ~/.cargo/git/db
+    #    key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain.toml') }}
+    #
+    #- uses: taiki-e/install-action@v2
+    #  with:
+    #    tool: cargo-chef
+    #
+    #- name: Prepare chef recipe
+    #  shell: bash
+    #  run: cargo chef prepare --recipe-path recipe.json
+    #
+    #- name: Cache dependencies
+    #  uses: actions/cache@v4
+    #  with:
+    #    path: target/${{ inputs.profile }}/deps
+    #    key: ${{ runner.os }}-cargo-${{ inputs.profile }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
+    #    restore-keys: |
+    #      ${{ runner.os }}-cargo-${{ inputs.profile }}-
+    #      ${{ runner.os }}-cargo
+    #
+    #- name: Cook dependencies
+    #  shell: bash
+    #  run: cargo chef cook --profile ${{ inputs.profile }} --recipe-path recipe.json

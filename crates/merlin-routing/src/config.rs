@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
 /// Complete routing configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct RoutingConfig {
     /// Model tier configuration
     pub tiers: TierConfig,
@@ -14,24 +14,6 @@ pub struct RoutingConfig {
     pub execution: ExecutionConfig,
     /// Workspace configuration
     pub workspace: WorkspaceConfig,
-}
-
-impl RoutingConfig {
-    /// Returns the default configuration.
-    pub fn default_config() -> Self {
-        Self {
-            tiers: TierConfig::default(),
-            validation: ValidationConfig::default(),
-            execution: ExecutionConfig::default(),
-            workspace: WorkspaceConfig::default(),
-        }
-    }
-}
-
-impl Default for RoutingConfig {
-    fn default() -> Self {
-        Self::default_config()
-    }
 }
 
 /// Model tier configuration.

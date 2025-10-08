@@ -1,3 +1,9 @@
+//! Tool implementations for agent capabilities.
+//!
+//! This module provides tools that agents can use to interact with the filesystem
+//! and execute commands, including reading/writing files, listing directories,
+//! and running shell commands.
+
 use crate::Result;
 use async_trait::async_trait;
 use serde_json::Value;
@@ -29,20 +35,15 @@ pub struct ToolRegistry {
 type ToolList = Arc<Vec<Arc<dyn Tool>>>;
 
 impl ToolRegistry {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            tools: Arc::new(Vec::new()),
-        }
-    }
-
+    /// Creates an empty tool registry. Prefer `Default`.
+    /// Adds a tool to the registry.
     #[must_use]
     pub fn with_tool(mut self, tool: Arc<dyn Tool>) -> Self {
         Arc::make_mut(&mut self.tools).push(tool);
         self
     }
 
-    #[must_use]
+    /// Gets a tool by name, if it exists.
     pub fn get_tool(&self, name: &str) -> Option<Arc<dyn Tool>> {
         self.tools
             .iter()
@@ -50,7 +51,7 @@ impl ToolRegistry {
             .cloned()
     }
 
-    #[must_use]
+    /// Lists all available tools.
     pub fn list_tools(&self) -> Vec<&dyn Tool> {
         self.tools.iter().map(AsRef::as_ref).collect()
     }
@@ -58,11 +59,15 @@ impl ToolRegistry {
 
 impl Default for ToolRegistry {
     fn default() -> Self {
-        Self::new()
+        Self {
+            tools: Arc::new(Vec::default()),
+        }
     }
 }
 
+/// Command execution tool
 pub mod command;
+/// File operation tools (read, write, list)
 pub mod file_ops;
 
 pub use command::RunCommandTool;

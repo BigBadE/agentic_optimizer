@@ -45,7 +45,7 @@ Manages Ollama installation and models.
 ```rust
 use agentic_local::OllamaManager;
 
-let manager = OllamaManager::new();
+let manager = OllamaManager::default();
 
 // Check availability
 if manager.is_available().await {
@@ -169,7 +169,7 @@ cargo test
 
 **Custom URL:**
 ```rust
-let manager = OllamaManager::new()
+let manager = OllamaManager::default()
     .with_url("http://custom:8080".to_string());
 ```
 

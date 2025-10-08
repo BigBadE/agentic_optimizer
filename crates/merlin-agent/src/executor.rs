@@ -15,6 +15,7 @@ use crate::{
     AgentConfig, AgentRequest, AgentResponse, ExecutionMetadata, ExecutionResult, ToolRegistry,
 };
 
+/// Executes agent requests by building context and coordinating with providers
 pub struct AgentExecutor {
     provider: Arc<dyn ModelProvider>,
     config: AgentConfig,
@@ -23,15 +24,17 @@ pub struct AgentExecutor {
 }
 
 impl AgentExecutor {
+    /// Create a new executor with the given provider and configuration
     pub fn new(provider: Arc<dyn ModelProvider>, config: AgentConfig) -> Self {
         Self {
             provider,
             config,
             context_builder: None,
-            tool_registry: ToolRegistry::new(),
+            tool_registry: ToolRegistry::default(),
         }
     }
 
+    /// Attach a language-specific backend for semantic analysis
     #[must_use]
     pub fn with_language_backend(mut self, backend: Box<dyn LanguageProvider>) -> Self {
         let builder = if let Some(mut builder) = self.context_builder.take() {
@@ -45,7 +48,7 @@ impl AgentExecutor {
         self
     }
 
-    #[must_use]
+    /// Get a reference to the tool registry
     pub fn tool_registry(&self) -> &ToolRegistry {
         &self.tool_registry
     }

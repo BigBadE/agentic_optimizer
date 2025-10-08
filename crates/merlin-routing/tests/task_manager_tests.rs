@@ -1,4 +1,7 @@
-/// Comprehensive tests for TaskManager functionality
+//! Comprehensive tests for `TaskManager` functionality
+#![cfg(test)]
+#![allow(clippy::expect_used, reason = "Test code is allowed to use expect")]
+
 mod common;
 
 use common::*;
@@ -7,9 +10,11 @@ use merlin_routing::user_interface::task_manager::{TaskManager, TaskStatus};
 use std::time::{Duration, Instant};
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_add_task() {
-    let mut manager = TaskManager::new();
-    let task_id = TaskId::new();
+    let mut manager = TaskManager::default();
+    let task_id = TaskId::default();
     let task = create_test_task("Test task");
 
     manager.add_task(task_id, task);
@@ -19,9 +24,11 @@ fn test_add_task() {
 }
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_remove_task() {
-    let mut manager = TaskManager::new();
-    let task_id = TaskId::new();
+    let mut manager = TaskManager::default();
+    let task_id = TaskId::default();
 
     manager.add_task(task_id, create_test_task("Test"));
     let removed = manager.remove_task(task_id);
@@ -31,12 +38,14 @@ fn test_remove_task() {
 }
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_remove_task_with_children() {
-    let mut manager = TaskManager::new();
+    let mut manager = TaskManager::default();
 
-    let parent_id = TaskId::new();
-    let child1_id = TaskId::new();
-    let child2_id = TaskId::new();
+    let parent_id = TaskId::default();
+    let child1_id = TaskId::default();
+    let child2_id = TaskId::default();
 
     manager.add_task(parent_id, create_test_task("Parent"));
     manager.add_task(child1_id, create_child_task("Child 1", parent_id));
@@ -50,11 +59,13 @@ fn test_remove_task_with_children() {
 }
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_collapse_expand() {
-    let mut manager = TaskManager::new();
+    let mut manager = TaskManager::default();
 
-    let parent_id = TaskId::new();
-    let child_id = TaskId::new();
+    let parent_id = TaskId::default();
+    let child_id = TaskId::default();
 
     manager.add_task(parent_id, create_test_task("Parent"));
     manager.add_task(child_id, create_child_task("Child", parent_id));
@@ -74,9 +85,11 @@ fn test_collapse_expand() {
 }
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_toggle_collapse() {
-    let mut manager = TaskManager::new();
-    let task_id = TaskId::new();
+    let mut manager = TaskManager::default();
+    let task_id = TaskId::default();
 
     manager.add_task(task_id, create_test_task("Test"));
 
@@ -90,11 +103,13 @@ fn test_toggle_collapse() {
 }
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_has_children() {
-    let mut manager = TaskManager::new();
+    let mut manager = TaskManager::default();
 
-    let parent_id = TaskId::new();
-    let child_id = TaskId::new();
+    let parent_id = TaskId::default();
+    let child_id = TaskId::default();
 
     manager.add_task(parent_id, create_test_task("Parent"));
     assert!(!manager.has_children(parent_id));
@@ -104,17 +119,19 @@ fn test_has_children() {
 }
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_task_order_preserved_after_rebuild() {
-    let mut manager = TaskManager::new();
+    let mut manager = TaskManager::default();
     let now = Instant::now();
 
     // Add older task
-    let task1_id = TaskId::new();
+    let task1_id = TaskId::default();
     let task1 = create_test_task_with_time("First", now);
     manager.insert_task_for_load(task1_id, task1);
 
     // Add newer task
-    let task2_id = TaskId::new();
+    let task2_id = TaskId::default();
     let task2 = create_test_task_with_time("Second", now + Duration::from_secs(1));
     manager.insert_task_for_load(task2_id, task2);
 
@@ -127,12 +144,14 @@ fn test_task_order_preserved_after_rebuild() {
 }
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_is_descendant_of() {
-    let mut manager = TaskManager::new();
+    let mut manager = TaskManager::default();
 
-    let grandparent_id = TaskId::new();
-    let parent_id = TaskId::new();
-    let child_id = TaskId::new();
+    let grandparent_id = TaskId::default();
+    let parent_id = TaskId::default();
+    let child_id = TaskId::default();
 
     manager.add_task(grandparent_id, create_test_task("Grandparent"));
     manager.add_task(parent_id, create_child_task("Parent", grandparent_id));
@@ -152,13 +171,15 @@ fn test_is_descendant_of() {
 }
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_get_visible_tasks_with_nested_collapse() {
-    let mut manager = TaskManager::new();
+    let mut manager = TaskManager::default();
 
-    let root_id = TaskId::new();
-    let child1_id = TaskId::new();
-    let child2_id = TaskId::new();
-    let grandchild_id = TaskId::new();
+    let root_id = TaskId::default();
+    let child1_id = TaskId::default();
+    let child2_id = TaskId::default();
+    let grandchild_id = TaskId::default();
 
     manager.add_task(root_id, create_test_task("Root"));
     manager.add_task(child1_id, create_child_task("Child 1", root_id));
@@ -180,25 +201,28 @@ fn test_get_visible_tasks_with_nested_collapse() {
 }
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_iter_tasks() {
-    let mut manager = TaskManager::new();
+    let mut manager = TaskManager::default();
 
-    let id1 = TaskId::new();
-    let id2 = TaskId::new();
+    let id1 = TaskId::default();
+    let id2 = TaskId::default();
 
     manager.add_task(id1, create_test_task("Task 1"));
     manager.add_task(id2, create_test_task("Task 2"));
 
-    let tasks: Vec<_> = manager.iter_tasks().collect();
-    assert_eq!(tasks.len(), 2);
+    assert_eq!(manager.iter_tasks().count(), 2);
 }
 
 #[test]
+/// # Panics
+/// Panics if assertions fail.
 fn test_is_empty() {
-    let mut manager = TaskManager::new();
+    let mut manager = TaskManager::default();
     assert!(manager.is_empty());
 
-    let id = TaskId::new();
+    let id = TaskId::default();
     manager.add_task(id, create_test_task("Test"));
     assert!(!manager.is_empty());
 
@@ -207,9 +231,11 @@ fn test_is_empty() {
 }
 
 #[test]
+/// # Panics
+/// Panics if task does not exist or assertions fail.
 fn test_get_task_mut() {
-    let mut manager = TaskManager::new();
-    let task_id = TaskId::new();
+    let mut manager = TaskManager::default();
+    let task_id = TaskId::default();
 
     manager.add_task(task_id, create_test_task("Test"));
 

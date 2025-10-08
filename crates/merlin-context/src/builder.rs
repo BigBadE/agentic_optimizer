@@ -55,7 +55,6 @@ pub struct ContextBuilder {
 
 impl ContextBuilder {
     /// Create a new builder with defaults.
-    #[must_use]
     pub fn new(project_root: PathBuf) -> Self {
         Self {
             project_root,
@@ -90,7 +89,7 @@ impl ContextBuilder {
     /// Returns an error if file scanning or reading fails.
     pub async fn build_context(&mut self, query: &Query) -> Result<Context> {
         // Step 1: Analyze the query to extract intent
-        let analyzer = QueryAnalyzer::new();
+        let analyzer = QueryAnalyzer;
         let intent = analyzer.analyze(&query.text);
 
         tracing::info!(
@@ -306,7 +305,7 @@ impl ContextBuilder {
             // Check if chunks overlap when considering context expansion
             // Two chunks overlap if: start - CONTEXT <= current_end + CONTEXT
             let expanded_current_end = current_end + CONTEXT_LINES;
-            let expanded_start = start.saturating_sub(CONTEXT_LINES);
+            let expanded_start = start - CONTEXT_LINES;
 
             if expanded_start <= expanded_current_end {
                 // Merge: extend current chunk
@@ -348,7 +347,7 @@ impl ContextBuilder {
         let (context_start, context_end) = if include_context {
             const CONTEXT_LINES: usize = 50;
             (
-                start_line.saturating_sub(CONTEXT_LINES).max(1),
+                (start_line.saturating_sub(CONTEXT_LINES)).max(1),
                 (end_line + CONTEXT_LINES).min(lines.len()),
             )
         } else {
@@ -659,7 +658,7 @@ impl ContextBuilder {
                     && let (Ok(start), Ok(end)) =
                         (start_str.parse::<usize>(), end_str.parse::<usize>())
                 {
-                    let line_count = end.saturating_sub(start);
+                    let line_count = end - start;
                     let estimated_tokens = line_count * 10;
                     return Self::should_include_chunk(estimated_tokens, result.score);
                 }

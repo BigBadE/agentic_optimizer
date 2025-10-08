@@ -20,7 +20,6 @@ pub struct ContextBuilder<'analysis> {
 
 impl<'analysis> ContextBuilder<'analysis> {
     /// Create a new context builder bound to an analysis session and backend.
-    #[must_use]
     pub fn new(analysis: &'analysis Analysis, backend: &'analysis RustBackend) -> Self {
         Self { analysis, backend }
     }
@@ -33,13 +32,13 @@ impl<'analysis> ContextBuilder<'analysis> {
     /// # Errors
     /// Returns an error if rust-analyzer parsing fails for the file.
     pub fn get_related_context(&self, file: &Path) -> Result<Vec<FileContext>> {
-        let mut related_files = HashSet::new();
+        let mut related_files: HashSet<PathBuf> = HashSet::default();
         related_files.insert(file.to_path_buf());
 
         let imports = self.extract_imports(file)?;
         related_files.extend(imports);
 
-        let mut contexts = Vec::new();
+        let mut contexts = Vec::default();
         for path in related_files {
             if let Ok(content) = read_to_string(&path) {
                 contexts.push(FileContext::new(path, content));
@@ -65,7 +64,7 @@ impl<'analysis> ContextBuilder<'analysis> {
             .map_err(|error| Error::Other(error.to_string()))?;
 
         let syntax = parsed.syntax();
-        let mut imports = Vec::new();
+        let mut imports = Vec::default();
 
         for node in syntax.descendants() {
             if node.kind() == SyntaxKind::USE

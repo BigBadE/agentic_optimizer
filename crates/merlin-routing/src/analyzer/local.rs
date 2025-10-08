@@ -13,16 +13,7 @@ pub struct LocalTaskAnalyzer {
 }
 
 impl LocalTaskAnalyzer {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            intent_extractor: IntentExtractor::new(),
-            complexity_estimator: ComplexityEstimator::new(),
-            task_decomposer: TaskDecomposer::new(),
-            max_parallel_tasks: 4,
-        }
-    }
-
+    /// Set maximum parallel tasks
     #[must_use]
     pub fn with_max_parallel(mut self, max: usize) -> Self {
         self.max_parallel_tasks = max;
@@ -32,7 +23,12 @@ impl LocalTaskAnalyzer {
 
 impl Default for LocalTaskAnalyzer {
     fn default() -> Self {
-        Self::new()
+        Self {
+            intent_extractor: IntentExtractor,
+            complexity_estimator: ComplexityEstimator,
+            task_decomposer: TaskDecomposer,
+            max_parallel_tasks: 4,
+        }
     }
 }
 
@@ -82,7 +78,7 @@ mod tests {
     /// # Panics
     /// Panics if analyze returns an error in the test harness.
     async fn test_simple_request() {
-        let analyzer = LocalTaskAnalyzer::new();
+        let analyzer = LocalTaskAnalyzer::default();
         let analysis = match analyzer.analyze("Add a comment to main.rs").await {
             Ok(analysis) => analysis,
             Err(error) => panic!("analyze failed: {error}"),
@@ -99,7 +95,7 @@ mod tests {
     /// # Panics
     /// Panics if analyze returns an error in the test harness.
     async fn test_refactor_request() {
-        let analyzer = LocalTaskAnalyzer::new();
+        let analyzer = LocalTaskAnalyzer::default();
         let analysis = match analyzer.analyze("Refactor the parser module").await {
             Ok(analysis) => analysis,
             Err(error) => panic!("analyze failed: {error}"),
@@ -116,7 +112,7 @@ mod tests {
     /// # Panics
     /// Panics if complexity estimation produces unexpected categories.
     async fn test_complexity_estimation() {
-        let analyzer = LocalTaskAnalyzer::new();
+        let analyzer = LocalTaskAnalyzer::default();
 
         let simple = analyzer.estimate_complexity("Add a comment");
         assert!(matches!(simple, Complexity::Trivial | Complexity::Simple));
@@ -129,7 +125,7 @@ mod tests {
     /// # Panics
     /// Panics if analyze returns an error in the test harness.
     async fn test_context_needs() {
-        let analyzer = LocalTaskAnalyzer::new();
+        let analyzer = LocalTaskAnalyzer::default();
         let analysis = match analyzer.analyze("Modify test.rs and main.rs").await {
             Ok(analysis) => analysis,
             Err(error) => panic!("analyze failed: {error}"),

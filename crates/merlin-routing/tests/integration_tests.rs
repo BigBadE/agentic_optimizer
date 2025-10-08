@@ -1,6 +1,6 @@
-// Integration tests for the routing system
-//
-// These tests verify end-to-end functionality of the routing architecture.
+//! Integration tests for the routing system
+//!
+//! These tests verify end-to-end functionality of the routing architecture.
 // They use the valor crate for comprehensive testing scenarios.
 //
 // TODO: Implement full integration tests

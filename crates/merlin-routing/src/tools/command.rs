@@ -13,7 +13,7 @@ pub struct RunCommandTool {
 }
 
 impl RunCommandTool {
-    #[must_use]
+    /// Create a new run command tool
     pub fn new(workspace_root: PathBuf) -> Self {
         Self {
             workspace_root,
@@ -28,6 +28,7 @@ impl RunCommandTool {
         }
     }
 
+    /// Set allowed commands
     #[must_use]
     pub fn with_allowed_commands(mut self, commands: Vec<String>) -> Self {
         self.allowed_commands = commands;

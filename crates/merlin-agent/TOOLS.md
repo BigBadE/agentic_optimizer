@@ -86,7 +86,7 @@ async fn main() -> anyhow::Result<()> {
 To add a new tool:
 
 1. Implement the `Tool` trait in `merlin-tools`
-2. Register it in `ToolRegistry::new()` in `crates/merlin-agent/src/tools.rs`
+2. Register it in `ToolRegistry::default()` in `crates/merlin-agent/src/tools.rs`
 3. The tool will automatically appear in the system prompt
 
 Example:
@@ -113,13 +113,13 @@ impl Tool for MyTool {
 impl ToolRegistry {
     pub fn new() -> Self {
         let mut registry = Self {
-            tools: HashMap::new(),
+            tools: HashMap::default(),
         };
         
-        registry.register(Arc::new(EditTool::new()));
-        registry.register(Arc::new(ShowTool::new()));
-        registry.register(Arc::new(BashTool::new()));
-        registry.register(Arc::new(MyTool::new())); // Add your tool here
+        registry.register(Arc::new(EditTool::default()));
+        registry.register(Arc::new(ShowTool::default()));
+        registry.register(Arc::new(BashTool::default()));
+        registry.register(Arc::new(MyTool::default())); // Add your tool here
         
         registry
     }

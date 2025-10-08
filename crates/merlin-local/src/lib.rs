@@ -4,9 +4,13 @@
 //! local model execution that mirrors the remote provider APIs used elsewhere
 //! in the system.
 
+/// Error types for local provider operations.
 pub mod error;
+/// Local model provider implementation using Ollama.
 pub mod inference;
+/// Ollama service management utilities.
 pub mod manager;
+/// Data types for Ollama models and API interactions.
 pub mod models;
 
 pub use error::{LocalError, Result};

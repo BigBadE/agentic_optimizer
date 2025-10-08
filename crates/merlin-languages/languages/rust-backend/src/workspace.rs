@@ -62,7 +62,6 @@ pub struct WorkspaceLoader {
 
 impl WorkspaceLoader {
     /// Create a new workspace loader.
-    #[must_use]
     pub fn new(project_root: &Path) -> Self {
         Self {
             project_root: project_root.to_path_buf(),
@@ -71,7 +70,6 @@ impl WorkspaceLoader {
     }
 
     /// Create a new workspace loader with custom configuration.
-    #[must_use]
     pub fn with_config(project_root: &Path, config: LoadConfig) -> Self {
         Self {
             project_root: project_root.to_path_buf(),
@@ -229,8 +227,8 @@ fn finish_spinner(progress: Option<&ProgressBar>, message: &str) {
 }
 
 fn build_file_index(vfs: &Vfs) -> (FileIdMap, FileMetadata) {
-    let mut file_id_map = HashMap::new();
-    let mut file_metadata = FileMetadata::new();
+    let mut file_id_map = HashMap::default();
+    let mut file_metadata = FileMetadata::default();
 
     for (file_id, path) in vfs.iter() {
         if let Some(abs_path) = path.as_path() {

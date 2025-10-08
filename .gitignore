@@ -20,3 +20,8 @@ metrics.json
 
 # Cache files
 .agentic_cache/
+
+# Benchmark results
+/target/criterion/
+/benchmark_results/
+benchmark_results.txt

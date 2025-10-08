@@ -30,7 +30,6 @@ pub struct ContextExpander<'expander> {
 
 impl<'expander> ContextExpander<'expander> {
     /// Create a new context expander
-    #[must_use]
     #[allow(
         dead_code,
         reason = "Module reserved for future context expansion features"
@@ -55,6 +54,10 @@ impl<'expander> ContextExpander<'expander> {
         dead_code,
         reason = "Module reserved for future context expansion features"
     )]
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Context expansion requires multiple analysis steps"
+    )]
     pub fn expand(&self, plan: &ContextPlan) -> Vec<FileContext> {
         let spinner = ProgressBar::new_spinner();
         spinner.set_style(
@@ -72,7 +75,7 @@ impl<'expander> ContextExpander<'expander> {
             plan.file_patterns
         );
 
-        let mut files = HashSet::new();
+        let mut files = HashSet::default();
 
         // Step 1: Find seed files based on patterns
         if !plan.file_patterns.is_empty() {
@@ -172,7 +175,7 @@ impl<'expander> ContextExpander<'expander> {
             .git_exclude(false)
             .build();
 
-        let mut files = Vec::new();
+        let mut files = Vec::default();
 
         for entry in walker {
             match entry {
@@ -216,7 +219,7 @@ impl<'expander> ContextExpander<'expander> {
             .git_exclude(false)
             .build();
 
-        let mut files = Vec::new();
+        let mut files = Vec::default();
 
         for entry in walker {
             let Ok(dir_entry) = entry else {
@@ -259,7 +262,7 @@ impl<'expander> ContextExpander<'expander> {
         reason = "Module reserved for future context expansion features"
     )]
     fn expand_from_entry_points(&self, entry_files: &[PathBuf], max_depth: usize) -> Vec<PathBuf> {
-        let mut visited: HashSet<PathBuf> = HashSet::new();
+        let mut visited: HashSet<PathBuf> = HashSet::default();
         let mut to_process: Vec<(PathBuf, usize)> =
             entry_files.iter().cloned().map(|path| (path, 0)).collect();
 
@@ -291,7 +294,7 @@ impl<'expander> ContextExpander<'expander> {
     )]
     fn expand_semantic(_query: &str, _top_k: usize) -> Vec<PathBuf> {
         // TODO: Implement semantic search using embeddings
-        Vec::new()
+        Vec::default()
     }
 
     #[allow(
@@ -299,7 +302,7 @@ impl<'expander> ContextExpander<'expander> {
         reason = "Module reserved for future context expansion features"
     )]
     fn find_test_files(&self, files: &HashSet<PathBuf>) -> Vec<PathBuf> {
-        let mut test_files = Vec::new();
+        let mut test_files = Vec::default();
 
         for entry in WalkDir::new(self.project_root)
             .into_iter()

@@ -88,7 +88,6 @@ impl SymbolSearcher<'_> {
 
 impl<'analysis> SymbolSearcher<'analysis> {
     /// Create a new `SymbolSearcher` bound to an analysis snapshot.
-    #[must_use]
     pub fn new(analysis: &'analysis Analysis, backend: &'analysis RustBackend) -> Self {
         Self { analysis, backend }
     }
@@ -98,7 +97,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
     /// # Errors
     /// Returns an error if rust-analyzer queries fail.
     pub fn search(&self, query: &SearchQuery) -> Result<SearchResult> {
-        let mut symbols = Vec::new();
+        let mut symbols = Vec::default();
 
         if let Some(symbol_name) = &query.symbol_name {
             symbols.extend(self.find_symbol_by_name(symbol_name)?);
@@ -148,7 +147,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
             .map_err(|error| Error::Other(error.to_string()))?;
 
         let Some(offset) = line_index.offset(LineCol {
-            line: line.saturating_sub(1),
+            line: line - 1,
             col: 0,
         }) else {
             return Ok(None);
@@ -200,7 +199,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
     /// # Errors
     /// Returns an error if rust-analyzer queries fail.
     pub fn find_references(&self, symbol_name: &str) -> Result<Vec<SymbolInfo>> {
-        let mut results = Vec::new();
+        let mut results = Vec::default();
 
         // First, find the symbol definition using the global index
         let definitions = self.find_symbol_by_name(symbol_name)?;
@@ -271,7 +270,7 @@ impl<'analysis> SymbolSearcher<'analysis> {
     /// # Errors
     /// Returns an error if rust-analyzer queries fail.
     fn list_all_symbols(&self) -> Result<Vec<SymbolInfo>> {
-        let mut symbols = Vec::new();
+        let mut symbols = Vec::default();
 
         for file_id in self.backend.file_id_map.values() {
             symbols.extend(self.list_symbols_in_file_by_id(*file_id)?);

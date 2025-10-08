@@ -16,12 +16,14 @@ pub use text::chunk_text;
 
 /// Optimal token range for chunks
 pub const MIN_CHUNK_TOKENS: usize = 100; // ~25 lines
+/// Optimal minimum token count for a chunk (~50 lines).
 pub const OPTIMAL_MIN_TOKENS: usize = 200; // ~50 lines
+/// Optimal maximum token count for a chunk (~125 lines).
 pub const OPTIMAL_MAX_TOKENS: usize = 500; // ~125 lines
+/// Maximum allowed token count for a chunk (~200 lines).
 pub const MAX_CHUNK_TOKENS: usize = 800; // ~200 lines
 
 /// Estimate tokens from text (rough: ~4 chars per token)
-#[must_use]
 pub fn estimate_tokens(text: &str) -> usize {
     let chars = text.len();
     let words = text.split_whitespace().count();
@@ -48,7 +50,6 @@ pub struct FileChunk {
 
 impl FileChunk {
     /// Create a new chunk
-    #[must_use]
     pub fn new(
         file_path: String,
         content: String,
@@ -66,7 +67,6 @@ impl FileChunk {
     }
 
     /// Get a display name for this chunk
-    #[must_use]
     pub fn display_name(&self) -> String {
         format!(
             "{}:{}-{} ({})",
@@ -76,7 +76,6 @@ impl FileChunk {
 }
 
 /// Chunk a file based on its extension
-#[must_use]
 pub fn chunk_file(file_path: &Path, content: &str) -> Vec<FileChunk> {
     let path_str = file_path.display().to_string();
 

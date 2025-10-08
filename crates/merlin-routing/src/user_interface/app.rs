@@ -85,9 +85,9 @@ impl TuiApp {
         let app = Self {
             terminal,
             event_receiver: receiver,
-            task_manager: TaskManager::new(),
+            task_manager: TaskManager::default(),
             state,
-            input_manager: InputManager::new(),
+            input_manager: InputManager::default(),
             renderer: Renderer::new(theme),
             focused_pane: FocusedPane::Input,
             pending_input: None,
@@ -197,10 +197,10 @@ impl TuiApp {
             .or_else(|| self.get_selected_task_id());
 
         let Some(parent_id) = parent_id else {
-            return Vec::new();
+            return Vec::default();
         };
 
-        let mut context = Vec::new();
+        let mut context = Vec::default();
 
         if let Some(parent_task) = self.task_manager.get_task(parent_id) {
             let output = parent_task.output_tree.to_text();
@@ -245,7 +245,7 @@ impl TuiApp {
     /// # Errors
     /// Returns an error if reading or polling events fails.
     fn collect_input_events() -> Result<Vec<Event>> {
-        let mut events = Vec::new();
+        let mut events = Vec::default();
         events.push(event::read().map_err(|err| RoutingError::Other(err.to_string()))?);
 
         while event::poll(Duration::from_millis(0))
@@ -386,7 +386,7 @@ impl TuiApp {
         if should_wrap {
             let terminal_width = self.terminal.size().map(|size| size.width).unwrap_or(80);
             let input_width = (f32::from(terminal_width) * 0.7) as usize;
-            let max_line_width = input_width.saturating_sub(4);
+            let max_line_width = input_width - 4;
             self.input_manager.auto_wrap(max_line_width);
         }
     }
@@ -646,7 +646,7 @@ impl TuiApp {
         if pos < self.task_manager.task_order().len() {
             self.state.selected_task_index = pos;
         } else {
-            self.state.selected_task_index = self.task_manager.task_order().len().saturating_sub(1);
+            self.state.selected_task_index = self.task_manager.task_order().len() - 1;
         }
 
         if let Some(&new_task_id) = self
@@ -665,7 +665,7 @@ impl TuiApp {
         if self.state.selected_task_index >= self.task_manager.task_order().len()
             && !self.task_manager.is_empty()
         {
-            self.state.selected_task_index = self.task_manager.task_order().len().saturating_sub(1);
+            self.state.selected_task_index = self.task_manager.task_order().len() - 1;
         }
     }
 

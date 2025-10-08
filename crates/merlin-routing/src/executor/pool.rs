@@ -22,6 +22,9 @@ pub struct ExecutorPool {
 }
 
 impl ExecutorPool {
+    const ENV_OPENROUTER_API_KEY: &'static str = "OPENROUTER_API_KEY";
+    const ENV_ANTHROPIC_API_KEY: &'static str = "ANTHROPIC_API_KEY";
+    /// Create a new executor pool
     pub fn new(
         router: Arc<dyn ModelRouter>,
         validator: Arc<dyn Validator>,
@@ -58,15 +61,16 @@ impl ExecutorPool {
                 model_name,
             } => match provider_name.as_str() {
                 "openrouter" => {
-                    let api_key = env::var("OPENROUTER_API_KEY").map_err(|_| {
-                        RoutingError::Other("OPENROUTER_API_KEY not set".to_owned())
+                    let api_key = env::var(Self::ENV_OPENROUTER_API_KEY).map_err(|_| {
+                        RoutingError::Other(format!("{} not set", Self::ENV_OPENROUTER_API_KEY))
                     })?;
                     let provider = OpenRouterProvider::new(api_key)?.with_model(model_name.clone());
                     Ok(Arc::new(provider))
                 }
                 "anthropic" => {
-                    let api_key = env::var("ANTHROPIC_API_KEY")
-                        .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
+                    let api_key = env::var(Self::ENV_ANTHROPIC_API_KEY).map_err(|_| {
+                        RoutingError::Other(format!("{} not set", Self::ENV_ANTHROPIC_API_KEY))
+                    })?;
                     let provider = AnthropicProvider::new(api_key)?;
                     Ok(Arc::new(provider))
                 }
@@ -206,10 +210,11 @@ impl ExecutorPool {
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, reason = "Test code is allowed to use expect")]
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use std::path::PathBuf;
+    use tempfile::TempDir;
 
     use merlin_core::Response;
 
@@ -255,7 +260,8 @@ mod tests {
     async fn test_executor_pool_basic() {
         let router = Arc::new(MockRouter);
         let validator = Arc::new(MockValidator);
-        let workspace = WorkspaceState::new(PathBuf::from("/tmp"));
+        let tmp_dir = TempDir::new().expect("create temp dir");
+        let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
 
         let executor = ExecutorPool::new(router, validator, 2, workspace);
 

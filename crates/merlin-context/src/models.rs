@@ -16,7 +16,6 @@ pub struct ModelConfig {
 
 impl ModelConfig {
     /// Get model configuration from environment variables with fallback defaults
-    #[must_use]
     pub fn from_env() -> Self {
         Self {
             small: env::var("LOCAL_SMALL_MODEL")
@@ -30,7 +29,6 @@ impl ModelConfig {
     }
 
     /// Get default configuration without env vars
-    #[must_use]
     pub fn default_config() -> Self {
         Self {
             small: "qwen2.5-coder:1.5b-instruct-q4_K_M".to_string(),
@@ -41,7 +39,6 @@ impl ModelConfig {
     }
 
     /// Select appropriate model based on task complexity
-    #[must_use]
     pub fn select_for_task(&self, complexity: TaskComplexity) -> &str {
         match complexity {
             TaskComplexity::Simple => &self.small,

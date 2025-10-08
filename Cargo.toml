@@ -98,6 +98,10 @@ let-underscore = "deny"
 nonstandard-style = "deny"
 refining-impl-trait = "deny"
 unused = { level = "deny", priority = -1 }
+missing_docs = "deny"
+
+[workspace.lints.rustdoc]
+broken_intra_doc_links = "deny"
 
 # Strict lints, should not be changed.
 [workspace.lints.clippy]
@@ -118,6 +122,7 @@ cast_possible_truncation = { level = "allow", priority = 1 }
 cast_possible_wrap = { level = "allow", priority = 1 }
 cast_precision_loss = { level = "allow", priority = 1 }
 cast_sign_loss = { level = "allow", priority = 1 }
+must_use_candidate = { level = "allow", priority = 1 }
 wildcard_imports = { level = "allow", priority = 1 }
 
 # Restriction

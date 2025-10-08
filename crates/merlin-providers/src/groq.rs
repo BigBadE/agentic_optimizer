@@ -9,6 +9,8 @@ use std::time::Instant;
 const GROQ_API_URL: &str = "https://api.groq.com/openai/v1/chat/completions";
 /// Default model for Groq.
 const DEFAULT_MODEL: &str = "llama-3.1-70b-versatile";
+/// Env var key for Groq API key.
+const ENV_GROQ_API_KEY: &str = "GROQ_API_KEY";
 
 /// Groq API provider (free tier with rate limits).
 pub struct GroqProvider {
@@ -27,11 +29,11 @@ impl GroqProvider {
     ///
     /// Returns an error if the `GROQ_API_KEY` environment variable is not set.
     pub fn new() -> Result<Self> {
-        let api_key = env::var("GROQ_API_KEY")
-            .map_err(|_| Error::Other("GROQ_API_KEY not set".to_owned()))?;
+        let api_key = env::var(ENV_GROQ_API_KEY)
+            .map_err(|_| Error::Other(format!("{ENV_GROQ_API_KEY} not set")))?;
 
         Ok(Self {
-            client: Client::new(),
+            client: Client::default(),
             api_key,
             model: DEFAULT_MODEL.to_owned(),
         })
@@ -215,7 +217,7 @@ mod tests {
     #[test]
     fn groq_provider_with_api_key() {
         let provider = GroqProvider {
-            client: Client::new(),
+            client: Client::default(),
             api_key: "test_key".to_owned(),
             model: DEFAULT_MODEL.to_owned(),
         };
@@ -229,7 +231,7 @@ mod tests {
     #[tokio::test]
     async fn groq_availability() {
         let provider = GroqProvider {
-            client: Client::new(),
+            client: Client::default(),
             api_key: "test_key".to_owned(),
             model: DEFAULT_MODEL.to_owned(),
         };
@@ -242,7 +244,7 @@ mod tests {
     #[test]
     fn cost_estimation() {
         let provider = GroqProvider {
-            client: Client::new(),
+            client: Client::default(),
             api_key: "test_key".to_owned(),
             model: DEFAULT_MODEL.to_owned(),
         };

@@ -18,16 +18,17 @@ pub struct LocalModelProvider {
 }
 
 impl LocalModelProvider {
-    #[must_use]
+    /// Creates a new local model provider for the specified model.
     pub fn new(model_name: String) -> Self {
         Self {
-            client: Client::new(),
+            client: Client::default(),
             base_url: "http://localhost:11434".to_owned(),
             model_name,
-            manager: OllamaManager::new(),
+            manager: OllamaManager::default(),
         }
     }
 
+    /// Sets a custom URL for the Ollama service.
     #[must_use]
     pub fn with_url(mut self, url: String) -> Self {
         self.base_url.clone_from(&url);

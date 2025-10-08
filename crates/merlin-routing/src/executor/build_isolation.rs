@@ -140,27 +140,42 @@ impl IsolatedBuildEnv {
     }
 }
 
+/// Result of a build validation
 #[derive(Debug, Clone)]
 pub struct BuildResult {
+    /// Whether the build succeeded
     pub success: bool,
+    /// Standard output from the build command
     pub stdout: String,
+    /// Standard error from the build command
     pub stderr: String,
+    /// Build duration in milliseconds
     pub duration_ms: u64,
 }
 
+/// Result of test execution
 #[derive(Debug, Clone)]
 pub struct TestResult {
+    /// Whether all tests passed
     pub success: bool,
+    /// Number of tests that passed
     pub passed: usize,
+    /// Number of tests that failed
     pub failed: usize,
+    /// Detailed test output
     pub details: String,
+    /// Test execution duration in milliseconds
     pub duration_ms: u64,
 }
 
+/// Result of clippy lint execution
 #[derive(Debug, Clone)]
 pub struct LintResult {
+    /// Whether clippy found no issues
     pub success: bool,
+    /// List of clippy warnings
     pub warnings: Vec<String>,
+    /// Lint execution duration in milliseconds
     pub duration_ms: u64,
 }
 
@@ -174,7 +189,7 @@ fn parse_test_count(output: &str, status: &str) -> usize {
                 .enumerate()
                 .find(|(_, word)| *word == status)?;
             line.split_whitespace()
-                .nth(idx.saturating_sub(1))
+                .nth(idx - 1)
                 .and_then(|num| num.parse().ok())
         })
         .unwrap_or(0)

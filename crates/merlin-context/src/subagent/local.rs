@@ -19,18 +19,7 @@ pub struct LocalContextAgent {
 }
 
 impl LocalContextAgent {
-    /// Creates a new local context agent.
-    #[must_use]
-    pub fn new() -> Self {
-        let host = env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".to_owned());
-
-        Self {
-            ollama: Ollama::new(host, 11434),
-        }
-    }
-
     /// Creates a new agent with custom configuration.
-    #[must_use]
     pub fn with_config(host: String, port: u16) -> Self {
         Self {
             ollama: Ollama::new(host, port),
@@ -170,12 +159,6 @@ impl LocalContextAgent {
     }
 }
 
-impl Default for LocalContextAgent {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl ContextAgent for LocalContextAgent {
     fn generate_plan_sync(&self, _intent: &QueryIntent, _query_text: &str) -> Result<ContextPlan> {
         // This is a sync wrapper - should not be called from async context
@@ -194,5 +177,16 @@ impl ContextAgent for LocalContextAgent {
 
     fn name(&self) -> &'static str {
         "LocalContextAgent (Ollama)"
+    }
+}
+
+impl Default for LocalContextAgent {
+    /// Creates a new local context agent.
+    fn default() -> Self {
+        let host = env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".to_owned());
+
+        Self {
+            ollama: Ollama::new(host, 11434),
+        }
     }
 }

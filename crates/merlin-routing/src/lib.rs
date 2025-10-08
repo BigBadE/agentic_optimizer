@@ -1,14 +1,65 @@
+//! Intelligent task routing and orchestration for LLM-powered agents.
+//!
+//! This crate provides a comprehensive framework for routing tasks to appropriate
+//! language models based on complexity, cost, and quality requirements. It includes:
+//!
+//! - **Task Analysis**: Automatic analysis of task complexity and requirements
+//! - **Smart Routing**: Multiple strategies for selecting optimal models (complexity-based,
+//!   cost-optimization, quality-critical, long-context)
+//! - **Execution Management**: Parallel task execution with dependency tracking and conflict resolution
+//! - **Validation Pipeline**: Multi-stage validation (syntax, lint, test, build)
+//! - **Interactive UI**: Terminal user interface for monitoring and managing tasks
+//! - **Streaming Support**: Real-time streaming of LLM responses and execution progress
+//!
+//! # Architecture
+//!
+//! The crate is organized into several key modules:
+//!
+//! - [`agent`]: Agent execution and self-assessment capabilities
+//! - [`analyzer`]: Task complexity analysis and decomposition
+//! - [`router`]: Model selection strategies and tier management
+//! - [`executor`]: Task execution with workspace isolation and conflict detection
+//! - [`validator`]: Multi-stage validation pipeline for code generation
+//! - [`orchestrator`]: High-level coordination of all components
+//!
+//! # Example
+//!
+//! ```no_run
+//! use merlin_routing::{RoutingOrchestrator, RoutingConfig, Task};
+//!
+//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! let config = RoutingConfig::default();
+//! let orchestrator = RoutingOrchestrator::new(config);
+//!
+//! let task = Task::new("Implement a new feature".to_owned());
+//! let result = orchestrator.execute_task(task).await?;
+//! # Ok(())
+//! # }
+//! ```
+
+/// Agent execution and self-assessment
 pub mod agent;
+/// Task analysis and decomposition
 pub mod analyzer;
+/// Configuration types for routing and execution
 pub mod config;
+/// Error types and result aliases
 pub mod error;
+/// Task execution with workspace management
 pub mod executor;
+/// High-level orchestration of routing components
 pub mod orchestrator;
+/// Model selection and routing strategies
 pub mod router;
+/// Streaming events and channels
 pub mod streaming;
+/// Tool implementations for file operations and commands
 pub mod tools;
+/// Core types for tasks, analysis, and validation
 pub mod types;
+/// Terminal user interface for task management
 pub mod user_interface;
+/// Validation pipeline and stages
 pub mod validator;
 
 pub use agent::{AgentExecutor, SelfAssessor, StepTracker};

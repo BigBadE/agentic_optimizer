@@ -193,7 +193,7 @@ This helps debug issues like:
 To add a new tool that will be automatically intercepted:
 
 1. Implement the `Tool` trait in `merlin-tools`
-2. Register it in `ToolRegistry::new()`
+2. Register it in `ToolRegistry::default()`
 3. The tool will automatically appear in the system prompt
 4. Tool calls will be intercepted and executed
 

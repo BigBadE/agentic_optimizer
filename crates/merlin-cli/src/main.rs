@@ -1,3 +1,5 @@
+//! Merlin CLI - Interactive AI coding assistant command-line interface
+
 use anyhow::Result;
 use console::{Term, style};
 use dialoguer::Input;
@@ -105,7 +107,7 @@ async fn handle_chat(project: PathBuf, model: Option<String>) -> Result<()> {
 
     let backend = create_backend(Language::Rust)?;
 
-    let agent_config = AgentConfig::new()
+    let agent_config = AgentConfig::default()
         .with_system_prompt(
             "You are a helpful AI coding assistant. Analyze the provided code context and help the user with their requests. \
              Be concise but thorough. When making code changes, provide complete, working code."
@@ -385,7 +387,7 @@ async fn handle_interactive_agent(project: PathBuf, flags: InteractiveFlags) -> 
 
             match orchestrator.process_request(trimmed).await {
                 Ok(results) => {
-                    print_results_plain(&term, &results, matches!(flags.ui, UiMode::PlainVerbose))?
+                    print_results_plain(&term, &results, matches!(flags.ui, UiMode::PlainVerbose))?;
                 }
                 Err(error) => {
                     term.write_line(&format!("Error: {error}"))?;
@@ -441,6 +443,10 @@ fn cleanup_old_tasks(merlin_dir: &Path) -> Result<()> {
 ///
 /// # Errors
 /// Returns an error if filesystem, TUI, or async operations fail.
+#[allow(
+    clippy::too_many_lines,
+    reason = "Complex TUI event loop requires sequential logic"
+)]
 async fn run_tui_interactive(
     orchestrator: RoutingOrchestrator,
     project: PathBuf,

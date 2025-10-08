@@ -1,46 +1,65 @@
 use crate::{Complexity, Priority};
 use std::cmp::Ordering;
 
-/// Extracted intent from user request
+/// Extracted intent from user request.
 #[derive(Debug, Clone)]
 pub struct Intent {
+    /// Primary action to perform
     pub action: Action,
+    /// Scope of the operation
     pub scope: Scope,
+    /// Priority level
     pub priority: Priority,
+    /// Optional complexity hint from analysis
     pub complexity_hint: Option<Complexity>,
 }
 
+/// Action type for the task.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Action {
+    /// Create new code/files
     Create,
+    /// Modify existing code/files
     Modify,
+    /// Delete code/files
     Delete,
+    /// Refactor/restructure code
     Refactor,
+    /// Fix bugs or errors
     Fix,
+    /// Add or run tests
     Test,
+    /// Add documentation
     Document,
+    /// Analyze or review code
     Analyze,
+    /// Optimize performance or code quality
     Optimize,
 }
 
+/// Scope of the operation.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub enum Scope {
+    /// Single file
     File(String),
+    /// Function within a file
     Function(String),
+    /// Module
     Module(String),
+    /// Entire project
     Project,
+    /// Multiple files
     Multiple(Vec<String>),
 }
 
+/// Extracts intent (action, scope, priority) from user requests.
+#[derive(Default)]
 pub struct IntentExtractor;
 
 impl IntentExtractor {
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
+    // No-arg constructor unnecessary; use `Default` instead
 
-    #[must_use]
+    /// Extracts intent from a user request string.
     pub fn extract(&self, request: &str) -> Intent {
         let request_lower = request.to_lowercase();
         let action = Self::detect_action(&request_lower);
@@ -96,9 +115,9 @@ impl IntentExtractor {
                 Ordering::Less => Scope::Project,
             }
         } else if request.contains("function") || request.contains("fn ") {
-            Scope::Function(String::new())
+            Scope::Function(String::default())
         } else if request.contains("module") || request.contains("mod ") {
-            Scope::Module(String::new())
+            Scope::Module(String::default())
         } else {
             Scope::Project
         }
@@ -137,11 +156,7 @@ impl IntentExtractor {
     }
 }
 
-impl Default for IntentExtractor {
-    fn default() -> Self {
-        Self::new()
-    }
-}
+// Default derived above
 
 #[cfg(test)]
 mod tests {
@@ -151,7 +166,7 @@ mod tests {
     /// # Panics
     /// Panics if action detection fails for create.
     fn test_create_action() {
-        let extractor = IntentExtractor::new();
+        let extractor = IntentExtractor;
         let intent = extractor.extract("Create a new file test.rs");
         assert_eq!(intent.action, Action::Create);
     }
@@ -160,7 +175,7 @@ mod tests {
     /// # Panics
     /// Panics if action detection fails for fix.
     fn test_fix_action() {
-        let extractor = IntentExtractor::new();
+        let extractor = IntentExtractor;
         let intent = extractor.extract("Fix the bug in parser.rs");
         assert_eq!(intent.action, Action::Fix);
     }
@@ -169,7 +184,7 @@ mod tests {
     /// # Panics
     /// Panics if action detection fails for refactor.
     fn test_refactor_action() {
-        let extractor = IntentExtractor::new();
+        let extractor = IntentExtractor;
         let intent = extractor.extract("Refactor the entire module");
         assert_eq!(intent.action, Action::Refactor);
     }
@@ -178,7 +193,7 @@ mod tests {
     /// # Panics
     /// Panics if file scope detection fails.
     fn test_file_scope() {
-        let extractor = IntentExtractor::new();
+        let extractor = IntentExtractor;
         let intent = extractor.extract("Modify test.rs");
         assert!(matches!(intent.scope, Scope::File(_)));
     }
@@ -187,7 +202,7 @@ mod tests {
     /// # Panics
     /// Panics if priority detection fails.
     fn test_critical_priority() {
-        let extractor = IntentExtractor::new();
+        let extractor = IntentExtractor;
         let intent = extractor.extract("Critical bug fix needed");
         assert_eq!(intent.priority, Priority::Critical);
     }
@@ -196,7 +211,7 @@ mod tests {
     /// # Panics
     /// Panics if complexity estimation mapping fails.
     fn test_complexity_estimation() {
-        let extractor = IntentExtractor::new();
+        let extractor = IntentExtractor;
 
         let simple = extractor.extract("Add a comment");
         assert_eq!(simple.complexity_hint, Some(Complexity::Simple));

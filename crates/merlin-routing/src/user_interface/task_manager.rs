@@ -8,42 +8,58 @@ use std::time::Instant;
 /// Status of a task
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskStatus {
+    /// Task is currently running
     Running,
+    /// Task has completed successfully
     Completed,
+    /// Task has failed
     Failed,
 }
 
 /// Task display information
 pub struct TaskDisplay {
+    /// Description of the task
     pub description: String,
+    /// Current status of the task
     pub status: TaskStatus,
+    /// Optional progress information
     pub progress: Option<TaskProgress>,
+    /// Output lines from the task
     pub output_lines: Vec<String>,
+    /// When the task started
     pub start_time: Instant,
+    /// When the task ended (if completed)
     pub end_time: Option<Instant>,
+    /// ID of the parent task (if this is a subtask)
     pub parent_id: Option<TaskId>,
+    /// Hierarchical output tree
     pub output_tree: OutputTree,
+    /// List of task steps
     pub steps: Vec<TaskStepInfo>,
 }
 
 /// Task step information
 #[derive(Clone)]
 pub struct TaskStepInfo {
+    /// Unique identifier for this step
     #[allow(
         dead_code,
         reason = "Field is part of public API for task step tracking"
     )]
     pub step_id: String,
+    /// Type of step (e.g., `thinking`, `tool_call`)
     #[allow(
         dead_code,
         reason = "Field is part of public API for task step tracking"
     )]
     pub step_type: String,
+    /// Content of the step
     #[allow(
         dead_code,
         reason = "Field is part of public API for task step tracking"
     )]
     pub content: String,
+    /// When this step occurred
     #[allow(
         dead_code,
         reason = "Field is part of public API for task step tracking"
@@ -58,6 +74,7 @@ impl TaskStepInfo {
         &self.step_id
     }
 
+    /// Access `step_type`
     #[allow(dead_code, reason = "Accessor method for public API")]
     pub fn step_type(&self) -> &str {
         &self.step_type
@@ -77,6 +94,7 @@ impl TaskStepInfo {
 }
 
 /// Manages task storage, ordering, and hierarchy
+#[derive(Default)]
 pub struct TaskManager {
     tasks: HashMap<TaskId, TaskDisplay>,
     task_order: Vec<TaskId>,
@@ -84,15 +102,6 @@ pub struct TaskManager {
 }
 
 impl TaskManager {
-    /// Creates a new `TaskManager`
-    pub fn new() -> Self {
-        Self {
-            tasks: HashMap::new(),
-            task_order: Vec::new(),
-            collapsed_tasks: HashSet::new(),
-        }
-    }
-
     /// Adds a task to the manager with proper hierarchical positioning
     pub fn add_task(&mut self, task_id: TaskId, task: TaskDisplay) {
         let parent_id = task.parent_id;
@@ -313,13 +322,6 @@ impl TaskManager {
             }
             current_parent = self.get_parent_id(parent_id);
         }
-
         false
-    }
-}
-
-impl Default for TaskManager {
-    fn default() -> Self {
-        Self::new()
     }
 }

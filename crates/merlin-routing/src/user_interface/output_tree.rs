@@ -4,41 +4,65 @@ use std::collections::HashSet;
 /// A node in the output tree
 #[derive(Clone, Debug)]
 pub enum OutputNode {
+    /// A step in task execution
     Step {
+        /// Step identifier
         id: String,
+        /// Type of step
         step_type: StepType,
+        /// Step content
         content: String,
+        /// Child nodes
         children: Vec<OutputNode>,
     },
     #[allow(
         dead_code,
         reason = "ToolCall variant is part of public API for future use"
     )]
+    /// A tool invocation
     ToolCall {
+        /// Tool call identifier
         id: String,
+        /// Name of the tool
         tool_name: String,
+        /// Result of the tool call
         result: Option<ToolResult>,
     },
+    /// Plain text node
     Text {
+        /// Text content
         content: String,
     },
 }
 
+/// Result of a tool execution
 #[derive(Clone, Debug)]
 pub struct ToolResult {
+    /// Whether the tool succeeded
     pub success: bool,
+    /// Tool output content
     pub content: String,
 }
 
+/// Type of execution step
 #[derive(Clone, Debug, PartialEq, Eq)]
 pub enum StepType {
+    /// Thinking/reasoning step
     Thinking,
+    /// Tool call step
     ToolCall,
+    /// Output step
     Output,
+    /// Subtask step
     Subtask,
 }
 
 impl StepType {
+    /// Parse step type from string
+    #[allow(
+        clippy::should_implement_trait,
+        reason = "Simple string parsing, not implementing FromStr trait"
+    )]
     pub fn from_str(text: &str) -> Self {
         match text {
             "Thinking" => Self::Thinking,
@@ -50,6 +74,7 @@ impl StepType {
 }
 
 /// Tree structure for task output
+#[derive(Default)]
 pub struct OutputTree {
     root: Vec<OutputNode>,
     selected_index: usize,
@@ -58,22 +83,14 @@ pub struct OutputTree {
 }
 
 impl OutputTree {
-    pub fn new() -> Self {
-        Self {
-            root: Vec::new(),
-            selected_index: 0,
-            collapsed_nodes: HashSet::new(),
-            current_step_stack: Vec::new(),
-        }
-    }
-
+    /// Prefer `Default::default()` for construction.
     /// Add a new step to the tree
     pub fn add_step(&mut self, step_id: String, step_type: StepType, content: String) {
         let node = OutputNode::Step {
             id: step_id.clone(),
             step_type,
             content,
-            children: Vec::new(),
+            children: Vec::default(),
         };
 
         if let Some(parent_id) = self.current_step_stack.last().cloned() {
@@ -168,7 +185,7 @@ impl OutputTree {
 
     /// Get flattened list of visible nodes with their depth
     pub fn flatten_visible_nodes(&self) -> Vec<(OutputNodeRef<'_>, usize)> {
-        let mut result = Vec::new();
+        let mut result = Vec::default();
 
         for node in &self.root {
             self.flatten_node(node, 0, &mut result, &[]);
@@ -205,6 +222,7 @@ impl OutputTree {
         }
     }
 
+    /// Check if a node is collapsed
     pub fn is_collapsed(&self, node: &OutputNode) -> bool {
         Self::get_node_id(node).is_some_and(|id| self.collapsed_nodes.contains(id))
     }
@@ -291,12 +309,14 @@ impl OutputTree {
     }
 
     /// Navigation methods
+    /// Move selection up
     pub fn move_up(&mut self) {
         if self.selected_index > 0 {
             self.selected_index -= 1;
         }
     }
 
+    /// Move selection down
     pub fn move_down(&mut self) {
         let visible_count = self.flatten_visible_nodes().len();
         if self.selected_index + 1 < visible_count {
@@ -304,25 +324,29 @@ impl OutputTree {
         }
     }
 
+    /// Move selection to start
     pub fn move_to_start(&mut self) {
         self.selected_index = 0;
     }
 
+    /// Move selection to end
     pub fn move_to_end(&mut self) {
         let visible_count = self.flatten_visible_nodes().len();
-        self.selected_index = visible_count.saturating_sub(1);
+        self.selected_index = visible_count - 1;
     }
 
+    /// Move selection up by page
     pub fn page_up(&mut self, page_size: usize) {
-        self.selected_index = self.selected_index.saturating_sub(page_size);
+        self.selected_index -= page_size;
     }
 
+    /// Move selection down by page
     pub fn page_down(&mut self, page_size: usize) {
         let visible_count = self.flatten_visible_nodes().len();
-        self.selected_index =
-            (self.selected_index + page_size).min(visible_count.saturating_sub(1));
+        self.selected_index = (self.selected_index + page_size).min(visible_count - 1);
     }
 
+    /// Expand the currently selected node
     pub fn expand_selected(&mut self) {
         let visible = self.flatten_visible_nodes();
         if let Some((node_ref, _)) = visible.get(self.selected_index)
@@ -333,6 +357,7 @@ impl OutputTree {
         }
     }
 
+    /// Collapse the currently selected node
     pub fn collapse_selected(&mut self) {
         let visible = self.flatten_visible_nodes();
         if let Some((node_ref, _)) = visible.get(self.selected_index)
@@ -343,6 +368,7 @@ impl OutputTree {
         }
     }
 
+    /// Toggle collapse state of the currently selected node
     pub fn toggle_selected(&mut self) {
         let visible = self.flatten_visible_nodes();
         if let Some((node_ref, _)) = visible.get(self.selected_index)
@@ -357,13 +383,14 @@ impl OutputTree {
         }
     }
 
+    /// Get the selected index
     pub fn selected_index(&self) -> usize {
         self.selected_index
     }
 
     /// Get all text content as a flat string (for saving)
     pub fn to_text(&self) -> String {
-        let mut lines = Vec::new();
+        let mut lines = Vec::default();
         for node in &self.root {
             Self::node_to_text(node, 0, &mut lines);
         }
@@ -385,20 +412,18 @@ impl OutputTree {
     }
 }
 
-impl Default for OutputTree {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 /// Reference to a node with rendering context
 pub struct OutputNodeRef<'node> {
+    /// The output node being referenced
     pub node: &'node OutputNode,
+    /// Whether this is the last sibling
     pub is_last: bool,
+    /// Parent states for rendering tree lines
     pub parent_states: Vec<bool>,
 }
 
 impl OutputNode {
+    /// Get icon for this node
     pub fn get_icon(&self, is_collapsed: bool) -> &'static str {
         match self {
             Self::Step {
@@ -428,6 +453,7 @@ impl OutputNode {
         }
     }
 
+    /// Get content for this node
     pub fn get_content(&self) -> String {
         match self {
             Self::ToolCall {
@@ -441,8 +467,9 @@ impl OutputNode {
     }
 }
 
+/// Build tree prefix for rendering
 pub fn build_tree_prefix(depth: usize, is_last: bool, parent_states: &[bool]) -> String {
-    let mut prefix = String::new();
+    let mut prefix = String::default();
 
     for index in 0..depth {
         if index < parent_states.len() && !parent_states[index] {

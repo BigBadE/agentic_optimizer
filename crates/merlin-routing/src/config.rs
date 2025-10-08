@@ -1,17 +1,23 @@
+//! Configuration types for routing, validation, execution, and workspace settings.
+
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
 
-/// Complete routing configuration
+/// Complete routing configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RoutingConfig {
+    /// Model tier configuration
     pub tiers: TierConfig,
+    /// Validation configuration
     pub validation: ValidationConfig,
+    /// Execution configuration
     pub execution: ExecutionConfig,
+    /// Workspace configuration
     pub workspace: WorkspaceConfig,
 }
 
 impl RoutingConfig {
-    #[must_use]
+    /// Returns the default configuration.
     pub fn default_config() -> Self {
         Self {
             tiers: TierConfig::default(),
@@ -28,15 +34,22 @@ impl Default for RoutingConfig {
     }
 }
 
-/// Model tier configuration
+/// Model tier configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TierConfig {
+    /// Whether local model tier is enabled
     pub local_enabled: bool,
+    /// Default local model name
     pub local_model: String,
+    /// Whether Groq tier is enabled
     pub groq_enabled: bool,
+    /// Default Groq model name
     pub groq_model: String,
+    /// Whether premium tier is enabled
     pub premium_enabled: bool,
+    /// Maximum retry attempts per task
     pub max_retries: usize,
+    /// Timeout in seconds for model requests
     pub timeout_seconds: u64,
 }
 
@@ -54,20 +67,28 @@ impl Default for TierConfig {
     }
 }
 
-/// Validation configuration
+/// Validation configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[allow(
     clippy::struct_excessive_bools,
     reason = "Configuration struct can have more bools"
 )]
 pub struct ValidationConfig {
+    /// Whether validation is enabled
     pub enabled: bool,
+    /// Whether to stop on first validation failure
     pub early_exit: bool,
+    /// Whether to check syntax
     pub syntax_check: bool,
+    /// Whether to check build
     pub build_check: bool,
+    /// Whether to run tests
     pub test_check: bool,
+    /// Whether to run linting
     pub lint_check: bool,
+    /// Timeout in seconds for build operations
     pub build_timeout_seconds: u64,
+    /// Timeout in seconds for test operations
     pub test_timeout_seconds: u64,
 }
 
@@ -86,12 +107,16 @@ impl Default for ValidationConfig {
     }
 }
 
-/// Execution configuration
+/// Execution configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct ExecutionConfig {
+    /// Maximum number of tasks to execute concurrently
     pub max_concurrent_tasks: usize,
+    /// Whether parallel execution is enabled
     pub enable_parallel: bool,
+    /// Whether conflict detection is enabled
     pub enable_conflict_detection: bool,
+    /// Whether file locking is enabled
     pub enable_file_locking: bool,
 }
 
@@ -106,11 +131,14 @@ impl Default for ExecutionConfig {
     }
 }
 
-/// Workspace configuration
+/// Workspace configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceConfig {
+    /// Root path of the workspace
     pub root_path: PathBuf,
+    /// Whether workspace snapshots are enabled
     pub enable_snapshots: bool,
+    /// Whether transactional operations are enabled
     pub enable_transactions: bool,
 }
 

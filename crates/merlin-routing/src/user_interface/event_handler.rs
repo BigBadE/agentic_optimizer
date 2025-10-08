@@ -95,12 +95,12 @@ impl<'handler> EventHandler<'handler> {
             description,
             status: TaskStatus::Running,
             progress: None,
-            output_lines: Vec::new(),
+            output_lines: Vec::default(),
             start_time: Instant::now(),
             end_time: None,
             parent_id,
-            output_tree: super::output_tree::OutputTree::new(),
-            steps: Vec::new(),
+            output_tree: super::output_tree::OutputTree::default(),
+            steps: Vec::default(),
         };
 
         self.task_manager.add_task(task_id, task_display);

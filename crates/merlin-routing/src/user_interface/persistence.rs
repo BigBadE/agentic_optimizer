@@ -104,7 +104,7 @@ impl TaskPersistence {
     ///
     /// Returns an error if the task directory cannot be read or task files cannot be parsed
     fn load_tasks_sync(tasks_dir: &PathBuf) -> io::Result<HashMap<TaskId, TaskDisplay>> {
-        let mut tasks = HashMap::new();
+        let mut tasks = HashMap::default();
 
         if !tasks_dir.exists() {
             return Ok(tasks);
@@ -140,7 +140,7 @@ type LoadedTask = Option<(TaskId, TaskDisplay)>;
 fn load_single_task(path: &Path) -> io::Result<LoadedTask> {
     let file = File::open(path)?;
     let mut decoder = GzDecoder::new(file);
-    let mut json_str = String::new();
+    let mut json_str = String::default();
     decoder.read_to_string(&mut json_str)?;
 
     let serializable: SerializableTask =
@@ -152,7 +152,7 @@ fn load_single_task(path: &Path) -> io::Result<LoadedTask> {
 
 /// Deserializes a task from its serializable form
 fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
-    let mut output_tree = OutputTree::new();
+    let mut output_tree = OutputTree::default();
 
     for line in serializable.output_text.lines() {
         if !line.is_empty() {
@@ -185,12 +185,12 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
         description: serializable.description,
         status,
         progress: None,
-        output_lines: Vec::new(),
+        output_lines: Vec::default(),
         start_time,
         end_time,
         parent_id: serializable.parent_id,
         output_tree,
-        steps: Vec::new(),
+        steps: Vec::default(),
     };
 
     (serializable.id, task_display)

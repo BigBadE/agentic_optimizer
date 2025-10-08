@@ -15,20 +15,14 @@ pub struct LintValidationStage {
 }
 
 impl LintValidationStage {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            workspace: None,
-            max_warnings: 10,
-        }
-    }
-
+    /// Set workspace for lint validation
     #[must_use]
     pub fn with_workspace(mut self, workspace: Arc<WorkspaceState>) -> Self {
         self.workspace = Some(workspace);
         self
     }
 
+    /// Set maximum warnings allowed
     #[must_use]
     pub fn with_max_warnings(mut self, max_warnings: usize) -> Self {
         self.max_warnings = max_warnings;
@@ -38,7 +32,10 @@ impl LintValidationStage {
 
 impl Default for LintValidationStage {
     fn default() -> Self {
-        Self::new()
+        Self {
+            workspace: None,
+            max_warnings: 10,
+        }
     }
 }
 
@@ -136,7 +133,7 @@ mod tests {
     /// # Errors
     /// Returns an error if validation returns an unexpected failure in the test harness.
     async fn test_lint_validation_skip_no_files() -> Result<()> {
-        let stage = LintValidationStage::new();
+        let stage = LintValidationStage::default();
         let response = Response {
             text: "test".to_owned(),
             confidence: 1.0,
@@ -159,7 +156,7 @@ mod tests {
     /// # Errors
     /// Returns an error if `quick_check` returns an unexpected failure in the test harness.
     async fn test_quick_check() -> Result<()> {
-        let stage = LintValidationStage::new();
+        let stage = LintValidationStage::default();
 
         let good_response = Response {
             text: "Finished dev [unoptimized + debuginfo]".to_owned(),

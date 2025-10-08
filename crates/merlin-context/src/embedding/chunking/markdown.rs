@@ -4,12 +4,11 @@ use super::{FileChunk, MIN_CHUNK_TOKENS, OPTIMAL_MIN_TOKENS, estimate_tokens};
 use std::mem::take;
 
 /// Chunk Markdown by headers with token-based limits
-#[must_use]
 pub fn chunk_markdown(file_path: String, content: &str) -> Vec<FileChunk> {
     let lines: Vec<&str> = content.lines().collect();
-    let mut chunks: Vec<FileChunk> = Vec::new();
+    let mut chunks: Vec<FileChunk> = Vec::default();
     let mut current_chunk_start: usize = 0;
-    let mut buffer = String::new();
+    let mut buffer = String::default();
     let mut current_header = String::from("preamble");
     let mut line_count: usize = 0;
 

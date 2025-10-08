@@ -48,7 +48,7 @@ export GROQ_API_KEY="gsk-..."
 use agentic_providers::GroqProvider;
 use agentic_core::{ModelProvider, Query, Context};
 
-let provider = GroqProvider::new()?;
+let provider = GroqProvider::default()?;
 
 // Optional: Use different model
 let provider = provider.with_model("llama-3.1-8b-instant".to_string());

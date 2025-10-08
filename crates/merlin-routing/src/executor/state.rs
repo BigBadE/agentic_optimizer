@@ -11,10 +11,10 @@ pub struct WorkspaceState {
 }
 
 impl WorkspaceState {
-    #[must_use]
+    /// Create a new workspace state
     pub fn new(root_path: PathBuf) -> Arc<Self> {
         Arc::new(Self {
-            files: RwLock::new(HashMap::new()),
+            files: RwLock::new(HashMap::default()),
             root_path,
         })
     }
@@ -57,7 +57,7 @@ impl WorkspaceState {
     /// Returns an error if acquiring the read lock fails.
     pub async fn snapshot(&self, files: &[PathBuf]) -> Result<WorkspaceSnapshot> {
         let file_map = self.files.read().await;
-        let mut snapshot_files = HashMap::new();
+        let mut snapshot_files = HashMap::default();
 
         for path in files {
             if let Some(content) = file_map.get(path) {
@@ -78,21 +78,24 @@ pub struct WorkspaceSnapshot {
 }
 
 impl WorkspaceSnapshot {
-    #[must_use]
+    /// Get file content from snapshot
     pub fn get(&self, path: &PathBuf) -> Option<String> {
         self.files.get(path).cloned()
     }
 }
 
 #[cfg(test)]
+#[allow(clippy::expect_used, reason = "Test code is allowed to use expect")]
 mod tests {
     use super::*;
+    use tempfile::TempDir;
 
     #[tokio::test]
     /// # Panics
     /// Panics if workspace operations fail in the test harness.
     async fn test_workspace_concurrent_reads() {
-        let workspace = WorkspaceState::new(PathBuf::from("/tmp"));
+        let tmp_dir = TempDir::new().expect("create temp dir");
+        let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
 
         if let Err(error) = workspace
             .apply_changes(&[FileChange::Create {
@@ -116,7 +119,8 @@ mod tests {
     /// # Panics
     /// Panics if workspace operations fail in the test harness.
     async fn test_workspace_snapshot() {
-        let workspace = WorkspaceState::new(PathBuf::from("/tmp"));
+        let tmp_dir = TempDir::new().expect("create temp dir");
+        let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
 
         if let Err(error) = workspace
             .apply_changes(&[FileChange::Create {

@@ -15,20 +15,14 @@ pub struct BuildValidationStage {
 }
 
 impl BuildValidationStage {
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            timeout_seconds: 60,
-            workspace: None,
-        }
-    }
-
+    /// Set timeout for build validation
     #[must_use]
     pub fn with_timeout(mut self, timeout_seconds: u64) -> Self {
         self.timeout_seconds = timeout_seconds;
         self
     }
 
+    /// Set workspace for build validation
     #[must_use]
     pub fn with_workspace(mut self, workspace: Arc<WorkspaceState>) -> Self {
         self.workspace = Some(workspace);
@@ -38,7 +32,10 @@ impl BuildValidationStage {
 
 impl Default for BuildValidationStage {
     fn default() -> Self {
-        Self::new()
+        Self {
+            timeout_seconds: 60,
+            workspace: None,
+        }
     }
 }
 
@@ -124,7 +121,7 @@ mod tests {
     /// # Panics
     /// Panics if the result is not marked as skipped when no files are modified.
     async fn test_build_validation_skip_no_files() -> Result<()> {
-        let stage = BuildValidationStage::new();
+        let stage = BuildValidationStage::default();
         let response = Response {
             text: "fn main() {}".to_owned(),
             confidence: 1.0,
@@ -147,7 +144,7 @@ mod tests {
     /// # Panics
     /// Panics if `quick_check` logic does not match expected patterns.
     async fn test_quick_check() -> Result<()> {
-        let stage = BuildValidationStage::new();
+        let stage = BuildValidationStage::default();
 
         let good_response = Response {
             text: "fn main() {}".to_owned(),

@@ -4,12 +4,11 @@ use super::{FileChunk, MAX_CHUNK_TOKENS, MIN_CHUNK_TOKENS, estimate_tokens};
 use std::mem;
 
 /// Chunk Rust code - prioritizes innermost items (functions over impls)
-#[must_use]
 pub fn chunk_rust(file_path: String, content: &str) -> Vec<FileChunk> {
     let lines: Vec<&str> = content.lines().collect();
-    let mut chunks = Vec::new();
+    let mut chunks = Vec::default();
     let mut index = 0;
-    let mut buffer = String::new();
+    let mut buffer = String::default();
 
     while index < lines.len() {
         let trimmed = lines[index].trim();
@@ -226,9 +225,9 @@ fn chunk_impl_into_functions(
     end_idx: usize,
     _base_line: usize,
 ) -> Vec<FileChunk> {
-    let mut chunks = Vec::new();
+    let mut chunks = Vec::default();
     let mut index = start_idx;
-    let mut buffer = String::new();
+    let mut buffer = String::default();
 
     // Skip the impl line itself
     while index <= end_idx
@@ -283,8 +282,8 @@ fn force_split_large_chunk(
     end_idx: usize,
     base_id: &str,
 ) -> Vec<FileChunk> {
-    let mut chunks = Vec::new();
-    let mut buffer = String::new();
+    let mut chunks = Vec::default();
+    let mut buffer = String::default();
     let mut chunk_start = start_idx;
     let mut line_count = 0;
     let mut part_num = 1;
@@ -367,7 +366,7 @@ fn emit_chunk_from_range(
     end: usize,
     chunks: &mut Vec<FileChunk>,
 ) {
-    let mut split_content = String::new();
+    let mut split_content = String::default();
     for (idx, line) in lines.iter().enumerate().take(end + 1).skip(start) {
         if idx > start {
             split_content.push('\n');

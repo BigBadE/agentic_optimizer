@@ -18,6 +18,7 @@ struct Document {
 }
 
 /// BM25 search index
+#[derive(Default)]
 pub struct BM25Index {
     documents: Vec<Document>,
     avg_doc_length: f32,
@@ -26,6 +27,10 @@ pub struct BM25Index {
 
 impl BM25Index {
     /// Common stop words that should not influence scoring
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Comprehensive stopword list required"
+    )]
     fn stopwords() -> &'static HashSet<&'static str> {
         use std::sync::OnceLock;
 
@@ -116,15 +121,7 @@ impl BM25Index {
         })
     }
 
-    /// Create a new empty BM25 index
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            documents: Vec::new(),
-            avg_doc_length: 0.0,
-            idf_cache: HashMap::new(),
-        }
-    }
+    // Use Default instead of a no-arg constructor
 
     /// Add a document to the index
     pub fn add_document(&mut self, path: PathBuf, content: &str) {
@@ -153,7 +150,7 @@ impl BM25Index {
         self.avg_doc_length = total_length as f32 / self.documents.len() as f32;
 
         // Compute IDF for all terms
-        let mut doc_freq: HashMap<String, usize> = HashMap::new();
+        let mut doc_freq: HashMap<String, usize> = HashMap::default();
         for doc in &self.documents {
             for term in doc.terms.keys() {
                 *doc_freq.entry(term.clone()).or_insert(0) += 1;
@@ -170,10 +167,9 @@ impl BM25Index {
     }
 
     /// Search for documents matching the query
-    #[must_use]
     pub fn search(&self, query: &str, top_k: usize) -> Vec<(PathBuf, f32)> {
         let query_terms = Self::tokenize(query);
-        let mut scores: Vec<(PathBuf, f32)> = Vec::new();
+        let mut scores: Vec<(PathBuf, f32)> = Vec::default();
 
         for doc in &self.documents {
             let score = self.score_document(doc, &query_terms);
@@ -231,7 +227,7 @@ impl BM25Index {
     /// Tokenize text into terms with special token preservation and bigrams
     fn tokenize(text: &str) -> Vec<String> {
         let stopwords = Self::stopwords();
-        let mut terms = Vec::new();
+        let mut terms = Vec::default();
         let words: Vec<&str> = text.split_whitespace().collect();
 
         for word in &words {
@@ -290,7 +286,7 @@ impl BM25Index {
 
     /// Count term frequencies
     fn count_terms(terms: &[String]) -> HashMap<String, usize> {
-        let mut freq = HashMap::new();
+        let mut freq = HashMap::default();
         for term in terms {
             *freq.entry(term.clone()).or_insert(0) += 1;
         }
@@ -298,19 +294,12 @@ impl BM25Index {
     }
 
     /// Get the number of documents in the index
-    #[must_use]
     pub fn len(&self) -> usize {
         self.documents.len()
     }
 
     /// Check if the index is empty
-    #[must_use]
     pub fn is_empty(&self) -> bool {
         self.documents.is_empty()
-    }
-}
-impl Default for BM25Index {
-    fn default() -> Self {
-        Self::new()
     }
 }

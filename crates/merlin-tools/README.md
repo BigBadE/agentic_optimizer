@@ -65,7 +65,7 @@ use serde_json::json;
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
-    let edit_tool = EditTool::new();
+    let edit_tool = EditTool::default();
     
     let input = ToolInput {
         params: json!({

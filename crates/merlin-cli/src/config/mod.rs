@@ -7,6 +7,8 @@ use tracing::warn;
 
 use merlin_core::Result;
 
+const ENV_OPENROUTER_API_KEY: &str = "OPENROUTER_API_KEY";
+
 /// Main configuration for the agentic optimizer
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct Config {
@@ -59,7 +61,7 @@ pub struct ProvidersConfig {
 impl Default for ProvidersConfig {
     fn default() -> Self {
         Self {
-            openrouter_key: env::var("OPENROUTER_API_KEY").ok(),
+            openrouter_key: env::var(ENV_OPENROUTER_API_KEY).ok(),
             high_model: Some("anthropic/claude-sonnet-4-20250514".to_owned()),
             medium_model: Some("anthropic/claude-3.5-sonnet".to_owned()),
         }

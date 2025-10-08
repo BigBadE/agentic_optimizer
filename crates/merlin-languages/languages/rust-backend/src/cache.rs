@@ -25,7 +25,6 @@ pub struct WorkspaceCache {
 
 impl WorkspaceCache {
     /// Create a new workspace cache
-    #[must_use]
     pub fn new(project_root: PathBuf, file_metadata: HashMap<PathBuf, SystemTime>) -> Self {
         let file_count = file_metadata.len();
         Self {

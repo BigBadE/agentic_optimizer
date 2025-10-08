@@ -4,6 +4,7 @@
 //! for semantic code analysis using language-specific tools like rust-analyzer.
 
 mod backends;
+/// Language provider trait and types.
 pub mod provider;
 
 pub use provider::{LanguageProvider, SearchQuery, SearchResult, SymbolInfo, SymbolKind};
@@ -25,7 +26,7 @@ pub enum Language {
 pub fn create_backend(language: Language) -> Result<Box<dyn LanguageProvider>> {
     match language {
         Language::Rust => {
-            let backend = backends::RustBackendWrapper::new();
+            let backend = backends::RustBackendWrapper::default();
             Ok(Box::new(backend))
         }
     }

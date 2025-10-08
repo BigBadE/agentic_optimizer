@@ -31,11 +31,6 @@ fn default_timeout() -> u64 {
 pub struct BashTool;
 
 impl BashTool {
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Execute the provided shell command, enforcing the configured timeout.
     ///
     /// # Errors
@@ -106,7 +101,7 @@ impl BashTool {
 
 impl Default for BashTool {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 

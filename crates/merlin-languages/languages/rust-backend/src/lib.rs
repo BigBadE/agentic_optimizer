@@ -37,15 +37,25 @@ pub struct SymbolInfo {
 /// The kind of code symbol
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum SymbolKind {
+    /// A function definition.
     Function,
+    /// A struct definition.
     Struct,
+    /// An enum definition.
     Enum,
+    /// A trait definition.
     Trait,
+    /// A module definition.
     Module,
+    /// A constant definition.
     Constant,
+    /// A variable binding.
     Variable,
+    /// A struct or enum field.
     Field,
+    /// A method definition.
     Method,
+    /// A type alias.
     Type,
 }
 
@@ -95,17 +105,6 @@ pub struct RustBackend {
 }
 
 impl RustBackend {
-    /// Create a new uninitialized Rust backend
-    #[must_use]
-    pub fn new() -> Self {
-        Self {
-            analysis_host: None,
-            vfs: None,
-            project_root: PathBuf::new(),
-            file_id_map: Arc::new(HashMap::new()),
-        }
-    }
-
     /// Initialize with custom loading configuration
     ///
     /// # Errors
@@ -255,7 +254,7 @@ impl RustBackend {
     /// # Errors
     /// Returns an error if the workspace is not initialized
     pub fn build_import_graph(&self, files: &[PathBuf]) -> Result<ImportGraph> {
-        let mut graph = HashMap::new();
+        let mut graph = HashMap::default();
 
         for file in files {
             if let Ok(imports) = self.extract_imports(file) {
@@ -268,8 +267,14 @@ impl RustBackend {
 }
 
 impl Default for RustBackend {
+    /// Create a new uninitialized Rust backend
     fn default() -> Self {
-        Self::new()
+        Self {
+            analysis_host: None,
+            vfs: None,
+            project_root: PathBuf::default(),
+            file_id_map: Arc::new(HashMap::default()),
+        }
     }
 }
 

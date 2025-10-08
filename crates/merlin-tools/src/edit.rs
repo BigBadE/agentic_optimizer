@@ -26,11 +26,6 @@ struct EditParams {
 pub struct EditTool;
 
 impl EditTool {
-    #[must_use]
-    pub fn new() -> Self {
-        Self
-    }
-
     /// Apply the provided edit parameters to the target file.
     ///
     /// # Errors
@@ -85,7 +80,7 @@ impl EditTool {
 
 impl Default for EditTool {
     fn default() -> Self {
-        Self::new()
+        Self
     }
 }
 

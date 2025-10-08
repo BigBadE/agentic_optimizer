@@ -13,6 +13,7 @@ pub struct SelfAssessor {
 }
 
 impl SelfAssessor {
+    /// Create a new self-assessor with the given provider
     pub fn new(provider: Arc<dyn ModelProvider>) -> Self {
         Self { provider }
     }
@@ -32,7 +33,7 @@ impl SelfAssessor {
         let query = Query {
             text: prompt,
             conversation_id: None,
-            files_context: Vec::new(),
+            files_context: Vec::default(),
         };
 
         let context = Context::new(

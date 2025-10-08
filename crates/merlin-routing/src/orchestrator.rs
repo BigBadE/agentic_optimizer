@@ -26,10 +26,14 @@ pub struct RoutingOrchestrator {
 }
 
 impl RoutingOrchestrator {
-    #[must_use]
+    const ENV_OPENROUTER_API_KEY: &'static str = "OPENROUTER_API_KEY";
+    const ENV_ANTHROPIC_API_KEY: &'static str = "ANTHROPIC_API_KEY";
+    /// Creates a new routing orchestrator with the given configuration.
+    ///
+    /// Initializes analyzer, router, validator, and workspace with default implementations.
     pub fn new(config: RoutingConfig) -> Self {
         let analyzer = Arc::new(
-            LocalTaskAnalyzer::new().with_max_parallel(config.execution.max_concurrent_tasks),
+            LocalTaskAnalyzer::default().with_max_parallel(config.execution.max_concurrent_tasks),
         );
 
         let router = Arc::new(StrategyRouter::with_default_strategies().with_tier_config(
@@ -75,18 +79,21 @@ impl RoutingOrchestrator {
         Ok(Some(result))
     }
 
+    /// Sets a custom task analyzer.
     #[must_use]
     pub fn with_analyzer(mut self, analyzer: Arc<dyn TaskAnalyzer>) -> Self {
         self.analyzer = analyzer;
         self
     }
 
+    /// Sets a custom model router.
     #[must_use]
     pub fn with_router(mut self, router: Arc<dyn ModelRouter>) -> Self {
         self.router = router;
         self
     }
 
+    /// Sets a custom validator.
     #[must_use]
     pub fn with_validator(mut self, validator: Arc<dyn Validator>) -> Self {
         self.validator = validator;
@@ -112,7 +119,7 @@ impl RoutingOrchestrator {
     ) -> Result<TaskResult> {
         // Create tool registry with workspace tools
         let tool_registry = Arc::new(
-            ToolRegistry::new()
+            ToolRegistry::default()
                 .with_tool(Arc::new(ReadFileTool::new(
                     self.config.workspace.root_path.clone(),
                 )))
@@ -210,16 +217,16 @@ impl RoutingOrchestrator {
 
                 match provider_name.as_str() {
                     "openrouter" => {
-                        let api_key = var("OPENROUTER_API_KEY").map_err(|_| {
-                            RoutingError::Other("OPENROUTER_API_KEY not set".to_owned())
+                        let api_key = var(Self::ENV_OPENROUTER_API_KEY).map_err(|_| {
+                            RoutingError::Other(format!("{} not set", Self::ENV_OPENROUTER_API_KEY))
                         })?;
                         let provider =
                             OpenRouterProvider::new(api_key)?.with_model(model_name.clone());
                         Ok(Arc::new(provider))
                     }
                     "anthropic" => {
-                        let api_key = var("ANTHROPIC_API_KEY").map_err(|_| {
-                            RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned())
+                        let api_key = var(Self::ENV_ANTHROPIC_API_KEY).map_err(|_| {
+                            RoutingError::Other(format!("{} not set", Self::ENV_ANTHROPIC_API_KEY))
                         })?;
                         let provider = AnthropicProvider::new(api_key)?;
                         Ok(Arc::new(provider))
@@ -349,12 +356,12 @@ impl RoutingOrchestrator {
         self.execute_tasks(analysis.tasks).await
     }
 
-    #[must_use]
+    /// Gets the routing configuration.
     pub fn config(&self) -> &RoutingConfig {
         &self.config
     }
 
-    #[must_use]
+    /// Gets a reference to the workspace state.
     pub fn workspace(&self) -> Arc<WorkspaceState> {
         Arc::clone(&self.workspace)
     }

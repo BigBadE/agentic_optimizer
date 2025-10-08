@@ -14,7 +14,7 @@ pub struct ReadFileTool {
 }
 
 impl ReadFileTool {
-    #[must_use]
+    /// Create a new read file tool
     pub fn new(workspace_root: PathBuf) -> Self {
         Self { workspace_root }
     }
@@ -82,7 +82,7 @@ pub struct WriteFileTool {
 }
 
 impl WriteFileTool {
-    #[must_use]
+    /// Create a new write file tool
     pub fn new(workspace_root: PathBuf) -> Self {
         Self { workspace_root }
     }
@@ -169,7 +169,7 @@ pub struct ListFilesTool {
 }
 
 impl ListFilesTool {
-    #[must_use]
+    /// Create a new list files tool
     pub fn new(workspace_root: PathBuf) -> Self {
         Self { workspace_root }
     }
@@ -223,7 +223,7 @@ impl Tool for ListFilesTool {
             return Err(RoutingError::Other("Path outside workspace".to_owned()));
         }
 
-        let mut entries = Vec::new();
+        let mut entries = Vec::default();
         let mut read_dir = tokio_read_dir_async(&canonical_path)
             .await
             .map_err(|err| RoutingError::Other(format!("Failed to read directory: {err}")))?;
@@ -318,7 +318,7 @@ mod tests {
         let temp_dir = TempDir::new()?;
         fs::write(temp_dir.path().join("file1.txt"), "content1").await?;
         fs::write(temp_dir.path().join("file2.txt"), "content2").await?;
-        fs::create_dir(temp_dir.path().join("subdir")).await?;
+        fs::create_dir_all(temp_dir.path().join("subdir")).await?;
 
         let tool = ListFilesTool::new(temp_dir.path().to_path_buf());
         let result = tool.execute(json!({ "path": "" })).await?;

@@ -1,3 +1,5 @@
+//! Tests for BM25 tokenization and special token handling.
+
 #![cfg(test)]
 use merlin_context::embedding::BM25Index;
 
@@ -7,7 +9,7 @@ use merlin_context::embedding::BM25Index;
 /// Panics if the BM25 index does not return expected matches.
 #[test]
 fn test_special_token_preservation() {
-    let mut index = BM25Index::new();
+    let mut index = BM25Index::default();
 
     // Add document with special tokens
     index.add_document(
@@ -36,7 +38,7 @@ fn test_special_token_preservation() {
 #[test]
 fn test_tokenization_debug() {
     // This test helps debug what tokens are actually generated
-    let mut index = BM25Index::new();
+    let mut index = BM25Index::default();
 
     index.add_document("file1.rs".into(), "UserService::find_by_email");
     index.add_document("file2.rs".into(), "UserService find by email");
@@ -62,7 +64,7 @@ fn test_tokenization_debug() {
 /// Panics if no results are returned for the phrase query.
 #[test]
 fn test_bigram_generation() {
-    let mut index = BM25Index::new();
+    let mut index = BM25Index::default();
 
     index.add_document("test.rs".into(), "authentication service implementation");
     index.finalize();
@@ -78,7 +80,7 @@ fn test_bigram_generation() {
 /// Panics if special tokens or cleaned tokens do not return results.
 #[test]
 fn test_mixed_special_and_regular_tokens() {
-    let mut index = BM25Index::new();
+    let mut index = BM25Index::default();
 
     index.add_document(
         "cli.rs".into(),

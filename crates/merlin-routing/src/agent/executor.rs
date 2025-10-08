@@ -30,6 +30,9 @@ struct ExecInputs<'life> {
 }
 
 impl AgentExecutor {
+    const ENV_OPENROUTER_API_KEY: &'static str = "OPENROUTER_API_KEY";
+    const ENV_ANTHROPIC_API_KEY: &'static str = "ANTHROPIC_API_KEY";
+    /// Create a new agent executor
     pub fn new(
         router: Arc<dyn ModelRouter>,
         validator: Arc<dyn Validator>,
@@ -39,7 +42,7 @@ impl AgentExecutor {
             router,
             validator,
             tool_registry,
-            step_tracker: StepTracker::new(),
+            step_tracker: StepTracker::default(),
         }
     }
 
@@ -254,7 +257,7 @@ impl AgentExecutor {
         // Example: Look for patterns like "TOOL:read_file:path/to/file"
         // This is a placeholder - real implementation would use LLM's function calling
 
-        Vec::new()
+        Vec::default()
     }
 
     /// Create query with tool descriptions
@@ -295,15 +298,16 @@ impl AgentExecutor {
                 model_name,
             } => match provider_name.as_str() {
                 "openrouter" => {
-                    let api_key = env::var("OPENROUTER_API_KEY").map_err(|_| {
-                        RoutingError::Other("OPENROUTER_API_KEY not set".to_owned())
+                    let api_key = env::var(Self::ENV_OPENROUTER_API_KEY).map_err(|_| {
+                        RoutingError::Other(format!("{} not set", Self::ENV_OPENROUTER_API_KEY))
                     })?;
                     let provider = OpenRouterProvider::new(api_key)?.with_model(model_name.clone());
                     Ok(Arc::new(provider))
                 }
                 "anthropic" => {
-                    let api_key = env::var("ANTHROPIC_API_KEY")
-                        .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
+                    let api_key = env::var(Self::ENV_ANTHROPIC_API_KEY).map_err(|_| {
+                        RoutingError::Other(format!("{} not set", Self::ENV_ANTHROPIC_API_KEY))
+                    })?;
                     let provider = AnthropicProvider::new(api_key)?;
                     Ok(Arc::new(provider))
                 }
@@ -399,12 +403,17 @@ mod tests {
     async fn test_agent_executor_creation() {
         let router = Arc::new(StrategyRouter::with_default_strategies());
         let validator = Arc::new(ValidationPipeline::with_default_stages());
-        let tool_registry = Arc::new(ToolRegistry::new());
+        let tool_registry = Arc::new(ToolRegistry::default());
 
         let executor = AgentExecutor::new(router, validator, tool_registry);
 
         // Just verify it was created successfully
-        assert!(executor.step_tracker.get_steps(&TaskId::new()).is_none());
+        assert!(
+            executor
+                .step_tracker
+                .get_steps(&TaskId::default())
+                .is_none()
+        );
     }
 
     #[tokio::test]
@@ -413,7 +422,7 @@ mod tests {
     async fn test_tool_registry_integration() {
         let workspace = PathBuf::from(".");
         let tool_registry = Arc::new(
-            ToolRegistry::new()
+            ToolRegistry::default()
                 .with_tool(Arc::new(ReadFileTool::new(workspace.clone())))
                 .with_tool(Arc::new(WriteFileTool::new(workspace.clone())))
                 .with_tool(Arc::new(ListFilesTool::new(workspace.clone())))

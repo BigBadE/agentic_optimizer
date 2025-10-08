@@ -117,11 +117,6 @@ mod tests {
     use tempfile::TempDir;
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if tool execution fails in the test harness.
-    ///
-    /// # Panics
-    /// Panics if returned JSON is missing expected fields.
     async fn test_run_command_tool() -> Result<()> {
         let temp_dir = TempDir::new()?;
 
@@ -143,11 +138,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if `TempDir` creation fails in the test harness.
-    ///
-    /// # Panics
-    /// Panics if a non-whitelisted command unexpectedly succeeds.
     async fn test_command_whitelist() -> Result<()> {
         let temp_dir = TempDir::new()?;
 
@@ -163,11 +153,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if tool execution fails in the test harness.
-    ///
-    /// # Panics
-    /// Panics if returned JSON is missing expected fields.
     async fn test_custom_whitelist() -> Result<()> {
         let temp_dir = TempDir::new()?;
 

@@ -224,10 +224,6 @@ fn task_status_to_string(status: TaskStatus) -> &'static str {
 }
 
 /// Extracts clean task ID string from `TaskId` debug format
-///
-/// # Panics
-///
-/// This function may panic if the `TaskId` format changes unexpectedly
 fn extract_task_id_string(task_id: TaskId) -> String {
     let task_id_str = format!("{task_id:?}");
     let Some(stripped) = task_id_str.strip_prefix("TaskId(") else {

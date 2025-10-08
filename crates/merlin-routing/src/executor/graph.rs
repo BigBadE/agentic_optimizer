@@ -84,9 +84,6 @@ mod tests {
     use crate::Task;
 
     #[test]
-    /// # Panics
-    ///
-    /// Panics if assertions about ready task counts or IDs fail.
     fn test_task_graph_ready_tasks() {
         let task_a = Task::new("Task A".to_owned());
         let task_b = Task::new("Task B".to_owned()).with_dependencies(vec![task_a.id]);
@@ -105,9 +102,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    ///
-    /// Panics if the constructed graph incorrectly reports cycles.
     fn test_task_graph_cycle_detection() {
         let task_a = Task::new("Task A".to_owned());
         let task_b = Task::new("Task B".to_owned()).with_dependencies(vec![task_a.id]);

@@ -42,8 +42,6 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if a premium tier is not selected for critical tasks.
     async fn test_quality_critical_routing() {
         let strategy = QualityCriticalStrategy;
 
@@ -68,8 +66,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if a premium tier is not selected for high priority tasks.
     async fn test_high_priority_routing() {
         let strategy = QualityCriticalStrategy;
 
@@ -84,8 +80,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if applicability check fails unexpectedly.
     async fn test_low_priority_not_applicable() {
         let strategy = QualityCriticalStrategy;
 

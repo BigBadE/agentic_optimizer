@@ -60,7 +60,7 @@ tempfile = "3.23"
 
 # Testing dependencies
 criterion= { version = "0.7", features = ["html_reports", "async_tokio"] }
-iai = "0.1"
+iai-callgrind = "0.16"
 assert_cmd = "2.0"
 predicates = "3.1"
 
@@ -77,10 +77,10 @@ ra_ap_load-cargo = "0.0"
 [profile.dev]
 opt-level = 1
 lto = false
+codegen-backend = "cranelift"
 
 [profile.dev.package."*"]
 opt-level = 3
-#codegen-backend = "cranelift"
 
 [profile.release]
 codegen-units = 1
@@ -117,6 +117,9 @@ pedantic = "deny"
 perf = "deny"
 style = "deny"
 suspicious = "deny"
+
+# Complexity
+only_used_in_recursion = { level = "allow", priority = 1 }
 
 # Nursery
 missing_const_for_fn = { level = "allow", priority = 1 }

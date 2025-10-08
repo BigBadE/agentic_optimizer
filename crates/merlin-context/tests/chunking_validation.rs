@@ -1,7 +1,19 @@
 //! Integration tests for chunking validation across the entire codebase.
-
-#![cfg(test)]
-#![allow(clippy::print_stderr, reason = "Test output requires stderr")]
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
+)]
 
 use merlin_context::embedding::chunking::{
     FileChunk, MAX_CHUNK_TOKENS, MIN_CHUNK_TOKENS, chunk_file, estimate_tokens,
@@ -118,11 +130,7 @@ fn process_file_for_min_tokens(
     true
 }
 
-#[cfg(test)]
 #[test]
-/// # Panics
-///
-/// Panics if any chunk violates the minimum token constraint.
 fn test_all_chunks_respect_min_tokens() {
     let files = collect_all_source_files();
 
@@ -160,11 +168,7 @@ fn test_all_chunks_respect_min_tokens() {
     info!("✅ All chunks respect MIN_CHUNK_TOKENS");
 }
 
-#[cfg(test)]
 #[test]
-/// # Panics
-///
-/// Panics if any chunk exceeds the maximum token constraint.
 fn test_all_chunks_respect_max_tokens() {
     let files = collect_all_source_files();
 
@@ -304,11 +308,7 @@ fn process_file_for_line_numbers(
     true
 }
 
-#[cfg(test)]
 #[test]
-/// # Panics
-///
-/// Panics if any chunk has invalid line numbers.
 fn test_chunk_line_numbers_are_valid() {
     let files = collect_all_source_files();
 
@@ -410,11 +410,7 @@ fn display_chunk_statistics(total_files: usize, total_chunks: usize, token_count
     info!("  In target range: {in_range} ({percentage:.1}%)");
 }
 
-#[cfg(test)]
 #[test]
-/// # Panics
-///
-/// Panics if statistics calculations encounter unexpected empty state.
 fn test_chunk_statistics() {
     let files = collect_all_source_files();
 

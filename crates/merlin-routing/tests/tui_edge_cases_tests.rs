@@ -1,6 +1,19 @@
 //! Edge case tests for TUI - keyboard navigation, boundary conditions, error handling
-#![cfg(test)]
-
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
+)]
 mod common;
 
 use common::*;
@@ -13,8 +26,6 @@ use merlin_routing::user_interface::{EmojiMode, calculate_width as ui_calculate_
 use tui_textarea::Input;
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_manager_navigation_empty() {
     let manager = TaskManager::default();
 
@@ -23,8 +34,6 @@ fn test_task_manager_navigation_empty() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_manager_navigation_single_task() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -37,8 +46,6 @@ fn test_task_manager_navigation_single_task() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_navigation_empty() {
     let tree = OutputTree::default();
 
@@ -46,8 +53,6 @@ fn test_output_tree_navigation_empty() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_move_up_at_top() {
     let mut tree = OutputTree::default();
 
@@ -64,8 +69,6 @@ fn test_output_tree_move_up_at_top() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_move_down_at_bottom() {
     let mut tree = OutputTree::default();
 
@@ -84,8 +87,6 @@ fn test_output_tree_move_down_at_bottom() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_move_to_start() {
     let mut tree = OutputTree::default();
 
@@ -106,8 +107,6 @@ fn test_output_tree_move_to_start() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_move_to_end() {
     let mut tree = OutputTree::default();
 
@@ -128,8 +127,6 @@ fn test_output_tree_move_to_end() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_page_up() {
     let mut tree = OutputTree::default();
 
@@ -150,8 +147,6 @@ fn test_output_tree_page_up() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_page_down() {
     let mut tree = OutputTree::default();
 
@@ -171,8 +166,6 @@ fn test_output_tree_page_down() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_toggle_collapse() {
     let mut tree = OutputTree::default();
 
@@ -194,8 +187,6 @@ fn test_output_tree_toggle_collapse() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_expand_collapse_selected() {
     let mut tree = OutputTree::default();
 
@@ -219,8 +210,6 @@ fn test_output_tree_expand_collapse_selected() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_collapse_with_multiple_levels() {
     let mut manager = TaskManager::default();
 
@@ -243,8 +232,6 @@ fn test_task_collapse_with_multiple_levels() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_partial_collapse() {
     let mut manager = TaskManager::default();
 
@@ -269,8 +256,6 @@ fn test_task_partial_collapse() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_input_manager_very_long_line() {
     let mut manager = InputManager::default();
 
@@ -288,8 +273,6 @@ fn test_input_manager_very_long_line() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_input_manager_many_lines() {
     let mut manager = InputManager::default();
 
@@ -313,8 +296,6 @@ fn test_input_manager_many_lines() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_very_deep_nesting() {
     let mut tree = OutputTree::default();
 
@@ -337,8 +318,6 @@ fn test_output_tree_very_deep_nesting() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_many_siblings() {
     let mut tree = OutputTree::default();
 
@@ -366,8 +345,6 @@ fn test_output_tree_many_siblings() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_manager_many_tasks() {
     let mut manager = TaskManager::default();
 
@@ -382,8 +359,6 @@ fn test_task_manager_many_tasks() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_manager_remove_nonexistent() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -399,8 +374,6 @@ fn test_task_manager_remove_nonexistent() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_unicode_width_calculation() {
     use merlin_routing::user_interface::{EmojiMode, calculate_width};
 
@@ -411,8 +384,6 @@ fn test_unicode_width_calculation() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_text_truncation() {
     use merlin_routing::user_interface::{EmojiMode, truncate_to_width};
 
@@ -424,8 +395,6 @@ fn test_text_truncation() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_text_wrapping() {
     use merlin_routing::user_interface::{EmojiMode, wrap_text};
 
@@ -439,8 +408,6 @@ fn test_text_wrapping() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_emoji_stripping() {
     use merlin_routing::user_interface::strip_emojis;
 
@@ -454,8 +421,6 @@ fn test_emoji_stripping() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_output_tree_to_text() {
     let mut tree = OutputTree::default();
 
@@ -472,8 +437,6 @@ fn test_output_tree_to_text() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_manager_orphaned_tasks() {
     let mut manager = TaskManager::default();
 
@@ -489,8 +452,6 @@ fn test_task_manager_orphaned_tasks() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_manager_circular_reference_prevention() {
     let mut manager = TaskManager::default();
 
@@ -507,8 +468,6 @@ fn test_task_manager_circular_reference_prevention() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_zero_width_terminal_handling() {
     let _manager = InputManager::default();
 
@@ -517,8 +476,6 @@ fn test_zero_width_terminal_handling() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_special_control_characters() {
     let mut manager = InputManager::default();
 

@@ -123,8 +123,6 @@ mod tests {
     use super::*;
 
     #[test]
-    /// # Panics
-    /// Panics if decompose logic returns unexpected number of tasks.
     fn test_simple_task_no_decomposition() {
         let decomposer = TaskDecomposer;
         let extractor = IntentExtractor;
@@ -136,8 +134,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if refactor decomposition does not produce analyze/refactor/test sequence.
     fn test_refactor_decomposition() {
         let decomposer = TaskDecomposer;
         let extractor = IntentExtractor;
@@ -155,8 +151,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if complex creation does not produce design/implement/test sequence.
     fn test_complex_creation_decomposition() {
         let decomposer = TaskDecomposer;
         let extractor = IntentExtractor;
@@ -172,8 +166,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if fix path does not produce diagnose/fix/verify tasks.
     fn test_fix_with_analysis() {
         let decomposer = TaskDecomposer;
         let extractor = IntentExtractor;

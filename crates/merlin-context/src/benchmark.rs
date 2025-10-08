@@ -396,128 +396,138 @@ impl BenchmarkResult {
         if idcg > 0.0 { dcg / idcg } else { 0.0 }
     }
 
+    /// Format header section of the report
+    fn format_header(&self, report: &mut String) {
+        writeln!(report, "# Benchmark: {}\n", self.test_case.name).unwrap_or(());
+        writeln!(report, "**Query**: \"{}\"\n", self.test_case.query).unwrap_or(());
+        writeln!(report, "**Description**: {}\n", self.test_case.description).unwrap_or(());
+    }
+
+    /// Format metrics section of the report
+    fn format_metrics(&self, report: &mut String) {
+        report.push_str("## Metrics\n\n");
+        writeln!(
+            report,
+            "- **Precision@3**:  {:.1}%",
+            self.metrics.precision_at_3 * 100.0
+        )
+        .unwrap_or(());
+        writeln!(
+            report,
+            "- **Precision@5**:  {:.1}%",
+            self.metrics.precision_at_5 * 100.0
+        )
+        .unwrap_or(());
+        writeln!(
+            report,
+            "- **Precision@10**: {:.1}%",
+            self.metrics.precision_at_10 * 100.0
+        )
+        .unwrap_or(());
+        writeln!(
+            report,
+            "- **Recall@10**:    {:.1}%",
+            self.metrics.recall_at_10 * 100.0
+        )
+        .unwrap_or(());
+        writeln!(
+            report,
+            "- **Recall@20**:    {:.1}%",
+            self.metrics.recall_at_20 * 100.0
+        )
+        .unwrap_or(());
+        writeln!(report, "- **MRR**:          {:.3}", self.metrics.mrr).unwrap_or(());
+        writeln!(report, "- **NDCG@10**:      {:.3}", self.metrics.ndcg_at_10).unwrap_or(());
+        writeln!(
+            report,
+            "- **Exclusion**:    {:.1}%",
+            self.metrics.exclusion_rate * 100.0
+        )
+        .unwrap_or(());
+        writeln!(
+            report,
+            "- **Critical in Top-3**: {:.1}%",
+            self.metrics.critical_in_top_3 * 100.0
+        )
+        .unwrap_or(());
+        writeln!(
+            report,
+            "- **High in Top-5**:     {:.1}%\n",
+            self.metrics.high_in_top_5 * 100.0
+        )
+        .unwrap_or(());
+    }
+
+    /// Get status string for a ranked file
+    fn get_file_status(&self, rank: usize) -> String {
+        if let Some((_, expected)) = self
+            .found_expected
+            .iter()
+            .find(|(found_rank, _)| *found_rank == rank)
+        {
+            let priority = match expected.priority {
+                Priority::Critical => "Critical",
+                Priority::High => "High",
+                Priority::Medium => "Medium",
+                Priority::Low => "Low",
+            };
+            format!("Check mark (expected: {priority})")
+        } else if self
+            .found_excluded
+            .iter()
+            .any(|(excluded_rank, _)| *excluded_rank == rank)
+        {
+            "Cross mark (excluded)".to_string()
+        } else {
+            "Cross mark (not expected)".to_string()
+        }
+    }
+
+    /// Format top results section of the report
+    fn format_top_results(&self, report: &mut String) {
+        report.push_str("## Top 10 Results\n\n");
+        for (index, ranked_file) in self.ranked_files.iter().take(10).enumerate() {
+            let rank = index + 1;
+            let path_str = ranked_file.path.to_str().unwrap_or("?");
+            let status = self.get_file_status(rank);
+            writeln!(
+                report,
+                "{rank}. {path_str} {status} (score: {:.3})",
+                ranked_file.score
+            )
+            .unwrap_or(());
+        }
+    }
+
+    /// Format missing files section of the report
+    fn format_missing_files(&self, report: &mut String) {
+        if self.missing_expected.is_empty() {
+            return;
+        }
+        report.push_str("\n## Missing Expected Files\n\n");
+        for expected in &self.missing_expected {
+            let priority_str = match expected.priority {
+                Priority::Critical => "Critical",
+                Priority::High => "High",
+                Priority::Medium => "Medium",
+                Priority::Low => "Low",
+            };
+            writeln!(
+                report,
+                "- **{}** ({priority_str}): {}",
+                expected.path, expected.reason
+            )
+            .unwrap_or(());
+        }
+    }
+
     /// Format result as human-readable text
-    #[allow(clippy::unused_io_amount, reason = "Writing to String never fails")]
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Report formatting requires detailed output"
-    )]
     pub fn format_report(&self) -> String {
         let mut report = String::default();
-
-        {
-            writeln!(report, "# Benchmark: {}\n", self.test_case.name).unwrap_or(());
-            writeln!(report, "**Query**: \"{}\"\n", self.test_case.query).unwrap_or(());
-            writeln!(report, "**Description**: {}\n", self.test_case.description).unwrap_or(());
-
-            report.push_str("## Metrics\n\n");
-            writeln!(
-                report,
-                "- **Precision@3**:  {:.1}%",
-                self.metrics.precision_at_3 * 100.0
-            )
-            .unwrap_or(());
-            writeln!(
-                report,
-                "- **Precision@5**:  {:.1}%",
-                self.metrics.precision_at_5 * 100.0
-            )
-            .unwrap_or(());
-            writeln!(
-                report,
-                "- **Precision@10**: {:.1}%",
-                self.metrics.precision_at_10 * 100.0
-            )
-            .unwrap_or(());
-            writeln!(
-                report,
-                "- **Recall@10**:    {:.1}%",
-                self.metrics.recall_at_10 * 100.0
-            )
-            .unwrap_or(());
-            writeln!(
-                report,
-                "- **Recall@20**:    {:.1}%",
-                self.metrics.recall_at_20 * 100.0
-            )
-            .unwrap_or(());
-            writeln!(report, "- **MRR**:          {:.3}", self.metrics.mrr).unwrap_or(());
-            writeln!(report, "- **NDCG@10**:      {:.3}", self.metrics.ndcg_at_10).unwrap_or(());
-            writeln!(
-                report,
-                "- **Exclusion**:    {:.1}%",
-                self.metrics.exclusion_rate * 100.0
-            )
-            .unwrap_or(());
-            writeln!(
-                report,
-                "- **Critical in Top-3**: {:.1}%",
-                self.metrics.critical_in_top_3 * 100.0
-            )
-            .unwrap_or(());
-            writeln!(
-                report,
-                "- **High in Top-5**:     {:.1}%\n",
-                self.metrics.high_in_top_5 * 100.0
-            )
-            .unwrap_or(());
-
-            report.push_str("## Top 10 Results\n\n");
-            for (index, ranked_file) in self.ranked_files.iter().take(10).enumerate() {
-                let rank = index + 1;
-                let path_str = ranked_file.path.to_str().unwrap_or("?");
-
-                let status = if let Some((_, expected)) = self
-                    .found_expected
-                    .iter()
-                    .find(|(found_rank, _)| *found_rank == rank)
-                {
-                    format!(
-                        "Check mark (expected: {})",
-                        match expected.priority {
-                            Priority::Critical => "Critical",
-                            Priority::High => "High",
-                            Priority::Medium => "Medium",
-                            Priority::Low => "Low",
-                        }
-                    )
-                } else if self
-                    .found_excluded
-                    .iter()
-                    .any(|(excluded_rank, _)| *excluded_rank == rank)
-                {
-                    "Cross mark (excluded)".to_string()
-                } else {
-                    "Cross mark (not expected)".to_string()
-                };
-
-                writeln!(
-                    report,
-                    "{}. {} {} (score: {:.3})",
-                    rank, path_str, status, ranked_file.score
-                )
-                .unwrap_or(());
-            }
-
-            if !self.missing_expected.is_empty() {
-                report.push_str("\n## Missing Expected Files\n\n");
-                for expected in &self.missing_expected {
-                    let priority_str = match expected.priority {
-                        Priority::Critical => "Critical",
-                        Priority::High => "High",
-                        Priority::Medium => "Medium",
-                        Priority::Low => "Low",
-                    };
-                    writeln!(
-                        report,
-                        "- **{}** ({}): {}",
-                        expected.path, priority_str, expected.reason
-                    )
-                    .unwrap_or(());
-                }
-            }
-        }
-
+        self.format_header(&mut report);
+        self.format_metrics(&mut report);
+        self.format_top_results(&mut report);
+        self.format_missing_files(&mut report);
         report
     }
 }

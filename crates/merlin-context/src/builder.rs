@@ -550,9 +550,6 @@ impl ContextBuilder {
     ///
     /// # Errors
     /// Returns an error if search initialization or execution fails.
-    ///
-    /// # Panics
-    /// This function will panic if the vector manager is None after initialization attempt.
     pub async fn search_context(&mut self, query: &str) -> Result<Vec<SearchResult>> {
         if self.vector_manager.is_none() {
             tracing::info!("Initializing vector search...");

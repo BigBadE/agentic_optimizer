@@ -1,7 +1,19 @@
 //! Comprehensive tests for `TaskManager` functionality
-#![cfg(test)]
-#![allow(clippy::expect_used, reason = "Test code is allowed to use expect")]
-
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
+)]
 mod common;
 
 use common::*;
@@ -10,8 +22,6 @@ use merlin_routing::user_interface::task_manager::{TaskManager, TaskStatus};
 use std::time::{Duration, Instant};
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_add_task() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -24,8 +34,6 @@ fn test_add_task() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_remove_task() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -38,8 +46,6 @@ fn test_remove_task() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_remove_task_with_children() {
     let mut manager = TaskManager::default();
 
@@ -59,8 +65,6 @@ fn test_remove_task_with_children() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_collapse_expand() {
     let mut manager = TaskManager::default();
 
@@ -85,8 +89,6 @@ fn test_collapse_expand() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_toggle_collapse() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -103,8 +105,6 @@ fn test_toggle_collapse() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_has_children() {
     let mut manager = TaskManager::default();
 
@@ -119,8 +119,6 @@ fn test_has_children() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_task_order_preserved_after_rebuild() {
     let mut manager = TaskManager::default();
     let now = Instant::now();
@@ -144,8 +142,6 @@ fn test_task_order_preserved_after_rebuild() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_is_descendant_of() {
     let mut manager = TaskManager::default();
 
@@ -171,8 +167,6 @@ fn test_is_descendant_of() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_get_visible_tasks_with_nested_collapse() {
     let mut manager = TaskManager::default();
 
@@ -201,8 +195,6 @@ fn test_get_visible_tasks_with_nested_collapse() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_iter_tasks() {
     let mut manager = TaskManager::default();
 
@@ -216,8 +208,6 @@ fn test_iter_tasks() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_is_empty() {
     let mut manager = TaskManager::default();
     assert!(manager.is_empty());
@@ -231,8 +221,6 @@ fn test_is_empty() {
 }
 
 #[test]
-/// # Panics
-/// Panics if task does not exist or assertions fail.
 fn test_get_task_mut() {
     let mut manager = TaskManager::default();
     let task_id = TaskId::default();
@@ -240,10 +228,14 @@ fn test_get_task_mut() {
     manager.add_task(task_id, create_test_task("Test"));
 
     {
-        let task = manager.get_task_mut(task_id).expect("Task should exist");
+        let task = manager
+            .get_task_mut(task_id)
+            .unwrap_or_else(|| panic!("Task should exist"));
         task.status = TaskStatus::Completed;
     }
 
-    let task = manager.get_task(task_id).expect("Task should exist");
+    let task = manager
+        .get_task(task_id)
+        .unwrap_or_else(|| panic!("Task should exist"));
     assert_eq!(task.status, TaskStatus::Completed);
 }

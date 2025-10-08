@@ -60,8 +60,6 @@ mod tests {
     use crate::ContextRequirements;
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if selected tiers do not match expected routing.
     async fn test_cost_optimization() {
         let strategy = CostOptimizationStrategy::new(4000);
 
@@ -91,8 +89,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if applicability check fails unexpectedly.
     async fn test_critical_tasks_not_applicable() {
         let strategy = CostOptimizationStrategy::new(4000);
 

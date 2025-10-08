@@ -186,8 +186,6 @@ mod tests {
     use std::slice::from_ref;
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if lock acquisition unexpectedly fails in the test harness.
     async fn test_write_lock_exclusive() {
         let manager = Arc::new(FileLockManager::default());
         let task_a = TaskId::default();
@@ -204,8 +202,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if lock acquisition unexpectedly fails in the test harness.
     async fn test_read_locks_shared() {
         let manager = Arc::new(FileLockManager::default());
         let task_a = TaskId::default();
@@ -223,8 +219,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if lock acquisition unexpectedly fails in the test harness.
     async fn test_write_blocks_read() {
         let manager = Arc::new(FileLockManager::default());
         let task_a = TaskId::default();

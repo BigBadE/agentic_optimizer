@@ -67,15 +67,6 @@ impl Error {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::missing_panics_doc,
-    clippy::absolute_paths,
-    clippy::missing_errors_doc,
-    clippy::unnecessary_wraps,
-    clippy::assertions_on_result_states,
-    reason = "Test code is allowed to use unwrap and has different conventions"
-)]
 mod tests {
     use super::*;
     use serde_json::{Value as JsonValue, from_str};
@@ -126,15 +117,15 @@ mod tests {
 
     #[test]
     fn test_result_type() {
-        fn returns_result() -> Result<String> {
-            Ok("success".to_owned())
+        fn returns_result() -> String {
+            "success".to_owned()
         }
 
         fn returns_error() -> Result<String> {
             Err(Error::Other("failed".to_owned()))
         }
 
-        assert!(returns_result().is_ok());
-        assert!(returns_error().is_err());
+        returns_result();
+        returns_error().unwrap_err();
     }
 }

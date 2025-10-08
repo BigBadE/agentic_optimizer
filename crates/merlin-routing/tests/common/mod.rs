@@ -1,18 +1,25 @@
 //! Common test utilities and helpers for merlin-routing tests
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
+)]
 
 use merlin_core::{Response, TokenUsage};
 use merlin_routing::user_interface::output_tree::OutputTree;
 use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskStatus};
 use merlin_routing::{TaskId, TaskResult, ValidationResult};
 use std::time::Instant;
-
-// Reference all helper functions to prevent dead code warnings
-const _: fn() = || {
-    let _ = create_child_task;
-    let _ = create_completed_task;
-    let _ = create_failed_task;
-    let _ = create_test_task_result;
-};
 
 /// Create a basic test task with sensible defaults
 pub fn create_test_task(desc: &str) -> TaskDisplay {

@@ -138,14 +138,6 @@ impl FileContext {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::unwrap_used,
-    clippy::absolute_paths,
-    clippy::missing_panics_doc,
-    clippy::float_cmp,
-    clippy::redundant_clone,
-    reason = "Test code is allowed to use unwrap and has different conventions"
-)]
 mod tests {
     use super::*;
     use serde_json::{from_str, to_string};
@@ -208,7 +200,7 @@ mod tests {
             PathBuf::from("test.rs"),
             "content".to_owned(),
         )];
-        let context = Context::new("prompt").with_files(files.clone());
+        let context = Context::new("prompt").with_files(files);
         assert_eq!(context.files.len(), 1);
         assert_eq!(context.files[0].path, PathBuf::from("test.rs"));
     }
@@ -279,7 +271,7 @@ mod tests {
         let json = to_string(&response).unwrap();
         let deserialized: Response = from_str(&json).unwrap();
         assert_eq!(response.text, deserialized.text);
-        assert_eq!(response.confidence, deserialized.confidence);
+        assert!((response.confidence - deserialized.confidence).abs() < f64::EPSILON);
         assert_eq!(response.provider, deserialized.provider);
     }
 }

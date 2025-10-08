@@ -2,6 +2,20 @@
 //!
 //! This crate provides language provider abstractions and implementations
 //! for semantic code analysis using language-specific tools like rust-analyzer.
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        reason = "Allow for tests"
+    )
+)]
 
 mod backends;
 /// Language provider trait and types.
@@ -33,12 +47,6 @@ pub fn create_backend(language: Language) -> Result<Box<dyn LanguageProvider>> {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::missing_panics_doc,
-    clippy::uninlined_format_args,
-    clippy::assertions_on_result_states,
-    reason = "Test code is allowed to use unwrap and has different conventions"
-)]
 mod tests {
     use super::*;
 
@@ -50,7 +58,7 @@ mod tests {
     #[test]
     fn test_language_debug() {
         let lang = Language::Rust;
-        let debug_str = format!("{:?}", lang);
+        let debug_str = format!("{lang:?}");
         assert_eq!(debug_str, "Rust");
     }
 
@@ -64,6 +72,6 @@ mod tests {
     #[test]
     fn test_create_backend_rust() {
         let result = create_backend(Language::Rust);
-        assert!(result.is_ok());
+        result.unwrap();
     }
 }

@@ -264,11 +264,6 @@ mod tests {
     use tokio::fs;
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if tool execution or IO operations fail in the test harness.
-    ///
-    /// # Panics
-    /// Panics if returned JSON is missing expected fields.
     async fn test_read_file_tool() -> Result<()> {
         let temp_dir = TempDir::new()?;
         let test_file = temp_dir.path().join("test.txt");
@@ -283,11 +278,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if tool execution or IO operations fail in the test harness.
-    ///
-    /// # Panics
-    /// Panics if returned JSON is missing expected fields.
     async fn test_write_file_tool() -> Result<()> {
         let temp_dir = TempDir::new()?;
 
@@ -309,11 +299,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if tool execution or IO operations fail in the test harness.
-    ///
-    /// # Panics
-    /// Panics if returned JSON is missing expected entries array.
     async fn test_list_files_tool() -> Result<()> {
         let temp_dir = TempDir::new()?;
         fs::write(temp_dir.path().join("file1.txt"), "content1").await?;
@@ -332,11 +317,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if `TempDir` creation fails in the test harness.
-    ///
-    /// # Panics
-    /// Panics if traversal attempt does not produce an error.
     async fn test_security_path_traversal() -> Result<()> {
         let temp_dir = TempDir::new()?;
 

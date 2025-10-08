@@ -25,7 +25,7 @@ unicode-width.workspace = true
 
 [dev-dependencies]
 criterion.workspace = true
-iai.workspace = true
+iai-callgrind.workspace = true
 
 [[bench]]
 name = "routing_benchmarks"

@@ -1,6 +1,19 @@
 //! Comprehensive screen rendering tests - validates actual rendered output
-#![cfg(test)]
-
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
+)]
 mod common;
 
 use common::*;
@@ -18,8 +31,6 @@ use ratatui::buffer::Cell;
 
 /// Helper to extract text content from terminal buffer
 ///
-/// # Panics
-/// Does not panic - this is a test helper function.
 fn get_buffer_text(terminal: &Terminal<TestBackend>) -> String {
     terminal
         .backend()
@@ -32,8 +43,6 @@ fn get_buffer_text(terminal: &Terminal<TestBackend>) -> String {
 
 /// Helper to render and get buffer text
 ///
-/// # Panics
-/// Panics if rendering fails (this is expected in tests).
 fn render_and_get_text(
     terminal: &mut Terminal<TestBackend>,
     manager: &TaskManager,
@@ -58,8 +67,6 @@ fn render_and_get_text(
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_empty_screen() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -77,8 +84,6 @@ fn test_render_empty_screen() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_task_description() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -102,8 +107,6 @@ fn test_render_task_description() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_running_task_indicator() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -126,8 +129,6 @@ fn test_render_running_task_indicator() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_completed_task_indicator() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -148,8 +149,6 @@ fn test_render_completed_task_indicator() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_failed_task_indicator() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -170,8 +169,6 @@ fn test_render_failed_task_indicator() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_task_with_progress() {
     let backend = TestBackend::new(100, 30);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -202,8 +199,6 @@ fn test_render_task_with_progress() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_hierarchical_tasks() {
     let backend = TestBackend::new(100, 30);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -229,8 +224,6 @@ fn test_render_hierarchical_tasks() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_collapsed_task() {
     let backend = TestBackend::new(100, 30);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -255,8 +248,6 @@ fn test_render_collapsed_task() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_output_tree_with_steps() {
     let backend = TestBackend::new(120, 40);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -294,8 +285,6 @@ fn test_render_output_tree_with_steps() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_long_task_description() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -317,8 +306,6 @@ fn test_render_long_task_description() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_unicode_in_task() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -339,8 +326,6 @@ fn test_render_unicode_in_task() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_emoji_in_task() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -361,8 +346,6 @@ fn test_render_emoji_in_task() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_focused_input_pane() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -380,8 +363,6 @@ fn test_render_focused_input_pane() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_focused_tasks_pane() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -402,8 +383,6 @@ fn test_render_focused_tasks_pane() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_focused_output_pane() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -427,8 +406,6 @@ fn test_render_focused_output_pane() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_multiple_tasks() {
     let backend = TestBackend::new(100, 40);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -452,8 +429,6 @@ fn test_render_multiple_tasks() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_task_with_output_lines() {
     let backend = TestBackend::new(100, 40);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -483,8 +458,6 @@ fn test_render_task_with_output_lines() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_small_terminal() {
     let backend = TestBackend::new(40, 10);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -516,8 +489,6 @@ fn test_render_small_terminal() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_very_large_terminal() {
     let backend = TestBackend::new(200, 100);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -548,8 +519,6 @@ fn test_render_very_large_terminal() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_with_selected_task() {
     let backend = TestBackend::new(80, 24);
     let Ok(mut terminal) = Terminal::new(backend) else {
@@ -574,8 +543,6 @@ fn test_render_with_selected_task() {
 }
 
 #[test]
-/// # Panics
-/// Panics if rendering fails or assertions fail.
 fn test_render_deep_task_hierarchy() {
     let backend = TestBackend::new(120, 50);
     let Ok(mut terminal) = Terminal::new(backend) else {

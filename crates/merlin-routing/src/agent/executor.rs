@@ -168,7 +168,7 @@ impl AgentExecutor {
 
         // Check if response contains tool calls (simulated for now)
         // In a real implementation, this would parse the LLM response for tool calls
-        let tool_calls = self.extract_tool_calls(&response);
+        let tool_calls: Vec<(String, Value)> = vec![];
 
         if !tool_calls.is_empty() {
             // Execute tool calls
@@ -245,19 +245,6 @@ impl AgentExecutor {
             .ok_or_else(|| RoutingError::Other(format!("Tool not found: {tool_name}")))?;
 
         tool.execute(args).await
-    }
-
-    /// Extract tool calls from LLM response (simplified for Phase 2)
-    /// In a real implementation, this would parse function calling format
-    #[allow(clippy::unused_self, reason = "Will be implemented later.")]
-    fn extract_tool_calls(&self, _response: &Response) -> Vec<(String, Value)> {
-        // For Phase 2, we'll simulate tool calling by looking for markers in the text
-        // Real implementation would use proper function calling API
-
-        // Example: Look for patterns like "TOOL:read_file:path/to/file"
-        // This is a placeholder - real implementation would use LLM's function calling
-
-        Vec::default()
     }
 
     /// Create query with tool descriptions
@@ -398,8 +385,6 @@ mod tests {
     use std::path::PathBuf;
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if executor construction fails or initial state is unexpected.
     async fn test_agent_executor_creation() {
         let router = Arc::new(StrategyRouter::with_default_strategies());
         let validator = Arc::new(ValidationPipeline::with_default_stages());
@@ -417,8 +402,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if tool registry does not contain expected tools.
     async fn test_tool_registry_integration() {
         let workspace = PathBuf::from(".");
         let tool_registry = Arc::new(

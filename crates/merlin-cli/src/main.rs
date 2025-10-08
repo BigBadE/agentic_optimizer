@@ -1,4 +1,18 @@
 //! Merlin CLI - Interactive AI coding assistant command-line interface
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        reason = "Allow for tests"
+    )
+)]
 
 use anyhow::Result;
 use console::{Term, style};
@@ -9,7 +23,8 @@ use merlin_core::{Context, ModelProvider, Query, Response, TokenUsage};
 use merlin_languages::{Language, create_backend};
 use merlin_providers::OpenRouterProvider;
 use merlin_routing::{
-    MessageLevel, RoutingConfig, RoutingOrchestrator, Task, TaskResult, TuiApp, UiChannel, UiEvent,
+    MessageLevel, RoutingConfig, RoutingOrchestrator, Task, TaskId, TaskResult, TuiApp, UiChannel,
+    UiEvent,
 };
 use std::fs;
 use std::io::Write as _;
@@ -33,11 +48,6 @@ use config::Config;
 const MAX_TASKS: usize = 50;
 
 #[tokio::main]
-/// # Errors
-/// Returns an error if initialization or command handling fails.
-///
-/// # Panics
-/// May panic if tracing subscriber initialization fails unexpectedly.
 async fn main() -> Result<()> {
     Registry::default()
         .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "agentic_optimizer=info".into()))
@@ -466,25 +476,11 @@ fn cleanup_old_tasks(merlin_dir: &Path) -> Result<()> {
     Ok(())
 }
 
-/// Run fully self-contained TUI interactive session
+/// Initialize logging for TUI session
 ///
 /// # Errors
-/// Returns an error if filesystem, TUI, or async operations fail.
-#[allow(
-    clippy::too_many_lines,
-    reason = "Complex TUI event loop requires sequential logic"
-)]
-async fn run_tui_interactive(
-    orchestrator: RoutingOrchestrator,
-    project: PathBuf,
-    local_only: bool,
-    _verbose: bool,
-) -> Result<()> {
-    // Create .merlin directory for logs and task storage
-    let merlin_dir = project.join(".merlin");
-    fs::create_dir_all(&merlin_dir)?;
-
-    // Clean up old debug logs (delete and recreate)
+/// Returns error if file operations fail
+fn init_tui_logging(merlin_dir: &Path, project: &Path, local_only: bool) -> Result<fs::File> {
     let debug_log = merlin_dir.join("debug.log");
     if debug_log.exists() {
         fs::remove_file(&debug_log)?;
@@ -510,6 +506,82 @@ async fn run_tui_interactive(
             "Multi-Model"
         }
     )?;
+    Ok(log_file)
+}
+
+/// Execute a task from user input and handle the result
+async fn execute_user_task(
+    orchestrator: RoutingOrchestrator,
+    ui_channel: UiChannel,
+    mut log_file: fs::File,
+    user_input: String,
+    parent_task_id: Option<TaskId>,
+) {
+    let task = Task::new(user_input.clone());
+    let task_id = task.id;
+
+    if let Err(error) = writeln!(log_file, "Created task: {user_input}") {
+        let () = ui_channel.send(UiEvent::SystemMessage {
+            level: MessageLevel::Warning,
+            message: format!("Failed to write to log: {error}"),
+        });
+    }
+
+    ui_channel.task_started_with_parent(task_id, user_input.clone(), parent_task_id);
+
+    ui_channel.send(UiEvent::TaskOutput {
+        task_id,
+        output: format!("Prompt: {user_input}\n"),
+    });
+
+    match orchestrator
+        .execute_task_streaming(task, ui_channel.clone())
+        .await
+    {
+        Ok(result) => {
+            ui_channel.completed(result.task_id, result.clone());
+            try_write_log(
+                &ui_channel,
+                &mut log_file,
+                &format!("Response: {}", result.response.text),
+            );
+            try_write_log(
+                &ui_channel,
+                &mut log_file,
+                &format!(
+                    "Tier: {} | Duration: {}ms | Tokens: {}",
+                    result.tier_used,
+                    result.duration_ms,
+                    result.response.tokens_used.total()
+                ),
+            );
+        }
+        Err(error) => {
+            try_write_log(&ui_channel, &mut log_file, &format!("Error: {error}"));
+            ui_channel.send(UiEvent::SystemMessage {
+                level: MessageLevel::Error,
+                message: format!("Error: {error}"),
+            });
+            ui_channel.failed(task_id, error.to_string());
+        }
+    }
+}
+
+/// Run fully self-contained TUI interactive session
+///
+/// # Errors
+/// Returns an error if filesystem, TUI, or async operations fail.
+async fn run_tui_interactive(
+    orchestrator: RoutingOrchestrator,
+    project: PathBuf,
+    local_only: bool,
+    _verbose: bool,
+) -> Result<()> {
+    // Create .merlin directory for logs and task storage
+    let merlin_dir = project.join(".merlin");
+    fs::create_dir_all(&merlin_dir)?;
+
+    let mut log_file = init_tui_logging(&merlin_dir, &project, local_only)?;
 
     // Clean up old task files (keep last 50 tasks)
     cleanup_old_tasks(&merlin_dir)?;
@@ -537,80 +609,16 @@ async fn run_tui_interactive(
         if let Some(user_input) = tui_app.take_pending_input() {
             writeln!(log_file, "User: {user_input}")?;
 
-            let orchestrator_clone = orchestrator.clone();
-            let ui_channel_clone = ui_channel.clone();
-            let mut log_clone = log_file.try_clone()?;
-
-            // Get selected task as parent for new task
             let parent_task_id = tui_app.get_selected_task_id();
+            let log_clone = log_file.try_clone()?;
 
-            // TODO: Context gathering should be handled by self-determination (GATHER action)
-            // For now, disable automatic context injection to prevent infinite loops
-
-            spawn(async move {
-                // Create a single task from user input - let self-determination handle decomposition
-                // Use original user_input for task description, enhanced_input for execution
-                let task = Task::new(user_input.clone());
-                let task_id = task.id;
-
-                if let Err(error) = writeln!(log_clone, "Created task: {user_input}") {
-                    let () = ui_channel_clone.send(UiEvent::SystemMessage {
-                        level: MessageLevel::Warning,
-                        message: format!("Failed to write to log: {error}"),
-                    });
-                }
-
-                // Notify UI of task start (parent is the selected task, if any)
-                ui_channel_clone.task_started_with_parent(
-                    task_id,
-                    user_input.clone(),
-                    parent_task_id,
-                );
-
-                // Add prompt header to output
-                ui_channel_clone.send(UiEvent::TaskOutput {
-                    task_id,
-                    output: format!("Prompt: {user_input}\n"),
-                });
-
-                // Execute with self-determination (task will assess itself)
-                match orchestrator_clone
-                    .execute_task_streaming(task, ui_channel_clone.clone())
-                    .await
-                {
-                    Ok(result) => {
-                        ui_channel_clone.completed(result.task_id, result.clone());
-
-                        try_write_log(
-                            &ui_channel_clone,
-                            &mut log_clone,
-                            &format!("Response: {}", result.response.text),
-                        );
-                        try_write_log(
-                            &ui_channel_clone,
-                            &mut log_clone,
-                            &format!(
-                                "Tier: {} | Duration: {}ms | Tokens: {}",
-                                result.tier_used,
-                                result.duration_ms,
-                                result.response.tokens_used.total()
-                            ),
-                        );
-                    }
-                    Err(error) => {
-                        try_write_log(
-                            &ui_channel_clone,
-                            &mut log_clone,
-                            &format!("Error: {error}"),
-                        );
-                        ui_channel_clone.send(UiEvent::SystemMessage {
-                            level: MessageLevel::Error,
-                            message: format!("Error: {error}"),
-                        });
-                        ui_channel_clone.failed(task_id, error.to_string());
-                    }
-                }
-            });
+            spawn(execute_user_task(
+                orchestrator.clone(),
+                ui_channel.clone(),
+                log_clone,
+                user_input,
+                parent_task_id,
+            ));
         }
     }
 

@@ -159,8 +159,6 @@ mod tests {
     use super::*;
 
     #[test]
-    /// # Panics
-    /// Panics if trivial/simple complexity mapping fails.
     fn test_trivial_complexity() {
         let estimator = ComplexityEstimator;
         let extractor = IntentExtractor;
@@ -175,8 +173,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if complex refactor is not mapped to Complex.
     fn test_complex_refactor() {
         let estimator = ComplexityEstimator;
         let extractor = IntentExtractor;
@@ -191,8 +187,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if context estimation yields unexpected values.
     fn test_context_estimation() {
         let estimator = ComplexityEstimator;
         let extractor = IntentExtractor;
@@ -205,8 +199,6 @@ mod tests {
     }
 
     #[test]
-    /// # Panics
-    /// Panics if full context requirement is not detected.
     fn test_full_context_detection() {
         let estimator = ComplexityEstimator;
         let extractor = IntentExtractor;

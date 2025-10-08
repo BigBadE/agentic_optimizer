@@ -1,15 +1,20 @@
 //! Comprehensive tests for task execution and isolation
-#![cfg(test)]
-#![allow(
-    clippy::expect_used,
-    clippy::min_ident_chars,
-    clippy::shadow_unrelated,
-    clippy::redundant_clone,
-    clippy::absolute_paths,
-    clippy::ref_as_ptr,
-    clippy::cloned_ref_to_slice_refs,
-    reason = "Test code prioritizes clarity over efficiency"
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
 )]
+mod common;
 
 use merlin_routing::{
     ContextRequirements, FileChange, Task, TaskId,
@@ -23,12 +28,13 @@ use merlin_routing::{
 };
 use std::collections::HashSet;
 use std::path::PathBuf;
+use std::slice::from_ref;
 use std::sync::Arc;
+use std::time::Duration;
 use tempfile::TempDir;
+use tokio::time::sleep;
 
 #[test]
-/// # Panics
-/// Panics if task graph construction fails.
 fn test_task_graph_creation() {
     let task_a = Task::new("Task A".to_owned());
     let task_b = Task::new("Task B".to_owned());
@@ -39,13 +45,11 @@ fn test_task_graph_creation() {
 }
 
 #[test]
-/// # Panics
-/// Panics if ready task detection fails.
 fn test_ready_tasks_no_dependencies() {
     let task_a = Task::new("Task A".to_owned());
     let task_b = Task::new("Task B".to_owned());
 
-    let graph = TaskGraph::from_tasks(&[task_a.clone(), task_b.clone()]);
+    let graph = TaskGraph::from_tasks(&[task_a, task_b]);
     let completed = HashSet::default();
 
     let ready = graph.ready_tasks(&completed);
@@ -53,8 +57,6 @@ fn test_ready_tasks_no_dependencies() {
 }
 
 #[test]
-/// # Panics
-/// Panics if dependency chain handling fails.
 fn test_ready_tasks_linear_dependencies() {
     let task_a = Task::new("Task A".to_owned());
     let task_b = Task::new("Task B".to_owned()).with_dependencies(vec![task_a.id]);
@@ -64,26 +66,24 @@ fn test_ready_tasks_linear_dependencies() {
     let mut completed = HashSet::default();
 
     // Initially, only task_a should be ready
-    let ready = graph.ready_tasks(&completed);
-    assert_eq!(ready.len(), 1);
-    assert_eq!(ready[0].id, task_a.id);
+    let ready_initial = graph.ready_tasks(&completed);
+    assert_eq!(ready_initial.len(), 1);
+    assert_eq!(ready_initial[0].id, task_a.id);
 
     // After completing task_a, task_b should be ready
     completed.insert(task_a.id);
-    let ready = graph.ready_tasks(&completed);
-    assert_eq!(ready.len(), 1);
-    assert_eq!(ready[0].id, task_b.id);
+    let ready_after_a = graph.ready_tasks(&completed);
+    assert_eq!(ready_after_a.len(), 1);
+    assert_eq!(ready_after_a[0].id, task_b.id);
 
     // After completing task_b, task_c should be ready
     completed.insert(task_b.id);
-    let ready = graph.ready_tasks(&completed);
-    assert_eq!(ready.len(), 1);
-    assert_eq!(ready[0].id, task_c.id);
+    let ready_after_b = graph.ready_tasks(&completed);
+    assert_eq!(ready_after_b.len(), 1);
+    assert_eq!(ready_after_b[0].id, task_c.id);
 }
 
 #[test]
-/// # Panics
-/// Panics if diamond dependency handling fails.
 fn test_ready_tasks_diamond_dependencies() {
     let task_a = Task::new("Task A".to_owned());
     let task_b = Task::new("Task B".to_owned()).with_dependencies(vec![task_a.id]);
@@ -99,30 +99,28 @@ fn test_ready_tasks_diamond_dependencies() {
     let mut completed = HashSet::default();
 
     // Initially, only task_a should be ready
-    let ready = graph.ready_tasks(&completed);
-    assert_eq!(ready.len(), 1);
-    assert_eq!(ready[0].id, task_a.id);
+    let ready_initial = graph.ready_tasks(&completed);
+    assert_eq!(ready_initial.len(), 1);
+    assert_eq!(ready_initial[0].id, task_a.id);
 
     // After completing task_a, both task_b and task_c should be ready
     completed.insert(task_a.id);
-    let ready = graph.ready_tasks(&completed);
-    assert_eq!(ready.len(), 2);
+    let ready_after_a = graph.ready_tasks(&completed);
+    assert_eq!(ready_after_a.len(), 2);
 
     // After completing task_b but not task_c, task_d should not be ready
     completed.insert(task_b.id);
-    let ready = graph.ready_tasks(&completed);
-    assert!(!ready.iter().any(|t| t.id == task_d.id));
+    let ready_after_b = graph.ready_tasks(&completed);
+    assert!(!ready_after_b.iter().any(|task| task.id == task_d.id));
 
     // After completing both task_b and task_c, task_d should be ready
     completed.insert(task_c.id);
-    let ready = graph.ready_tasks(&completed);
-    assert_eq!(ready.len(), 1);
-    assert_eq!(ready[0].id, task_d.id);
+    let ready_after_both = graph.ready_tasks(&completed);
+    assert_eq!(ready_after_both.len(), 1);
+    assert_eq!(ready_after_both[0].id, task_d.id);
 }
 
 #[test]
-/// # Panics
-/// Panics if completion detection fails.
 fn test_graph_completion() {
     let task_a = Task::new("Task A".to_owned());
     let task_b = Task::new("Task B".to_owned());
@@ -140,8 +138,6 @@ fn test_graph_completion() {
 }
 
 #[test]
-/// # Panics
-/// Panics if cycle detection fails.
 fn test_cycle_detection_simple() {
     let task_a = Task::new("Task A".to_owned());
     let task_b = Task::new("Task B".to_owned()).with_dependencies(vec![task_a.id]);
@@ -152,8 +148,6 @@ fn test_cycle_detection_simple() {
 }
 
 #[test]
-/// # Panics
-/// Panics if file conflict detection fails.
 fn test_file_conflict_detection() {
     let file = PathBuf::from("shared.rs");
 
@@ -172,12 +166,10 @@ fn test_file_conflict_detection() {
     let ready = graph.ready_non_conflicting_tasks(&completed, &running);
 
     // Task B should be filtered out due to file conflict
-    assert!(!ready.iter().any(|t| t.id == task_b.id));
+    assert!(!ready.iter().any(|task| task.id == task_b.id));
 }
 
 #[test]
-/// # Panics
-/// Panics if non-conflicting task detection fails.
 fn test_no_conflict_separate_files() {
     let task_a = Task::new("Task A".to_owned())
         .with_context(ContextRequirements::default().with_files(vec![PathBuf::from("file_a.rs")]));
@@ -201,8 +193,6 @@ fn test_no_conflict_separate_files() {
 }
 
 #[test]
-/// # Panics
-/// Panics if empty graph handling fails.
 fn test_empty_graph() {
     let graph = TaskGraph::from_tasks(&[]);
     assert_eq!(graph.task_count(), 0);
@@ -213,8 +203,6 @@ fn test_empty_graph() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if exclusive write lock fails.
 async fn test_file_lock_write_exclusivity() {
     let manager = Arc::new(FileLockManager::default());
     let task_a = TaskId::default();
@@ -222,11 +210,11 @@ async fn test_file_lock_write_exclusivity() {
     let file = PathBuf::from("test.rs");
 
     let _guard_a = manager
-        .acquire_write_locks(task_a, &[file.clone()])
+        .acquire_write_locks(task_a, from_ref(&file))
         .await
         .expect("Task A should acquire write lock");
 
-    let result = manager.acquire_write_locks(task_b, &[file]).await;
+    let result = manager.acquire_write_locks(task_b, from_ref(&file)).await;
     assert!(
         result.is_err(),
         "Task B should not acquire lock while Task A holds it"
@@ -234,8 +222,6 @@ async fn test_file_lock_write_exclusivity() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if shared read locks fail.
 async fn test_file_lock_read_sharing() {
     let manager = Arc::new(FileLockManager::default());
     let task_a = TaskId::default();
@@ -244,24 +230,22 @@ async fn test_file_lock_read_sharing() {
     let file = PathBuf::from("test.rs");
 
     let _guard_a = manager
-        .acquire_read_locks(task_a, &[file.clone()])
+        .acquire_read_locks(task_a, from_ref(&file))
         .await
         .expect("Task A should acquire read lock");
 
     let _guard_b = manager
-        .acquire_read_locks(task_b, &[file.clone()])
+        .acquire_read_locks(task_b, from_ref(&file))
         .await
         .expect("Task B should acquire read lock");
 
     let _guard_c = manager
-        .acquire_read_locks(task_c, &[file])
+        .acquire_read_locks(task_c, from_ref(&file))
         .await
         .expect("Task C should acquire read lock");
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if write-read exclusivity fails.
 async fn test_file_lock_write_blocks_readers() {
     let manager = Arc::new(FileLockManager::default());
     let task_a = TaskId::default();
@@ -269,17 +253,15 @@ async fn test_file_lock_write_blocks_readers() {
     let file = PathBuf::from("test.rs");
 
     let _guard_a = manager
-        .acquire_write_locks(task_a, &[file.clone()])
+        .acquire_write_locks(task_a, from_ref(&file))
         .await
         .expect("Task A should acquire write lock");
 
-    let result = manager.acquire_read_locks(task_b, &[file]).await;
+    let result = manager.acquire_read_locks(task_b, from_ref(&file)).await;
     assert!(result.is_err(), "Read lock should be blocked by write lock");
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if read-write exclusivity fails.
 async fn test_file_lock_readers_block_writer() {
     let manager = Arc::new(FileLockManager::default());
     let task_a = TaskId::default();
@@ -287,11 +269,11 @@ async fn test_file_lock_readers_block_writer() {
     let file = PathBuf::from("test.rs");
 
     let _guard_a = manager
-        .acquire_read_locks(task_a, &[file.clone()])
+        .acquire_read_locks(task_a, from_ref(&file))
         .await
         .expect("Task A should acquire read lock");
 
-    let result = manager.acquire_write_locks(task_b, &[file]).await;
+    let result = manager.acquire_write_locks(task_b, from_ref(&file)).await;
     assert!(
         result.is_err(),
         "Write lock should be blocked by read locks"
@@ -299,8 +281,6 @@ async fn test_file_lock_readers_block_writer() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if lock release fails.
 async fn test_file_lock_release() {
     let manager = Arc::new(FileLockManager::default());
     let task_a = TaskId::default();
@@ -309,7 +289,7 @@ async fn test_file_lock_release() {
 
     {
         let _guard_a = manager
-            .acquire_write_locks(task_a, &[file.clone()])
+            .acquire_write_locks(task_a, from_ref(&file))
             .await
             .expect("Task A should acquire write lock");
 
@@ -317,18 +297,16 @@ async fn test_file_lock_release() {
     }
 
     // Small delay to allow async drop to complete
-    tokio::time::sleep(tokio::time::Duration::from_millis(10)).await;
+    sleep(Duration::from_millis(10)).await;
 
     // Task B should now be able to acquire the lock
     let _guard_b = manager
-        .acquire_write_locks(task_b, &[file])
+        .acquire_write_locks(task_b, from_ref(&file))
         .await
         .expect("Task B should acquire lock after Task A releases");
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if multi-file locking fails.
 async fn test_file_lock_multiple_files() {
     let manager = Arc::new(FileLockManager::default());
     let task_a = TaskId::default();
@@ -345,8 +323,6 @@ async fn test_file_lock_multiple_files() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if workspace isolation fails.
 async fn test_workspace_isolation() {
     let tmp_dir = TempDir::new().expect("create temp dir");
     let workspace = Arc::new(WorkspaceState::new(tmp_dir.path().to_path_buf()));
@@ -386,8 +362,6 @@ async fn test_workspace_isolation() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if workspace commit fails.
 async fn test_workspace_commit() {
     let tmp_dir = TempDir::new().expect("create temp dir");
     let workspace = Arc::new(WorkspaceState::new(tmp_dir.path().to_path_buf()));
@@ -426,8 +400,6 @@ async fn test_workspace_commit() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if conflict detection fails.
 async fn test_workspace_conflict_detection() {
     let tmp_dir = TempDir::new().expect("create temp dir");
     let workspace = Arc::new(WorkspaceState::new(tmp_dir.path().to_path_buf()));
@@ -469,8 +441,6 @@ async fn test_workspace_conflict_detection() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if file creation in workspace fails.
 async fn test_workspace_file_creation() {
     let tmp_dir = TempDir::new().expect("create temp dir");
     let workspace = Arc::new(WorkspaceState::new(tmp_dir.path().to_path_buf()));
@@ -505,8 +475,6 @@ async fn test_workspace_file_creation() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if file deletion in workspace fails.
 async fn test_workspace_file_deletion() {
     let tmp_dir = TempDir::new().expect("create temp dir");
     let workspace = Arc::new(WorkspaceState::new(tmp_dir.path().to_path_buf()));
@@ -543,8 +511,6 @@ async fn test_workspace_file_deletion() {
 }
 
 #[tokio::test]
-/// # Panics
-/// Panics if workspace rollback fails.
 async fn test_workspace_rollback() {
     let tmp_dir = TempDir::new().expect("create temp dir");
     let workspace = Arc::new(WorkspaceState::new(tmp_dir.path().to_path_buf()));
@@ -580,8 +546,6 @@ async fn test_workspace_rollback() {
 }
 
 #[test]
-/// # Panics
-/// Panics if file state handling fails.
 fn test_file_state_variants() {
     let created = FileState::Created("content".to_owned());
     let modified = FileState::Modified("content".to_owned());

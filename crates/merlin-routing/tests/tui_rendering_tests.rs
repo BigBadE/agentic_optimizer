@@ -1,12 +1,19 @@
 //! Tests for TUI rendering components
-#![cfg(test)]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::absolute_paths,
-    reason = "Test code is allowed to use expect/unwrap and absolute paths"
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
 )]
-
 mod common;
 
 use common::*;
@@ -20,10 +27,9 @@ use merlin_routing::user_interface::{
 };
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use ratatui::buffer::Cell;
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_renderer_creation() {
     let renderer = Renderer::new(Theme::default());
     // Default theme is Tokyo Night
@@ -31,8 +37,6 @@ fn test_renderer_creation() {
 }
 
 #[test]
-/// # Panics
-/// Panics if assertions fail.
 fn test_theme_cycling() {
     let mut renderer = Renderer::new(Theme::default());
 
@@ -44,8 +48,6 @@ fn test_theme_cycling() {
 }
 
 #[test]
-/// # Panics
-/// Panics if terminal creation or rendering fails.
 fn test_render_empty_state() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");
@@ -71,8 +73,6 @@ fn test_render_empty_state() {
 }
 
 #[test]
-/// # Panics
-/// Panics if terminal creation or rendering fails.
 fn test_render_with_tasks() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");
@@ -106,17 +106,11 @@ fn test_render_with_tasks() {
 
     // Check that the buffer contains our task
     let buffer = terminal.backend().buffer();
-    let content: String = buffer
-        .content()
-        .iter()
-        .map(ratatui::buffer::Cell::symbol)
-        .collect();
+    let content: String = buffer.content().iter().map(Cell::symbol).collect();
     assert!(content.contains("Test task") || content.contains("Test"));
 }
 
 #[test]
-/// # Panics
-/// Panics if terminal creation or rendering fails for any pane.
 fn test_render_all_panes() {
     let backend = TestBackend::new(120, 40);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");
@@ -152,8 +146,6 @@ fn test_render_all_panes() {
 }
 
 #[test]
-/// # Panics
-/// Panics if terminal creation or rendering fails.
 fn test_render_with_completed_task() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");
@@ -182,8 +174,6 @@ fn test_render_with_completed_task() {
 }
 
 #[test]
-/// # Panics
-/// Panics if terminal creation or rendering fails.
 fn test_render_with_failed_task() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");
@@ -212,8 +202,6 @@ fn test_render_with_failed_task() {
 }
 
 #[test]
-/// # Panics
-/// Panics if terminal creation or rendering fails for any theme.
 fn test_all_themes_render() {
     let backend = TestBackend::new(80, 24);
     let mut terminal = Terminal::new(backend).expect("Failed to create terminal");

@@ -1,18 +1,25 @@
 //! Comprehensive tests for output tree structure and navigation
-#![cfg(test)]
-#![allow(
-    clippy::expect_used,
-    clippy::min_ident_chars,
-    clippy::shadow_unrelated,
-    reason = "Test code is allowed to use expect, short variable names, and shadow variables"
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
 )]
+mod common;
 
 use merlin_routing::user_interface::output_tree::{OutputNode, OutputTree, StepType};
 use serde_json::json;
 
 #[test]
-/// # Panics
-/// Panics if step addition fails.
 fn test_add_step() {
     let mut tree = OutputTree::default();
 
@@ -27,8 +34,6 @@ fn test_add_step() {
 }
 
 #[test]
-/// # Panics
-/// Panics if nested step addition fails.
 fn test_add_nested_steps() {
     let mut tree = OutputTree::default();
 
@@ -53,8 +58,6 @@ fn test_add_nested_steps() {
 }
 
 #[test]
-/// # Panics
-/// Panics if step completion fails.
 fn test_complete_step() {
     let mut tree = OutputTree::default();
 
@@ -70,8 +73,6 @@ fn test_complete_step() {
 }
 
 #[test]
-/// # Panics
-/// Panics if analysis step auto-collapse doesn't work.
 fn test_analysis_step_auto_collapse() {
     let mut tree = OutputTree::default();
 
@@ -95,8 +96,6 @@ fn test_analysis_step_auto_collapse() {
 }
 
 #[test]
-/// # Panics
-/// Panics if text node addition fails.
 fn test_add_text() {
     let mut tree = OutputTree::default();
 
@@ -113,8 +112,6 @@ fn test_add_text() {
 }
 
 #[test]
-/// # Panics
-/// Panics if nested text addition fails.
 fn test_add_text_under_step() {
     let mut tree = OutputTree::default();
 
@@ -127,8 +124,6 @@ fn test_add_text_under_step() {
 }
 
 #[test]
-/// # Panics
-/// Panics if tool call completion fails.
 fn test_complete_tool_call() {
     let mut tree = OutputTree::default();
 
@@ -150,8 +145,6 @@ fn test_complete_tool_call() {
 }
 
 #[test]
-/// # Panics
-/// Panics if navigation up fails.
 fn test_navigation_up() {
     let mut tree = OutputTree::default();
 
@@ -180,8 +173,6 @@ fn test_navigation_up() {
 }
 
 #[test]
-/// # Panics
-/// Panics if navigation down fails.
 fn test_navigation_down() {
     let mut tree = OutputTree::default();
 
@@ -199,8 +190,6 @@ fn test_navigation_down() {
 }
 
 #[test]
-/// # Panics
-/// Panics if move to start fails.
 fn test_move_to_start() {
     let mut tree = OutputTree::default();
 
@@ -220,8 +209,6 @@ fn test_move_to_start() {
 }
 
 #[test]
-/// # Panics
-/// Panics if move to end fails.
 fn test_move_to_end() {
     let mut tree = OutputTree::default();
 
@@ -237,14 +224,16 @@ fn test_move_to_end() {
 }
 
 #[test]
-/// # Panics
-/// Panics if page navigation fails.
 fn test_page_navigation() {
     let mut tree = OutputTree::default();
 
-    for i in 0..20 {
-        tree.add_step(format!("step{i}"), StepType::Thinking, format!("Step {i}"));
-        tree.complete_step(&format!("step{i}"));
+    for idx in 0..20 {
+        tree.add_step(
+            format!("step{idx}"),
+            StepType::Thinking,
+            format!("Step {idx}"),
+        );
+        tree.complete_step(&format!("step{idx}"));
     }
 
     tree.page_down(5);
@@ -258,8 +247,6 @@ fn test_page_navigation() {
 }
 
 #[test]
-/// # Panics
-/// Panics if collapse/expand doesn't work.
 fn test_collapse_expand() {
     let mut tree = OutputTree::default();
 
@@ -271,26 +258,24 @@ fn test_collapse_expand() {
     tree.complete_step("parent");
 
     // Initially expanded - should see all 3 nodes
-    let nodes = tree.flatten_visible_nodes();
-    assert_eq!(nodes.len(), 3);
+    let nodes_expanded = tree.flatten_visible_nodes();
+    assert_eq!(nodes_expanded.len(), 3);
 
     // Collapse parent (which is at index 0)
     tree.collapse_selected();
 
     // Now should only see parent
-    let nodes = tree.flatten_visible_nodes();
-    assert_eq!(nodes.len(), 1);
+    let nodes_collapsed = tree.flatten_visible_nodes();
+    assert_eq!(nodes_collapsed.len(), 1);
 
     // Expand again
     tree.expand_selected();
 
-    let nodes = tree.flatten_visible_nodes();
-    assert_eq!(nodes.len(), 3);
+    let nodes_reexpanded = tree.flatten_visible_nodes();
+    assert_eq!(nodes_reexpanded.len(), 3);
 }
 
 #[test]
-/// # Panics
-/// Panics if toggle collapse doesn't work.
 fn test_toggle_collapse() {
     let mut tree = OutputTree::default();
 
@@ -300,23 +285,21 @@ fn test_toggle_collapse() {
     tree.complete_step("parent");
 
     // Initially expanded
-    let nodes = tree.flatten_visible_nodes();
-    assert_eq!(nodes.len(), 2);
+    let nodes_expanded = tree.flatten_visible_nodes();
+    assert_eq!(nodes_expanded.len(), 2);
 
     // Toggle to collapse
     tree.toggle_selected();
-    let nodes = tree.flatten_visible_nodes();
-    assert_eq!(nodes.len(), 1);
+    let nodes_collapsed = tree.flatten_visible_nodes();
+    assert_eq!(nodes_collapsed.len(), 1);
 
     // Toggle to expand
     tree.toggle_selected();
-    let nodes = tree.flatten_visible_nodes();
-    assert_eq!(nodes.len(), 2);
+    let nodes_reexpanded = tree.flatten_visible_nodes();
+    assert_eq!(nodes_reexpanded.len(), 2);
 }
 
 #[test]
-/// # Panics
-/// Panics if deep nesting fails.
 fn test_deep_nesting() {
     let mut tree = OutputTree::default();
 
@@ -352,8 +335,6 @@ fn test_deep_nesting() {
 }
 
 #[test]
-/// # Panics
-/// Panics if text export fails.
 fn test_to_text() {
     let mut tree = OutputTree::default();
 
@@ -371,8 +352,6 @@ fn test_to_text() {
 }
 
 #[test]
-/// # Panics
-/// Panics if empty tree handling fails.
 fn test_empty_tree() {
     let tree = OutputTree::default();
 
@@ -384,25 +363,21 @@ fn test_empty_tree() {
 }
 
 #[test]
-/// # Panics
-/// Panics if step type parsing fails.
 fn test_step_type_parsing() {
-    let thinking = StepType::from_str("Thinking");
+    let thinking = StepType::from_string("Thinking");
     assert_eq!(thinking, StepType::Thinking);
 
-    let tool_call = StepType::from_str("ToolCall");
+    let tool_call = StepType::from_string("ToolCall");
     assert_eq!(tool_call, StepType::ToolCall);
 
-    let subtask = StepType::from_str("Subtask");
+    let subtask = StepType::from_string("Subtask");
     assert_eq!(subtask, StepType::Subtask);
 
-    let output = StepType::from_str("Unknown");
+    let output = StepType::from_string("Unknown");
     assert_eq!(output, StepType::Output);
 }
 
 #[test]
-/// # Panics
-/// Panics if node icon rendering fails.
 fn test_node_icons() {
     let mut tree = OutputTree::default();
 
@@ -429,8 +404,6 @@ fn test_node_icons() {
 }
 
 #[test]
-/// # Panics
-/// Panics if node content retrieval fails.
 fn test_node_content() {
     let step = OutputNode::Step {
         id: "test".to_owned(),
@@ -451,8 +424,6 @@ fn test_node_content() {
 }
 
 #[test]
-/// # Panics
-/// Panics if mixed step types fail.
 fn test_mixed_step_types() {
     let mut tree = OutputTree::default();
 
@@ -482,8 +453,6 @@ fn test_mixed_step_types() {
 }
 
 #[test]
-/// # Panics
-/// Panics if sibling steps fail.
 fn test_sibling_steps() {
     let mut tree = OutputTree::default();
 
@@ -504,8 +473,6 @@ fn test_sibling_steps() {
 }
 
 #[test]
-/// # Panics
-/// Panics if complex tree structure fails.
 fn test_complex_tree_structure() {
     let mut tree = OutputTree::default();
 
@@ -545,8 +512,6 @@ fn test_complex_tree_structure() {
 }
 
 #[test]
-/// # Panics
-/// Panics if navigation on collapsed tree fails.
 fn test_navigation_with_collapsed_nodes() {
     let mut tree = OutputTree::default();
 

@@ -75,8 +75,6 @@ mod tests {
     use super::*;
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if analyze returns an error in the test harness.
     async fn test_simple_request() {
         let analyzer = LocalTaskAnalyzer::default();
         let analysis = match analyzer.analyze("Add a comment to main.rs").await {
@@ -92,8 +90,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if analyze returns an error in the test harness.
     async fn test_refactor_request() {
         let analyzer = LocalTaskAnalyzer::default();
         let analysis = match analyzer.analyze("Refactor the parser module").await {
@@ -109,8 +105,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if complexity estimation produces unexpected categories.
     async fn test_complexity_estimation() {
         let analyzer = LocalTaskAnalyzer::default();
 
@@ -122,8 +116,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if analyze returns an error in the test harness.
     async fn test_context_needs() {
         let analyzer = LocalTaskAnalyzer::default();
         let analysis = match analyzer.analyze("Modify test.rs and main.rs").await {

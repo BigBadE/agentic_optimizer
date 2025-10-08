@@ -104,7 +104,6 @@ impl TaskWorkspace {
     }
 
     /// Commit changes to global state (atomic)
-    /// Commit changes to global state (atomic)
     ///
     /// # Errors
     /// Returns an error if conflicts are detected or applying changes fails
@@ -186,14 +185,11 @@ fn hash_content(content: Option<&String>) -> u64 {
 }
 
 #[cfg(test)]
-#[allow(clippy::expect_used, reason = "Test code is allowed to use expect")]
 mod tests {
     use super::*;
     use tempfile::TempDir;
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if workspace operations fail in the test harness.
     async fn test_task_workspace_isolation() {
         let tmp_dir = TempDir::new().expect("create temp dir");
         let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
@@ -236,8 +232,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Panics
-    /// Panics if workspace operations fail in the test harness.
     async fn test_task_workspace_commit() {
         let tmp_dir = TempDir::new().expect("create temp dir");
         let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());

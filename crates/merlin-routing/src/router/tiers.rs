@@ -179,11 +179,6 @@ mod tests {
     use crate::{Complexity, ContextRequirements, Priority};
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if routing fails unexpectedly in the test harness.
-    ///
-    /// # Panics
-    /// Panics if premium tier is not selected for critical tasks.
     async fn test_strategy_router_priority() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
 
@@ -204,11 +199,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if routing fails unexpectedly in the test harness.
-    ///
-    /// # Panics
-    /// Panics if long context strategy does not select a premium tier.
     async fn test_long_context_strategy() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
 
@@ -222,11 +212,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if routing fails unexpectedly in the test harness.
-    ///
-    /// # Panics
-    /// Panics if low-cost tier is not selected for cheap tasks.
     async fn test_cost_optimization() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
 
@@ -241,11 +226,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if routing fails unexpectedly in the test harness.
-    ///
-    /// # Panics
-    /// Panics if router reasoning does not mention expected strategies for medium tasks.
     async fn test_complexity_fallback() -> Result<()> {
         let router = StrategyRouter::with_default_strategies();
 

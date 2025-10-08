@@ -36,12 +36,15 @@ struct Args {
     root: PathBuf,
 }
 
-#[tokio::main]
+/// Main entry point for the benchmark tool.
+///
 /// # Errors
-/// Returns an error if loading test cases, running benchmarks, or writing reports fails.
+/// Returns an error if test cases cannot be loaded, benchmarks fail to run,
+/// or report generation fails.
 ///
 /// # Panics
-/// May panic if terminal output fails or in unexpected runtime conditions.
+/// Panics if the tokio runtime cannot be created.
+#[tokio::main]
 async fn main() -> Result<()> {
     let args = Args::parse();
 
@@ -225,17 +228,19 @@ fn print_summary(results: &[BenchmarkResult]) {
     info!("");
 }
 
-/// Generate a Markdown report summarizing benchmark results.
+/// Compute average metric from benchmark results
+fn compute_average<MetricFn>(results: &[BenchmarkResult], metric_fn: MetricFn) -> f32
+where
+    MetricFn: Fn(&BenchmarkResult) -> f32,
+{
+    results.iter().map(metric_fn).sum::<f32>() / results.len() as f32
+}
+
+/// Write report header with metadata
 ///
 /// # Errors
-/// Returns an error if writing the report fails.
-#[allow(
-    clippy::too_many_lines,
-    reason = "Report generation requires comprehensive formatting"
-)]
-fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
-    let mut report = String::default();
-
+/// Returns an error if writing to the string fails.
+fn write_report_header(report: &mut String, results: &[BenchmarkResult]) -> Result<()> {
     report.push_str("# Context Fetching Benchmark Report\n\n");
     writeln!(
         report,
@@ -245,81 +250,65 @@ fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
     .map_err(|error| Error::Other(error.to_string()))?;
     writeln!(report, "**Test Cases**: {}\n", results.len())
         .map_err(|error| Error::Other(error.to_string()))?;
+    Ok(())
+}
 
+/// Write summary metrics table to report
+///
+/// # Errors
+/// Returns an error if writing to the string fails.
+fn write_summary_metrics(report: &mut String, results: &[BenchmarkResult]) -> Result<()> {
     report.push_str("## Summary\n\n");
 
-    let avg_precision_3 = results
-        .iter()
-        .map(|res| res.metrics.precision_at_3)
-        .sum::<f32>()
-        / results.len() as f32;
-    let avg_precision_5 = results
-        .iter()
-        .map(|res| res.metrics.precision_at_5)
-        .sum::<f32>()
-        / results.len() as f32;
-    let avg_precision_10 = results
-        .iter()
-        .map(|res| res.metrics.precision_at_10)
-        .sum::<f32>()
-        / results.len() as f32;
-    let avg_recall_10 = results
-        .iter()
-        .map(|res| res.metrics.recall_at_10)
-        .sum::<f32>()
-        / results.len() as f32;
-    let avg_mrr = results.iter().map(|res| res.metrics.mrr).sum::<f32>() / results.len() as f32;
-    let avg_ndcg = results
-        .iter()
-        .map(|res| res.metrics.ndcg_at_10)
-        .sum::<f32>()
-        / results.len() as f32;
-    let avg_exclusion = results
-        .iter()
-        .map(|res| res.metrics.exclusion_rate)
-        .sum::<f32>()
-        / results.len() as f32;
-    let avg_critical = results
-        .iter()
-        .map(|res| res.metrics.critical_in_top_3)
-        .sum::<f32>()
-        / results.len() as f32;
-    let avg_high = results
-        .iter()
-        .map(|res| res.metrics.high_in_top_5)
-        .sum::<f32>()
-        / results.len() as f32;
+    let avg_precision_3 = compute_average(results, |res| res.metrics.precision_at_3);
+    let avg_precision_5 = compute_average(results, |res| res.metrics.precision_at_5);
+    let avg_precision_10 = compute_average(results, |res| res.metrics.precision_at_10);
+    let avg_recall_10 = compute_average(results, |res| res.metrics.recall_at_10);
+    let avg_mrr = compute_average(results, |res| res.metrics.mrr);
+    let avg_ndcg = compute_average(results, |res| res.metrics.ndcg_at_10);
+    let avg_exclusion = compute_average(results, |res| res.metrics.exclusion_rate);
+    let avg_critical = compute_average(results, |res| res.metrics.critical_in_top_3);
+    let avg_high = compute_average(results, |res| res.metrics.high_in_top_5);
 
-    report.push_str("| Metric | Value |\n");
-    report.push_str("|--------|-------|\n");
+    report.push_str("| Metric | Value |\n|--------|-------|\n");
     writeln!(report, "| Precision@3 | {:.1}% |", avg_precision_3 * 100.0)
-        .map_err(|error| Error::Other(error.to_string()))?;
+        .map_err(|err| Error::Other(err.to_string()))?;
     writeln!(report, "| Precision@5 | {:.1}% |", avg_precision_5 * 100.0)
-        .map_err(|error| Error::Other(error.to_string()))?;
+        .map_err(|err| Error::Other(err.to_string()))?;
     writeln!(
         report,
         "| Precision@10 | {:.1}% |",
         avg_precision_10 * 100.0
     )
-    .map_err(|error| Error::Other(error.to_string()))?;
+    .map_err(|err| Error::Other(err.to_string()))?;
     writeln!(report, "| Recall@10 | {:.1}% |", avg_recall_10 * 100.0)
-        .map_err(|error| Error::Other(error.to_string()))?;
-    writeln!(report, "| MRR | {avg_mrr:.3} |").map_err(|error| Error::Other(error.to_string()))?;
-    writeln!(report, "| NDCG@10 | {avg_ndcg:.3} |")
-        .map_err(|error| Error::Other(error.to_string()))?;
+        .map_err(|err| Error::Other(err.to_string()))?;
+    writeln!(report, "| MRR | {avg_mrr:.3} |").map_err(|err| Error::Other(err.to_string()))?;
+    writeln!(report, "| NDCG@10 | {avg_ndcg:.3} |").map_err(|err| Error::Other(err.to_string()))?;
     writeln!(report, "| Exclusion Rate | {:.1}% |", avg_exclusion * 100.0)
-        .map_err(|error| Error::Other(error.to_string()))?;
+        .map_err(|err| Error::Other(err.to_string()))?;
     writeln!(
         report,
         "| Critical in Top-3 | {:.1}% |",
         avg_critical * 100.0
     )
-    .map_err(|error| Error::Other(error.to_string()))?;
+    .map_err(|err| Error::Other(err.to_string()))?;
     writeln!(report, "| High in Top-5 | {:.1}% |\n", avg_high * 100.0)
-        .map_err(|error| Error::Other(error.to_string()))?;
+        .map_err(|err| Error::Other(err.to_string()))?;
+    Ok(())
+}
+
+/// Generate a Markdown report summarizing benchmark results.
+///
+/// # Errors
+/// Returns an error if writing the report fails.
+fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
+    let mut report = String::default();
+
+    write_report_header(&mut report, results)?;
+    write_summary_metrics(&mut report, results)?;
 
     report.push_str("## Individual Test Cases\n\n");
-
     for result in results {
         report.push_str("---\n\n");
         report.push_str(&result.format_report());
@@ -327,6 +316,5 @@ fn generate_report(results: &[BenchmarkResult], path: &PathBuf) -> Result<()> {
     }
 
     fs::write(path, report)?;
-
     Ok(())
 }

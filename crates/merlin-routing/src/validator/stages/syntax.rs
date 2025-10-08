@@ -115,11 +115,6 @@ mod tests {
     use merlin_core::TokenUsage;
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if validation fails unexpectedly in the test harness.
-    ///
-    /// # Panics
-    /// Panics if the validation does not pass for syntactically valid code.
     async fn test_syntax_validation_pass() -> Result<()> {
         let stage = SyntaxValidationStage::default();
         let response = Response {
@@ -138,11 +133,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if validation fails unexpectedly in the test harness.
-    ///
-    /// # Panics
-    /// Panics if the validation incorrectly passes for syntactically invalid code.
     async fn test_syntax_validation_fail() -> Result<()> {
         let stage = SyntaxValidationStage::default();
         let response = Response {
@@ -161,11 +151,6 @@ mod tests {
     }
 
     #[tokio::test]
-    /// # Errors
-    /// Returns an error if validation fails unexpectedly in the test harness.
-    ///
-    /// # Panics
-    /// Panics if mismatched braces are not detected by the syntax checker.
     async fn test_mismatched_braces() -> Result<()> {
         let stage = SyntaxValidationStage::default();
         let response = Response {

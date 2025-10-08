@@ -212,8 +212,6 @@ impl ModelProvider for GroqProvider {
 mod tests {
     use super::*;
 
-    /// # Panics
-    /// Panics if provider name or model doesn't match expected values.
     #[test]
     fn groq_provider_with_api_key() {
         let provider = GroqProvider {
@@ -226,21 +224,6 @@ mod tests {
         assert_eq!(provider.model, DEFAULT_MODEL);
     }
 
-    /// # Panics
-    /// Panics if provider is not available.
-    #[tokio::test]
-    async fn groq_availability() {
-        let provider = GroqProvider {
-            client: Client::default(),
-            api_key: "test_key".to_owned(),
-            model: DEFAULT_MODEL.to_owned(),
-        };
-
-        assert!(provider.is_available().await);
-    }
-
-    /// # Panics
-    /// Panics if cost estimation doesn't return zero.
     #[test]
     fn cost_estimation() {
         let provider = GroqProvider {

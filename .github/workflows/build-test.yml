@@ -50,7 +50,7 @@ jobs:
         run: cargo llvm-cov --lcov --output-path coverage.info --workspace --ignore-filename-regex "test_repositories|benchmarks" --release --verbose -- --nocapture
 
       - name: Run clippy
-        run: cargo clippy --all-targets --all-features -- -D warnings
+        run: cargo clippy --release --all-targets --all-features -- -D warnings
 
       - name: Upload coverage to Codecov
         if: github.event_name == 'push' && matrix.os == 'ubuntu-latest'

@@ -428,7 +428,7 @@ fn test_wrap_with_cursor_position() {
     let mut manager = InputManager::default();
 
     let text = "This is a test sentence for wrapping";
-    input_string(&mut manager, &text);
+    input_string(&mut manager, text);
 
     // Move cursor to middle
     move_cursor(&mut manager, CursorMove::Head);

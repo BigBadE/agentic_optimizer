@@ -1,0 +1,24 @@
+{
+  "timestamp": "2025-01-08T22:52:00Z",
+  "type": "quality",
+  "metrics": {
+    "success_rate": 95.5,
+    "prev_success_rate": 94.2,
+    "success_rate_change": 1.38,
+    "avg_score": 8.7,
+    "prev_avg_score": 8.5,
+    "change": 2.35,
+    "total_tests": 150,
+    "prev_total_tests": 145,
+    "passed_tests": 143,
+    "prev_passed_tests": 137,
+    "failed_tests": 7,
+    "prev_failed_tests": 8
+  },
+  "history": [
+    {"timestamp": "2025-01-01", "success_rate": 93.0, "avg_score": 8.2, "total_tests": 140},
+    {"timestamp": "2025-01-03", "success_rate": 94.2, "avg_score": 8.5, "total_tests": 145},
+    {"timestamp": "2025-01-05", "success_rate": 94.8, "avg_score": 8.6, "total_tests": 148},
+    {"timestamp": "2025-01-08", "success_rate": 95.5, "avg_score": 8.7, "total_tests": 150}
+  ]
+}

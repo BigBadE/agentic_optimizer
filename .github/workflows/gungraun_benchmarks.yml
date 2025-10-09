@@ -41,7 +41,9 @@ jobs:
           profile: release
 
       - name: Install binstall
-        uses: taiki-e/install-action@cargo-binstall
+        uses: taiki-e/install-action@v2
+        with:
+         tool: cargo-binstall
 
       - name: Install gungraun-runner
         run: |

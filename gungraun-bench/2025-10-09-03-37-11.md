@@ -1,0 +1,31 @@
+# Performance Benchmark Results
+
+**Date**: 2025-10-09 03:37:09
+
+## Summary
+
+Benchmarks completed successfully. Detailed results are available in the Criterion output.
+
+## Benchmark Groups
+
+- `complexity_analysis`
+- `concurrent_requests`
+- `config_overhead`
+- `end_to_end_request`
+- `memory_usage`
+- `request_analysis`
+- `request_throughput`
+- `task_decomposition`
+- `task_graph`
+
+## Viewing Results
+
+To view detailed HTML reports:
+```bash
+# Open the main report
+open target/criterion/report/index.html
+```
+
+## Raw Data
+
+Full benchmark data is stored in `target/criterion/` (9 groups)

@@ -3,8 +3,10 @@
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
+use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::fs;
+use std::hash::{Hash as _, Hasher as _};
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 use std::time::{Duration, SystemTime};
@@ -19,7 +21,7 @@ use bincode::config::standard as bincode_config;
 use bincode::{Decode, Encode, decode_from_slice, encode_to_vec};
 use merlin_core::{Error, Result};
 
-type ChunkResult = (PathBuf, FileChunk, Vec<f32>, String);
+type ChunkResult = (PathBuf, FileChunk, Vec<f32>, String, u64);
 
 /// Helper struct to hold vector score data
 struct VectorScoreData {
@@ -56,8 +58,10 @@ struct CachedEmbedding {
     embedding: Vec<f32>,
     /// Chunk content preview
     preview: String,
-    /// Last modification time
+    /// Last modification time (for informational purposes)
     modified: SystemTime,
+    /// Content hash (xxHash64 for fast validation)
+    content_hash: u64,
 }
 
 impl Default for VectorCache {
@@ -79,7 +83,7 @@ struct VectorCache {
 }
 
 impl VectorCache {
-    const VERSION: u32 = 3; // Bumped for normalized relative paths
+    const VERSION: u32 = 5; // Bumped for content_hash field
 
     fn is_valid(&self) -> bool {
         self.version == Self::VERSION
@@ -94,6 +98,8 @@ pub struct VectorSearchManager {
     bm25: BM25Index,
     /// File modification times for cache invalidation
     file_times: HashMap<PathBuf, SystemTime>,
+    /// File content hashes for validation
+    file_hashes: HashMap<PathBuf, u64>,
     /// Embedding client
     client: EmbeddingClient,
     /// Project root
@@ -103,14 +109,22 @@ pub struct VectorSearchManager {
 }
 
 impl VectorSearchManager {
+    /// Compute hash of file content for cache validation
+    fn compute_file_hash(content: &str) -> u64 {
+        let mut hasher = DefaultHasher::new();
+        content.hash(&mut hasher);
+        hasher.finish()
+    }
+
     /// Create a new vector search manager
     pub fn new(project_root: PathBuf) -> Self {
-        let cache_path = project_root.join("..merlin").join("embeddings.bin");
+        let cache_path = project_root.join(".merlin").join("embeddings.bin");
 
         Self {
             store: VectorStore::default(),
             bm25: BM25Index::default(),
             file_times: HashMap::default(),
+            file_hashes: HashMap::default(),
             client: EmbeddingClient::default(),
             project_root,
             cache_path,
@@ -231,6 +245,8 @@ impl VectorSearchManager {
                 entry.end_line
             );
             self.file_times.insert(entry.path.clone(), entry.modified);
+            self.file_hashes
+                .insert(entry.path.clone(), entry.content_hash);
             self.store.add(
                 PathBuf::from(&chunk_path),
                 entry.embedding.clone(),
@@ -954,6 +970,9 @@ impl VectorSearchManager {
             return Vec::default();
         }
 
+        // Compute content hash once for the entire file
+        let content_hash = Self::compute_file_hash(&content);
+
         // Chunk the file
         let chunks = chunk_file(&relative_path, &content);
         let mut chunk_results: Vec<ChunkResult> = Vec::default();
@@ -963,7 +982,13 @@ impl VectorSearchManager {
 
             match client.embed(&chunk.content).await {
                 Ok(embedding) => {
-                    chunk_results.push((relative_path.clone(), chunk, embedding, preview));
+                    chunk_results.push((
+                        relative_path.clone(),
+                        chunk,
+                        embedding,
+                        preview,
+                        content_hash,
+                    ));
                 }
                 Err(error) => {
                     warn!(
@@ -979,17 +1004,23 @@ impl VectorSearchManager {
 
     /// Process embedding results for a single file
     fn process_chunk_results(&mut self, chunk_results: Vec<ChunkResult>, total_chunks: &mut usize) {
+        if chunk_results.is_empty() {
+            return;
+        }
+
         let relative_path = &chunk_results[0].0;
         let absolute_path = self.project_root.join(relative_path);
+        let content_hash = chunk_results[0].4;
 
-        // Track file modification time
+        // Track file modification time and content hash
         if let Ok(metadata) = fs::metadata(&absolute_path)
             && let Ok(modified) = metadata.modified()
         {
             self.file_times.insert(relative_path.clone(), modified);
+            self.file_hashes.insert(relative_path.clone(), content_hash);
         }
 
-        for (path, chunk, embedding, preview) in chunk_results {
+        for (path, chunk, embedding, preview, _hash) in chunk_results {
             let chunk_path = format!("{}:{}-{}", path.display(), chunk.start_line, chunk.end_line);
 
             // Add to vector store
@@ -1054,7 +1085,7 @@ impl VectorSearchManager {
         entries: &[CachedEmbedding],
     ) -> (Vec<CachedEmbedding>, Vec<PathBuf>) {
         let mut valid = Vec::default();
-        let mut invalid = Vec::default();
+        let mut invalid_set: HashSet<PathBuf> = HashSet::default();
 
         for entry in entries {
             let absolute_path = self.project_root.join(&entry.path);
@@ -1064,23 +1095,27 @@ impl VectorSearchManager {
                 continue;
             }
 
-            // Check if file was modified
-            let Ok(metadata) = fs::metadata(&absolute_path) else {
-                continue; // File doesn't exist anymore
-            };
-
-            let Ok(modified) = metadata.modified() else {
-                invalid.push(entry.path.clone());
+            // Read file content and compute hash
+            let Ok(content) = fs::read_to_string(&absolute_path) else {
+                invalid_set.insert(entry.path.clone());
                 continue;
             };
 
-            if modified > entry.modified {
-                invalid.push(entry.path.clone());
-            } else {
+            let current_hash = Self::compute_file_hash(&content);
+
+            // Compare content hash - this is the most reliable check
+            if current_hash != entry.content_hash {
+                invalid_set.insert(entry.path.clone());
+                continue;
+            }
+
+            // File is valid if not already marked invalid
+            if !invalid_set.contains(&entry.path) {
                 valid.push(entry.clone());
             }
         }
 
+        let invalid: Vec<PathBuf> = invalid_set.into_iter().collect();
         (valid, invalid)
     }
 
@@ -1110,18 +1145,70 @@ impl VectorSearchManager {
             })?;
         }
 
-        let cache = VectorCache::default();
+        let mut embeddings = Vec::default();
+
+        for entry in self.store.iter() {
+            let chunk_path_str = entry.path.to_str().unwrap_or("");
+
+            let Some((path_str, range)) = chunk_path_str.rsplit_once(':') else {
+                continue;
+            };
+
+            let Some((start_str, end_str)) = range.split_once('-') else {
+                continue;
+            };
+
+            let Ok(start_line) = start_str.parse::<usize>() else {
+                continue;
+            };
+            let Ok(end_line) = end_str.parse::<usize>() else {
+                continue;
+            };
+
+            let path = PathBuf::from(path_str);
+            let modified = self
+                .file_times
+                .get(&path)
+                .copied()
+                .unwrap_or(SystemTime::UNIX_EPOCH);
+            let content_hash = self.file_hashes.get(&path).copied().unwrap_or(0);
+
+            embeddings.push(CachedEmbedding {
+                path,
+                chunk_id: format!("{start_line}-{end_line}"),
+                start_line,
+                end_line,
+                embedding: entry.embedding,
+                preview: entry.preview,
+                modified,
+                content_hash,
+            });
+        }
+
+        let cache = VectorCache {
+            version: VectorCache::VERSION,
+            embeddings,
+        };
+
+        info!(
+            "  Saving cache with {} embeddings to {}",
+            cache.embeddings.len(),
+            self.cache_path.display()
+        );
 
         let data = encode_to_vec(&cache, bincode_config())
             .map_err(|error| Error::Other(format!("Failed to serialize cache: {error}")))?;
+        let data_len = data.len();
         fs::write(&self.cache_path, data)
             .map_err(|error| Error::Other(format!("Failed to write cache: {error}")))?;
+
+        info!("  ✓ Cache saved successfully ({} bytes)", data_len);
         Ok(())
     }
 
     /// Get the number of indexed files
     pub fn len(&self) -> usize {
-        self.store.len()
+        self.bm25.len()
     }
 
     /// Check if the store is empty

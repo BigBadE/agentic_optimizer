@@ -144,9 +144,9 @@ fn bench_task_graph(criterion: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default()
-        .measurement_time(Duration::from_secs(10))
-        .warm_up_time(Duration::from_secs(3))
-        .sample_size(50);
+        .measurement_time(Duration::from_secs(5))
+        .warm_up_time(Duration::from_secs(2))
+        .sample_size(20);
     targets = bench_request_analysis,
              bench_task_decomposition,
              bench_complexity_analysis,

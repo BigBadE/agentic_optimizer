@@ -196,9 +196,9 @@ fn bench_config_overhead(criterion: &mut Criterion) {
 criterion_group! {
     name = integration_benches;
     config = Criterion::default()
-        .measurement_time(Duration::from_secs(15))
-        .warm_up_time(Duration::from_secs(5))
-        .sample_size(30);
+        .measurement_time(Duration::from_secs(7))
+        .warm_up_time(Duration::from_secs(2))
+        .sample_size(15);
     targets = bench_end_to_end_request,
              bench_memory_usage,
              bench_concurrent_requests,

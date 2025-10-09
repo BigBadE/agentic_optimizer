@@ -28,7 +28,9 @@ use walkdir::WalkDir;
 /// # Errors
 /// Returns error if test case files cannot be read or parsed
 pub async fn run_benchmarks_async(test_cases_dir: &Path) -> Result<Vec<BenchmarkResult>> {
-    let mut results = Vec::new();
+    use tokio::task::JoinSet;
+
+    let mut test_cases = Vec::new();
 
     for entry in WalkDir::new(test_cases_dir)
         .into_iter()
@@ -38,9 +40,20 @@ pub async fn run_benchmarks_async(test_cases_dir: &Path) -> Result<Vec<Benchmark
         {
             let test_case = TestCase::from_file(entry.path())
                 .with_context(|| format!("Failed to load test case: {}", entry.path().display()))?;
+            test_cases.push(test_case);
+        }
+    }
 
-            let result = run_single_benchmark_async(&test_case).await;
-            results.push(result);
+    let mut tasks = JoinSet::new();
+    for test_case in test_cases {
+        tasks.spawn(async move { run_single_benchmark_async(&test_case).await });
+    }
+
+    let mut results = Vec::new();
+    while let Some(result) = tasks.join_next().await {
+        match result {
+            Ok(benchmark_result) => results.push(benchmark_result),
+            Err(error) => eprintln!("Task failed: {error}"),
         }
     }
 

@@ -70,7 +70,8 @@ cargo run --release --bin quality-bench -- --output "$QUALITY_OUT"
 success "Quality results -> $QUALITY_OUT"
 
 # 3) Run Performance Benchmarks (writes perf-results.md and target/criterion)
-info "Running performance benchmarks..."
+# Exclude gungraun benchmarks (Linux/Valgrind only, run in CI)
+info "Running performance benchmarks (excluding gungraun)..."
 cargo run --release --bin perf-bench -- --output "$PERF_OUT"
 success "Performance results -> $PERF_OUT"
 

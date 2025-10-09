@@ -64,6 +64,9 @@ fn main() -> Result<()> {
     } else if args.iai {
         // Run only IAI benchmarks
         cmd.arg("iai_");
+    } else {
+        // Exclude gungraun benchmarks by default (Linux/Valgrind only)
+        cmd.arg("--").arg("--skip").arg("gungraun");
     }
 
     if args.verbose {

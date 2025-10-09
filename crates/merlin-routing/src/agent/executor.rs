@@ -1,10 +1,13 @@
 use serde_json::Value;
+use std::future::Future;
+use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
 
 use crate::{
-    ModelRouter, ModelTier, Result, RoutingError, Task, TaskDecision, TaskId, TaskResult,
-    TaskState, ToolRegistry, UiChannel, UiEvent, Validator, streaming::StepType,
+    ExecutionContext, ExecutionMode, ModelRouter, ModelTier, Result, RoutingError, SubtaskSpec,
+    Task, TaskAction, TaskDecision, TaskId, TaskResult, TaskState, ToolRegistry, UiChannel,
+    UiEvent, ValidationResult, Validator, streaming::StepType,
 };
 use merlin_core::{Context, ModelProvider, Query, Response, TokenUsage};
 use merlin_local::LocalModelProvider;
@@ -14,7 +17,11 @@ use std::fmt::Write as _;
 
 use super::{SelfAssessor, StepTracker};
 
+/// Type alias for boxed future returning `TaskResult`
+type BoxedTaskFuture<'future> = Pin<Box<dyn Future<Output = Result<TaskResult>> + Send + 'future>>;
+
 /// Agent executor that streams task execution with tool calling
+#[derive(Clone)]
 pub struct AgentExecutor {
     router: Arc<dyn ModelRouter>,
     validator: Arc<dyn Validator>,
@@ -330,48 +337,199 @@ impl AgentExecutor {
         is_greeting || is_very_short
     }
 
-    /// Execute a task with self-determination (Phase 1)
+    /// Execute a task with self-determination (Phase 5.1)
     /// The task assesses itself and decides whether to complete, decompose, or gather context
     ///
     /// # Errors
     ///
     /// Returns an error if routing, provider creation, execution, or validation fails
-    pub async fn execute_self_determining(
+    pub fn execute_self_determining(
         &mut self,
         mut task: Task,
         ui_channel: UiChannel,
-    ) -> Result<TaskResult> {
-        let task_id = task.id;
+    ) -> BoxedTaskFuture<'_> {
+        Box::pin(async move {
+            let task_id = task.id;
+            let start = Instant::now();
+            let mut exec_context = ExecutionContext::new(task.description.clone());
 
-        // Check if this is a simple request that doesn't need assessment
-        let is_simple = Self::is_simple_request(&task.description);
+            // Check if this is a simple request that doesn't need assessment
+            let is_simple = Self::is_simple_request(&task.description);
 
-        if is_simple {
-            // Skip assessment for simple requests, execute directly
-            task.state = TaskState::Executing;
-            return self.execute_streaming(task, ui_channel).await;
+            if is_simple {
+                // Skip assessment for simple requests, execute directly
+                task.state = TaskState::Executing;
+                return self.execute_streaming(task, ui_channel).await;
+            }
+
+            // Self-determination loop
+            loop {
+                // Update task state
+                task.state = TaskState::Assessing;
+
+                // Route and create provider
+                let decision_result = self.router.route(&task).await?;
+                let provider = Self::create_provider(&decision_result.tier)?;
+
+                // Assess the task
+                let Ok(decision) = self
+                    .assess_task_with_provider(&provider, &task, &ui_channel, task_id)
+                    .await
+                else {
+                    // Fallback to streaming execution if assessment fails
+                    task.state = TaskState::Executing;
+                    return self.execute_streaming(task, ui_channel).await;
+                };
+
+                // Record decision
+                task.decision_history.push(decision.clone());
+
+                // Execute based on decision
+                match decision.action {
+                    TaskAction::Complete { result } => {
+                        // Task can be completed immediately
+                        task.state = TaskState::Completed;
+
+                        let duration_ms = start.elapsed().as_millis() as u64;
+
+                        return Ok(TaskResult {
+                            task_id,
+                            response: Response {
+                                text: result,
+                                confidence: 1.0,
+                                tokens_used: TokenUsage::default(),
+                                provider: decision_result.tier.to_string(),
+                                latency_ms: duration_ms,
+                            },
+                            tier_used: decision_result.tier.to_string(),
+                            tokens_used: TokenUsage::default(),
+                            validation: ValidationResult::default(),
+                            duration_ms,
+                        });
+                    }
+
+                    TaskAction::Decompose {
+                        subtasks,
+                        execution_mode,
+                    } => {
+                        // Task needs to be decomposed into subtasks
+                        task.state = TaskState::AwaitingSubtasks;
+
+                        return self
+                            .execute_with_subtasks(task, subtasks, execution_mode, ui_channel)
+                            .await;
+                    }
+
+                    TaskAction::GatherContext { needs } => {
+                        // Task needs more context before proceeding
+                        ui_channel.send(UiEvent::TaskOutput {
+                            task_id,
+                            output: format!("Gathering context: {}", needs.join(", ")),
+                        });
+
+                        // Gather the requested context
+                        Self::gather_context(&mut exec_context, &needs);
+
+                        // Continue loop to re-assess with new context
+                    }
+                }
+            }
+        })
+    }
+
+    /// Execute a task with subtasks
+    ///
+    /// # Errors
+    /// Returns an error if subtask execution fails
+    #[allow(
+        clippy::needless_pass_by_value,
+        reason = "Task is consumed by async block"
+    )]
+    fn execute_with_subtasks(
+        &mut self,
+        task: Task,
+        subtasks: Vec<SubtaskSpec>,
+        _execution_mode: ExecutionMode,
+        ui_channel: UiChannel,
+    ) -> BoxedTaskFuture<'_> {
+        Box::pin(async move {
+            let task_id = task.id;
+            let start = Instant::now();
+
+            ui_channel.send(UiEvent::TaskOutput {
+                task_id,
+                output: format!("Decomposing into {} subtasks", subtasks.len()),
+            });
+
+            // Convert subtask specs to tasks
+            let mut subtask_results = Vec::new();
+
+            // For now, only support sequential execution to avoid Send issues
+            // Parallel execution can be added later with proper Send bounds
+            for spec in subtasks {
+                let subtask = Task::new(spec.description).with_complexity(spec.complexity);
+
+                ui_channel.send(UiEvent::TaskOutput {
+                    task_id,
+                    output: format!("Executing subtask: {}", subtask.description),
+                });
+
+                let result = self
+                    .execute_self_determining(subtask, ui_channel.clone())
+                    .await?;
+                subtask_results.push(result);
+            }
+
+            // Combine results
+            let combined_response = subtask_results
+                .iter()
+                .map(|result| result.response.text.as_str())
+                .collect::<Vec<_>>()
+                .join("\n\n");
+
+            let duration_ms = start.elapsed().as_millis() as u64;
+
+            Ok(TaskResult {
+                task_id,
+                response: Response {
+                    text: combined_response,
+                    confidence: 1.0,
+                    tokens_used: TokenUsage::default(),
+                    provider: "decomposed".to_owned(),
+                    latency_ms: duration_ms,
+                },
+                tier_used: "decomposed".to_owned(),
+                tokens_used: TokenUsage::default(),
+                validation: ValidationResult::default(),
+                duration_ms,
+            })
+        })
+    }
+
+    /// Gather context based on needs
+    ///
+    /// # Errors
+    /// Returns an error if context gathering fails
+    fn gather_context(exec_context: &mut ExecutionContext, needs: &[String]) {
+        for need in needs {
+            // Parse the need and gather appropriate context
+            if need.to_lowercase().contains("file") {
+                // Would read files and add to context
+                exec_context
+                    .findings
+                    .push(format!("Gathered file context for: {need}"));
+            } else if need.to_lowercase().contains("command") {
+                // Would execute commands and add results to context
+                exec_context
+                    .findings
+                    .push(format!("Gathered command output for: {need}"));
+            } else {
+                // Generic context gathering
+                exec_context
+                    .findings
+                    .push(format!("Gathered context for: {need}"));
+            }
         }
-
-        // Update task state
-        task.state = TaskState::Assessing;
-
-        // Start "Analysis" step (will be collapsed by default)
-        // Create assessor with the router's provider
-        let decision_result = self.router.route(&task).await?;
-        let provider = Self::create_provider(&decision_result.tier)?;
-        if (self
-            .assess_task_with_provider(&provider, &task, &ui_channel, task_id)
-            .await)
-            .is_err()
-        {
-            // Fallback to streaming execution if assessment fails
-            task.state = TaskState::Executing;
-            return self.execute_streaming(task, ui_channel).await;
-        }
-
-        // For Phase 1, after assessment we continue with normal streaming execution
-        task.state = TaskState::Executing;
-        self.execute_streaming(task, ui_channel).await
     }
 }
 

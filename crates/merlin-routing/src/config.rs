@@ -14,6 +14,32 @@ pub struct RoutingConfig {
     pub execution: ExecutionConfig,
     /// Workspace configuration
     pub workspace: WorkspaceConfig,
+    /// Cache configuration
+    pub cache: CacheConfig,
+}
+
+/// Cache configuration.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct CacheConfig {
+    /// Whether caching is enabled
+    pub enabled: bool,
+    /// Time-to-live for cache entries in hours
+    pub ttl_hours: u64,
+    /// Maximum cache size in megabytes
+    pub max_size_mb: usize,
+    /// Similarity threshold for semantic matching (0.0-1.0)
+    pub similarity_threshold: f32,
+}
+
+impl Default for CacheConfig {
+    fn default() -> Self {
+        Self {
+            enabled: true,
+            ttl_hours: 24,
+            max_size_mb: 100,
+            similarity_threshold: 0.95,
+        }
+    }
 }
 
 /// Model tier configuration.

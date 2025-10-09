@@ -1,4 +1,3 @@
-use std::collections::HashSet;
 use std::env::var;
 use std::sync::Arc;
 use std::time::{Duration, Instant};
@@ -318,8 +317,6 @@ impl RoutingOrchestrator {
                 return Err(RoutingError::CyclicDependency);
             }
 
-            // TODO: Implement conflict-aware execution
-            // For now, use basic executor
             let executor = ExecutorPool::new(
                 Arc::clone(&self.router),
                 Arc::clone(&self.validator),
@@ -327,11 +324,7 @@ impl RoutingOrchestrator {
                 Arc::clone(&self.workspace),
             );
 
-            let basic_graph = TaskGraph::from_tasks(
-                &graph.ready_non_conflicting_tasks(&HashSet::default(), &HashSet::default()),
-            );
-
-            executor.execute_graph(basic_graph).await
+            executor.execute_conflict_aware_graph(graph).await
         } else {
             let graph = TaskGraph::from_tasks(&tasks);
 

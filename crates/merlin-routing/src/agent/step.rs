@@ -5,7 +5,7 @@ use crate::{
 use std::collections::HashMap;
 
 /// Tracks execution steps for tasks
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct StepTracker {
     steps: HashMap<TaskId, Vec<TaskStep>>,
 }

@@ -14,10 +14,11 @@
     clippy::print_stderr,
     clippy::tests_outside_test_module,
     missing_docs,
+    unsafe_code,
     reason = "Test allows"
 )]
 
-use gungraun::{benchmark, benchmark_group, main};
+use gungraun::{library_benchmark, library_benchmark_group, main};
 use merlin_routing::{RoutingConfig, RoutingOrchestrator};
 use std::hint::black_box;
 use tokio::runtime::Runtime;
@@ -28,7 +29,7 @@ fn create_runtime() -> Runtime {
 }
 
 // Benchmark simple request analysis
-#[benchmark]
+#[library_benchmark]
 fn gungraun_analyze_simple_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
@@ -42,7 +43,7 @@ fn gungraun_analyze_simple_request() {
 }
 
 // Benchmark medium complexity request
-#[benchmark]
+#[library_benchmark]
 fn gungraun_analyze_medium_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
@@ -58,7 +59,7 @@ fn gungraun_analyze_medium_request() {
 }
 
 // Benchmark complex request analysis
-#[benchmark]
+#[library_benchmark]
 fn gungraun_analyze_complex_request() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
@@ -74,19 +75,19 @@ fn gungraun_analyze_complex_request() {
 }
 
 // Benchmark Orchestrator creation overhead
-#[benchmark]
+#[library_benchmark]
 fn gungraun_create_orchestrator() {
     let config = RoutingConfig::default();
     let _orchestrator = black_box(RoutingOrchestrator::new(config));
 }
 
 // Benchmark config creation
-#[benchmark]
+#[library_benchmark]
 fn gungraun_create_config() {
     let _config = black_box(RoutingConfig::default());
 }
 
-benchmark_group!(
+library_benchmark_group!(
     name = routing_group;
     benchmarks =
         gungraun_analyze_simple_request,
@@ -96,4 +97,4 @@ benchmark_group!(
         gungraun_create_config
 );
 
-main!(benchmark_groups = routing_group);
+main!(library_benchmark_groups = routing_group);

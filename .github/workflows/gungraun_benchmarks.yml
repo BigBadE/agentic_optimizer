@@ -40,14 +40,18 @@ jobs:
         with:
           profile: release
 
+      - uses: taiki-e/install-action@cargo-binstall
       - name: Install gungraun-runner
         run: |
-          curl -L --proto '=https' --tlsv1.2 -sSf https://raw.githubusercontent.com/cargo-bins/cargo-binstall/main/install-from-binstall-release.sh | bash
-          cargo binstall --no-confirm gungraun-runner@0.17.0
+            version=$(cargo metadata --format-version=1 |\
+            jq '.packages[] | select(.name == "gungraun").version' |\
+            tr -d '"'
+          )
+          cargo binstall --no-confirm gungraun-runner --version $version
 
       - name: Run Gungraun benchmarks
         run: |
-          cargo run --profile ci-release --bin perf-bench -- --gungraun --output gungraun-results.md
+          cargo run --profile ci-release --bin perf-bench -- --output gungraun-results.md
           echo " Gungraun benchmarks completed"
           if [ -f gungraun-results.md ]; then
             head -30 gungraun-results.md

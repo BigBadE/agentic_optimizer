@@ -57,7 +57,7 @@ flate2 = "1.1"
 tempfile = "3.23"
 
 # Testing dependencies
-criterion= { version = "0.7", features = ["html_reports", "async_tokio"] }
+criterion = { version = "0.7", features = ["html_reports", "async_tokio"] }
 gungraun = "0.17"
 assert_cmd = "2.0"
 predicates = "3.1"
@@ -96,7 +96,7 @@ codegen-units = 16
 strip = "debuginfo"
 
 [workspace.lints.rust]
-unsafe_code = "forbid"
+unsafe_code = "deny"
 warnings = "deny"
 future-incompatible = "deny"
 let-underscore = "deny"

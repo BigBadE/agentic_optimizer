@@ -1,0 +1,4 @@
+# Benchmark data will be automatically populated by CI workflows
+# - quality-latest.json (from quality benchmarks)
+# - perf-latest.json (from performance benchmarks)
+# - gungraun-latest.json (from gungraun benchmarks)

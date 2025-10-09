@@ -10,10 +10,11 @@
     clippy::print_stderr,
     clippy::tests_outside_test_module,
     missing_docs,
+    unsafe_code,
     reason = "Test allows"
 )]
 
-use gungraun::{benchmark, benchmark_group, main};
+use gungraun::{library_benchmark, library_benchmark_group, main};
 use merlin_routing::{RoutingConfig, RoutingOrchestrator};
 use std::hint::black_box;
 use tokio::runtime::Runtime;
@@ -23,7 +24,7 @@ fn create_runtime() -> Runtime {
 }
 
 // Benchmark end-to-end simple query
-#[benchmark]
+#[library_benchmark]
 fn gungraun_e2e_simple_query() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
@@ -37,7 +38,7 @@ fn gungraun_e2e_simple_query() {
 }
 
 // Benchmark end-to-end code modification
-#[benchmark]
+#[library_benchmark]
 fn gungraun_e2e_code_modification() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
@@ -51,7 +52,7 @@ fn gungraun_e2e_code_modification() {
 }
 
 // Benchmark end-to-end complex refactor
-#[benchmark]
+#[library_benchmark]
 fn gungraun_e2e_complex_refactor() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
@@ -67,7 +68,7 @@ fn gungraun_e2e_complex_refactor() {
 }
 
 // Benchmark multiple sequential requests
-#[benchmark]
+#[library_benchmark]
 fn gungraun_sequential_requests() {
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
@@ -82,7 +83,7 @@ fn gungraun_sequential_requests() {
     });
 }
 
-benchmark_group!(
+library_benchmark_group!(
     name = integration_group;
     benchmarks =
         gungraun_e2e_simple_query,
@@ -91,4 +92,4 @@ benchmark_group!(
         gungraun_sequential_requests
 );
 
-main!(benchmark_groups = integration_group);
+main!(library_benchmark_groups = integration_group);

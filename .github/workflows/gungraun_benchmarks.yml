@@ -41,16 +41,11 @@ jobs:
           profile: release
 
       - name: Install binstall
-        uses: taiki-e/install-action@v2
-        with:
-         tool: cargo-binstall
+        uses: taiki-e/install-action@cargo-binstall
 
       - name: Install gungraun-runner
         run: |
-            version=$(cargo metadata --format-version=1 |\
-            jq '.packages[] | select(.name == "gungraun").version' |\
-            tr -d '"'
-          )
+          version=$(cargo metadata --format-version=1 | jq '.packages[] | select(.name == "gungraun").version' | tr -d '"')
           cargo binstall --no-confirm gungraun-runner --version $version
 
       - name: Run Gungraun benchmarks

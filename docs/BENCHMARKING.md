@@ -2,6 +2,66 @@
 
 **Status**: ✅ Implemented with continuous tracking
 
+## 🌐 Web-Based Benchmark Dashboard
+
+**View Live Dashboard:** https://bigbade.github.io/agentic_optimizer/
+
+The project includes a comprehensive web-based benchmark tracking system that aggregates and visualizes results from all three benchmark suites with historical trend analysis.
+
+### Dashboard Features
+
+- **Real-time Metrics**: View current performance across all benchmark types
+- **Historical Trends**: Track changes over time with interactive charts
+- **Comparison Views**: Compare current vs. previous runs
+- **Detailed Results**: Drill down into specific benchmark data
+- **Auto-refresh**: Dashboard updates automatically when new benchmarks run
+
+### Benchmark Types Tracked
+
+1. **Quality Benchmarks** - Task success rate and quality scores
+2. **Performance Benchmarks** (Criterion) - Latency and throughput metrics
+3. **Gungraun Benchmarks** - Memory usage and instruction counts
+
+### Setting Up the Dashboard
+
+```bash
+# Generate the dashboard structure
+bash scripts/generate-benchmark-dashboard.sh gh-pages
+
+# Initialize gh-pages branch if needed
+git checkout --orphan gh-pages
+git rm -rf .
+cp -r gh-pages/* .
+git add .
+git commit -m "Initialize benchmark dashboard"
+git push origin gh-pages
+
+# Enable GitHub Pages in repository settings
+# Settings → Pages → Source: gh-pages branch
+```
+
+### Updating Dashboard Data
+
+The dashboard automatically updates when benchmarks run in CI. To manually update:
+
+```bash
+# Run benchmarks locally
+cargo bench --workspace
+
+# Parse results and generate JSON
+python3 scripts/parse-benchmarks.py \
+  --criterion-dir target/criterion \
+  --gungraun-output gungraun-results.md \
+  --quality-results quality-results.md \
+  --output-dir gh-pages/data
+
+# Commit and push to gh-pages
+cd gh-pages
+git add data/
+git commit -m "Update benchmark data"
+git push origin gh-pages
+```
+
 ## Overview
 
 Merlin uses [Criterion.rs](https://github.com/bheisler/criterion.rs) for performance benchmarking with:
@@ -37,18 +97,8 @@ Benchmark results are saved to:
 
 ```bash
 # Open HTML report (Linux/macOS)
-open target/criterion/report/index.html
-
 # Windows
 start target/criterion/report/index.html
-```
-
-## Benchmark Suites
-
-### 1. Request Analysis (`request_analysis`)
-
-Tests the performance of analyzing incoming requests:
-
 **Tests**:
 - Simple requests (e.g., "Add a comment")
 - Medium complexity (e.g., "Refactor parser with error handling")

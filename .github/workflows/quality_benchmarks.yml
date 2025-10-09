@@ -60,18 +60,54 @@ jobs:
           path: gh-pages
           fetch-depth: 0
 
+      - name: Setup Python
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Parse benchmark results
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        run: |
+          python3 scripts/parse-benchmarks.py \
+            --quality-results quality-results.md \
+            --output-dir /tmp/benchmark-data \
+            --history-dir .benchmark-history
+
       - name: Publish quality results to gh-pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
-          mkdir -p gh-pages/quality-bench
-          cp quality-results.md gh-pages/quality-bench/latest.md
-          cp quality-results.md "gh-pages/quality-bench/${ts}.md"
+          
+          # Switch to gh-pages branch
           cd gh-pages
+          
+          # Create directories
+          mkdir -p quality-bench data
+          
+          # Copy markdown results
+          cp ../quality-results.md quality-bench/latest.md
+          cp ../quality-results.md "quality-bench/${ts}.md"
+          
+          # Copy parsed JSON data
+          if [ -f /tmp/benchmark-data/quality-latest.json ]; then
+            cp /tmp/benchmark-data/quality-latest.json data/
+          fi
+          
+          # Generate dashboard if it doesn't exist
+          if [ ! -f index.html ]; then
+            cd ..
+            bash scripts/generate-benchmark-dashboard.sh /tmp/dashboard-temp
+            cd gh-pages
+            cp /tmp/dashboard-temp/index.html .
+            cp -r /tmp/dashboard-temp/assets .
+          fi
+          
+          # Commit and push
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add quality-bench/
+          git add quality-bench/ data/ index.html assets/ || true
           git commit -m "Update quality benchmark results: ${ts}" || echo "No changes to commit"
           git push origin gh-pages
 

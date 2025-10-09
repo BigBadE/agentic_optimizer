@@ -75,17 +75,53 @@ jobs:
           path: gh-pages
           fetch-depth: 0
 
+      - name: Setup Python
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('gungraun-results.md') != ''
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      - name: Parse benchmark results
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('gungraun-results.md') != ''
+        run: |
+          python3 scripts/parse-benchmarks.py \
+            --gungraun-output gungraun-results.md \
+            --output-dir /tmp/benchmark-data \
+            --history-dir .benchmark-history
+
       - name: Publish Gungraun results to gh-pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('gungraun-results.md') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
-          mkdir -p gh-pages/gungraun-bench
-          cp gungraun-results.md gh-pages/gungraun-bench/latest.md
-          cp gungraun-results.md "gh-pages/gungraun-bench/${ts}.md"
+          
+          # Switch to gh-pages branch
           cd gh-pages
+          
+          # Create directories
+          mkdir -p gungraun-bench data
+          
+          # Copy markdown results
+          cp ../gungraun-results.md gungraun-bench/latest.md
+          cp ../gungraun-results.md "gungraun-bench/${ts}.md"
+          
+          # Copy parsed JSON data
+          if [ -f /tmp/benchmark-data/gungraun-latest.json ]; then
+            cp /tmp/benchmark-data/gungraun-latest.json data/
+          fi
+          
+          # Generate dashboard if it doesn't exist
+          if [ ! -f index.html ]; then
+            cd ..
+            bash scripts/generate-benchmark-dashboard.sh /tmp/dashboard-temp
+            cd gh-pages
+            cp /tmp/dashboard-temp/index.html .
+            cp -r /tmp/dashboard-temp/assets .
+          fi
+          
+          # Commit and push
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add gungraun-bench/
+          git add gungraun-bench/ data/ index.html assets/ || true
           git commit -m "Update Gungraun benchmark results: ${ts}" || echo "No changes to commit"
           git push origin gh-pages

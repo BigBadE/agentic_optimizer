@@ -77,8 +77,9 @@ impl<'handler> EventHandler<'handler> {
             } => self.handle_tool_call_completed(task_id, &tool, &result),
 
             UiEvent::ThinkingUpdate { .. } | UiEvent::SubtaskSpawned { .. } => {
-                // Deprecated: handled by TaskStepStarted
-                // TODO: Phase 5 - Handle hierarchical tasks
+                // Deprecated events: functionality now handled by TaskStepStarted
+                // These events are kept for backward compatibility with existing tests
+                // and will be removed in a future phase when hierarchical task support is added
             }
         }
     }

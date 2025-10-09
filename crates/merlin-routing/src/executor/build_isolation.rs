@@ -1,11 +1,15 @@
 use super::state::WorkspaceState;
 use crate::{FileChange, Result, RoutingError};
-use std::path::PathBuf;
+use std::future::Future;
+use std::path::{Path, PathBuf};
+use std::pin::Pin;
 use std::time::{Duration, Instant};
 use tempfile::TempDir;
-use tokio::fs::{create_dir_all, remove_file, write};
+use tokio::fs::{create_dir_all, read_dir, read_to_string, remove_file, write};
 use tokio::process::Command;
 use tokio::time::timeout;
+
+type BoxFuture<T> = Pin<Box<dyn Future<Output = T> + Send>>;
 
 /// Isolated build environment for task validation
 pub struct IsolatedBuildEnv {
@@ -17,19 +21,86 @@ impl IsolatedBuildEnv {
     /// Create isolated build environment
     ///
     /// # Errors
-    /// Returns an error if the temporary directory cannot be created.
+    /// Returns an error if the temporary directory cannot be created or if workspace copying fails.
     pub fn new(workspace: &WorkspaceState) -> Result<Self> {
         let temp_dir = TempDir::new()
             .map_err(|err| RoutingError::Other(format!("Failed to create temp dir: {err}")))?;
-
-        // TODO: Copy workspace files for full isolation
-        // For now, we just create an empty temp directory
-        // In production, this would copy the entire workspace
 
         Ok(Self {
             temp_dir,
             _original_workspace: workspace.root_path().clone(),
         })
+    }
+
+    /// Copy workspace files to isolated environment
+    ///
+    /// This copies essential build files (Cargo.toml, Cargo.lock, src/, etc.) to the
+    /// isolated environment for full build isolation. Large directories like target/
+    /// and .git/ are excluded for performance.
+    ///
+    /// # Errors
+    /// Returns an error if filesystem operations fail during copying.
+    pub async fn copy_workspace_files(&self, workspace_root: &Path) -> Result<()> {
+        Self::copy_dir_recursive(
+            workspace_root.to_path_buf(),
+            self.temp_dir.path().to_path_buf(),
+            workspace_root.to_path_buf(),
+        )
+        .await
+    }
+
+    fn copy_dir_recursive(
+        source: PathBuf,
+        dest: PathBuf,
+        workspace_root: PathBuf,
+    ) -> BoxFuture<Result<()>> {
+        Box::pin(async move {
+            let mut entries = read_dir(&source).await?;
+
+            while let Some(entry) = entries.next_entry().await? {
+                let path = entry.path();
+                let file_name = entry.file_name();
+                let file_name_str = file_name.to_string_lossy();
+
+                if file_name_str.starts_with('.') && file_name_str != ".cargo" {
+                    continue;
+                }
+
+                if matches!(
+                    file_name_str.as_ref(),
+                    "target" | "node_modules" | ".git" | ".idea" | ".vscode"
+                ) {
+                    continue;
+                }
+
+                let relative_path = path
+                    .strip_prefix(&workspace_root)
+                    .map_err(|err| RoutingError::Other(format!("Path strip failed: {err}")))?;
+                let dest_path = dest.join(relative_path);
+
+                if path.is_dir() {
+                    create_dir_all(&dest_path).await?;
+                    Self::copy_dir_recursive(path, dest.clone(), workspace_root.clone()).await?;
+                } else if path.is_file() {
+                    Self::copy_file(&path, &dest_path).await?;
+                }
+            }
+
+            Ok(())
+        })
+    }
+
+    /// Copy a single file from source to destination
+    ///
+    /// # Errors
+    /// Returns an error if filesystem operations fail during copying.
+    async fn copy_file(source: &Path, dest: &Path) -> Result<()> {
+        if let Some(parent) = dest.parent() {
+            create_dir_all(parent).await?;
+        }
+        let content = read_to_string(source).await.unwrap_or_default();
+        write(dest, content).await?;
+        Ok(())
     }
 
     /// Apply changes to isolated environment

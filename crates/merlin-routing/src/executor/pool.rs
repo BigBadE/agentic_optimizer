@@ -10,6 +10,7 @@ use merlin_local::LocalModelProvider;
 use merlin_providers::{AnthropicProvider, GroqProvider, OpenRouterProvider};
 
 use super::graph::TaskGraph;
+use super::scheduler::ConflictAwareTaskGraph;
 use super::state::WorkspaceState;
 use crate::{ModelRouter, ModelTier, Result, RoutingError, Task, TaskResult, Validator};
 
@@ -99,6 +100,73 @@ impl ExecutorPool {
 
         loop {
             let ready = graph.ready_tasks(&completed);
+
+            if ready.is_empty() && join_set.is_empty() {
+                break;
+            }
+
+            for task in ready {
+                if running.contains(&task.id) {
+                    continue;
+                }
+
+                if join_set.len() >= self.max_concurrent {
+                    break;
+                }
+
+                running.insert(task.id);
+
+                let router = Arc::clone(&self.router);
+                let validator = Arc::clone(&self.validator);
+                let workspace = Arc::clone(&self.workspace);
+                let permit = Arc::clone(&semaphore)
+                    .acquire_owned()
+                    .await
+                    .map_err(|err| RoutingError::Other(err.to_string()))?;
+
+                join_set.spawn(async move {
+                    let result = Self::execute_task(task, router, validator, workspace).await;
+                    drop(permit);
+                    result
+                });
+            }
+
+            if let Some(result) = join_set.join_next().await {
+                let task_result =
+                    result.map_err(|err| RoutingError::ExecutionFailed(err.to_string()))??;
+                running.remove(&task_result.task_id);
+                completed.insert(task_result.task_id);
+                results.push(task_result);
+            }
+        }
+
+        Ok(results)
+    }
+
+    /// Execute conflict-aware task graph with file-level conflict detection
+    ///
+    /// This method ensures that tasks accessing the same files don't run concurrently,
+    /// preventing race conditions and file conflicts.
+    ///
+    /// # Errors
+    /// Returns an error if the graph has cycles, if task execution fails, or if acquiring
+    /// a semaphore permit fails.
+    pub async fn execute_conflict_aware_graph(
+        &self,
+        graph: ConflictAwareTaskGraph,
+    ) -> Result<Vec<TaskResult>> {
+        if graph.has_cycles() {
+            return Err(RoutingError::CyclicDependency);
+        }
+
+        let mut completed = HashSet::new();
+        let mut running = HashSet::new();
+        let mut results = Vec::new();
+        let mut join_set = JoinSet::new();
+        let semaphore = Arc::new(Semaphore::new(self.max_concurrent));
+
+        loop {
+            let ready = graph.ready_non_conflicting_tasks(&completed, &running);
 
             if ready.is_empty() && join_set.is_empty() {
                 break;

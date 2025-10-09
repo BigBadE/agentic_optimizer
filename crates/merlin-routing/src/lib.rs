@@ -56,12 +56,16 @@
 pub mod agent;
 /// Task analysis and decomposition
 pub mod analyzer;
+/// Response caching with semantic similarity
+pub mod cache;
 /// Configuration types for routing and execution
 pub mod config;
 /// Error types and result aliases
 pub mod error;
 /// Task execution with workspace management
 pub mod executor;
+/// Metrics collection and reporting
+pub mod metrics;
 /// High-level orchestration of routing components
 pub mod orchestrator;
 /// Model selection and routing strategies
@@ -82,13 +86,17 @@ pub use analyzer::{
     Action, ComplexityEstimator, Intent, IntentExtractor, LocalTaskAnalyzer, Scope, TaskAnalyzer,
     TaskDecomposer,
 };
-pub use config::{ExecutionConfig, RoutingConfig, TierConfig, ValidationConfig, WorkspaceConfig};
+pub use cache::{CachedResponse, ResponseCache};
+pub use config::{
+    CacheConfig, ExecutionConfig, RoutingConfig, TierConfig, ValidationConfig, WorkspaceConfig,
+};
 pub use error::{Result, RoutingError};
 pub use executor::{
     BuildResult, ConflictAwareTaskGraph, ConflictReport, ExecutorPool, FileConflict,
     FileLockManager, IsolatedBuildEnv, LintResult, TaskGraph, TaskWorkspace, TestResult,
     WorkspaceSnapshot, WorkspaceState,
 };
+pub use metrics::{DailyReport, MetricsCollector, MetricsReport, RequestMetrics, TierBreakdown};
 pub use orchestrator::RoutingOrchestrator;
 pub use router::{
     AvailabilityChecker, ComplexityBasedStrategy, CostOptimizationStrategy, LongContextStrategy,

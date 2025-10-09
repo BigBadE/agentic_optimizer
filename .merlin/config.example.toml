@@ -1,0 +1,65 @@
+# Merlin Configuration File
+# Copy this file to .merlin/config.toml and customize as needed
+
+[tiers]
+# Local model tier (Ollama)
+local_enabled = true
+local_model = "qwen2.5-coder:7b"
+
+# Groq tier (free, fast)
+groq_enabled = true
+groq_model = "llama-3.1-70b-versatile"
+
+# Premium tier (Claude, DeepSeek)
+premium_enabled = true
+
+# Retry and timeout settings
+max_retries = 3
+timeout_seconds = 300
+
+[validation]
+# Enable validation pipeline
+enabled = true
+
+# Stop on first failure
+early_exit = true
+
+# Build and test timeouts
+build_timeout_seconds = 60
+test_timeout_seconds = 300
+
+[execution]
+# Maximum concurrent tasks
+max_concurrent_tasks = 4
+
+# Enable parallel execution
+enable_parallel = true
+
+# Enable conflict detection
+enable_conflict_detection = true
+
+# Enable file locking
+enable_file_locking = true
+
+[workspace]
+# Workspace root path (relative to config file)
+root_path = "."
+
+# Enable workspace snapshots
+enable_snapshots = true
+
+# Enable transactional operations
+enable_transactions = true
+
+[cache]
+# Enable response caching
+enabled = true
+
+# Cache time-to-live in hours
+ttl_hours = 24
+
+# Maximum cache size in megabytes
+max_size_mb = 100
+
+# Similarity threshold for semantic matching (0.0-1.0)
+similarity_threshold = 0.95

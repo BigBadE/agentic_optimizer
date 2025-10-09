@@ -42,6 +42,11 @@ pub struct UiChannel {
 }
 
 impl UiChannel {
+    /// Creates a UI channel from an existing sender (for testing)
+    pub fn from_sender(sender: mpsc::UnboundedSender<UiEvent>) -> Self {
+        Self { sender }
+    }
+
     /// Sends a UI event
     pub fn send(&self, event: UiEvent) {
         drop(self.sender.send(event));

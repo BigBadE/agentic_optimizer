@@ -128,3 +128,215 @@ fn test_cli_with_args() {
         .success()
         .stdout(predicate::str::contains("Usage"));
 }
+
+#[test]
+fn test_cli_config_command() {
+    cargo_bin().arg("config").assert().success();
+}
+
+#[test]
+fn test_cli_config_full() {
+    cargo_bin().arg("config").arg("--full").assert().success();
+}
+
+#[test]
+fn test_cli_metrics_command() {
+    cargo_bin().arg("metrics").assert().success();
+}
+
+#[test]
+fn test_cli_metrics_daily() {
+    cargo_bin().arg("metrics").arg("--daily").assert().success();
+}
+
+#[test]
+fn test_cli_with_local_flag() {
+    let temp = temp_dir();
+
+    fs::create_dir(temp.path().join("src"))
+        .unwrap_or_else(|err| panic!("Failed to create src: {err}"));
+    fs::write(
+        temp.path().join("Cargo.toml"),
+        "[package]\nname=\"test\"\nversion=\"0.1.0\"",
+    )
+    .unwrap_or_else(|err| panic!("Failed to write Cargo.toml: {err}"));
+
+    cargo_bin()
+        .current_dir(temp.path())
+        .arg("--local")
+        .arg("--help")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_cli_with_validation_disabled() {
+    cargo_bin()
+        .arg("--validation")
+        .arg("disabled")
+        .arg("--help")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_cli_with_validation_enabled() {
+    cargo_bin()
+        .arg("--validation")
+        .arg("enabled")
+        .arg("--help")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_cli_with_ui_plain() {
+    cargo_bin()
+        .arg("--ui")
+        .arg("plain")
+        .arg("--help")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_cli_with_ui_plain_verbose() {
+    cargo_bin()
+        .arg("--ui")
+        .arg("plain-verbose")
+        .arg("--help")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_cli_with_ui_tui() {
+    cargo_bin()
+        .arg("--ui")
+        .arg("tui")
+        .arg("--help")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_cli_with_project_flag() {
+    let temp = temp_dir();
+
+    fs::create_dir(temp.path().join("src"))
+        .unwrap_or_else(|err| panic!("Failed to create src: {err}"));
+    fs::write(
+        temp.path().join("Cargo.toml"),
+        "[package]\nname=\"proj\"\nversion=\"0.1.0\"",
+    )
+    .unwrap_or_else(|err| panic!("Failed to write Cargo.toml: {err}"));
+
+    cargo_bin()
+        .arg("--project")
+        .arg(temp.path())
+        .arg("--help")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_cli_prompt_command_help() {
+    cargo_bin()
+        .arg("prompt")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Show relevant files"));
+}
+
+#[test]
+fn test_cli_query_command_help() {
+    cargo_bin()
+        .arg("query")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("Ask a question"));
+}
+
+#[test]
+fn test_cli_chat_command_help() {
+    cargo_bin()
+        .arg("chat")
+        .arg("--help")
+        .assert()
+        .success()
+        .stdout(predicate::str::contains("interactive chat"));
+}
+
+#[test]
+fn test_cli_config_in_project() {
+    let temp = temp_dir();
+
+    // Create project structure
+    fs::create_dir(temp.path().join("src"))
+        .unwrap_or_else(|err| panic!("Failed to create src: {err}"));
+    fs::write(
+        temp.path().join("Cargo.toml"),
+        "[package]\nname=\"test\"\nversion=\"0.1.0\"\nedition=\"2021\"",
+    )
+    .unwrap_or_else(|err| panic!("Failed to write Cargo.toml: {err}"));
+
+    // Create a config file
+    fs::write(
+        temp.path().join("config.toml"),
+        "[providers]\nhigh_model = \"test-model\"",
+    )
+    .unwrap_or_else(|err| panic!("Failed to write config.toml: {err}"));
+
+    cargo_bin()
+        .current_dir(temp.path())
+        .arg("config")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_cli_multiple_flags_combined() {
+    cargo_bin()
+        .arg("--local")
+        .arg("--validation")
+        .arg("disabled")
+        .arg("--ui")
+        .arg("plain")
+        .arg("--help")
+        .assert()
+        .success();
+}
+
+#[test]
+fn test_cli_invalid_validation_value() {
+    cargo_bin()
+        .arg("--validation")
+        .arg("invalid")
+        .arg("--help")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid value"));
+}
+
+#[test]
+fn test_cli_invalid_ui_value() {
+    cargo_bin()
+        .arg("--ui")
+        .arg("invalid")
+        .arg("--help")
+        .assert()
+        .failure()
+        .stderr(predicate::str::contains("invalid value"));
+}
+
+#[test]
+fn test_cli_nonexistent_project() {
+    cargo_bin()
+        .arg("--project")
+        .arg("/nonexistent/path/that/does/not/exist")
+        .arg("config")
+        .assert()
+        .success();
+}

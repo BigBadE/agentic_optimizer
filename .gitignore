@@ -28,3 +28,8 @@ metrics.json
 benchmark_results.txt
 quality-results.md
 perf-results.md
+gungraun-results.md
+.benchmark-history/
+
+# gh-pages content (should only be on gh-pages branch)
+/gh-pages/

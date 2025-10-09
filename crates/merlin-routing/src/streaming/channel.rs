@@ -8,6 +8,11 @@ pub struct StreamingChannel {
 }
 
 impl StreamingChannel {
+    /// Creates a streaming channel from an existing sender (for testing)
+    pub fn from_sender(sender: mpsc::UnboundedSender<StreamingEvent>) -> Self {
+        Self { sender }
+    }
+
     /// Sends a streaming event through the channel.
     ///
     /// Events are dropped if the receiver has been closed.

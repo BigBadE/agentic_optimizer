@@ -26,7 +26,8 @@ pub mod theme;
 /// TUI application and main event loop
 mod app;
 mod event_handler;
-mod persistence;
+/// Task persistence (public for testing)
+pub mod persistence;
 
 // Re-exports
 pub use app::TuiApp;

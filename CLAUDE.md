@@ -294,3 +294,52 @@ All public items require doc comments:
 /// ```
 pub fn function() -> Result<()> { ... }
 ```
+
+## Critical Task Completion Requirements
+
+**BEFORE marking any task as complete, you MUST:**
+
+1. **Run clippy and fix ALL warnings/errors**:
+   ```bash
+   cargo clippy --workspace --all-targets --all-features
+   ```
+   - Fix every warning - this project has ZERO tolerance for clippy warnings
+   - Never use `#[allow]` attributes outside of test modules
+   - All code must pass the strict linting rules defined in Cargo.toml
+
+2. **Run all tests and ensure they pass**:
+   ```bash
+   cargo test --workspace
+   ```
+   - All tests must pass
+   - No ignored tests should be introduced without justification
+   - Test coverage should increase, not decrease
+
+3. **Verify the build succeeds**:
+   ```bash
+   cargo build --workspace
+   ```
+   - All crates must compile
+   - No build warnings
+
+**This is CRITICALLY important** - incomplete or untested code creates technical debt and breaks CI/CD.
+
+## Verification Before Task Completion
+
+**CRITICAL**: Before marking any task as complete, you MUST run the verification script:
+
+```bash
+./scripts/verify.sh
+```
+
+This script will:
+1. Format all code with `cargo fmt`
+2. Run `cargo clippy` with all warnings treated as errors
+3. Run all tests across the workspace
+
+**The verification script MUST pass with no errors.** If it fails:
+- Fix all clippy warnings (never use `#[allow]` outside test modules)
+- Fix all test failures
+- Ensure code is properly formatted
+
+This is the single source of truth for code quality - if `verify.sh` passes, the code is ready.

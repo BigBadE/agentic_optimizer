@@ -1,875 +1,446 @@
-# Merlin - Cost Reduction Plan
+# Merlin Development Plan
 
-## Executive Summary
-
-**Current Costs (3-day analysis):**
-- **Total**: $45.61 ($456/month projected)
-- **Cache Reads**: $27.76 (60.8%) - 92.5M tokens
-- **Cache Writes**: $14.36 (31.5%) - 3.8M tokens  
-- **Output Tokens**: $3.44 (7.5%) - 229K tokens
-- **Input Tokens**: $0.05 (0.1%) - 17K tokens
-
-**Primary Cost Drivers:**
-1. Cache reads dominate (60.8% of spend)
-2. Cache writes substantial (31.5% of spend)
-3. Output tokens significant (7.5% of spend)
-
-**Target Savings: 70-85% reduction ($318-$388/month)**
+**Current Status**: Production-ready multi-model routing system
+**Phase**: 4 Complete | Phase 5 Planning
 
 ---
 
-## Cost Breakdown Analysis
+## Current State
 
-### Per-Day Averages
-- Cache reads: ~30.8M tokens/day → $9.25/day
-- Cache writes: ~1.27M tokens/day → $4.79/day
-- Output tokens: ~76.5K tokens/day → $1.15/day
-- **Average daily cost: $15.20**
+### ✅ What Works (Phases 0-4 Complete)
 
-### Problem Identification
-1. **Excessive cache reads**: Repeated re-processing of same codebase context
-2. **Large cache writes**: Full codebase context likely being cached each request
-3. **Verbose outputs**: 178K output tokens on Oct 1 suggests excessive generation
-4. **Poor context reuse**: High cache write-to-read ratio indicates inefficient caching
+**Architecture** (9 crates, 136 files):
+- Multi-tier routing: Local (Ollama) → Groq (free) → Premium (Claude/DeepSeek)
+- Task decomposition with 4 execution strategies (Sequential, Pipeline, Parallel, Hybrid)
+- Validation pipeline: Syntax → Build → Test → Lint
+- TUI with real-time progress, task trees, streaming output
+- Tool system: File operations (read/write/list), command execution
+- Agent streaming: Steps, tool calls, context tracking
+- Cost tracking and automatic tier escalation
 
----
+**Model Tiers**:
+- **Local**: Qwen 2.5 Coder 7B (~100ms, $0)
+- **Groq**: Llama 3.1 70B (~500ms, free tier)
+- **Premium**: Claude 3.5 Sonnet, DeepSeek (~2s, paid)
 
-## Optimization Strategies
+**Testing**: 149 tests passing (all workspace: 445 total including dependencies), ~35% coverage estimated
+**Verification**: ✅ `./scripts/verify.sh` passing (fmt + clippy + tests)
 
-### Strategy 1: Intelligent Context Windowing (Est. 50-60% cost reduction)
-
-**Problem**: Sending entire codebase context on every request causes massive cache overhead.
-
-**Solution**: Implement smart context selection
-- Use AST parsing to identify relevant files/functions only
-- Implement dependency graph to include only necessary context
-- Use vector embeddings for semantic similarity search
-- Maintain minimal "core context" + focused "task context"
-
-**Implementation**:
-```
-1. Index codebase on first run (one-time cost)
-2. For each request:
-   a. Parse user query to identify relevant symbols
-   b. Use grep/ripgrep to find definitions
-   c. Build minimal dependency tree (max 5-10 files)
-   d. Send only relevant context (5-20KB vs full codebase)
-```
-
-**Cost Impact**:
-- **Before**: 30.8M cache reads/day @ $0.3/M = $9.25/day
-- **After**: 3-5M cache reads/day @ $0.3/M = $0.90-$1.50/day
-- **Savings**: $7.75-$8.35/day ($232-$250/month)
-
-- **Before**: 1.27M cache writes/day @ $3.75/M = $4.79/day
-- **After**: 0.15-0.25M cache writes/day @ $3.75/M = $0.56-$0.94/day
-- **Savings**: $3.85-$4.23/day ($115-$127/month)
-
-**Total Strategy 1 Savings: $347-$377/month (76-83% reduction)**
+**Known Issues**:
+- ⚠️ Quality benchmarks not integrated with context system
 
 ---
 
-### Strategy 2: Output Token Optimization (Est. 30-40% output reduction)
+## Critical Gaps
 
-**Problem**: AI generates verbose responses, unnecessary explanations, repeated code.
+### 1. Test Coverage Gaps ⚠️
 
-**Solution**: Constrained generation with explicit instructions
+**Improved (50-70% coverage)** ✅:
+- ✅ TUI input handling (`user_interface/input.rs`) - 21 tests
+- ✅ TUI persistence (`user_interface/persistence.rs`) - 15 tests
+- ✅ UI events (`user_interface/events.rs`) - 20 tests
+
+**Medium (10-40%)**:
+- Tool execution error handling (10-20%)
+- Provider fallback chains (20-40%)
+- Context system (30%)
+
+**Target**: 70% overall (currently ~35%, up from 26%)
+
+### 2. Technical Debt
+
+**Code TODOs** (5 instances):
+- `orchestrator.rs:321` - Implement conflict-aware execution
+- `build_isolation.rs:25` - Copy workspace files for full isolation
+- `event_handler.rs:81` - Phase 5: Handle hierarchical tasks
+- `integration_tests.rs:24,99` - Implement full integration tests
+
+---
+
+## Phase 5: Advanced Features
+
+### Goal
+Transform from task router to autonomous coding agent with self-determination, response caching, and advanced optimization.
+
+### 5.1 Self-Determining Tasks (Week 1-2)
+
+**Problem**: Tasks always decompose into 3 rigid subtasks regardless of complexity.
+
+**Solution**: Tasks assess themselves and decide execution path at runtime.
 
 **Implementation**:
 ```rust
-// Add to system prompt
-"CRITICAL RULES:
-- Output ONLY code changes, no explanations unless explicitly asked
-- Use edit_file tool instead of generating full files
-- For multi-file changes, output file paths only, then edit on request
-- Maximum response: 150 tokens for acknowledgments, 500 for code blocks
-- Use references (e.g., 'see line 45') instead of repeating code"
-```
-
-**Additional Techniques**:
-1. **Streaming with early termination**: Stop generation when task complete
-2. **Diff-based edits**: Send only changed lines, not full files
-3. **Response templates**: Predefined formats for common tasks
-4. **Compressed notation**: Use shorthand in tool calls
-
-**Cost Impact**:
-- **Before**: 76.5K output tokens/day @ $15/M = $1.15/day
-- **After**: 30-35K output tokens/day @ $15/M = $0.45-$0.52/day
-- **Savings**: $0.63-$0.70/day ($19-$21/month)**
-
----
-
-### Strategy 3: Multi-Turn Conversation Optimization (Est. 40% reduction)
-
-**Problem**: Each turn re-caches similar context, accumulating costs.
-
-**Solution**: Session-aware context management
-
-**Implementation**:
-```
-1. Maintain conversation state in local cache
-2. Track which files/context already sent
-3. Use differential updates:
-   - First turn: Send minimal context
-   - Follow-ups: "Context unchanged, continue from previous"
-4. Implement context expiry (5-10 min TTL)
-5. Use prompt caching strategically:
-   - Cache static system prompts (rules, tool definitions)
-   - Cache unchanged file contents
-   - DON'T cache dynamic conversation history
-```
-
-**Cost Impact**:
-- Reduces redundant cache writes in multi-turn conversations
-- **Savings**: Additional 20-30% on cache operations
-- **Estimated**: $2-3/day ($60-$90/month)
-
----
-
-### Strategy 4: Haiku/Sonnet Hybrid Approach (Est. 60-70% cost reduction)
-
-**Problem**: Using Sonnet 4.5 for all tasks, including simple ones.
-
-**Solution**: Route to cheaper models based on task complexity
-
-**Model Costs**:
-- **Haiku 4**: $0.80/M input, $4/M output, $0.08/M cache read
-- **Sonnet 4.5**: $3/M input, $15/M output, $0.30/M cache read
-
-**Routing Logic**:
-```rust
-enum TaskComplexity {
-    Simple,   // Haiku: grep searches, file viewing, simple edits
-    Medium,   // Haiku: single-file refactors, bug fixes
-    Complex,  // Sonnet: architecture, multi-file changes, reasoning
+pub enum TaskAction {
+    Complete { result: String },              // Simple task, done immediately
+    Decompose {                               // Complex, needs breakdown
+        subtasks: Vec<SubtaskSpec>,
+        execution_mode: ExecutionMode,
+    },
+    Elevate {                                 // Too complex for current tier
+        reason: ElevationReason,
+        suggested_tier: ModelTier,
+    },
+    GatherContext { context_needs: Vec<ContextRequest> },  // Need more info
 }
 
-fn route_model(task: &str) -> Model {
-    if task.contains(&["explain", "design", "architecture"]) {
-        Model::Sonnet45
-    } else if task.contains(&["search", "find", "view", "show"]) {
-        Model::Haiku4
-    } else {
-        // Default to Haiku, escalate if needed
-        Model::Haiku4
-    }
-}
-```
+impl AgentExecutor {
+    pub async fn execute_self_determining(&self, task: Task) -> Result<TaskResult> {
+        loop {
+            // 1. Assess task
+            let decision = self.assessor.assess_task(&task, &self.context).await?;
 
-**Cost Impact** (assuming 70% tasks can use Haiku):
-- **Haiku portion (70%)**:
-  - Cache reads: 21.6M @ $0.08/M = $1.73/day (was $6.48)
-  - Output: 53.5K @ $4/M = $0.21/day (was $0.80)
-  - Savings: $5.34/day
-
-- **Sonnet portion (30%)**: $4.56/day
-- **Total**: $6.29/day vs $15.20/day
-- **Savings**: $8.91/day ($267/month)**
-
----
-
-### Strategy 5: Local + Multi-Cloud Hybrid (Est. 95-98% cost reduction)
-
-**Problem**: Even cheap cloud APIs accumulate costs at scale; latency for simple tasks.
-
-**Solution**: Intelligent tiered routing: Local → Groq (free) → Gemini Flash → Sonnet
-
-**Architecture**:
-```
-Layer 1 (Local): Ultra-fast router (Phi-3-mini, 1-3B)
-  ├─ Task classification (~10ms, $0)
-  ├─ Simple searches/lookups ($0)
-  └─ Route to Layer 2 or 3
-  
-Layer 2 (Local): Code specialist (Qwen2.5-Coder-7B)
-  ├─ Code completions (~100ms, $0)
-  ├─ Single-file edits ($0)
-  ├─ Simple refactors ($0)
-  └─ Escalate if uncertain
-
-Layer 3 (Cloud Free): Groq API (Llama 3.1 70B)
-  ├─ Multi-file analysis (~2s, ~$0 if under limit)
-  ├─ Complex reasoning ($0.50/M if over limit)
-  └─ Escalate if fails
-
-Layer 4 (Cloud Cheap): Gemini Flash 2.0
-  ├─ Advanced tasks (~3s, $0.30/M output)
-  ├─ Cache: $0.01875/M (26x cheaper than Haiku)
-  └─ Escalate for critical quality
-
-Layer 5 (Cloud Premium): Sonnet 4.5
-  └─ Only critical/complex tasks requiring best quality
-```
-
-**Hardware Requirements** (Consumer PC):
-- **Minimum**: 8GB VRAM (RTX 3060) or 16GB RAM (CPU only)
-  - Phi-3-mini (3.8B): Classification/routing
-  - Qwen2.5-Coder-7B (quantized): Code tasks
-  
-- **Recommended**: 16GB VRAM (RTX 4060 Ti) or 32GB RAM
-  - + DeepSeek-Coder-6.7B: Better code quality
-  
-- **Optimal**: 24GB VRAM (RTX 4090) or 64GB RAM
-  - + Qwen2.5-Coder-32B (quantized): Near-Sonnet quality
-
-**Local Model Performance**:
-
-| Model | Size | VRAM | Speed (GPU) | Code Quality | Use Case |
-|-------|------|------|-------------|--------------|----------|
-| Phi-3-mini | 3.8B | 4GB | 100+ tok/s | 60% | Routing, classification |
-| Qwen2.5-Coder-7B | 7B | 6GB | 50+ tok/s | 75% | Code edits, completion |
-| DeepSeek-Coder-6.7B | 6.7B | 6GB | 50+ tok/s | 78% | Code understanding |
-| Qwen2.5-Coder-32B | 32B | 20GB | 15+ tok/s | 88% | Complex refactors |
-
-**Cloud API Alternatives** (cheaper than Haiku):
-
-| Provider | Model | Input | Output | Cache Read | vs Haiku |
-|----------|-------|-------|--------|------------|----------|
-| **Groq** | Llama 3.1 70B | Free tier | Free tier | N/A | 100% cheaper |
-| **Google** | Gemini Flash 2.0 | $0.075/M | $0.30/M | $0.01875/M | 90% cheaper |
-| **DeepSeek** | DeepSeek-V3 | $0.27/M | $1.10/M | N/A | 72% cheaper |
-| **OpenAI** | GPT-4o-mini | $0.15/M | $0.60/M | N/A | 81% cheaper |
-| Anthropic | Haiku 4 | $0.80/M | $4.00/M | $0.08/M | baseline |
-
-**Implementation**:
-```rust
-// Local model manager
-struct LocalModels {
-    router: Phi3Mini,      // 3.8B - instant classification
-    coder: Qwen2_5Coder7B, // 7B - code specialist
-}
-
-// Multi-tier routing
-async fn route_query(query: &str, models: &LocalModels) -> Response {
-    // Layer 1: Local routing (10ms, $0)
-    let task_type = models.router.classify(query).await;
-    
-    match task_type {
-        TaskType::SimpleSearch | TaskType::Lookup => {
-            // Handle locally, no API call
-            handle_local(query)
-        }
-        TaskType::CodeEdit | TaskType::Completion => {
-            // Layer 2: Local 7B model (100ms, $0)
-            let result = models.coder.generate(query).await;
-            if result.confidence > 0.85 {
-                return result;
+            // 2. Execute decision
+            match decision.action {
+                TaskAction::Complete { result } => return Ok(result),
+                TaskAction::Decompose { subtasks, mode } => {
+                    return self.execute_with_subtasks(task, subtasks, mode).await;
+                }
+                TaskAction::Elevate { suggested_tier, .. } => {
+                    let elevated = self.router.get_executor(suggested_tier)?;
+                    return elevated.execute_self_determining(task).await;
+                }
+                TaskAction::GatherContext { context_needs } => {
+                    self.gather_context(context_needs).await?;
+                    continue;  // Re-assess with new context
+                }
             }
-            // Escalate if uncertain
-            route_to_cloud(query, CloudTier::Groq)
         }
-        TaskType::Complex => {
-            // Start with free tier
-            route_to_cloud(query, CloudTier::Groq)
-        }
-    }
-}
-
-async fn route_to_cloud(query: &str, tier: CloudTier) -> Response {
-    let result = match tier {
-        CloudTier::Groq => {
-            // Try free Groq first
-            groq_client.call(query).await
-        }
-        CloudTier::GeminiFlash => {
-            // 4x cheaper than Haiku
-            gemini_client.call(query).await
-        }
-        CloudTier::Sonnet => {
-            // Last resort, highest quality
-            sonnet_client.call(query).await
-        }
-    };
-    
-    // Auto-escalate on failure
-    if result.is_err() || result.confidence < 0.7 {
-        let next_tier = tier.escalate();
-        route_to_cloud(query, next_tier).await
-    } else {
-        result
     }
 }
 ```
 
-**Cost Impact** (Full Hybrid):
+**Files to Create**:
+- `crates/merlin-routing/src/agent/self_assess.rs` - Assessment engine
+- `crates/merlin-routing/src/agent/elevate.rs` - Elevation strategy
 
-Assume task distribution:
-- 30% handled by local router (free)
-- 40% handled by local 7B model (free)
-- 15% routed to Groq (free tier)
-- 10% routed to Gemini Flash ($0.30/M output)
-- 5% routed to Sonnet ($15/M output)
+**Files to Modify**:
+- `crates/merlin-routing/src/types.rs` - Add TaskAction, ElevationReason
+- `crates/merlin-routing/src/agent/executor.rs` - Add execute_self_determining
 
-**Before** (current):
-- 76.5K output tokens/day @ $15/M = $1.15/day
-- 30.8M cache reads/day @ $0.30/M = $9.25/day
-- **Total: $15.20/day**
+**Benefits**:
+- Simple tasks stay simple ("say hi" → 1 task, not 3)
+- Complex tasks get proper breakdown (assessed during execution)
+- Smart tier elevation (only when truly needed)
 
-**After** (full hybrid):
-- Local (70%): $0.00/day
-- Groq (15%): $0.00/day (under free limit)
-- Gemini (10%): 7.6K tokens @ $0.30/M = $0.002/day
-- Gemini cache: 3.1M @ $0.01875/M = $0.06/day
-- Sonnet (5%): 3.8K tokens @ $15/M = $0.06/day
-- Sonnet cache: 1.5M @ $0.30/M = $0.45/day
-- **Total: $0.57/day**
+**Tests Needed**: ~15-20 tests
+- Self-assessment with various complexity levels
+- Elevation decisions
+- Context gathering
+- Subtask spawning
 
-**Savings: $14.63/day ($439/month, 96.2% reduction)**
+### 5.2 Response Caching (Week 3)
 
-**Additional Benefits**:
-- **Speed**: Local models respond in 10-200ms (vs 2-5s cloud)
-- **Privacy**: Sensitive code never leaves your machine
-- **Reliability**: No API rate limits or outages
-- **Offline**: Works without internet for 70% of tasks
+**Problem**: Identical queries repeatedly hit expensive APIs.
 
-**Setup Requirements**:
-```bash
-# Install Ollama for local model management
-# Windows: Download from ollama.ai
-ollama pull phi3:mini        # 3.8B router
-ollama pull qwen2.5-coder:7b # 7B code specialist
-
-# Optional: Larger models if you have VRAM
-ollama pull deepseek-coder:6.7b
-ollama pull qwen2.5-coder:32b  # Requires 20GB+ VRAM
-```
-
-**Benchmark** (estimated on RTX 4060 Ti):
-- Phi-3-mini (routing): ~150 tokens/sec, ~10ms latency
-- Qwen2.5-Coder-7B: ~60 tokens/sec, ~100ms latency
-- Total cost: $0 (electricity ~$0.15/month at 200W, $0.12/kWh)
-
----
-
-### Strategy 6: Precomputed Indexing & Local Caching (Est. 20-30% reduction)
-
-**Problem**: Repeatedly asking AI to find/search/analyze code structure.
-
-**Solution**: Build local index, query locally, send only results to AI
+**Solution**: Local cache with semantic similarity matching.
 
 **Implementation**:
-```
-1. On initialization:
-   - Build symbol table (functions, structs, modules)
-   - Create file dependency graph
-   - Generate embeddings for semantic search
-   - Extract doc comments and signatures
-
-2. On user query:
-   - Parse query locally (regex, AST)
-   - Search index first (grep, symbol lookup)
-   - Send only findings to AI for interpretation
-   
-3. Incremental updates:
-   - Watch file changes
-   - Update only modified files in index
-```
-
-**Cost Impact**:
-- Eliminates 20-30% of AI requests entirely (pure lookups)
-- **Savings**: $3-4.50/day ($90-$135/month)
-
----
-
-## Recommended Architecture
-
-### System Components
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│                        User Query                            │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│              Query Analyzer & Router                         │
-│  - Classify task complexity                                  │
-│  - Determine required context                                │
-│  - Select model (Haiku/Sonnet)                               │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-         ┌─────────────┴─────────────┐
-         │                           │
-┌────────▼────────┐        ┌─────────▼────────┐
-│  Local Index    │        │  Context Builder │
-│  - Symbol table │        │  - AST parser    │
-│  - Dep graph    │        │  - Dep resolver  │
-│  - Embeddings   │        │  - Diff tracker  │
-└────────┬────────┘        └─────────┬────────┘
-         │                           │
-         └─────────────┬─────────────┘
-                       │
-         ┌─────────────▼──────────────┐
-         │    Minimal Context (5-20KB)│
-         └─────────────┬──────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│                   Claude API Call                            │
-│  - Cached system prompt (static)                             │
-│  - Minimal context (dynamic)                                 │
-│  - Constrained output instructions                           │
-└──────────────────────┬──────────────────────────────────────┘
-                       │
-┌──────────────────────▼──────────────────────────────────────┐
-│              Response Processor                              │
-│  - Extract code edits                                        │
-│  - Apply changes locally                                     │
-│  - Update index incrementally                                │
-└──────────────────────────────────────────────────────────────┘
-```
-
-### Core Modules
-
 ```rust
-// 1. Codebase indexer
-mod indexer {
-    struct CodebaseIndex {
-        symbols: SymbolTable,           // Fast lookup
-        dependencies: DependencyGraph,   // Context resolution
-        embeddings: VectorStore,         // Semantic search
-    }
+pub struct ResponseCache {
+    storage: HashMap<String, CachedResponse>,
+    embedding_model: EmbeddingModel,
+    similarity_threshold: f32,  // 0.95 = near-exact match
 }
 
-// 2. Context builder
-mod context {
-    struct ContextBuilder {
-        max_tokens: usize,              // e.g., 8000
-        max_files: usize,               // e.g., 10
-        cache: ConversationCache,
-    }
-    
-    fn build_minimal_context(
+impl ResponseCache {
+    pub async fn get_or_compute(
+        &mut self,
         query: &str,
-        index: &CodebaseIndex,
-    ) -> MinimalContext { }
-}
+        compute: impl Future<Output = Response>,
+    ) -> Response {
+        // Check for exact match
+        if let Some(cached) = self.storage.get(query) {
+            if !cached.is_expired() {
+                return cached.response.clone();
+            }
+        }
 
-// 3. Model router
-mod router {
-    enum Model { Haiku4, Sonnet45 }
-    
-    fn select_model(task_type: TaskType) -> Model { }
-    fn estimate_cost(context: &Context, model: Model) -> f64 { }
-}
+        // Check for semantic similarity
+        let query_embedding = self.embedding_model.embed(query);
+        for (cached_query, cached_response) in &self.storage {
+            let similarity = cosine_similarity(&query_embedding, &cached_response.embedding);
+            if similarity > self.similarity_threshold {
+                return cached_response.response.clone();
+            }
+        }
 
-// 4. API client with optimization
-mod api {
-    struct OptimizedClient {
-        static_cache: Vec<Message>,     // System prompt, rules
-        conversation_state: HashMap,     // Track sent context
+        // Cache miss - compute and store
+        let response = compute.await;
+        self.store(query, response.clone());
+        response
     }
 }
 ```
 
----
+**Files to Create**:
+- `crates/merlin-routing/src/cache/mod.rs` - Cache infrastructure
+- `crates/merlin-routing/src/cache/embedding.rs` - Semantic similarity
 
-## Implementation Phases
+**Savings Estimate**: 40-60% reduction in API calls for repeated queries
 
-### Phase 1: Foundation (Week 1)
-**Goal**: Reduce cache operations by 60%
+### 5.3 Configuration Files (Week 4)
 
-- [ ] Implement codebase indexer (AST + symbol table)
-- [ ] Build dependency graph analyzer
-- [ ] Create minimal context builder
-- [ ] Add local grep/search (avoid AI for lookups)
+**Problem**: All config hardcoded or from environment variables.
 
-**Expected Savings**: $8-10/day ($240-300/month)
+**Solution**: TOML/JSON configuration with validation.
 
-### Phase 2: Output Optimization (Week 2)
-**Goal**: Reduce output tokens by 35%
+**Implementation**:
+```toml
+# .merlin/config.toml
 
-- [ ] Implement constrained prompting system
-- [ ] Add diff-based editing (send only changes)
-- [ ] Create response templates for common tasks
-- [ ] Add output token tracking & warnings
+[tiers]
+local_enabled = true
+local_model = "qwen2.5-coder:7b"
+groq_enabled = true
+groq_model = "llama-3.1-70b-versatile"
+premium_enabled = true
+max_retries = 3
+timeout_seconds = 300
 
-**Expected Savings**: Additional $0.60/day ($18/month)
+[validation]
+enabled = true
+early_exit = true
+syntax_check = true
+build_check = true
+test_check = true
+lint_check = true
 
-### Phase 3: Multi-Model Routing (Week 3)
-**Goal**: Route 70% of tasks to Haiku
+[execution]
+max_concurrent_tasks = 4
+enable_conflict_detection = true
 
-- [ ] Implement task classifier
-- [ ] Build Haiku/Sonnet router
-- [ ] Add escalation mechanism (Haiku → Sonnet if needed)
-- [ ] Create cost tracking dashboard
-
-**Expected Savings**: Additional $6-8/day ($180-240/month)
-
-### Phase 4: Advanced Optimization (Week 4)
-**Goal**: Fine-tune for maximum efficiency
-
-- [ ] Implement semantic search with embeddings
-- [ ] Add conversation-aware caching
-- [ ] Build incremental index updates
-- [ ] Create cost analytics & reporting
-
-**Expected Savings**: Additional $2-3/day ($60-90/month)
-
-### Phase 5: Local + Multi-Cloud Hybrid (Week 5)
-**Goal**: Achieve 95-98% cost reduction
-
-- [ ] Implement local model manager
-- [ ] Integrate Groq API (free tier)
-- [ ] Integrate Gemini Flash API (4x cheaper than Haiku)
-- [ ] Implement multi-tier routing
-
-**Expected Savings**: Additional $10-12/day ($300-360/month)
-
----
-
-## Cost Projections
-
-### Current State
-```
-Daily:   $15.20
-Monthly: $456.00
-Yearly:  $5,472.00
+[cache]
+enabled = true
+ttl_hours = 24
+similarity_threshold = 0.95
+max_size_mb = 100
 ```
 
-### After Phase 1 (Context Optimization)
-```
-Daily:   $5.20 - $7.20 (66% reduction)
-Monthly: $156 - $216
-Yearly:  $1,872 - $2,592
-Savings: $240-$300/month
+**Files to Create**:
+- `crates/merlin-cli/src/config/loader.rs` - Load/validate config
+- `crates/merlin-cli/src/config/schema.rs` - Config schema types
+
+**Files to Modify**:
+- `crates/merlin-routing/src/config.rs` - Add From<ConfigFile>
+
+### 5.4 Metrics & Analytics (Week 5)
+
+**Problem**: No visibility into cost, performance, or quality trends.
+
+**Solution**: Comprehensive metrics tracking with dashboard.
+
+**Implementation**:
+```rust
+pub struct MetricsCollector {
+    requests: Vec<RequestMetrics>,
+    db: sled::Db,
+}
+
+pub struct RequestMetrics {
+    pub timestamp: SystemTime,
+    pub query: String,
+    pub tier_used: ModelTier,
+    pub latency_ms: u64,
+    pub tokens_used: TokenUsage,
+    pub cost: f64,
+    pub success: bool,
+    pub escalated: bool,
+}
+
+impl MetricsCollector {
+    pub fn daily_report(&self) -> DailyReport {
+        let today = self.requests_today();
+        DailyReport {
+            total_requests: today.len(),
+            success_rate: today.iter().filter(|r| r.success).count() as f64 / today.len() as f64,
+            avg_latency: today.iter().map(|r| r.latency_ms).sum::<u64>() / today.len() as u64,
+            total_cost: today.iter().map(|r| r.cost).sum(),
+            tier_distribution: self.tier_breakdown(&today),
+        }
+    }
+}
 ```
 
-### After Phase 2 (+ Output Optimization)
+**Commands**:
+```bash
+merlin metrics --daily      # Today's stats
+merlin metrics --weekly     # Week summary
+merlin metrics --export     # Export to CSV
 ```
-Daily:   $4.60 - $6.60 (70% reduction)
-Monthly: $138 - $198
-Yearly:  $1,656 - $2,376
-Savings: $258-$318/month
-```
-
-### After Phase 3 (+ Multi-Model)
-```
-Daily:   $2.20 - $3.20 (79-86% reduction)
-Monthly: $66 - $96
-Yearly:  $792 - $1,152
-Savings: $360-$390/month
-```
-
-### After Phase 4 (Full Optimization)
-```
-Daily:   $1.50 - $2.50 (84-90% reduction)
-Monthly: $45 - $75
-Yearly:  $540 - $900
-Savings: $381-$411/month ($4,572-$4,932/year)
-```
-
-### After Phase 5 (Local + Multi-Cloud Hybrid) ⭐ RECOMMENDED
-```
-Daily:   $0.15 - $0.60 (96-99% reduction)
-Monthly: $4.50 - $18.00
-Yearly:  $54 - $216
-Savings: $438-$451/month ($5,256-$5,418/year)
-```
-
-**Breakdown** (Hybrid approach):
-- 70% tasks: Local models ($0/day)
-- 15% tasks: Groq free tier ($0/day)
-- 10% tasks: Gemini Flash ($0.07/day)
-- 5% tasks: Sonnet 4.5 ($0.50/day)
-- **Total: ~$0.57/day average**
-
-**Additional Benefits**:
-- Response time: 10-200ms (vs 2-5s)
-- Works offline for 70% of tasks
-- No rate limits on local inference
-- Privacy: sensitive code stays local
 
 ---
 
-## Key Performance Indicators (KPIs)
+## Immediate Priorities (Next 2 Weeks)
 
-### Cost Metrics
-- [ ] **Daily API cost < $3.00** (80% reduction target)
-- [ ] **Cache reads < 5M tokens/day** (84% reduction)
-- [ ] **Output tokens < 35K/day** (54% reduction)
-- [ ] **Average cost per request < $0.15**
+### Priority 1: TUI Test Coverage ✅ COMPLETE
+**Implemented**:
+- ✅ `user_interface/input.rs` - 21 comprehensive tests
+- ✅ `user_interface/persistence.rs` - 15 save/load tests
+- ✅ `user_interface/events.rs` - 20 event structure tests
 
-### Efficiency Metrics
-- [ ] **Context size < 20KB per request** (vs full codebase)
-- [ ] **70%+ requests use Haiku** (cost optimization)
-- [ ] **90%+ cache hit rate** (for static context)
-- [ ] **Response time < 3s** (faster + cheaper)
+**Result**: 56 new tests added, ~60-70% coverage on TUI modules
+**Files**: `tests/input_manager_comprehensive_tests.rs`, `tests/persistence_tests.rs`, `tests/ui_events_tests.rs`
 
-### Accuracy Metrics
-- [ ] **Success rate > 95%** (correct answers)
-- [ ] **Escalation rate < 15%** (Haiku → Sonnet)
-- [ ] **Re-query rate < 10%** (context sufficient first time)
+### Priority 2: Integration Tests (2-3 days)
+**Complete TODOs**:
+- `integration_tests.rs:24` - Full integration test suite
+- `integration_tests.rs:99` - Comprehensive integration tests
+
+**Scenarios**:
+- Full request → response flow
+- Tool execution chains
+- Validation pipeline end-to-end
+- Provider fallback/escalation
+
+### Priority 3: Quality Benchmarks Integration (3-4 days)
+**Connect to actual system**:
+- Hook benchmark binary to merlin-context search
+- Test on Valor repository
+- Generate JSON for CI integration
+
+---
+
+## Medium-Term (1-2 Months)
+
+### Tool System Hardening
+- Error recovery for file operations
+- Command timeout handling
+- Tool chaining validation
+- Parameter validation
+- **Tests needed**: ~25-30
+
+### Provider System Robustness
+- Rate limiting tests
+- Fallback chain verification
+- Health check integration
+- Cost tracking accuracy
+- **Tests needed**: ~20
+
+### Context System Improvements
+- Window management tests
+- Compression validation
+- Relevance scoring verification
+- **Tests needed**: ~15
+
+**Target**: 70% overall coverage (currently 26%, need 44% increase)
+
+---
+
+## Success Metrics
+
+### Phase 5 Targets
+
+**Performance**:
+- [ ] Daily cost < $1.00 (currently ~$0-2/day depending on usage)
+- [ ] P95 latency < 3s for simple tasks
+- [ ] 90%+ cache hit rate for repeated queries
+
+**Quality**:
+- [ ] 95%+ task success rate
+- [ ] < 15% escalation rate (tier upgrades)
+- [ ] 70%+ test coverage
+
+**Features**:
+- [ ] Self-determining tasks operational
+- [ ] Response caching saving 40%+ API calls
+- [ ] Config file support
+- [ ] Metrics dashboard functional
+
+### Code Quality
+- [ ] All TODOs resolved or tracked as issues
+- [ ] All clippy warnings fixed
+- [ ] Documentation coverage > 90%
+- [ ] No `unwrap()`/`expect()` in production code
 
 ---
 
 ## Risk Mitigation
 
-### Potential Issues
+### Self-Determining Tasks
+- **Risk**: Models make poor decomposition decisions
+- **Mitigation**: Conservative assessment prompts, user override option
+- **Fallback**: Disable via config flag, use static decomposition
 
-**Risk 1: Reduced Context = Lower Accuracy**
-- *Mitigation*: Implement confidence scoring; escalate to full context if needed
-- *Fallback*: Allow user to manually request more context
-- *Monitoring*: Track success rate; adjust context window if < 90%
+### Response Caching
+- **Risk**: Stale cache returns outdated responses
+- **Mitigation**: TTL-based expiry, invalidation on file changes
+- **Fallback**: Disable caching per-query with `--no-cache`
 
-**Risk 2: Haiku Insufficient for Complex Tasks**
-- *Mitigation*: Conservative routing; prefer Sonnet for ambiguity
-- *Fallback*: Auto-escalate on Haiku failure/low confidence
-- *Monitoring*: Track Haiku success rate by task type
-
-**Risk 3: Index Maintenance Overhead**
-- *Mitigation*: Incremental updates only; lazy indexing
-- *Fallback*: Disable indexing for small projects (< 50 files)
-- *Monitoring*: Track index build time vs API cost savings
-
-**Risk 4: Over-Optimization Complexity**
-- *Mitigation*: Phase-based rollout; measure each phase
-- *Fallback*: Feature flags to disable optimizations
-- *Monitoring*: Cost vs complexity ratio
+### Performance Impact
+- **Risk**: New features add latency overhead
+- **Mitigation**: Benchmark each feature, maintain P95 < 3s
+- **Fallback**: Feature flags to disable expensive features
 
 ---
 
-## Success Criteria
+## Next Actions
 
-### Phase 1 Success (Week 1)
-- Daily cost reduced to < $7.00 (54% reduction)
-- Context size < 30KB average
-- No accuracy degradation (> 90% success rate)
+1. **Immediate** (this week):
+   - ✅ Fix gungraun benchmarks (DONE)
+   - ✅ Add TUI tests (DONE - 56 tests added)
+   - Add integration tests
 
-### Phase 2 Success (Week 2)
-- Daily cost reduced to < $6.00 (61% reduction)
-- Output tokens < 50K/day
-- Response quality maintained
+2. **Short-term** (2 weeks):
+   - ✅ Complete TUI test coverage (56 tests added)
+   - Integrate quality benchmarks
+   - Resolve code TODOs (orchestrator, build_isolation)
 
-### Phase 3 Success (Week 3)
-- Daily cost reduced to < $3.50 (77% reduction)
-- 60%+ tasks routed to Haiku
-- Escalation rate < 20%
+3. **Medium-term** (1 month):
+   - Implement self-determining tasks
+   - Add response caching
+   - Reach 50% test coverage
 
-### Phase 4 Success (Week 4)
-- **Daily cost reduced to < $2.50 (84% reduction)**
-- **Monthly savings: $380+ ($4,560/year)**
-- **All KPIs met**
-- **Production-ready tool**
-
-### Phase 5 Success (Week 5)
-- **Daily cost reduced to < $0.60 (96% reduction)**
-- **Monthly savings: $438+ ($5,256/year)**
-- **All KPIs met**
-- **Production-ready tool**
+4. **Long-term** (2 months):
+   - Config file support
+   - Metrics dashboard
+   - Reach 70% test coverage
 
 ---
 
-## Alternative Approaches (Considered)
+## Open Questions
 
-### 1. Fine-Tuned Smaller Model
-- **Pros**: Potentially much cheaper (10x+ reduction)
-- **Cons**: Training cost, maintenance, less flexible
-- **Verdict**: Revisit if costs don't improve enough
+1. **Self-assessment prompts**: What format ensures reliable JSON responses?
+   - Test with various models, add strict parsing with fallbacks
 
-### 2. Hybrid Local LLM + Cloud
-- **Pros**: Free inference for simple tasks
-- **Cons**: GPU costs, limited quality, complexity
-- **Verdict**: Not worth complexity for current scale
+2. **Cache invalidation**: When should cache entries expire?
+   - Default 24h TTL, invalidate on workspace file changes
 
-### 3. Batch Processing
-- **Pros**: Potential volume discounts
-- **Cons**: Poor UX (delays), not offered by Anthropic
-- **Verdict**: Not applicable
+3. **Config migration**: How to handle config schema changes?
+   - Version field in config, migration scripts for breaking changes
 
-### 4. Competitor APIs (OpenAI, Gemini)
-- **Pros**: Different pricing models
-- **Cons**: Quality differences, migration cost
-- **Verdict**: Monitor pricing, but Claude quality preferred
+4. **Metrics storage**: Local DB or cloud service?
+   - Start with local sled DB, optional cloud export later
+
+5. **Test flakiness**: How to ensure TUI tests are reliable?
+   - Mock all I/O, use deterministic fixtures, avoid timing dependencies
 
 ---
 
-## Next Steps
+## File Structure After Phase 5
 
-1. **Immediate**: Review and approve this plan
-2. **Week 1**: Implement Phase 1 (context optimization)
-3. **Week 2**: Measure Phase 1 results, implement Phase 2
-4. **Week 3**: Implement multi-model routing
-5. **Week 4**: Fine-tune and productionize
-6. **Week 5**: Implement local + multi-cloud hybrid
-
-**Target Launch**: Full optimization deployed in 5 weeks
-**Target Savings**: $438+/month (96% reduction)
-**Break-even**: Immediate (no infrastructure costs)
-
----
-
-## Appendix: Code Snippets
-
-### A. Minimal Context Builder
-
-```rust
-use std::collections::HashSet;
-
-struct ContextBuilder {
-    max_tokens: usize,
-    max_files: usize,
-}
-
-impl ContextBuilder {
-    fn build_context(&self, query: &str, index: &CodebaseIndex) -> String {
-        let relevant_symbols = self.extract_symbols(query);
-        let mut files = HashSet::new();
-        let mut context = String::new();
-        
-        // Get relevant files
-        for symbol in relevant_symbols {
-            if let Some(file) = index.find_definition(&symbol) {
-                files.insert(file);
-                if files.len() >= self.max_files {
-                    break;
-                }
-            }
-        }
-        
-        // Build minimal context
-        for file in files {
-            context.push_str(&format!("// File: {}\n", file));
-            context.push_str(&index.get_file_content(file));
-            context.push_str("\n\n");
-            
-            if context.len() > self.max_tokens * 4 {
-                break;
-            }
-        }
-        
-        context
-    }
-    
-    fn extract_symbols(&self, query: &str) -> Vec<String> {
-        // Simple regex-based extraction
-        // In production: use NLP/embeddings
-        query.split_whitespace()
-            .filter(|w| w.chars().next().unwrap_or('_').is_alphanumeric())
-            .map(String::from)
-            .collect()
-    }
-}
 ```
-
-### B. Model Router
-
-```rust
-use anthropic::{Model, Client};
-
-enum TaskComplexity {
-    Simple,   // Haiku
-    Medium,   // Haiku with Sonnet fallback
-    Complex,  // Sonnet
-}
-
-struct ModelRouter {
-    haiku_client: Client,
-    sonnet_client: Client,
-}
-
-impl ModelRouter {
-    fn classify_task(&self, query: &str) -> TaskComplexity {
-        let complex_keywords = [
-            "design", "architecture", "refactor", "explain why",
-            "complex", "optimize", "performance"
-        ];
-        
-        let simple_keywords = [
-            "find", "search", "show", "view", "list",
-            "what is", "where is"
-        ];
-        
-        if complex_keywords.iter().any(|k| query.to_lowercase().contains(k)) {
-            TaskComplexity::Complex
-        } else if simple_keywords.iter().any(|k| query.to_lowercase().contains(k)) {
-            TaskComplexity::Simple
-        } else {
-            // Default to Haiku, escalate if needed
-            TaskComplexity::Medium
-        }
-    }
-    
-    async fn route_request(&self, query: &str, context: &str) -> Result<String> {
-        let complexity = self.classify_task(query);
-        
-        match complexity {
-            TaskComplexity::Simple => {
-                self.haiku_client.complete(query, context).await
-            }
-            TaskComplexity::Medium => {
-                let result = self.haiku_client.complete(query, context).await;
-                if self.is_low_confidence(&result?) {
-                    // Escalate to Sonnet
-                    self.sonnet_client.complete(query, context).await
-                } else {
-                    result
-                }
-            }
-            TaskComplexity::Complex => {
-                self.sonnet_client.complete(query, context).await
-            }
-        }
-    }
-    
-    fn is_low_confidence(&self, response: &str) -> bool {
-        response.contains("I'm not sure") 
-            || response.contains("unclear")
-            || response.len() < 50
-    }
-}
-```
-
-### C. Cost Tracking
-
-```rust
-use std::sync::atomic::{AtomicU64, Ordering};
-
-struct CostTracker {
-    input_tokens: AtomicU64,
-    output_tokens: AtomicU64,
-    cache_read_tokens: AtomicU64,
-    cache_write_tokens: AtomicU64,
-}
-
-impl CostTracker {
-    fn record_request(&self, usage: &TokenUsage) {
-        self.input_tokens.fetch_add(usage.input, Ordering::Relaxed);
-        self.output_tokens.fetch_add(usage.output, Ordering::Relaxed);
-        self.cache_read_tokens.fetch_add(usage.cache_read, Ordering::Relaxed);
-        self.cache_write_tokens.fetch_add(usage.cache_write, Ordering::Relaxed);
-    }
-    
-    fn calculate_cost(&self, model: Model) -> f64 {
-        let (input_cost, output_cost, cache_read_cost, cache_write_cost) = 
-            match model {
-                Model::Sonnet45 => (3.0, 15.0, 0.3, 3.75),
-                Model::Haiku4 => (0.8, 4.0, 0.08, 1.0),
-            };
-        
-        let input = self.input_tokens.load(Ordering::Relaxed) as f64;
-        let output = self.output_tokens.load(Ordering::Relaxed) as f64;
-        let cache_read = self.cache_read_tokens.load(Ordering::Relaxed) as f64;
-        let cache_write = self.cache_write_tokens.load(Ordering::Relaxed) as f64;
-        
-        (input * input_cost + output * output_cost + 
-         cache_read * cache_read_cost + cache_write * cache_write_cost) / 1_000_000.0
-    }
-    
-    fn daily_report(&self) {
-        println!("Daily Cost Report");
-        println!("Input: {} tokens", self.input_tokens.load(Ordering::Relaxed));
-        println!("Output: {} tokens", self.output_tokens.load(Ordering::Relaxed));
-        println!("Cache Read: {} tokens", self.cache_read_tokens.load(Ordering::Relaxed));
-        println!("Cache Write: {} tokens", self.cache_write_tokens.load(Ordering::Relaxed));
-        println!("Total Cost: ${:.2}", self.calculate_cost(Model::Sonnet45));
-    }
-}
+crates/merlin-routing/src/
+├── agent/
+│   ├── self_assess.rs     # NEW: Self-assessment engine
+│   ├── elevate.rs         # NEW: Elevation strategy
+│   ├── executor.rs        # MODIFIED: Add execute_self_determining
+│   └── step.rs            # EXISTING
+├── cache/
+│   ├── mod.rs             # NEW: Cache infrastructure
+│   ├── storage.rs         # NEW: Cache storage (sled)
+│   └── embedding.rs       # NEW: Semantic similarity
+├── config/
+│   ├── loader.rs          # NEW: Config file loading
+│   └── schema.rs          # NEW: Config schema validation
+├── metrics/
+│   ├── mod.rs             # NEW: Metrics collection
+│   ├── collector.rs       # NEW: Request tracking
+│   └── reporter.rs        # NEW: Report generation
+└── [existing modules...]
 ```
 
 ---
 
-**End of Plan**
-
-*Estimated completion: 5 weeks*  
-*Projected savings: $438+/month (96% reduction)*  
-*ROI: Immediate (development time only)*
-
+**Estimated Timeline**: 5 weeks for Phase 5 complete
+**Estimated Effort**: ~80-100 hours of focused development
+**ROI**: Reduced API costs, faster iteration, better quality

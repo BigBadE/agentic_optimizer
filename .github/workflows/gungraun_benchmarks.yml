@@ -40,7 +40,9 @@ jobs:
         with:
           profile: release
 
-      - uses: taiki-e/install-action@cargo-binstall
+      - name: Install binstall
+        uses: taiki-e/install-action@cargo-binstall
+
       - name: Install gungraun-runner
         run: |
             version=$(cargo metadata --format-version=1 |\

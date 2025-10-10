@@ -1,6 +1,8 @@
 // Benchmark Dashboard JavaScript
 
 let charts = {};
+let currentData = { quality: null, perf: null, gungraun: null };
+let selectedBenchmark = { quality: null, perf: null, gungraun: null };
 
 // Switch between tabs
 function switchTab(tabName) {
@@ -9,7 +11,7 @@ function switchTab(tabName) {
         tab.classList.remove('active');
     });
     event.target.classList.add('active');
-    
+
     // Update tab content
     document.querySelectorAll('.tab-content').forEach(content => {
         content.classList.remove('active');
@@ -50,16 +52,21 @@ async function loadBenchmarkData() {
             fetch('data/perf-latest.json').then(r => r.ok ? r.json() : null).catch(() => null),
             fetch('data/gungraun-latest.json').then(r => r.ok ? r.json() : null).catch(() => null)
         ]);
-        
+
+        // Store data globally for filtering
+        currentData.quality = qualityData;
+        currentData.perf = perfData;
+        currentData.gungraun = gungraunData;
+
         updateStatsGrid(qualityData, perfData, gungraunData);
         updateCharts(qualityData, perfData, gungraunData);
         updateTables(qualityData, perfData, gungraunData);
         updateDetailedResults(qualityData, perfData, gungraunData);
-        
+
         // Update timestamp
         const timestamp = new Date().toLocaleString();
         document.getElementById('lastUpdated').textContent = `Last updated: ${timestamp}`;
-        
+
     } catch (error) {
         console.error('Error loading benchmark data:', error);
         showError('Failed to load benchmark data. Please try again later.');
@@ -275,41 +282,53 @@ function updateDetailedResults(quality, perf, gungraun) {
 
     let html = '';
 
-    // Performance benchmarks - show top 10 slowest
+    // Performance benchmarks - show ALL with search/filter
     if (perf && perf.benchmarks && perf.benchmarks.length > 0) {
-        const sorted = [...perf.benchmarks].sort((a, b) => b.mean_ms - a.mean_ms);
-        const top10 = sorted.slice(0, 10);
+        html += '<div class="benchmark-table-section">';
+        html += '<h3>Performance Benchmarks <span class="badge">' + perf.benchmarks.length + ' tests</span></h3>';
+        html += '<input type="text" id="perfFilter" class="filter-input" placeholder="Search benchmarks..." onkeyup="filterBenchmarks(\'perf\')">';
+        html += '<table class="metric-table clickable-table" id="perfBenchTable"><thead><tr>';
+        html += '<th onclick="sortTable(\'perf\', 0)">Benchmark ▼</th>';
+        html += '<th onclick="sortTable(\'perf\', 1)">Mean Time ▼</th>';
+        html += '<th onclick="sortTable(\'perf\', 2)">Median Time ▼</th>';
+        html += '<th onclick="sortTable(\'perf\', 3)">Std Dev ▼</th>';
+        html += '</tr></thead><tbody id="perfBenchBody">';
 
-        html += '<h3>Top 10 Slowest Performance Benchmarks</h3>';
-        html += '<table class="metric-table"><thead><tr>';
-        html += '<th>Benchmark</th><th>Mean Time</th><th>Median Time</th><th>Std Dev</th>';
-        html += '</tr></thead><tbody>';
-
-        top10.forEach(bench => {
-            html += '<tr>';
-            html += `<td>${bench.name}</td>`;
+        perf.benchmarks.forEach((bench, idx) => {
+            html += `<tr class="clickable-row" onclick="selectBenchmark('perf', ${idx})" data-name="${bench.name.toLowerCase()}">`;
+            html += `<td><strong>${bench.name}</strong></td>`;
             html += `<td>${bench.mean_ms.toFixed(3)} ms</td>`;
             html += `<td>${bench.median_ms.toFixed(3)} ms</td>`;
             html += `<td>±${bench.std_dev_ms.toFixed(3)} ms</td>`;
             html += '</tr>';
         });
 
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
+    } else if (perf) {
+        html += '<div class="benchmark-table-section">';
+        html += '<h3>Performance Benchmarks</h3>';
+        html += '<p class="no-data">No performance benchmark data available. Total benchmarks: ' + (perf.metrics.total_benchmarks || 0) + '</p>';
+        html += '<p class="info">Run <code>cargo bench --workspace</code> to generate performance benchmark data.</p>';
+        html += '</div>';
     }
 
-    // Gungraun benchmarks - show top 10 most instruction-heavy
+    // Gungraun benchmarks - show ALL with search/filter
     if (gungraun && gungraun.benchmarks && gungraun.benchmarks.length > 0) {
-        const sorted = [...gungraun.benchmarks].sort((a, b) => b.instructions - a.instructions);
-        const top10 = sorted.slice(0, 10);
+        html += '<div class="benchmark-table-section">';
+        html += '<h3>Memory & Instructions (Gungraun) <span class="badge">' + gungraun.benchmarks.length + ' tests</span></h3>';
+        html += '<input type="text" id="gungraunFilter" class="filter-input" placeholder="Search benchmarks..." onkeyup="filterBenchmarks(\'gungraun\')">';
+        html += '<table class="metric-table clickable-table" id="gungraunBenchTable"><thead><tr>';
+        html += '<th onclick="sortTable(\'gungraun\', 0)">Benchmark ▼</th>';
+        html += '<th onclick="sortTable(\'gungraun\', 1)">Instructions ▼</th>';
+        html += '<th onclick="sortTable(\'gungraun\', 2)">Cycles ▼</th>';
+        html += '<th onclick="sortTable(\'gungraun\', 3)">L1 Accesses ▼</th>';
+        html += '<th onclick="sortTable(\'gungraun\', 4)">L2 Accesses ▼</th>';
+        html += '<th onclick="sortTable(\'gungraun\', 5)">RAM Accesses ▼</th>';
+        html += '</tr></thead><tbody id="gungraunBenchBody">';
 
-        html += '<h3>Top 10 Most Instruction-Heavy Benchmarks (Gungraun)</h3>';
-        html += '<table class="metric-table"><thead><tr>';
-        html += '<th>Benchmark</th><th>Instructions</th><th>Cycles</th><th>L1 Accesses</th><th>L2 Accesses</th><th>RAM Accesses</th>';
-        html += '</tr></thead><tbody>';
-
-        top10.forEach(bench => {
-            html += '<tr>';
-            html += `<td>${bench.name}</td>`;
+        gungraun.benchmarks.forEach((bench, idx) => {
+            html += `<tr class="clickable-row" onclick="selectBenchmark('gungraun', ${idx})" data-name="${bench.name.toLowerCase()}">`;
+            html += `<td><strong>${bench.name}</strong></td>`;
             html += `<td>${formatNumber(bench.instructions)}</td>`;
             html += `<td>${formatNumber(bench.estimated_cycles)}</td>`;
             html += `<td>${formatNumber(bench.l1_accesses)}</td>`;
@@ -318,30 +337,100 @@ function updateDetailedResults(quality, perf, gungraun) {
             html += '</tr>';
         });
 
-        html += '</tbody></table>';
+        html += '</tbody></table></div>';
+    } else if (gungraun) {
+        html += '<div class="benchmark-table-section">';
+        html += '<h3>Memory & Instructions (Gungraun)</h3>';
+        html += '<p class="no-data">No gungraun benchmark data available. Total benchmarks: ' + (gungraun.metrics.total_benchmarks || 0) + '</p>';
+        html += '<p class="info">Gungraun benchmarks require specific setup. Check project documentation.</p>';
+        html += '</div>';
     }
 
     // Quality metrics summary
     if (quality && quality.metrics) {
-        html += '<h3>Quality Metrics Summary</h3>';
+        html += '<div class="benchmark-table-section">';
+        html += '<h3>Quality Metrics Summary <span class="badge">' + (quality.metrics.test_cases || 0) + ' tests</span></h3>';
         html += '<table class="metric-table"><thead><tr>';
-        html += '<th>Metric</th><th>Value</th>';
+        html += '<th>Metric</th><th>Value</th><th>Description</th>';
         html += '</tr></thead><tbody>';
-        html += `<tr><td>Test Cases</td><td>${quality.metrics.test_cases || 0}</td></tr>`;
-        html += `<tr><td>Precision@3</td><td>${formatPercent(quality.metrics.precision_at_3 || 0)}</td></tr>`;
-        html += `<tr><td>Precision@10</td><td>${formatPercent(quality.metrics.precision_at_10 || 0)}</td></tr>`;
-        html += `<tr><td>Recall@10</td><td>${formatPercent(quality.metrics.recall_at_10 || 0)}</td></tr>`;
-        html += `<tr><td>MRR</td><td>${(quality.metrics.mrr || 0).toFixed(4)}</td></tr>`;
-        html += `<tr><td>NDCG@10</td><td>${(quality.metrics.ndcg_at_10 || 0).toFixed(4)}</td></tr>`;
-        html += `<tr><td>Critical in Top-3</td><td>${formatPercent(quality.metrics.critical_in_top_3 || 0)}</td></tr>`;
-        html += '</tbody></table>';
+        html += `<tr><td><strong>Test Cases</strong></td><td>${quality.metrics.test_cases || 0}</td><td>Total number of quality tests</td></tr>`;
+        html += `<tr><td><strong>Precision@3</strong></td><td>${formatPercent(quality.metrics.precision_at_3 || 0)}</td><td>Accuracy of top 3 results</td></tr>`;
+        html += `<tr><td><strong>Precision@10</strong></td><td>${formatPercent(quality.metrics.precision_at_10 || 0)}</td><td>Accuracy of top 10 results</td></tr>`;
+        html += `<tr><td><strong>Recall@10</strong></td><td>${formatPercent(quality.metrics.recall_at_10 || 0)}</td><td>Coverage in top 10 results</td></tr>`;
+        html += `<tr><td><strong>MRR</strong></td><td>${(quality.metrics.mrr || 0).toFixed(4)}</td><td>Mean Reciprocal Rank</td></tr>`;
+        html += `<tr><td><strong>NDCG@10</strong></td><td>${(quality.metrics.ndcg_at_10 || 0).toFixed(4)}</td><td>Normalized Discounted Cumulative Gain</td></tr>`;
+        html += `<tr><td><strong>Critical in Top-3</strong></td><td>${formatPercent(quality.metrics.critical_in_top_3 || 0)}</td><td>Critical issues found in top 3</td></tr>`;
+        html += '</tbody></table></div>';
     }
 
     if (!html) {
-        html = '<p>No detailed results available.</p>';
+        html = '<p class="no-data">No benchmark data available. Run benchmarks to populate this dashboard.</p>';
     }
 
     container.innerHTML = html;
+}
+
+// Filter benchmarks by search text
+function filterBenchmarks(type) {
+    const input = document.getElementById(type + 'Filter');
+    const filter = input.value.toLowerCase();
+    const table = document.getElementById(type + 'BenchTable');
+    const rows = table.getElementsByTagName('tr');
+
+    for (let i = 1; i < rows.length; i++) {
+        const row = rows[i];
+        const name = row.getAttribute('data-name');
+        if (name && name.includes(filter)) {
+            row.style.display = '';
+        } else {
+            row.style.display = 'none';
+        }
+    }
+}
+
+// Select a benchmark to highlight and show details
+function selectBenchmark(type, index) {
+    const tbody = document.getElementById(type + 'BenchBody');
+    const rows = tbody.getElementsByTagName('tr');
+
+    // Remove previous selection
+    for (let row of rows) {
+        row.classList.remove('selected');
+    }
+
+    // Add selection to clicked row
+    rows[index].classList.add('selected');
+
+    // Store selection
+    selectedBenchmark[type] = index;
+
+    // Could add modal or side panel with more details here
+}
+
+// Sort table by column
+function sortTable(type, columnIndex) {
+    const table = document.getElementById(type + 'BenchTable');
+    const tbody = document.getElementById(type + 'BenchBody');
+    const rows = Array.from(tbody.getElementsByTagName('tr'));
+
+    rows.sort((a, b) => {
+        const aText = a.getElementsByTagName('td')[columnIndex].textContent;
+        const bText = b.getElementsByTagName('td')[columnIndex].textContent;
+
+        // Try numeric sort
+        const aNum = parseFloat(aText.replace(/[^0-9.-]/g, ''));
+        const bNum = parseFloat(bText.replace(/[^0-9.-]/g, ''));
+
+        if (!isNaN(aNum) && !isNaN(bNum)) {
+            return bNum - aNum; // Descending
+        }
+
+        // Text sort
+        return aText.localeCompare(bText);
+    });
+
+    // Re-append rows in sorted order
+    rows.forEach(row => tbody.appendChild(row));
 }
 
 // Show error message

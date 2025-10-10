@@ -83,13 +83,9 @@ async fn run_benchmarks_for_project(
 ) -> Vec<BenchmarkResult> {
     let project_root = Path::new(project_root_str).to_path_buf();
 
-    eprintln!("\n=== Setting up benchmarks for project: {project_root_str} ===");
-
     // Create language backend
     let rust_backend: Box<dyn LanguageProvider> =
         create_backend(Language::Rust).expect("Failed to create Rust backend");
-
-    eprintln!("✓ Created Rust backend");
 
     // Create builder with language backend and increase max_files
     let builder = Arc::new(Mutex::new(
@@ -98,7 +94,12 @@ async fn run_benchmarks_for_project(
             .with_max_files(20), // Request more files for benchmarks
     ));
 
-    eprintln!("✓ Created ContextBuilder with max_files=20");
+    // Warm up the builder by running a dummy query to initialize all systems
+    // This ensures embeddings and rust-analyzer are ready before parallel execution
+    {
+        let warmup_query = Query::new("initialization");
+        drop(builder.lock().await.build_context(&warmup_query).await);
+    }
 
     // Run test cases in parallel, sharing the builder
     let mut tasks = JoinSet::new();
@@ -126,23 +127,27 @@ async fn run_single_benchmark_with_builder(
     builder: Arc<Mutex<ContextBuilder>>,
 ) -> BenchmarkResult {
     let project_path = Path::new(&test_case.project_root);
+    let mut logs = Vec::new();
 
-    eprintln!("Running test: {}", test_case.name);
-    eprintln!("  Query: {}", test_case.query);
-    eprintln!("  Project: {}", project_path.display());
+    logs.push(format!("Running test: {}", test_case.name));
+    logs.push(format!("Query: {}", test_case.query));
+    logs.push(format!("Project: {}", project_path.display()));
 
     let results = perform_search_with_builder(&test_case.query, project_path, builder)
         .await
         .unwrap_or_else(|err| {
-            eprintln!("  ❌ Search failed: {err}");
+            logs.push(format!("❌ Search failed: {err}"));
             Vec::new()
         });
 
     let num_results = results.len();
-    eprintln!("  ✓ Found {num_results} results");
+    logs.push(format!("✓ Found {num_results} results"));
+
     if !results.is_empty() {
-        let first_result = &results[0];
-        eprintln!("  First result: {first_result}");
+        logs.push("Retrieved files:".to_owned());
+        for (index, result) in results.iter().take(10).enumerate() {
+            logs.push(format!("  {}. {result}", index + 1));
+        }
     }
 
     let metrics = BenchmarkMetrics::calculate(&results, &test_case.expected);
@@ -152,6 +157,7 @@ async fn run_single_benchmark_with_builder(
         query: test_case.query.clone(),
         results,
         metrics,
+        logs,
     }
 }
 
@@ -166,14 +172,23 @@ pub struct BenchmarkResult {
     pub results: Vec<String>,
     /// Calculated metrics
     pub metrics: BenchmarkMetrics,
+    /// Execution logs
+    pub logs: Vec<String>,
 }
 
 /// Run a single benchmark test case
 async fn run_single_benchmark_async(test_case: &TestCase) -> BenchmarkResult {
     let project_path = Path::new(&test_case.project_root);
+    let mut logs = Vec::new();
+
+    logs.push(format!("Running test: {}", test_case.name));
+    logs.push(format!("Query: {}", test_case.query));
+
     let results = perform_search_async(&test_case.query, project_path)
         .await
         .unwrap_or_default();
+
+    logs.push(format!("✓ Found {} results", results.len()));
 
     let metrics = BenchmarkMetrics::calculate(&results, &test_case.expected);
 
@@ -182,6 +197,7 @@ async fn run_single_benchmark_async(test_case: &TestCase) -> BenchmarkResult {
         query: test_case.query.clone(),
         results,
         metrics,
+        logs,
     }
 }
 
@@ -206,22 +222,16 @@ async fn perform_search_with_builder(
         builder_guard.build_context(&query_obj).await?
     };
 
-    let num_files = context.files.len();
-    eprintln!("  Context built: {num_files} files in context");
-
     let paths: Vec<String> = context
         .files
         .iter()
         .map(|file: &FileContext| {
-            let relative_path = file
-                .path
+            file.path
                 .strip_prefix(project_root)
                 .unwrap_or(&file.path)
                 .to_string_lossy()
                 .to_string()
-                .replace('\\', "/"); // Normalize to forward slashes for cross-platform consistency
-            eprintln!("    - {relative_path}");
-            relative_path
+                .replace('\\', "/") // Normalize to forward slashes for cross-platform consistency
         })
         .collect();
 
@@ -249,7 +259,8 @@ fn mock_search(_query: &str) -> Vec<String> {
 /// Generate markdown report from benchmark results
 #[allow(
     clippy::let_underscore_must_use,
-    reason = "writeln! to String never fails"
+    clippy::too_many_lines,
+    reason = "writeln! to String never fails, report generation is inherently long"
 )]
 pub fn generate_report(results: &[BenchmarkResult]) -> String {
     use std::fmt::Write as _;
@@ -330,6 +341,18 @@ pub fn generate_report(results: &[BenchmarkResult]) -> String {
             let _ = writeln!(report, "{}. `{}`", index + 1, path);
         }
         report.push('\n');
+
+        // Add execution logs
+        if !result.logs.is_empty() {
+            report.push_str("<details>\n");
+            report.push_str("<summary>Execution Logs</summary>\n\n");
+            report.push_str("```\n");
+            for log in &result.logs {
+                let _ = writeln!(report, "{log}");
+            }
+            report.push_str("```\n");
+            report.push_str("</details>\n\n");
+        }
     }
 
     report

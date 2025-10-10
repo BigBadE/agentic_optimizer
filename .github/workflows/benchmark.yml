@@ -117,4 +117,5 @@ jobs:
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git rm perf-results.md
           git commit -m "chore: remove perf-results.md after publishing to gh-pages [skip ci]"
+          git pull --rebase origin master
           git push origin master

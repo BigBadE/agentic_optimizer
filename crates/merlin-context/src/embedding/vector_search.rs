@@ -7,7 +7,6 @@ use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
 use std::env;
-use std::env::current_dir;
 use std::fs;
 use std::hash::{Hash as _, Hasher as _};
 use std::path::{Path, PathBuf};
@@ -138,29 +137,23 @@ impl VectorSearchManager {
 
     /// Resolve cache path with environment override support
     ///
-    /// Env variables (checked in order):
-    /// - `MERLIN_VECTOR_CACHE_FILE`: absolute file path to cache file
-    /// - `MERLIN_VECTOR_CACHE_ROOT`: directory under which a stable subdir is used: vector/<hash>/embeddings.bin
-    fn resolve_cache_path(project_root: &PathBuf) -> PathBuf {
-        if let Ok(file_override) = env::var("MERLIN_VECTOR_CACHE_FILE") {
-            let path = PathBuf::from(file_override);
-            info!("Using MERLIN_VECTOR_CACHE_FILE: {}", path.display());
-            return path;
-        }
-
-        if let Ok(root_override) = env::var("MERLIN_VECTOR_CACHE_ROOT") {
-            let mut hasher = DefaultHasher::new();
-            project_root.hash(&mut hasher);
-            let hash = hasher.finish();
-            let path = PathBuf::from(root_override)
+    /// Env variables:
+    /// - `MERLIN_FOLDER`: directory for the entire Merlin state (e.g. `.merlin`). We store embeddings at `{MERLIN_FOLDER}/cache/vector/embeddings.bin`
+    fn resolve_cache_path(project_root: &Path) -> PathBuf {
+        if let Ok(folder) = env::var("MERLIN_FOLDER") {
+            let path = PathBuf::from(folder)
+                .join("cache")
                 .join("vector")
-                .join(format!("{hash:016x}"))
                 .join("embeddings.bin");
-            info!("Using MERLIN_VECTOR_CACHE_ROOT: {}", path.display());
+            info!("Using MERLIN_FOLDER: {}", path.display());
             return path;
         }
 
-        project_root.join(".merlin").join("embeddings.bin")
+        project_root
+            .join(".merlin")
+            .join("cache")
+            .join("vector")
+            .join("embeddings.bin")
     }
 
     /// Initialize vector store by loading from cache or generating embeddings
@@ -193,29 +186,6 @@ impl VectorSearchManager {
         self.initialize_from_scratch(&spinner).await?;
 
         Ok(())
-    }
-
-    /// Build a fallback cache path in the workspace target directory
-    ///
-    /// # Errors
-    /// Returns an error if cwd cannot be determined
-    fn fallback_cache_path(project_root: &PathBuf) -> Result<PathBuf> {
-        use std::collections::hash_map::DefaultHasher;
-        use std::hash::{Hash as _, Hasher as _};
-
-        let mut hasher = DefaultHasher::new();
-        project_root.hash(&mut hasher);
-        let hash = hasher.finish();
-
-        let cwd_path =
-            current_dir().map_err(|error_var| Error::Other(format!("cwd error: {error_var}")))?;
-        let path = cwd_path
-            .join("target")
-            .join(".agentic-cache")
-            .join("vector")
-            .join(format!("{hash:016x}"))
-            .join("embeddings.bin");
-        Ok(path)
     }
 
     /// Create a configured progress spinner
@@ -1307,7 +1277,7 @@ impl VectorSearchManager {
     ///
     /// # Errors
     /// Returns an error if the cache directory cannot be created or serialization fails
-    fn save_cache(&mut self) -> Result<()> {
+    fn save_cache(&self) -> Result<()> {
         self.ensure_cache_dir()?;
         let embeddings = self.prepare_embeddings();
         let cache = VectorCache {
@@ -1326,28 +1296,15 @@ impl VectorSearchManager {
         Ok(())
     }
 
-    /// Ensure the cache directory exists; falls back to a workspace cache path if creation fails
+    /// Ensure the cache directory exists
     ///
     /// # Errors
-    /// Returns an error if both primary and fallback cache directory creation fail
-    fn ensure_cache_dir(&mut self) -> Result<()> {
-        if let Some(parent) = self.cache_path.parent()
-            && fs::create_dir_all(parent).is_err()
-        {
-            let fallback = Self::fallback_cache_path(&self.project_root)?;
-            if let Some(fallback_parent) = fallback.parent() {
-                fs::create_dir_all(fallback_parent).map_err(|error| {
-                    Error::Other(format!(
-                        "Failed to create fallback cache directory: {error}"
-                    ))
-                })?;
-            }
-            info!(
-                "Falling back to cache path: {} (was: {})",
-                fallback.display(),
-                self.cache_path.display()
-            );
-            self.cache_path = fallback;
+    /// Returns an error if the cache directory cannot be created
+    fn ensure_cache_dir(&self) -> Result<()> {
+        if let Some(parent) = self.cache_path.parent() {
+            fs::create_dir_all(parent).map_err(|error| {
+                Error::Other(format!("Failed to create cache directory: {error}"))
+            })?;
         }
         Ok(())
     }
@@ -1389,25 +1346,23 @@ impl VectorSearchManager {
         result
     }
 
-    /// Write cache bytes to current `cache_path`, falling back if needed
+    /// Write cache bytes to current `cache_path`
     ///
     /// # Errors
-    /// Returns an error if both primary and fallback writes fail
-    fn write_cache_bytes(&mut self, data: &[u8]) -> Result<()> {
-        if fs::write(&self.cache_path, data).is_err() {
-            let fallback = Self::fallback_cache_path(&self.project_root)?;
-            if let Some(parent) = fallback.parent() {
+    /// Returns an error if the write fails even after ensuring parent dir exists
+    fn write_cache_bytes(&self, data: &[u8]) -> Result<()> {
+        if let Err(write_error) = fs::write(&self.cache_path, data) {
+            if let Some(parent) = self.cache_path.parent() {
                 fs::create_dir_all(parent).map_err(|error| {
-                    Error::Other(format!(
-                        "Failed to create fallback cache directory: {error}"
-                    ))
+                    Error::Other(format!("Failed to create cache directory: {error}"))
                 })?;
             }
-            info!("Retrying cache write to fallback: {}", fallback.display());
-            fs::write(&fallback, data).map_err(|error| {
-                Error::Other(format!("Failed to write fallback cache: {error}"))
+            fs::write(&self.cache_path, data).map_err(|error| {
+                Error::Other(format!(
+                    "Failed to write cache to {}: {error}. Prior error: {write_error}",
+                    self.cache_path.display()
+                ))
             })?;
-            self.cache_path = fallback;
         }
         Ok(())
     }

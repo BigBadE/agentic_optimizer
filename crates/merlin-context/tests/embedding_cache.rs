@@ -66,8 +66,11 @@ async fn test_cache_initialization_and_persistence() {
         "Manager should not be empty after initialization"
     );
 
-    // Verify cache file was created
-    let cache_path = project_root.join(".merlin").join("embeddings.bin");
+    let cache_path = project_root
+        .join(".merlin")
+        .join("cache")
+        .join("vector")
+        .join("embeddings.bin");
     assert!(cache_path.exists(), "Cache file should exist");
 
     // Create a new manager and initialize from cache
@@ -215,7 +218,11 @@ async fn test_empty_cache_rebuilds() {
     let initial_len = manager.len();
 
     // Delete cache file
-    let cache_path = project_root.join(".merlin").join("embeddings.bin");
+    let cache_path = project_root
+        .join(".merlin")
+        .join("cache")
+        .join("vector")
+        .join("embeddings.bin");
     if cache_path.exists() {
         fs::remove_file(&cache_path).expect("Failed to delete cache file");
     }
@@ -273,7 +280,11 @@ fn test_cache_directory_creation() {
     let manager = VectorSearchManager::new(project_root.clone());
 
     // Verify cache path is set correctly
-    let cache_path = project_root.join(".merlin").join("embeddings.bin");
+    let cache_path = project_root
+        .join(".merlin")
+        .join("cache")
+        .join("vector")
+        .join("embeddings.bin");
     assert!(cache_path.to_str().is_some(), "Cache path should be valid");
 
     drop(manager);
@@ -342,7 +353,11 @@ async fn test_cache_version_validation() {
     }
 
     // Verify cache was created
-    let cache_path = project_root.join(".merlin").join("embeddings.bin");
+    let cache_path = project_root
+        .join(".merlin")
+        .join("cache")
+        .join("vector")
+        .join("embeddings.bin");
     assert!(cache_path.exists(), "Cache file should exist");
 
     // Corrupt the cache by writing invalid data

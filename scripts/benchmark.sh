@@ -123,7 +123,7 @@ fi
 
 # Run Quality Benchmarks (writes quality-results.md)
 info "Running quality benchmarks..."
-export MERLIN_VECTOR_CACHE_ROOT="${ROOT_DIR}/target/.agentic-cache"
+export MERLIN_FOLDER="${ROOT_DIR}/target/.merlin"
 run_with_affinity cargo run --release --bin quality-bench -- --output "$QUALITY_OUT"
 success "Quality results -> $QUALITY_OUT"
 

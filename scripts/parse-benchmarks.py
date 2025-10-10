@@ -281,7 +281,17 @@ def parse_quality_benchmarks(results_file: Path) -> Tuple[Dict[str, Any], bool]:
         import traceback
         traceback.print_exc()
 
-    return results
+    # valid if at least one parsed metric > 0 or test_cases > 0
+    metrics = results["metrics"]
+    valid = (
+        metrics.get("test_cases", 0) > 0
+        or any(
+            (isinstance(value, (int, float)) and value > 0)
+            for key, value in metrics.items()
+            if key != "test_cases"
+        )
+    )
+    return results, valid
 
 def main():
     import argparse

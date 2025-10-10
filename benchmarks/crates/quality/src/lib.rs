@@ -15,7 +15,7 @@
 pub mod metrics;
 pub mod test_case;
 
-use anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result, anyhow};
 use merlin_context::ContextBuilder;
 use merlin_core::{FileContext, Query};
 use merlin_languages::{Language, LanguageProvider, create_backend};
@@ -186,31 +186,6 @@ pub struct BenchmarkResult {
     pub logs: Vec<String>,
 }
 
-/// Run a single benchmark test case
-async fn run_single_benchmark_async(test_case: &TestCase) -> BenchmarkResult {
-    let project_path = Path::new(&test_case.project_root);
-    let mut logs = Vec::new();
-
-    logs.push(format!("Running test: {}", test_case.name));
-    logs.push(format!("Query: {}", test_case.query));
-
-    let results = perform_search_async(&test_case.query, project_path)
-        .await
-        .unwrap_or_default();
-
-    logs.push(format!("✓ Found {} results", results.len()));
-
-    let metrics = BenchmarkMetrics::calculate(&results, &test_case.expected);
-
-    BenchmarkResult {
-        name: test_case.name.clone(),
-        query: test_case.query.clone(),
-        results,
-        metrics,
-        logs,
-    }
-}
-
 /// Perform actual context search using merlin-context with a shared builder
 ///
 /// # Errors
@@ -221,7 +196,7 @@ async fn perform_search_with_builder(
     builder: Arc<Mutex<ContextBuilder>>,
 ) -> Result<Vec<String>> {
     if !project_root.exists() {
-        return Ok(mock_search(query));
+        return Err(anyhow!("Failed to find project {}", project_root.display()));
     }
 
     let query_obj = Query::new(query);
@@ -246,24 +221,6 @@ async fn perform_search_with_builder(
         .collect();
 
     Ok(paths)
-}
-
-/// Perform actual context search using merlin-context
-///
-/// # Errors
-/// Returns error if context building fails
-async fn perform_search_async(query: &str, project_root: &Path) -> Result<Vec<String>> {
-    let builder = Arc::new(Mutex::new(ContextBuilder::new(project_root.to_path_buf())));
-    perform_search_with_builder(query, project_root, builder).await
-}
-
-/// Mock search fallback when project doesn't exist
-fn mock_search(_query: &str) -> Vec<String> {
-    vec![
-        "crates/css/modules/cascade/src/lib.rs".to_owned(),
-        "crates/css/modules/core/src/lib.rs".to_owned(),
-        "crates/css/orchestrator/src/lib.rs".to_owned(),
-    ]
 }
 
 /// Setup repository by cloning if needed and checking out specific commit

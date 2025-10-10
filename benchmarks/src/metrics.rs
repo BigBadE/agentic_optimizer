@@ -57,25 +57,40 @@ pub struct BenchmarkMetrics {
 }
 
 impl BenchmarkMetrics {
+    /// Normalize path separators to forward slashes for consistent comparison
+    fn normalize_path(path: &str) -> String {
+        path.replace('\\', "/")
+    }
+
     /// Calculate metrics from results and expected files
     #[allow(
         clippy::min_ident_chars,
         reason = "Standard variable names for algorithms"
     )]
     pub fn calculate(results: &[String], expected: &[ExpectedFile]) -> Self {
-        let expected_paths: HashSet<_> = expected.iter().map(|exp| exp.path.as_str()).collect();
+        // Normalize all paths to use forward slashes for consistent comparison
+        let expected_paths: HashSet<_> = expected
+            .iter()
+            .map(|exp| Self::normalize_path(&exp.path))
+            .collect();
         let critical_paths: HashSet<_> = expected
             .iter()
             .filter(|exp| exp.priority == Priority::Critical)
-            .map(|exp| exp.path.as_str())
+            .map(|exp| Self::normalize_path(&exp.path))
             .collect();
 
-        let precision_at_3 = Self::precision_at_k(results, &expected_paths, 3);
-        let precision_at_10 = Self::precision_at_k(results, &expected_paths, 10);
-        let recall_at_10 = Self::recall_at_k(results, &expected_paths, 10);
-        let mrr = Self::mean_reciprocal_rank(results, &expected_paths);
-        let ndcg_at_10 = Self::ndcg_at_k(results, expected, 10);
-        let critical_in_top_3 = Self::critical_in_top_k(results, &critical_paths, 3);
+        // Normalize result paths as well
+        let normalized_results: Vec<String> = results
+            .iter()
+            .map(|res| Self::normalize_path(res))
+            .collect();
+
+        let precision_at_3 = Self::precision_at_k(&normalized_results, &expected_paths, 3);
+        let precision_at_10 = Self::precision_at_k(&normalized_results, &expected_paths, 10);
+        let recall_at_10 = Self::recall_at_k(&normalized_results, &expected_paths, 10);
+        let mrr = Self::mean_reciprocal_rank(&normalized_results, &expected_paths);
+        let ndcg_at_10 = Self::ndcg_at_k(&normalized_results, expected, 10);
+        let critical_in_top_3 = Self::critical_in_top_k(&normalized_results, &critical_paths, 3);
 
         Self {
             precision_at_3,
@@ -92,7 +107,7 @@ impl BenchmarkMetrics {
         clippy::min_ident_chars,
         reason = "Standard variable names for algorithms"
     )]
-    fn precision_at_k(results: &[String], expected: &HashSet<&str>, k: usize) -> f64 {
+    fn precision_at_k(results: &[String], expected: &HashSet<String>, k: usize) -> f64 {
         let top_k = results.iter().take(k);
         let relevant_count = top_k.filter(|res| expected.contains(res.as_str())).count();
         (relevant_count as f64 / k.min(results.len()) as f64) * 100.0
@@ -103,7 +118,7 @@ impl BenchmarkMetrics {
         clippy::min_ident_chars,
         reason = "Standard variable names for algorithms"
     )]
-    fn recall_at_k(results: &[String], expected: &HashSet<&str>, k: usize) -> f64 {
+    fn recall_at_k(results: &[String], expected: &HashSet<String>, k: usize) -> f64 {
         if expected.is_empty() {
             return 0.0;
         }
@@ -113,7 +128,7 @@ impl BenchmarkMetrics {
     }
 
     /// Calculate Mean Reciprocal Rank
-    fn mean_reciprocal_rank(results: &[String], expected: &HashSet<&str>) -> f64 {
+    fn mean_reciprocal_rank(results: &[String], expected: &HashSet<String>) -> f64 {
         for (index, result) in results.iter().enumerate() {
             if expected.contains(result.as_str()) {
                 return 1.0 / (index + 1) as f64;
@@ -140,9 +155,10 @@ impl BenchmarkMetrics {
         reason = "Standard variable names for algorithms"
     )]
     fn dcg_at_k(results: &[String], expected: &[ExpectedFile], k: usize) -> f64 {
+        // Normalize expected paths for comparison
         let expected_map: HashMap<_, _> = expected
             .iter()
-            .map(|exp| (exp.path.as_str(), exp))
+            .map(|exp| (Self::normalize_path(&exp.path), exp))
             .collect();
 
         results
@@ -183,7 +199,7 @@ impl BenchmarkMetrics {
         clippy::min_ident_chars,
         reason = "Standard variable names for algorithms"
     )]
-    fn critical_in_top_k(results: &[String], critical: &HashSet<&str>, k: usize) -> f64 {
+    fn critical_in_top_k(results: &[String], critical: &HashSet<String>, k: usize) -> f64 {
         if critical.is_empty() {
             return 0.0;
         }

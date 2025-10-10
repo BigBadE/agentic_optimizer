@@ -17,6 +17,8 @@ use clap::Parser;
 use merlin_benchmarks::{generate_report, run_benchmarks_async};
 use std::fs::write;
 use std::path::PathBuf;
+use tracing::Level;
+use tracing_subscriber::{EnvFilter, fmt};
 
 #[derive(Parser)]
 #[command(name = "quality-bench")]
@@ -41,6 +43,11 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Initialize tracing subscriber to see debug logs
+    fmt()
+        .with_env_filter(EnvFilter::from_default_env().add_directive(Level::INFO.into()))
+        .init();
+
     let args = Args::parse();
 
     println!("Running context quality benchmarks...");

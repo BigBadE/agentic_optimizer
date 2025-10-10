@@ -1,0 +1,20 @@
+# Test Case: HTML Parsing
+name = "HTML Parse Error Recovery"
+description = "Query about HTML parser error recovery"
+query = "how does the parser recover from malformed HTML tags"
+project_root = "benchmarks/test_repositories/valor"
+
+[[expected]]
+path = "crates/html/src/parser.rs"
+priority = "critical"
+reason = "HTML parser implementation"
+
+[[expected]]
+path = "crates/html/src/lib.rs"
+priority = "high"
+reason = "HTML module"
+
+[[expected]]
+path = "crates/html/src/tokenizer.rs"
+priority = "medium"
+reason = "HTML tokenizer"

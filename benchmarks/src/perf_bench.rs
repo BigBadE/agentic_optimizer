@@ -1,15 +1,28 @@
 //! Performance benchmark runner CLI.
 #![allow(
+    dead_code,
+    clippy::expect_used,
+    clippy::unwrap_used,
+    clippy::panic,
+    clippy::missing_panics_doc,
+    clippy::missing_errors_doc,
     clippy::print_stdout,
     clippy::print_stderr,
-    clippy::missing_errors_doc,
-    clippy::missing_panics_doc,
-    reason = "CLI binary uses stdout/stderr for output"
+    clippy::tests_outside_test_module,
+    clippy::cognitive_complexity,
+    clippy::too_many_lines,
+    clippy::collapsible_if,
+    clippy::items_after_statements,
+    clippy::absolute_paths,
+    clippy::min_ident_chars,
+    clippy::excessive_nesting,
+    reason = "Test allows"
 )]
 
 use anyhow::{Context as _, Result};
 use chrono::Local;
 use clap::Parser;
+use serde_json::Value as JsonValue;
 use std::fmt::Write as _;
 use std::fs::{self, write};
 use std::path::PathBuf;
@@ -107,12 +120,13 @@ fn main() -> Result<()> {
     };
 
     if let Some(output_path) = &args.output {
+        let display = output_path.display();
         write(output_path, &report)
-            .with_context(|| format!("Failed to write report to {}", output_path.display()))?;
-        println!("Report written to: {}", output_path.display());
+            .with_context(|| format!("Failed to write report to {display}"))?;
+        println!("Report written to: {display}");
         println!();
         println!("To upload results:");
-        println!("  git add -f {}", output_path.display());
+        println!("  git add -f {display}");
         println!("  git commit -m \"Update performance benchmark results\"");
         println!("  git push");
     } else {
@@ -131,12 +145,18 @@ fn generate_criterion_report(criterion_dir: &PathBuf) -> Result<String> {
     )
     .map_err(|err| anyhow::anyhow!("Failed to write to string: {err}"))?;
 
-    report.push_str("## Summary\n\n");
-    report.push_str("Benchmarks completed successfully. Detailed results are available in the Criterion output.\n\n");
+    #[derive(Debug)]
+    struct BenchResult {
+        name: String,
+        mean_ns: f64,
+        std_dev_ns: f64,
+        median_ns: f64,
+    }
 
-    report.push_str("## Benchmark Groups\n\n");
+    // Collect benchmark results with detailed timing data
+    let mut results = Vec::new();
+    let mut total_time_ns: f64 = 0.0;
 
-    let mut groups = Vec::new();
     for entry in fs::read_dir(criterion_dir).context("Failed to read criterion directory")? {
         let entry = entry.context("Failed to read directory entry")?;
         let path = entry.path();
@@ -144,15 +164,140 @@ fn generate_criterion_report(criterion_dir: &PathBuf) -> Result<String> {
             && path.file_name().is_some_and(|name| name != "report")
             && let Some(name) = path.file_name()
         {
-            groups.push(name.to_string_lossy().to_string());
+            let group_name = name.to_string_lossy().to_string();
+
+            // First try direct path (single benchmark)
+            let direct_estimates = path.join("base").join("estimates.json");
+            if direct_estimates.exists() {
+                if let Ok(estimates_content) = fs::read_to_string(&direct_estimates) {
+                    if let Ok(estimates) = serde_json::from_str::<JsonValue>(&estimates_content) {
+                        let mean_ns = estimates
+                            .get("mean")
+                            .and_then(|mean_val| mean_val.get("point_estimate"))
+                            .and_then(JsonValue::as_f64)
+                            .unwrap_or(0.0);
+
+                        let std_dev_ns = estimates
+                            .get("std_dev")
+                            .and_then(|std_val| std_val.get("point_estimate"))
+                            .and_then(JsonValue::as_f64)
+                            .unwrap_or(0.0);
+
+                        let median_ns = estimates
+                            .get("median")
+                            .and_then(|median_val| median_val.get("point_estimate"))
+                            .and_then(JsonValue::as_f64)
+                            .unwrap_or(mean_ns);
+
+                        total_time_ns += mean_ns;
+                        results.push(BenchResult {
+                            name: group_name,
+                            mean_ns,
+                            std_dev_ns,
+                            median_ns,
+                        });
+                        continue;
+                    }
+                }
+            }
+
+            // Try nested structure (sub-benchmarks) - show each individually
+            if let Ok(sub_entries) = fs::read_dir(&path) {
+                let mut sub_results: Vec<_> = sub_entries
+                    .filter_map(Result::ok)
+                    .filter_map(|sub_entry| {
+                        let sub_path = sub_entry.path();
+                        if !sub_path.is_dir() {
+                            return None;
+                        }
+
+                        let sub_name = sub_path.file_name()?.to_string_lossy().to_string();
+                        let estimates_path = sub_path.join("base").join("estimates.json");
+
+                        if !estimates_path.exists() {
+                            return None;
+                        }
+
+                        let estimates_content = fs::read_to_string(&estimates_path).ok()?;
+                        let estimates: JsonValue = serde_json::from_str(&estimates_content).ok()?;
+
+                        let mean_ns = estimates.get("mean")?.get("point_estimate")?.as_f64()?;
+
+                        let std_dev_ns = estimates
+                            .get("std_dev")
+                            .and_then(|std_val| std_val.get("point_estimate"))
+                            .and_then(JsonValue::as_f64)
+                            .unwrap_or(0.0);
+
+                        let median_ns = estimates
+                            .get("median")
+                            .and_then(|median_val| median_val.get("point_estimate"))
+                            .and_then(JsonValue::as_f64)
+                            .unwrap_or(mean_ns);
+
+                        Some(BenchResult {
+                            name: format!("{group_name}/{sub_name}"),
+                            mean_ns,
+                            std_dev_ns,
+                            median_ns,
+                        })
+                    })
+                    .collect();
+
+                if !sub_results.is_empty() {
+                    for result in &sub_results {
+                        total_time_ns += result.mean_ns;
+                    }
+                    results.append(&mut sub_results);
+                }
+            }
         }
     }
 
-    groups.sort();
+    results.sort_by(|lhs, rhs| lhs.name.cmp(&rhs.name));
 
-    for group in &groups {
-        writeln!(&mut report, "- `{group}`")
+    report.push_str("## Summary\n\n");
+    writeln!(&mut report, "**Total Benchmarks**: {}\n", results.len())
+        .map_err(|err| anyhow::anyhow!("Failed to write to string: {err}"))?;
+
+    if !results.is_empty() && total_time_ns > 0.0 {
+        let avg_time_ms = (total_time_ns / results.len() as f64) / 1_000_000.0;
+        writeln!(&mut report, "**Average Time**: {avg_time_ms:.3} ms\n")
             .map_err(|err| anyhow::anyhow!("Failed to write to string: {err}"))?;
+    }
+
+    report.push_str("## Benchmark Results\n\n");
+    report.push_str("| Benchmark | Mean | Median | Std Dev |\n");
+    report.push_str("|-----------|------|--------|--------|\n");
+
+    for result in &results {
+        if result.mean_ns > 0.0 {
+            let format_time = |nanoseconds: f64| {
+                let milliseconds = nanoseconds / 1_000_000.0;
+                let microseconds = nanoseconds / 1_000.0;
+                if milliseconds >= 1.0 {
+                    format!("{milliseconds:.3} ms")
+                } else if microseconds >= 1.0 {
+                    format!("{microseconds:.3} μs")
+                } else {
+                    format!("{nanoseconds:.1} ns")
+                }
+            };
+
+            let mean_str = format_time(result.mean_ns);
+            let median_str = format_time(result.median_ns);
+            let std_dev_str = format_time(result.std_dev_ns);
+
+            writeln!(
+                &mut report,
+                "| `{}` | {} | {} | {} |",
+                result.name, mean_str, median_str, std_dev_str
+            )
+            .map_err(|err| anyhow::anyhow!("Failed to write to string: {err}"))?;
+        } else {
+            writeln!(&mut report, "| `{}` | N/A | N/A | N/A |", result.name)
+                .map_err(|err| anyhow::anyhow!("Failed to write to string: {err}"))?;
+        }
     }
 
     report.push_str("\n## Viewing Results\n\n");
@@ -165,8 +310,8 @@ fn generate_criterion_report(criterion_dir: &PathBuf) -> Result<String> {
     report.push_str("## Raw Data\n\n");
     writeln!(
         &mut report,
-        "Full benchmark data is stored in `target/criterion/` ({} groups)",
-        groups.len()
+        "Full benchmark data is stored in `target/criterion/` ({} benchmarks)",
+        results.len()
     )
     .map_err(|err| anyhow::anyhow!("Failed to write to string: {err}"))?;
 

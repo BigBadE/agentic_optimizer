@@ -166,7 +166,7 @@ impl ContextBuilder {
         let semantic_matches = self.perform_hybrid_search(query_text).await?;
 
         // Process search results into prioritized chunks
-        let (search_prioritized, file_scores) = Self::process_search_results(&semantic_matches);
+        let (search_prioritized, file_scores) = self.process_search_results(&semantic_matches);
 
         // Use context manager to add hybrid search results
         let mut context_mgr = ContextManager::new(MAX_CONTEXT_TOKENS);
@@ -645,7 +645,10 @@ impl ContextBuilder {
     }
 
     /// Processes search results into prioritized file chunks.
-    fn process_search_results(semantic_matches: &[SearchResult]) -> ProcessSearchResultsReturn {
+    fn process_search_results(
+        &self,
+        semantic_matches: &[SearchResult],
+    ) -> ProcessSearchResultsReturn {
         // Filter out low-quality small chunks
         let filtered_matches: Vec<_> = semantic_matches
             .iter()
@@ -677,13 +680,15 @@ impl ContextBuilder {
             if let Some(path_str) = result.file_path.to_str()
                 && let Some((file_part, range_part)) = path_str.rsplit_once(':')
             {
-                let path = PathBuf::from(file_part);
+                // Convert relative path to absolute by joining with project root
+                let relative_path = PathBuf::from(file_part);
+                let absolute_path = self.project_root.join(relative_path);
                 if let Some((start_str, end_str)) = range_part.split_once('-')
                     && let (Ok(start), Ok(end)) =
                         (start_str.parse::<usize>(), end_str.parse::<usize>())
                 {
                     file_chunks
-                        .entry(path)
+                        .entry(absolute_path)
                         .or_default()
                         .push((start, end, result.score));
                 }

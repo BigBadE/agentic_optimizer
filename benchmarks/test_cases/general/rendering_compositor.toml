@@ -1,0 +1,25 @@
+# Test Case: Rendering Compositor
+name = "Async Rendering Pipeline"
+description = "Query about implementing async rendering"
+query = "implement async rendering to prevent main thread blocking"
+project_root = "benchmarks/test_repositories/valor"
+
+[[expected]]
+path = "crates/renderer/src/compositor.rs"
+priority = "critical"
+reason = "Compositor implementation"
+
+[[expected]]
+path = "crates/renderer/src/renderer.rs"
+priority = "critical"
+reason = "Renderer"
+
+[[expected]]
+path = "crates/renderer/src/lib.rs"
+priority = "high"
+reason = "Renderer module"
+
+[[expected]]
+path = "crates/renderer/src/display_list.rs"
+priority = "medium"
+reason = "Display list"

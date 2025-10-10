@@ -18,6 +18,7 @@ pub mod test_case;
 use anyhow::{Context as _, Result};
 use merlin_context::ContextBuilder;
 use merlin_core::{FileContext, Query};
+use merlin_languages::{Language, LanguageProvider, create_backend};
 use metrics::{AggregateMetrics, BenchmarkMetrics};
 use std::collections::HashMap;
 use std::path::Path;
@@ -82,8 +83,22 @@ async fn run_benchmarks_for_project(
 ) -> Vec<BenchmarkResult> {
     let project_root = Path::new(project_root_str).to_path_buf();
 
-    // Create single builder for this project wrapped in Arc<Mutex> for parallel sharing
-    let builder = Arc::new(Mutex::new(ContextBuilder::new(project_root.clone())));
+    eprintln!("\n=== Setting up benchmarks for project: {project_root_str} ===");
+
+    // Create language backend
+    let rust_backend: Box<dyn LanguageProvider> =
+        create_backend(Language::Rust).expect("Failed to create Rust backend");
+
+    eprintln!("✓ Created Rust backend");
+
+    // Create builder with language backend and increase max_files
+    let builder = Arc::new(Mutex::new(
+        ContextBuilder::new(project_root.clone())
+            .with_language_backend(rust_backend)
+            .with_max_files(20), // Request more files for benchmarks
+    ));
+
+    eprintln!("✓ Created ContextBuilder with max_files=20");
 
     // Run test cases in parallel, sharing the builder
     let mut tasks = JoinSet::new();
@@ -111,9 +126,24 @@ async fn run_single_benchmark_with_builder(
     builder: Arc<Mutex<ContextBuilder>>,
 ) -> BenchmarkResult {
     let project_path = Path::new(&test_case.project_root);
+
+    eprintln!("Running test: {}", test_case.name);
+    eprintln!("  Query: {}", test_case.query);
+    eprintln!("  Project: {}", project_path.display());
+
     let results = perform_search_with_builder(&test_case.query, project_path, builder)
         .await
-        .unwrap_or_default();
+        .unwrap_or_else(|err| {
+            eprintln!("  ❌ Search failed: {err}");
+            Vec::new()
+        });
+
+    let num_results = results.len();
+    eprintln!("  ✓ Found {num_results} results");
+    if !results.is_empty() {
+        let first_result = &results[0];
+        eprintln!("  First result: {first_result}");
+    }
 
     let metrics = BenchmarkMetrics::calculate(&results, &test_case.expected);
 
@@ -176,15 +206,22 @@ async fn perform_search_with_builder(
         builder_guard.build_context(&query_obj).await?
     };
 
+    let num_files = context.files.len();
+    eprintln!("  Context built: {num_files} files in context");
+
     let paths: Vec<String> = context
         .files
         .iter()
         .map(|file: &FileContext| {
-            file.path
+            let relative_path = file
+                .path
                 .strip_prefix(project_root)
                 .unwrap_or(&file.path)
                 .to_string_lossy()
                 .to_string()
+                .replace('\\', "/"); // Normalize to forward slashes for cross-platform consistency
+            eprintln!("    - {relative_path}");
+            relative_path
         })
         .collect();
 

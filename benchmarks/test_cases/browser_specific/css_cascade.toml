@@ -1,0 +1,25 @@
+# Test Case: CSS Cascade
+name = "CSS Parsing Implementation"
+description = "Query about CSS parsing and cascade"
+query = "how does CSS parsing work"
+project_root = "benchmarks/test_repositories/valor"
+
+[[expected]]
+path = "crates/css/src/parser.rs"
+priority = "critical"
+reason = "CSS parser"
+
+[[expected]]
+path = "crates/css/modules/cascade/src/lib.rs"
+priority = "critical"
+reason = "Cascade implementation"
+
+[[expected]]
+path = "crates/css/src/lib.rs"
+priority = "high"
+reason = "CSS module entry"
+
+[[expected]]
+path = "crates/css/orchestrator/src/lib.rs"
+priority = "medium"
+reason = "CSS orchestrator"

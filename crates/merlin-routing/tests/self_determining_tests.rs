@@ -19,6 +19,7 @@ use merlin_routing::{
 };
 use std::sync::Arc;
 #[tokio::test]
+#[ignore = "Requires Ollama running locally"]
 async fn test_simple_task_skips_assessment() {
     let router = Arc::new(StrategyRouter::with_default_strategies());
     let validator = Arc::new(ValidationPipeline::with_default_stages());

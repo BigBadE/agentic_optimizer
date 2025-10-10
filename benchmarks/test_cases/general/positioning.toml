@@ -1,0 +1,20 @@
+# Test Case: Relative Positioning
+name = "CSS Positioning"
+description = "Query about relative positioning"
+query = "how is relative positioning calculated"
+project_root = "benchmarks/test_repositories/valor"
+
+[[expected]]
+path = "crates/css/modules/core/src/9_visual_formatting/part_9_4_3_relative_positioning.rs"
+priority = "critical"
+reason = "Relative positioning implementation"
+
+[[expected]]
+path = "crates/css/modules/positioned_layout/src/lib.rs"
+priority = "high"
+reason = "Positioned layout module"
+
+[[expected]]
+path = "crates/css/modules/core/src/lib.rs"
+priority = "medium"
+reason = "CSS core"

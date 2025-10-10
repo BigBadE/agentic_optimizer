@@ -19,8 +19,12 @@ use anyhow::{Context as _, Result};
 use merlin_context::ContextBuilder;
 use merlin_core::{FileContext, Query};
 use metrics::{AggregateMetrics, BenchmarkMetrics};
+use std::collections::HashMap;
 use std::path::Path;
+use std::sync::Arc;
 use test_case::TestCase;
+use tokio::sync::Mutex;
+use tokio::task::JoinSet;
 use walkdir::WalkDir;
 
 /// Run all benchmarks in a directory
@@ -28,8 +32,6 @@ use walkdir::WalkDir;
 /// # Errors
 /// Returns error if test case files cannot be read or parsed
 pub async fn run_benchmarks_async(test_cases_dir: &Path) -> Result<Vec<BenchmarkResult>> {
-    use tokio::task::JoinSet;
-
     let mut test_cases = Vec::new();
 
     for entry in WalkDir::new(test_cases_dir)
@@ -44,20 +46,83 @@ pub async fn run_benchmarks_async(test_cases_dir: &Path) -> Result<Vec<Benchmark
         }
     }
 
+    // Group test cases by project root to share ContextBuilder/VectorSearchManager instances
+    let mut grouped_cases: HashMap<String, Vec<TestCase>> = HashMap::new();
+    for test_case in test_cases {
+        grouped_cases
+            .entry(test_case.project_root.clone())
+            .or_default()
+            .push(test_case);
+    }
+
+    // Spawn each project group as a parallel task
+    let mut group_tasks = JoinSet::new();
+
+    for (project_root_str, project_cases) in grouped_cases {
+        group_tasks.spawn(async move {
+            run_benchmarks_for_project(&project_root_str, project_cases).await
+        });
+    }
+
+    let mut all_results = Vec::new();
+    while let Some(result) = group_tasks.join_next().await {
+        match result {
+            Ok(group_results) => all_results.extend(group_results),
+            Err(error) => eprintln!("Project group failed: {error}"),
+        }
+    }
+
+    Ok(all_results)
+}
+
+/// Run benchmarks for a single project with a shared `ContextBuilder`
+async fn run_benchmarks_for_project(
+    project_root_str: &str,
+    test_cases: Vec<TestCase>,
+) -> Vec<BenchmarkResult> {
+    let project_root = Path::new(project_root_str).to_path_buf();
+
+    // Create single builder for this project wrapped in Arc<Mutex> for parallel sharing
+    let builder = Arc::new(Mutex::new(ContextBuilder::new(project_root.clone())));
+
+    // Run test cases in parallel, sharing the builder
     let mut tasks = JoinSet::new();
     for test_case in test_cases {
-        tasks.spawn(async move { run_single_benchmark_async(&test_case).await });
+        let builder_clone = Arc::clone(&builder);
+        tasks.spawn(
+            async move { run_single_benchmark_with_builder(&test_case, builder_clone).await },
+        );
     }
 
     let mut results = Vec::new();
     while let Some(result) = tasks.join_next().await {
         match result {
             Ok(benchmark_result) => results.push(benchmark_result),
-            Err(error) => eprintln!("Task failed: {error}"),
+            Err(error) => eprintln!("Benchmark task failed: {error}"),
         }
     }
 
-    Ok(results)
+    results
+}
+
+/// Run a single benchmark test case with a shared `ContextBuilder`
+async fn run_single_benchmark_with_builder(
+    test_case: &TestCase,
+    builder: Arc<Mutex<ContextBuilder>>,
+) -> BenchmarkResult {
+    let project_path = Path::new(&test_case.project_root);
+    let results = perform_search_with_builder(&test_case.query, project_path, builder)
+        .await
+        .unwrap_or_default();
+
+    let metrics = BenchmarkMetrics::calculate(&results, &test_case.expected);
+
+    BenchmarkResult {
+        name: test_case.name.clone(),
+        query: test_case.query.clone(),
+        results,
+        metrics,
+    }
 }
 
 /// Result of running a single benchmark
@@ -90,19 +155,26 @@ async fn run_single_benchmark_async(test_case: &TestCase) -> BenchmarkResult {
     }
 }
 
-/// Perform actual context search using merlin-context
+/// Perform actual context search using merlin-context with a shared builder
 ///
 /// # Errors
 /// Returns error if context building fails
-async fn perform_search_async(query: &str, project_root: &Path) -> Result<Vec<String>> {
+async fn perform_search_with_builder(
+    query: &str,
+    project_root: &Path,
+    builder: Arc<Mutex<ContextBuilder>>,
+) -> Result<Vec<String>> {
     if !project_root.exists() {
         return Ok(mock_search(query));
     }
 
-    let mut builder = ContextBuilder::new(project_root.to_path_buf());
     let query_obj = Query::new(query);
 
-    let context = builder.build_context(&query_obj).await?;
+    // Lock the builder for this search operation and build context
+    let context = {
+        let mut builder_guard = builder.lock().await;
+        builder_guard.build_context(&query_obj).await?
+    };
 
     let paths: Vec<String> = context
         .files
@@ -117,6 +189,15 @@ async fn perform_search_async(query: &str, project_root: &Path) -> Result<Vec<St
         .collect();
 
     Ok(paths)
+}
+
+/// Perform actual context search using merlin-context
+///
+/// # Errors
+/// Returns error if context building fails
+async fn perform_search_async(query: &str, project_root: &Path) -> Result<Vec<String>> {
+    let builder = Arc::new(Mutex::new(ContextBuilder::new(project_root.to_path_buf())));
+    perform_search_with_builder(query, project_root, builder).await
 }
 
 /// Mock search fallback when project doesn't exist

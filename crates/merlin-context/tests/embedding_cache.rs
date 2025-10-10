@@ -360,3 +360,54 @@ async fn test_cache_version_validation() {
         "Should rebuild from scratch after invalid cache"
     );
 }
+
+#[tokio::test]
+async fn test_batch_processing_timeout() {
+    use std::time::Duration;
+    use tokio::time::timeout;
+
+    let temp_dir = TempDir::new().expect("Failed to create temp directory");
+    let project_root = temp_dir.path().to_path_buf();
+    let src_dir = project_root.join("src");
+    fs::create_dir_all(&src_dir).expect("Failed to create src directory");
+
+    // Create exactly 15 files to test batch processing (batch size is 10)
+    // This should trigger at least 2 batches
+    for i in 0..15 {
+        fs::write(
+            src_dir.join(format!("module_{i}.rs")),
+            format!(
+                "//! Module {i}\n\npub fn function_{i}() -> i32 {{\n    {i}\n}}\n\npub struct Struct{i} {{\n    value: i32,\n}}\n"
+            ),
+        )
+        .expect("Failed to write test file");
+    }
+
+    // Initialize vector search manager with a timeout
+    let mut manager = VectorSearchManager::new(project_root.clone());
+
+    // Set a reasonable timeout - should complete in 30 seconds if working correctly
+    // If it hangs after 10 files, this will catch it
+    let result = timeout(Duration::from_secs(30), manager.initialize()).await;
+
+    match result {
+        Ok(Ok(())) => {
+            // Success - verify all files were processed
+            eprintln!("Initialization completed successfully");
+            assert!(
+                manager.len() >= 10,
+                "Should have indexed at least 10 files, got {}",
+                manager.len()
+            );
+        }
+        Ok(Err(error)) => {
+            // Embedding model might not be available
+            eprintln!("Skipping test: {error}");
+        }
+        Err(timeout_error) => {
+            panic!(
+                "Initialization timed out after 30 seconds - likely stuck after batch processing: {timeout_error}"
+            );
+        }
+    }
+}

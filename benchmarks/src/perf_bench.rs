@@ -56,17 +56,24 @@ fn main() -> Result<()> {
     cmd.arg("bench")
         .arg("-p")
         .arg(&args.package)
-        .arg("--benches")
         .arg("--no-fail-fast");
 
     if let Some(name) = &args.name {
-        cmd.arg("--").arg(name);
+        cmd.arg("--bench").arg(name);
     } else if args.iai {
         // Run only IAI benchmarks
         cmd.arg("iai_");
     } else {
-        // Exclude gungraun benchmarks by default (Linux/Valgrind only)
-        cmd.arg("--").arg("--skip").arg("gungraun");
+        // Run all non-gungraun benchmarks individually
+        // gungraun benchmarks are Linux/Valgrind only, run in CI
+        cmd.arg("--bench")
+            .arg("cache_benchmarks")
+            .arg("--bench")
+            .arg("integration_benchmarks")
+            .arg("--bench")
+            .arg("metrics_benchmarks")
+            .arg("--bench")
+            .arg("routing_benchmarks");
     }
 
     if args.verbose {

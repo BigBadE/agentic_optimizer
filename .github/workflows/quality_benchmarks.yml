@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master ]
     paths:
-      - 'benchmarks/data/quality-results.md'
+      - 'benchmarks/data/quality/latest.json'
   workflow_dispatch:
 
 concurrency:

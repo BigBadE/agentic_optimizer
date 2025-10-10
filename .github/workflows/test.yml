@@ -37,7 +37,6 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           profile: debug
-          components: rustc-codegen-cranelift-preview
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov

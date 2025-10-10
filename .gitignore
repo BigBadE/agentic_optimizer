@@ -2,3 +2,5 @@
 .cargo
 Cargo.lock
 target/
+.cargo/
+benchmarks

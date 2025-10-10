@@ -3,6 +3,9 @@ name = "merlin-context"
 version.workspace = true
 edition.workspace = true
 
+[dev-dependencies]
+tempfile.workspace = true
+
 [dependencies]
 merlin-core.workspace = true
 merlin-languages.workspace = true

@@ -39,7 +39,7 @@ impl CachedResponse {
 
     /// Checks if this cache entry has expired
     pub fn is_expired(&self) -> bool {
-        SystemTime::now() > self.expires_at
+        SystemTime::now() >= self.expires_at
     }
 }
 
@@ -292,12 +292,12 @@ mod tests {
 
         // Add entries until we trigger eviction
         let large_text = "x".repeat(100_000); // 100KB
-        for i in 0..20 {
-            cache.put(format!("query{i}"), create_test_response(&large_text));
+        for idx in 0..20 {
+            cache.put(format!("query{idx}"), create_test_response(&large_text));
         }
 
         // Should have evicted some entries to stay under limit
-        let max_bytes = 1 * 1024 * 1024;
+        let max_bytes = 1024 * 1024;
         assert!(cache.size_bytes() <= max_bytes);
         assert!(cache.len() < 20); // Some entries should have been evicted
     }
@@ -318,8 +318,8 @@ mod tests {
         cache.put("first".to_owned(), create_test_response(&large_text));
 
         // Add more entries to trigger eviction
-        for i in 0..15 {
-            cache.put(format!("query{i}"), create_test_response(&large_text));
+        for idx in 0..15 {
+            cache.put(format!("query{idx}"), create_test_response(&large_text));
         }
 
         // The "first" entry should have been evicted

@@ -1,6 +1,7 @@
 # Merlin 
 [![DeepSource](https://app.deepsource.com/gh/BigBadE/agentic_optimizer.svg/?label=active+issues&show_trend=true&token=wViZ5mQV5zbj5EQV4856JR3g)](https://app.deepsource.com/gh/BigBadE/agentic_optimizer/)
 [![CodeScene Average Code Health](https://codescene.io/projects/72070/status-badges/average-code-health)](https://codescene.io/projects/72070)
+[![codecov](https://codecov.io/gh/BigBadE/agentic_optimizer/graph/badge.svg?token=rhOCXhgOUe)](https://codecov.io/gh/BigBadE/agentic_optimizer)
 
 An intelligent AI coding assistant with multi-model routing, automatic task decomposition, and comprehensive validation. Named after the Merlin falcon, known for its speed, precision, and adaptability.
 

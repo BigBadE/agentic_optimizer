@@ -202,6 +202,12 @@ impl Default for InputManager {
         input_area.set_block(Block::default().borders(Borders::ALL).title("Input"));
         input_area.set_cursor_line_style(Style::default());
 
+        // Ensure at least one empty line for proper rendering
+        if input_area.lines().is_empty() {
+            input_area.insert_char(' ');
+            input_area.delete_char();
+        }
+
         Self {
             input_area,
             manual_newlines: HashSet::default(),

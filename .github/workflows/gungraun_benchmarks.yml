@@ -98,6 +98,11 @@ jobs:
       - name: Parse benchmark results
         if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('gungraun-output.txt') != ''
         run: |
+          # Copy existing history from gh-pages if it exists
+          if [ -d gh-pages/.benchmark-history ]; then
+            cp -r gh-pages/.benchmark-history .
+          fi
+
           python3 scripts/parse-benchmarks.py \
             --gungraun-output gungraun-output.txt \
             --output-dir /tmp/benchmark-data \
@@ -119,9 +124,16 @@ jobs:
           cp ../gungraun-results.md gungraun-bench/latest.md
           cp ../gungraun-results.md "gungraun-bench/${ts}.md"
           
-          # Copy parsed JSON data
+          # Copy parsed JSON data (both latest and history)
           if [ -f /tmp/benchmark-data/gungraun-latest.json ]; then
             cp /tmp/benchmark-data/gungraun-latest.json data/
+            # Also save timestamped version for history
+            cp /tmp/benchmark-data/gungraun-latest.json "data/gungraun-${ts}.json"
+          fi
+
+          # Copy history directory
+          if [ -d ../.benchmark-history ]; then
+            cp -r ../.benchmark-history .
           fi
           
           # Generate dashboard if it doesn't exist
@@ -136,6 +148,7 @@ jobs:
           # Commit and push
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add gungraun-bench/ data/ index.html assets/ || true
+          git add gungraun-bench/ data/ .benchmark-history/ index.html assets/ || true
           git commit -m "Update Gungraun benchmark results: ${ts}" || echo "No changes to commit"
+          git pull --rebase origin gh-pages || true
           git push origin gh-pages

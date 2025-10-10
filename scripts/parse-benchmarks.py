@@ -225,6 +225,7 @@ def parse_quality_benchmarks(results_file: Path) -> Tuple[Dict[str, Any], bool]:
     results = {
         "timestamp": datetime.now().isoformat(),
         "type": "quality",
+        "benchmarks": [],
         "metrics": {
             "test_cases": 0,
             "precision_at_3": 0.0,
@@ -250,7 +251,7 @@ def parse_quality_benchmarks(results_file: Path) -> Tuple[Dict[str, Any], bool]:
         if test_cases_match:
             results["metrics"]["test_cases"] = int(test_cases_match.group(1))
 
-        # Parse metrics from table
+        # Parse metrics from aggregate table
         # Format: | Precision@3 | 45.2% | 60% |
         precision_3_match = re.search(r'\|\s*Precision@3\s*\|\s*([\d.]+|NaN)%', content)
         if precision_3_match and precision_3_match.group(1) != "NaN":
@@ -276,6 +277,53 @@ def parse_quality_benchmarks(results_file: Path) -> Tuple[Dict[str, Any], bool]:
         if critical_match and critical_match.group(1) != "NaN":
             results["metrics"]["critical_in_top_3"] = float(critical_match.group(1))
 
+        # Parse individual test results
+        # Look for pattern like:
+        # Test: test_name
+        # Query: some query text
+        # Metrics:
+        #   P@3:  66.7%
+        #   P@10: 40.0%
+        #   R@10: 40.0%
+        #   MRR:  0.611
+        #   NDCG: 0.471
+        #   Crit: 66.7%
+
+        test_pattern = re.compile(
+            r'Test:\s*([^\n]+)\s*\n'
+            r'Query:\s*([^\n]+)\s*\n'
+            r'[^\n]*\n'  # Results count line
+            r'Metrics:\s*\n'
+            r'\s*P@3:\s*([\d.]+)%\s*\n'
+            r'\s*P@10:\s*([\d.]+)%\s*\n'
+            r'\s*R@10:\s*([\d.]+)%\s*\n'
+            r'\s*MRR:\s*([\d.]+)\s*\n'
+            r'\s*NDCG:\s*([\d.]+)\s*\n'
+            r'\s*Crit:\s*([\d.]+)%',
+            re.MULTILINE
+        )
+
+        for match in test_pattern.finditer(content):
+            test_name = match.group(1).strip()
+            query = match.group(2).strip()
+            p3 = float(match.group(3))
+            p10 = float(match.group(4))
+            r10 = float(match.group(5))
+            mrr = float(match.group(6))
+            ndcg = float(match.group(7))
+            crit = float(match.group(8))
+
+            results["benchmarks"].append({
+                "test_case": test_name,
+                "query": query,
+                "precision_at_3": p3,
+                "precision_at_10": p10,
+                "recall_at_10": r10,
+                "mrr": mrr,
+                "ndcg_at_10": ndcg,
+                "critical_in_top_3": crit
+            })
+
     except Exception as e:
         print(f"Error parsing quality benchmarks: {e}", file=sys.stderr)
         import traceback
@@ -293,6 +341,148 @@ def parse_quality_benchmarks(results_file: Path) -> Tuple[Dict[str, Any], bool]:
     )
     return results, valid
 
+def parse_timestamp(ts: str) -> datetime:
+    """Parse ISO timestamp to datetime object."""
+    return datetime.fromisoformat(ts.replace('Z', '+00:00'))
+
+def smart_downsample_history(history: List[Dict[str, Any]], max_entries: int = 500) -> List[Dict[str, Any]]:
+    """
+    Intelligently downsample history to max_entries by removing entries that are:
+    1. Older (prioritize keeping recent data)
+    2. Close to other entries (remove redundant nearby points)
+
+    Uses a weighted scoring system where older + closer entries get removed first.
+    """
+    if len(history) <= max_entries:
+        return history
+
+    # Calculate timestamps as seconds since epoch for easier math
+    entries = []
+    for i, entry in enumerate(history):
+        try:
+            ts = parse_timestamp(entry["timestamp"])
+            entries.append({
+                "index": i,
+                "timestamp_dt": ts,
+                "timestamp_sec": ts.timestamp(),
+                "data": entry
+            })
+        except Exception as e:
+            print(f"Warning: Could not parse timestamp {entry.get('timestamp')}: {e}", file=sys.stderr)
+            # Keep entries with unparseable timestamps
+            entries.append({
+                "index": i,
+                "timestamp_dt": None,
+                "timestamp_sec": 0,
+                "data": entry
+            })
+
+    # Always keep the first and last entries
+    to_keep = {0, len(entries) - 1}
+
+    # Calculate how many entries we need to remove
+    to_remove_count = len(entries) - max_entries
+
+    # Score each entry (except first and last) for removal
+    # Higher score = more likely to remove
+    scores = []
+
+    for i in range(1, len(entries) - 1):
+        if entries[i]["timestamp_sec"] == 0:
+            # Don't remove entries with bad timestamps
+            continue
+
+        # Calculate time distance to nearest neighbors
+        time_to_prev = entries[i]["timestamp_sec"] - entries[i-1]["timestamp_sec"]
+        time_to_next = entries[i+1]["timestamp_sec"] - entries[i]["timestamp_sec"]
+        min_neighbor_distance = min(time_to_prev, time_to_next)
+
+        # Calculate age (older = higher score)
+        # Normalize to 0-1 range where newest = 0, oldest = 1
+        total_time_range = entries[-1]["timestamp_sec"] - entries[0]["timestamp_sec"]
+        if total_time_range > 0:
+            age_score = (entries[i]["timestamp_sec"] - entries[0]["timestamp_sec"]) / total_time_range
+        else:
+            age_score = 0
+
+        # Calculate proximity score (closer to neighbors = higher score)
+        # Normalize to 0-1 range where farthest = 0, closest = 1
+        if total_time_range > 0:
+            proximity_score = 1.0 - (min_neighbor_distance / (total_time_range / len(entries)))
+            proximity_score = max(0.0, min(1.0, proximity_score))
+        else:
+            proximity_score = 0
+
+        # Combined score: 60% proximity, 40% age
+        # This prioritizes removing points that are close to neighbors,
+        # but also biases toward removing older points
+        combined_score = (0.6 * proximity_score) + (0.4 * age_score)
+
+        scores.append({
+            "index": i,
+            "score": combined_score
+        })
+
+    # Sort by score (highest first) and mark top N for removal
+    scores.sort(key=lambda x: x["score"], reverse=True)
+
+    for i in range(min(to_remove_count, len(scores))):
+        # Don't add to to_keep set (these get removed)
+        pass
+
+    # Add all entries we want to keep
+    for i in range(len(entries)):
+        if i in to_keep:
+            continue
+        # Check if this index is in the removal list
+        should_remove = False
+        for j in range(min(to_remove_count, len(scores))):
+            if scores[j]["index"] == i:
+                should_remove = True
+                break
+        if not should_remove:
+            to_keep.add(i)
+
+    # Return kept entries in original order
+    result = [entries[i]["data"] for i in sorted(to_keep)]
+
+    print(f"Downsampled history from {len(history)} to {len(result)} entries", file=sys.stderr)
+    return result
+
+def load_existing_history(output_file: Path, max_history: int = 500) -> List[Dict[str, Any]]:
+    """Load existing history from latest.json if it exists."""
+    if not output_file.exists():
+        return []
+
+    try:
+        with open(output_file) as f:
+            data = json.load(f)
+            history = data.get("history", [])
+            # Use smart downsampling instead of simple truncation
+            return smart_downsample_history(history, max_history)
+    except Exception as e:
+        print(f"Warning: Could not load history from {output_file}: {e}", file=sys.stderr)
+        return []
+
+def add_history_entry(results: Dict[str, Any], existing_history: List[Dict[str, Any]]) -> Dict[str, Any]:
+    """Add current results as a history entry and append to existing history."""
+    # Create a history entry from current metrics
+    history_entry = {
+        "timestamp": results["timestamp"],
+    }
+
+    # Add all metrics to history
+    if "metrics" in results:
+        history_entry.update(results["metrics"])
+
+    # Append to history (most recent last)
+    new_history = existing_history + [history_entry]
+
+    # Add history to results
+    results["history"] = new_history
+
+    return results
+
 def main():
     import argparse
 
@@ -305,6 +495,8 @@ def main():
                        help="Path to quality benchmark results")
     parser.add_argument("--output-dir", type=Path, default=Path("benchmark-data"),
                        help="Output directory for JSON files")
+    parser.add_argument("--history-source", type=Path, default=None,
+                       help="Path to gh-pages data directory to load existing history from")
 
     args = parser.parse_args()
 
@@ -321,6 +513,15 @@ def main():
     criterion_results, criterion_valid = parse_criterion_results(args.criterion_dir)
     if criterion_valid:
         output_file = criterion_dir / "latest.json"
+
+        # Load existing history from gh-pages if available
+        history_file = output_file
+        if args.history_source:
+            history_file = args.history_source / "criterion" / "latest.json"
+
+        existing_history = load_existing_history(history_file)
+        criterion_results = add_history_entry(criterion_results, existing_history)
+
         with open(output_file, 'w') as f:
             json.dump(criterion_results, f, indent=2)
     else:
@@ -330,6 +531,15 @@ def main():
     gungraun_results, gungraun_valid = parse_gungraun_output(args.gungraun_output)
     if gungraun_valid:
         output_file = gungraun_dir / "latest.json"
+
+        # Load existing history from gh-pages if available
+        history_file = output_file
+        if args.history_source:
+            history_file = args.history_source / "gungraun" / "latest.json"
+
+        existing_history = load_existing_history(history_file)
+        gungraun_results = add_history_entry(gungraun_results, existing_history)
+
         with open(output_file, 'w') as f:
             json.dump(gungraun_results, f, indent=2)
     else:
@@ -339,6 +549,15 @@ def main():
     quality_results, quality_valid = parse_quality_benchmarks(args.quality_results)
     if quality_valid:
         output_file = quality_dir / "latest.json"
+
+        # Load existing history from gh-pages if available
+        history_file = output_file
+        if args.history_source:
+            history_file = args.history_source / "quality" / "latest.json"
+
+        existing_history = load_existing_history(history_file)
+        quality_results = add_history_entry(quality_results, existing_history)
+
         with open(output_file, 'w') as f:
             json.dump(quality_results, f, indent=2)
     else:

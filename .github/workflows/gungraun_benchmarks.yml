@@ -30,6 +30,12 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Cache apt packages
+        uses: actions/cache@v4
+        with:
+          path: /var/cache/apt/archives
+          key: ${{ runner.os }}-apt-valgrind
+
       - name: Install Valgrind
         run: |
           sudo apt-get update
@@ -70,7 +76,8 @@ jobs:
         run: |
           python3 scripts/parse-benchmarks.py \
             --gungraun-output gungraun-output.txt \
-            --output-dir benchmark-data
+            --output-dir benchmark-data \
+            --history-source gh-pages/data
 
       - name: Upload parsed JSON
         uses: actions/upload-artifact@v4

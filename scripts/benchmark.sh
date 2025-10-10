@@ -15,7 +15,7 @@ mkdir -p benchmarks/data
 QUALITY_OUT="benchmarks/data/quality-results.md"
 
 usage() {
-  cat <<EOF
+  cat <<'EOF'
 Usage: scripts/benchmark.sh [options]
 
 Outputs:
@@ -72,18 +72,22 @@ run_with_affinity() {
   fi
 
   if [[ "${OS:-}" == "Windows_NT" ]]; then
+    # Use a hidden PowerShell wrapper to minimize external influence, but handle Ctrl+C
     # Create temporary files and script
-    local ps1 out_file err_file
+    local ps1 out_file err_file pid_file
     if ps1=$(mktemp -t merlin_bench_psXXXXXX.ps1 2>/dev/null); then :; else ps1="${TMPDIR:-${TMP:-/tmp}}/merlin_bench_ps$$.ps1"; : >"$ps1"; fi
     out_file=$(mktemp 2>/dev/null || mktemp -t merlin_bench_out)
     err_file=$(mktemp 2>/dev/null || mktemp -t merlin_bench_err)
+    pid_file=$(mktemp 2>/dev/null || mktemp -t merlin_bench_pid)
 
     cat >"$ps1" <<'PS1'
 $outPath = $args[0]
 $errPath = $args[1]
-$exe = $args[2]
-if ($args.Length -gt 3) { $procArgs = $args[3..($args.Length-1)] } else { $procArgs = @() }
+$pidPath = $args[2]
+$exe = $args[3]
+if ($args.Length -gt 4) { $procArgs = $args[4..($args.Length-1)] } else { $procArgs = @() }
 $p = Start-Process -FilePath $exe -ArgumentList $procArgs -WindowStyle Hidden -RedirectStandardOutput $outPath -RedirectStandardError $errPath -PassThru
+try { Set-Content -Path $pidPath -Value ($p.Id) -NoNewline } catch {}
 Start-Sleep -Milliseconds 100
 try { (Get-Process -Id $p.Id).ProcessorAffinity = 1 } catch {}
 try { (Get-Process -Id $p.Id).PriorityClass = 'High' } catch {}
@@ -94,15 +98,75 @@ PS1
 
     # Invoke powershell in background so we can live-stream outputs
     local exe="$1"; shift
-    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps1" "$out_file" "$err_file" "$exe" "$@" &
+    powershell.exe -NoProfile -ExecutionPolicy Bypass -File "$ps1" "$out_file" "$err_file" "$pid_file" "$exe" "$@" &
     local ps_pid=$!
+
+    # Read spawned child PID (best-effort)
+    local child_pid=""
+    for _ in {1..50}; do
+      if [[ -s "$pid_file" ]]; then
+        child_pid="$(cat "$pid_file" 2>/dev/null | tr -d '\r\n')"
+        break
+      fi
+      sleep 0.1
+    done
+
     # Stream outputs until process exits
-    tail -n +1 -f "$out_file" & local tail_out=$!
-    tail -n +1 -f "$err_file" >&2 & local tail_err=$!
+    tail -n +1 -f "$out_file" & BENCH_TAIL_OUT=$!
+    tail -n +1 -f "$err_file" >&2 & BENCH_TAIL_ERR=$!
+
+    # Export PIDs to globals for trap handler
+    BENCH_PS_PID=$ps_pid
+    BENCH_CHILD_PID=$child_pid
+    BENCH_INTERRUPTED=0
+
+    # Retry helper for rm on Windows when files are briefly busy
+    _bench_rm_retry() {
+      local attempts=10
+      while (( attempts > 0 )); do
+        rm -f "$@" && return 0
+        attempts=$((attempts-1))
+        sleep 0.1
+      done
+      # last try
+      rm -f "$@" || true
+    }
+
+    # Cleanup function (used for both normal exit and Ctrl+C)
+    _bench_cleanup() {
+      # Kill tails and wait for them to release file handles
+      kill "$BENCH_TAIL_OUT" >/dev/null 2>&1 || true
+      kill "$BENCH_TAIL_ERR" >/dev/null 2>&1 || true
+      wait "$BENCH_TAIL_OUT" >/dev/null 2>&1 || true
+      wait "$BENCH_TAIL_ERR" >/dev/null 2>&1 || true
+
+      # Kill child and wrapper process tree on Windows
+      if [[ -n "$BENCH_CHILD_PID" ]]; then
+        command -v taskkill.exe >/dev/null 2>&1 && taskkill.exe /PID "$BENCH_CHILD_PID" /T /F >/dev/null 2>&1 || true
+      fi
+      if [[ -n "$BENCH_PS_PID" ]]; then
+        command -v taskkill.exe >/dev/null 2>&1 && taskkill.exe /PID "$BENCH_PS_PID" /T /F >/dev/null 2>&1 || true
+      fi
+
+      # Give Windows a moment to release locks, then remove files with retries
+      sleep 0.1
+      _bench_rm_retry "$ps1" "$out_file" "$err_file" "$pid_file"
+    }
+
+    # Trap Ctrl+C to ensure termination of subprocesses
+    _bench_on_int() {
+      BENCH_INTERRUPTED=1
+      _bench_cleanup
+    }
+    trap _bench_on_int INT
+
     wait $ps_pid; local code=$?
-    kill $tail_out >/dev/null 2>&1 || true
-    kill $tail_err >/dev/null 2>&1 || true
-    rm -f "$ps1" "$out_file" "$err_file" || true
+    trap - INT
+    # If interrupted, standardize exit code to 130
+    if [[ "$BENCH_INTERRUPTED" -eq 1 ]]; then
+      code=130
+    fi
+    _bench_cleanup
     return $code
   elif command -v taskset >/dev/null 2>&1; then
     if command -v ionice >/dev/null 2>&1; then
@@ -146,7 +210,7 @@ else
 fi
 
 # Summary
-cat <<EOF
+cat <<'EOF'
 
 ========================================
 Local benchmarks completed successfully

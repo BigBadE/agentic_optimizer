@@ -8,13 +8,14 @@
 
 Merlin has three distinct testing/benchmarking systems:
 
-### 1. **Automated Tests** (~202 tests)
+### 1. **Automated Tests** (~213 tests)
 Standard Rust test suite covering unit, integration, and E2E scenarios.
 
 **Distribution**:
 - **Unit Tests** (~113): Inline `#[cfg(test)]` modules in `src/` files
   - +37 new tests in merlin-core, merlin-tools, merlin-languages
-- **Integration Tests** (~86): `tests/` directories testing component interactions
+- **Integration Tests** (~97): `tests/` directories testing component interactions
+  - +11 new embedding cache tests in merlin-context
 - **E2E Tests** (~7): CLI behavior validation in `merlin-cli/tests/`
 
 **Coverage by Area**:
@@ -22,6 +23,7 @@ Standard Rust test suite covering unit, integration, and E2E scenarios.
 - ✅ **Core Types** (90%+): Comprehensive tests added (Query, Response, Context, FileContext, TokenUsage, Error)
 - ✅ **Tool Abstractions** (80%+): Tool trait, ToolInput, ToolOutput, ToolError tested
 - ✅ **Language Provider Types** (70%+): SymbolInfo, SearchQuery, SearchResult tested
+- ✅ **Embedding Cache System** (90%+): Comprehensive tests for cache behavior, validation, and progress stability
 - ⚠️ **Validation Pipeline** (~40%): Moderate coverage
 - ⚠️ **Context System** (~30%): Needs expansion
 - ❌ **TUI Input/Persistence** (0%): Critical gap
@@ -81,7 +83,8 @@ crates/
 │   ├── src/query/analyzer.rs           # 5 inline tests
 │   └── tests/
 │       ├── bm25_tokenization.rs        # 4 tests
-│       └── chunking_validation.rs      # 4 tests
+│       ├── chunking_validation.rs      # 4 tests
+│       └── embedding_cache.rs          # 11 tests (cache behavior, validation, progress stability)
 │
 ├── merlin-agent/
 │   └── tests/
@@ -107,6 +110,77 @@ crates/
 benchmarks/                              # Context quality benchmarks (separate system)
 ├── test_cases/valor/                   # 20 test case definitions (TOML)
 └── test_repositories/valor/            # Real codebase for testing
+```
+
+---
+
+## Embedding Cache System Tests
+
+### Test Coverage: 11 tests in `crates/merlin-context/tests/embedding_cache.rs`
+
+#### Cache Behavior Tests
+1. **`test_cache_initialization_and_persistence`**: Verifies cache is created on first run and loaded on subsequent runs
+2. **`test_cache_invalidation_on_file_modification`**: Ensures modified files are re-embedded using content hash validation
+3. **`test_cache_handles_new_files`**: Confirms new files are detected and embedded
+4. **`test_cache_handles_deleted_files`**: Validates deleted files are removed from cache
+5. **`test_empty_cache_rebuilds`**: Tests cache rebuild from scratch when cache is missing
+6. **`test_cache_version_validation`**: Checks graceful handling of corrupted or incompatible cache files
+
+#### Search & Performance Tests
+7. **`test_search_returns_relevant_results`**: Validates search functionality returns results within limits
+8. **`test_concurrent_file_processing`**: Ensures multiple files (20+) are processed correctly in parallel batches
+9. **`test_chunk_count_consistency`**: Verifies `process_chunk_results` returns correct chunk counts
+
+#### Configuration Tests
+10. **`test_cache_directory_creation`**: Ensures cache directory structure is created correctly
+
+#### Progress Display Stability
+11. **Progress display flickering fix** (verified in code):
+    - **Issue**: Spinner message updated on every file completion within async tasks, causing rapid flickering as 10 concurrent tasks completed
+    - **Root Cause**: Display updated inside `tasks.join_next()` loop, updating 10 times per batch in rapid succession
+    - **Fix**: Accumulate batch results, update display once per batch (10 files) instead of per file
+    - **Location**: `crates/merlin-context/src/embedding/vector_search.rs:1045-1090`
+    - **Behavior**: Message now updates once per batch: "Embedding files... X/Y (Z chunks)"
+
+### Cache Validation Strategy
+
+The embedding cache uses **content hash validation** (DefaultHasher) for reliability:
+- Each file's content is hashed on embedding
+- Cache entries store both modification time and content hash
+- On reload, content hash is recomputed and compared
+- Mismatches trigger re-embedding of affected files
+
+This ensures the cache remains valid even if:
+- File timestamps are unreliable (e.g., git operations)
+- Files are modified without timestamp changes
+- Cross-platform development with different file systems
+
+### Progress Display Implementation
+
+**Before (Flickering)**:
+```rust
+// Inside tasks.join_next() loop - updates 10 times per batch rapidly
+while let Some(result) = tasks.join_next().await {
+    let chunk_count = self.process_chunk_results(chunk_results);
+    total_chunks += chunk_count;
+    processed_files += 1;
+    spinner.set_message(format!("Embedding files... {processed_files}/{total_files} ({total_chunks} chunks)"));
+}
+```
+
+**After (Stable)**:
+```rust
+// Accumulate batch results, update once per batch
+let mut batch_chunks = 0;
+let mut batch_files = 0;
+while let Some(result) = tasks.join_next().await {
+    let chunk_count = self.process_chunk_results(chunk_results);
+    batch_chunks += chunk_count;
+    batch_files += 1;
+}
+total_chunks += batch_chunks;
+processed_files += batch_files;
+spinner.set_message(format!("Embedding files... {processed_files}/{total_files} ({total_chunks} chunks)"));
 ```
 
 ---

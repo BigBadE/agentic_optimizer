@@ -10,7 +10,6 @@ use std::hash::{Hash as _, Hasher as _};
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 use std::time::{Duration, SystemTime};
-use tokio::task::JoinSet;
 use tracing::{info, warn};
 
 use crate::context_inclusion::MIN_SIMILARITY_SCORE;
@@ -951,9 +950,11 @@ impl VectorSearchManager {
     }
 
     /// Embed a single file and return chunks with embeddings
-    async fn embed_single_file(relative_path: PathBuf, absolute_path: PathBuf) -> Vec<ChunkResult> {
-        let client = EmbeddingClient::default();
-
+    async fn embed_single_file(
+        relative_path: PathBuf,
+        absolute_path: PathBuf,
+        client: &EmbeddingClient,
+    ) -> Vec<ChunkResult> {
         let content = match fs::read_to_string(&absolute_path) {
             Ok(content) => content,
             Err(error) => {
@@ -1038,46 +1039,83 @@ impl VectorSearchManager {
     }
 
     /// Embed a batch of files (chunked)
-    /// Embed a batch of files (chunked)
     ///
     /// # Errors
     /// Returns an error if any embedding task fails
     async fn embed_files(&mut self, files: Vec<PathBuf>, spinner: &ProgressBar) -> Result<()> {
-        const BATCH_SIZE: usize = 10;
+        // Process files in small batches to balance speed and resource usage
+        // Small batches (2-3 files) prevent Ollama from being overwhelmed while
+        // still providing some parallelism
+        const BATCH_SIZE: usize = 3;
+
         let total_files = files.len();
         let mut processed_files = 0;
         let mut total_chunks = 0;
 
+        // Create shared client for all files
+        let client = EmbeddingClient::default();
+
         for file_batch in files.chunks(BATCH_SIZE) {
-            let mut tasks = JoinSet::default();
-
-            for file_path in file_batch {
-                let relative_path = file_path.clone();
-                let absolute_path = self.project_root.join(file_path);
-
-                tasks.spawn(Self::embed_single_file(relative_path, absolute_path));
-            }
-
-            // Collect results from the batch
-            let mut batch_chunks = 0;
-
-            while let Some(result) = tasks.join_next().await {
-                match result {
-                    Ok(chunk_results) if !chunk_results.is_empty() => {
-                        let chunk_count = self.process_chunk_results(chunk_results);
-                        batch_chunks += chunk_count;
-                    }
-                    Err(task_error) => {
-                        warn!("    Task error: {task_error}");
-                    }
-                    Ok(_) => {} // Empty results, skip
+            // Process batch - up to 3 files concurrently
+            let batch_results = match file_batch.len() {
+                3 => {
+                    let (result1, result2, result3) = tokio::join!(
+                        Self::embed_single_file(
+                            file_batch[0].clone(),
+                            self.project_root.join(&file_batch[0]),
+                            &client
+                        ),
+                        Self::embed_single_file(
+                            file_batch[1].clone(),
+                            self.project_root.join(&file_batch[1]),
+                            &client
+                        ),
+                        Self::embed_single_file(
+                            file_batch[2].clone(),
+                            self.project_root.join(&file_batch[2]),
+                            &client
+                        ),
+                    );
+                    vec![result1, result2, result3]
                 }
+                2 => {
+                    let (result1, result2) = tokio::join!(
+                        Self::embed_single_file(
+                            file_batch[0].clone(),
+                            self.project_root.join(&file_batch[0]),
+                            &client
+                        ),
+                        Self::embed_single_file(
+                            file_batch[1].clone(),
+                            self.project_root.join(&file_batch[1]),
+                            &client
+                        ),
+                    );
+                    vec![result1, result2]
+                }
+                1 => {
+                    vec![
+                        Self::embed_single_file(
+                            file_batch[0].clone(),
+                            self.project_root.join(&file_batch[0]),
+                            &client,
+                        )
+                        .await,
+                    ]
+                }
+                _ => Vec::new(),
+            };
+
+            // Process all results from batch
+            for chunk_results in batch_results {
+                if !chunk_results.is_empty() {
+                    let chunk_count = self.process_chunk_results(chunk_results);
+                    total_chunks += chunk_count;
+                }
+                processed_files += 1;
             }
 
-            // Update display once per batch instead of per file
-            // Always increment by batch size to track all files, not just successful ones
-            total_chunks += batch_chunks;
-            processed_files += file_batch.len();
+            // Update progress after each batch
             spinner.set_message(format!(
                 "Embedding files... {processed_files}/{total_files} ({total_chunks} chunks)"
             ));

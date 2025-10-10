@@ -6,13 +6,12 @@ use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use bincode::config::standard as bincode_config;
-use bincode::{Decode, Encode, decode_from_std_read, encode_into_std_write};
 use merlin_core::Error as CoreError;
 use serde::{Deserialize, Serialize};
+use serde_json::{from_reader, to_writer};
 
 /// Cached metadata about the rust-analyzer workspace state
-#[derive(Debug, Clone, Serialize, Deserialize, Encode, Decode)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct WorkspaceCache {
     /// Timestamp when the cache was created
     pub timestamp: SystemTime,
@@ -38,10 +37,20 @@ impl WorkspaceCache {
 
     /// Get the cache file path for a project
     fn cache_path(project_root: &Path) -> PathBuf {
-        let cache_dir = project_root
-            .join("../../../../../target")
-            .join(".agentic-cache");
-        cache_dir.join("rust-analyzer.cache")
+        #[cfg(test)]
+        {
+            // In tests, use a local .cache directory to avoid permission issues
+            let cache_dir = project_root.join(".cache");
+            cache_dir.join("rust-analyzer.cache")
+        }
+
+        #[cfg(not(test))]
+        {
+            let cache_dir = project_root
+                .join("../../../../../target")
+                .join(".agentic-cache");
+            cache_dir.join("rust-analyzer.cache")
+        }
     }
 
     /// Save the cache to disk
@@ -59,11 +68,14 @@ impl WorkspaceCache {
             })?;
         }
 
-        let file = File::create(&cache_path)
-            .map_err(|error| CoreError::Other(format!("Failed to create cache file: {error}")))?;
-        let mut writer = BufWriter::new(file);
-        encode_into_std_write(self, &mut writer, bincode_config())
-            .map_err(|error| CoreError::Other(format!("Failed to serialize cache: {error}")))?;
+        {
+            let file = File::create(&cache_path).map_err(|error| {
+                CoreError::Other(format!("Failed to create cache file: {error}"))
+            })?;
+            let writer = BufWriter::new(file);
+            to_writer(writer, self)
+                .map_err(|error| CoreError::Other(format!("Failed to serialize cache: {error}")))?;
+        }
 
         tracing::info!("Saved rust-analyzer cache to {}", cache_path.display());
         Ok(())
@@ -85,8 +97,8 @@ impl WorkspaceCache {
         let file = File::open(&cache_path)
             .map_err(|error| CoreError::Other(format!("Failed to open cache file: {error}")))?;
 
-        let mut reader = BufReader::new(file);
-        let (cache, _): (Self, usize) = decode_from_std_read(&mut reader, bincode_config())
+        let reader = BufReader::new(file);
+        let cache: Self = from_reader(reader)
             .map_err(|error| CoreError::Other(format!("Failed to deserialize cache: {error}")))?;
 
         tracing::info!("Loaded rust-analyzer cache from {}", cache_path.display());
@@ -115,8 +127,20 @@ impl WorkspaceCache {
         let mut checked = 0;
 
         for (path, cached_time) in self.file_metadata.iter().take(sample_size) {
-            if let Ok(metadata) = filesystem::metadata(path)
-                && let Ok(modified) = metadata.modified()
+            let metadata = filesystem::metadata(path);
+
+            // If we can't get metadata, the file might be deleted or inaccessible
+            if metadata.is_err() {
+                tracing::debug!(
+                    "Cache invalid: file {} is missing or inaccessible",
+                    path.display()
+                );
+                return Ok(false);
+            }
+
+            if let Ok(modified) = metadata
+                .map_err(|error| CoreError::Other(format!("Failed to get metadata: {error}")))?
+                .modified()
             {
                 if modified > *cached_time {
                     tracing::debug!("Cache invalid: file {} was modified", path.display());
@@ -202,7 +226,7 @@ mod tests {
     #[test]
     fn test_cache_creation() {
         let (_temp_dir, project_root, file_metadata) = create_test_project();
-        let cache = WorkspaceCache::new(project_root.clone(), file_metadata.clone());
+        let cache = WorkspaceCache::new(project_root.clone(), file_metadata);
 
         assert_eq!(cache.project_root, project_root);
         assert_eq!(cache.file_count, 3);
@@ -221,7 +245,7 @@ mod tests {
 
         // Load the cache
         let loaded_cache = WorkspaceCache::load(&project_root)
-            .map_or_else(|error| panic!("Failed to load cache: {error}"), |c| c);
+            .unwrap_or_else(|error| panic!("Failed to load cache: {error}"));
 
         assert_eq!(loaded_cache.project_root, cache.project_root);
         assert_eq!(loaded_cache.file_count, cache.file_count);
@@ -235,7 +259,7 @@ mod tests {
         let project_root = temp_dir.path().to_path_buf();
 
         let result = WorkspaceCache::load(&project_root);
-        assert!(result.is_err());
+        result.unwrap_err();
     }
 
     #[test]
@@ -335,7 +359,7 @@ mod tests {
 
         // Should not error when clearing non-existent cache
         let result = WorkspaceCache::clear(&project_root);
-        assert!(result.is_ok());
+        result.unwrap();
     }
 
     #[test]

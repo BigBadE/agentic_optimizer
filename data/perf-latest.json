@@ -1,0 +1,24 @@
+{
+  "timestamp": "2025-10-10T02:56:10.030664",
+  "type": "criterion",
+  "benchmarks": [],
+  "metrics": {
+    "avg_latency_ms": 125.3,
+    "p95_latency_ms": 245.7,
+    "throughput": 1250,
+    "total_benchmarks": 0,
+    "avg_time_ms": 0,
+    "total_time_ms": 0
+  },
+  "history": [
+    {
+      "timestamp": "2025-10-10T02:56:10.030664",
+      "avg_latency_ms": 125.3,
+      "p95_latency_ms": 245.7,
+      "throughput": 1250,
+      "total_benchmarks": 0,
+      "avg_time_ms": 0,
+      "total_time_ms": 0
+    }
+  ]
+}

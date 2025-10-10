@@ -1,0 +1,85 @@
+{
+  "timestamp": "2025-10-10T16:44:42.441997",
+  "type": "gungraun",
+  "benchmarks": [
+    {
+      "name": "gungraun_integration::integration_group::gungraun_e2e_simple_query",
+      "instructions": 99466,
+      "l1_accesses": 136046,
+      "l2_accesses": 863,
+      "ram_accesses": 1904,
+      "estimated_cycles": 207001
+    },
+    {
+      "name": "gungraun_integration::integration_group::gungraun_e2e_code_modification",
+      "instructions": 100495,
+      "l1_accesses": 137169,
+      "l2_accesses": 863,
+      "ram_accesses": 1905,
+      "estimated_cycles": 208159
+    },
+    {
+      "name": "gungraun_integration::integration_group::gungraun_e2e_complex_refactor",
+      "instructions": 125871,
+      "l1_accesses": 170331,
+      "l2_accesses": 917,
+      "ram_accesses": 1969,
+      "estimated_cycles": 243831
+    },
+    {
+      "name": "gungraun_integration::integration_group::gungraun_sequential_requests",
+      "instructions": 145106,
+      "l1_accesses": 194876,
+      "l2_accesses": 904,
+      "ram_accesses": 1968,
+      "estimated_cycles": 268276
+    },
+    {
+      "name": "gungraun_routing::routing_group::gungraun_analyze_simple_request",
+      "instructions": 98871,
+      "l1_accesses": 135209,
+      "l2_accesses": 879,
+      "ram_accesses": 1916,
+      "estimated_cycles": 206664
+    },
+    {
+      "name": "gungraun_routing::routing_group::gungraun_analyze_medium_request",
+      "instructions": 120693,
+      "l1_accesses": 163780,
+      "l2_accesses": 917,
+      "ram_accesses": 1968,
+      "estimated_cycles": 237245
+    },
+    {
+      "name": "gungraun_routing::routing_group::gungraun_analyze_complex_request",
+      "instructions": 105845,
+      "l1_accesses": 143480,
+      "l2_accesses": 895,
+      "ram_accesses": 1923,
+      "estimated_cycles": 215260
+    },
+    {
+      "name": "gungraun_routing::routing_group::gungraun_create_orchestrator",
+      "instructions": 6200,
+      "l1_accesses": 8595,
+      "l2_accesses": 24,
+      "ram_accesses": 101,
+      "estimated_cycles": 12250
+    },
+    {
+      "name": "gungraun_routing::routing_group::gungraun_create_config",
+      "instructions": 935,
+      "l1_accesses": 1322,
+      "l2_accesses": 1,
+      "ram_accesses": 18,
+      "estimated_cycles": 1957
+    }
+  ],
+  "metrics": {
+    "total_benchmarks": 9,
+    "avg_instructions": 89276,
+    "total_instructions": 803482,
+    "avg_cycles": 177849,
+    "total_cycles": 1600643
+  }
+}

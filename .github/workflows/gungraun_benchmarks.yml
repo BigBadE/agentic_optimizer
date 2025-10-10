@@ -50,7 +50,7 @@ jobs:
 
       - name: Run Gungraun benchmarks
         run: |
-          cargo bench --profile ci-release -p merlin-routing --bench gungraun_integration --bench gungraun_routing 2>&1 | tee gungraun-output.txt || true
+          cargo bench --profile ci-release -p merlin-benchmarks-gungraun --bench gungraun_integration --bench gungraun_routing 2>&1 | tee gungraun-output.txt || true
 
       - name: Test
         run: cat gungraun-output.txt
@@ -79,12 +79,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gungraun-json-results
-          path: benchmark-data/gungraun-latest.json
+          path: benchmark-data/gungraun/latest.json
           retention-days: 90
           if-no-files-found: warn
 
       - name: Publish Gungraun results to gh-pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmark-data/gungraun-latest.json') != ''
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmark-data/gungraun/latest.json') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
@@ -93,13 +93,13 @@ jobs:
           cd gh-pages
 
           # Create directories
-          mkdir -p data
+          mkdir -p data/gungraun
 
           # Copy pre-generated JSON data
-          if [ -f ../benchmark-data/gungraun-latest.json ]; then
-            cp ../benchmark-data/gungraun-latest.json data/
+          if [ -f ../benchmark-data/gungraun/latest.json ]; then
+            cp ../benchmark-data/gungraun/latest.json data/gungraun/
             # Also save timestamped version for history
-            cp ../benchmark-data/gungraun-latest.json "data/gungraun-${ts}.json"
+            cp ../benchmark-data/gungraun/latest.json "data/gungraun/${ts}.json"
           fi
 
           # Generate dashboard if it doesn't exist

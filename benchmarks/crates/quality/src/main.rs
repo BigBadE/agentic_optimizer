@@ -14,7 +14,7 @@
 
 use anyhow::{Context as _, Result};
 use clap::Parser;
-use merlin_benchmarks::{generate_report, run_benchmarks_async};
+use merlin_benchmarks_quality::{generate_report, run_benchmarks_async};
 use std::fs::write;
 use std::path::PathBuf;
 use tracing::Level;
@@ -25,7 +25,7 @@ use tracing_subscriber::{EnvFilter, fmt};
 #[command(about = "Run context quality benchmarks", long_about = None)]
 struct Args {
     /// Directory containing test case TOML files
-    #[arg(short, long, default_value = "benchmarks/test_cases")]
+    #[arg(short, long, default_value = "benchmarks/crates/quality/test_cases")]
     test_cases: PathBuf,
 
     /// Output file for results (markdown format)

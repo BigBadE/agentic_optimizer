@@ -1,0 +1,38 @@
+[package]
+name = "merlin-benchmarks-criterion"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+merlin-context.workspace = true
+merlin-core.workspace = true
+merlin-routing.workspace = true
+merlin-agent.workspace = true
+merlin-tools.workspace = true
+merlin-providers.workspace = true
+merlin-local.workspace = true
+anyhow.workspace = true
+tokio.workspace = true
+uuid.workspace = true
+
+[dev-dependencies]
+criterion = { version = "0.7", features = ["html_reports", "async_tokio"] }
+
+[[bench]]
+name = "cache_benchmarks"
+harness = false
+
+[[bench]]
+name = "routing_benchmarks"
+harness = false
+
+[[bench]]
+name = "integration_benchmarks"
+harness = false
+
+[[bench]]
+name = "metrics_benchmarks"
+harness = false
+
+[lints]
+workspace = true

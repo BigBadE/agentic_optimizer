@@ -23,25 +23,5 @@ tempfile.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
 
-[dev-dependencies]
-criterion.workspace = true
-gungraun.workspace = true
-
-[[bench]]
-name = "routing_benchmarks"
-harness = false
-
-[[bench]]
-name = "integration_benchmarks"
-harness = false
-
-[[bench]]
-name = "gungraun_routing"
-harness = false
-
-[[bench]]
-name = "gungraun_integration"
-harness = false
-
 [lints]
 workspace = true

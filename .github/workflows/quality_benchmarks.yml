@@ -77,12 +77,12 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: quality-json-results
-          path: benchmark-data/quality-latest.json
+          path: benchmark-data/quality/latest.json
           retention-days: 90
           if-no-files-found: warn
 
       - name: Publish quality results to gh-pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmark-data/quality-latest.json') != ''
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmark-data/quality/latest.json') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
@@ -91,13 +91,13 @@ jobs:
           cd gh-pages
 
           # Create directories
-          mkdir -p data
+          mkdir -p data/quality
 
           # Copy pre-generated JSON data
-          if [ -f ../benchmark-data/quality-latest.json ]; then
-            cp ../benchmark-data/quality-latest.json data/
+          if [ -f ../benchmark-data/quality/latest.json ]; then
+            cp ../benchmark-data/quality/latest.json data/quality/
             # Also save timestamped version for history
-            cp ../benchmark-data/quality-latest.json "data/quality-${ts}.json"
+            cp ../benchmark-data/quality/latest.json "data/quality/${ts}.json"
           fi
 
           # Generate dashboard if it doesn't exist

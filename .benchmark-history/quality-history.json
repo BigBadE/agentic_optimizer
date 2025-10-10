@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-10-10T06:37:33.570802",
+  "timestamp": "2025-10-10T06:37:36.497417",
   "type": "quality",
   "metrics": {
     "test_cases": 40,
@@ -8,7 +8,21 @@
     "recall_at_10": 19.3,
     "mrr": 0.285,
     "ndcg_at_10": 0.189,
-    "critical_in_top_3": 18.8
+    "critical_in_top_3": 18.8,
+    "test_cases_change": 0.0,
+    "prev_test_cases": 40,
+    "precision_at_3_change": 0.0,
+    "prev_precision_at_3": 14.2,
+    "precision_at_10_change": 0.0,
+    "prev_precision_at_10": 8.2,
+    "recall_at_10_change": 0.0,
+    "prev_recall_at_10": 19.3,
+    "mrr_change": 0.0,
+    "prev_mrr": 0.285,
+    "ndcg_at_10_change": 0.0,
+    "prev_ndcg_at_10": 0.189,
+    "critical_in_top_3_change": 0.0,
+    "prev_critical_in_top_3": 18.8
   },
   "history": [
     {
@@ -23,6 +37,16 @@
     },
     {
       "timestamp": "2025-10-10T06:37:33.570802",
+      "test_cases": 40,
+      "precision_at_3": 14.2,
+      "precision_at_10": 8.2,
+      "recall_at_10": 19.3,
+      "mrr": 0.285,
+      "ndcg_at_10": 0.189,
+      "critical_in_top_3": 18.8
+    },
+    {
+      "timestamp": "2025-10-10T06:37:36.497417",
       "test_cases": 40,
       "precision_at_3": 14.2,
       "precision_at_10": 8.2,

@@ -1,0 +1,20 @@
+# Test Case: Visual Formatting
+name = "Block Formatting Context"
+description = "Query about block formatting context"
+query = "how does block formatting context work"
+project_root = "benchmarks/test_repositories/valor"
+
+[[expected]]
+path = "crates/css/modules/core/src/9_visual_formatting/part_9_4_1_block_formatting_context.rs"
+priority = "critical"
+reason = "BFC implementation"
+
+[[expected]]
+path = "crates/css/modules/core/src/9_visual_formatting/mod.rs"
+priority = "high"
+reason = "Visual formatting module"
+
+[[expected]]
+path = "crates/css/modules/display/src/lib.rs"
+priority = "medium"
+reason = "Display module"

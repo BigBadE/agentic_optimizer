@@ -1,0 +1,25 @@
+# Test Case: WGPU Backend
+name = "Graphics Backend"
+description = "Query about the WGPU graphics backend"
+query = "how does the graphics backend work with WGPU"
+project_root = "benchmarks/test_repositories/valor"
+
+[[expected]]
+path = "crates/renderer/wgpu_backend/src/lib.rs"
+priority = "critical"
+reason = "WGPU backend entry"
+
+[[expected]]
+path = "crates/renderer/wgpu_backend/src/state/mod.rs"
+priority = "critical"
+reason = "WGPU state management"
+
+[[expected]]
+path = "crates/renderer/src/backend.rs"
+priority = "high"
+reason = "Backend abstraction"
+
+[[expected]]
+path = "crates/renderer/src/lib.rs"
+priority = "medium"
+reason = "Renderer module"

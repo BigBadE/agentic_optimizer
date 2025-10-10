@@ -1,0 +1,20 @@
+# Test Case: Flexbox Layout
+name = "Layout Engine"
+description = "Query about implementing flexbox layout"
+query = "implement flexbox layout algorithm"
+project_root = "benchmarks/test_repositories/valor"
+
+[[expected]]
+path = "crates/css/modules/flexbox/src/lib.rs"
+priority = "critical"
+reason = "Flexbox implementation"
+
+[[expected]]
+path = "crates/css/modules/display/src/lib.rs"
+priority = "high"
+reason = "Display module"
+
+[[expected]]
+path = "crates/css/modules/core/src/lib.rs"
+priority = "medium"
+reason = "CSS core"

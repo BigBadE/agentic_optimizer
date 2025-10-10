@@ -17,54 +17,91 @@ def parse_criterion_results(criterion_dir: Path) -> Dict[str, Any]:
         "type": "criterion",
         "benchmarks": [],
         "metrics": {
-            "avg_latency_ms": 125.3,
-            "p95_latency_ms": 245.7,
-            "throughput": 1250,
             "total_benchmarks": 0,
             "avg_time_ms": 0,
             "total_time_ms": 0
         }
     }
-    
+
     # Look for benchmark groups
     if not criterion_dir.exists():
         print(f"Warning: Criterion directory not found: {criterion_dir}", file=sys.stderr)
         print("Using default metrics", file=sys.stderr)
         return results
-    
+
     for group_dir in criterion_dir.iterdir():
         if not group_dir.is_dir() or group_dir.name == "report":
             continue
-        
-        # Try to read estimates.json
-        estimates_file = group_dir / "base" / "estimates.json"
-        if estimates_file.exists():
+
+        group_name = group_dir.name
+
+        # First try direct path (single benchmark)
+        direct_estimates = group_dir / "base" / "estimates.json"
+        if direct_estimates.exists():
             try:
-                with open(estimates_file) as f:
+                with open(direct_estimates) as f:
                     estimates = json.load(f)
-                
-                # Extract mean time
-                mean_time_ns = estimates.get("mean", {}).get("point_estimate", 0)
-                mean_time_ms = mean_time_ns / 1_000_000  # Convert ns to ms
-                
+
+                mean_ns = estimates.get("mean", {}).get("point_estimate", 0)
+                std_dev_ns = estimates.get("std_dev", {}).get("point_estimate", 0)
+                median_ns = estimates.get("median", {}).get("point_estimate", mean_ns)
+
                 results["benchmarks"].append({
-                    "name": group_dir.name,
-                    "mean_time_ms": round(mean_time_ms, 3),
-                    "mean_time_ns": mean_time_ns,
-                    "std_dev": estimates.get("std_dev", {}).get("point_estimate", 0),
+                    "name": group_name,
+                    "mean_ns": mean_ns,
+                    "mean_ms": round(mean_ns / 1_000_000, 6),
+                    "median_ns": median_ns,
+                    "median_ms": round(median_ns / 1_000_000, 6),
+                    "std_dev_ns": std_dev_ns,
+                    "std_dev_ms": round(std_dev_ns / 1_000_000, 6),
                 })
             except Exception as e:
-                print(f"Error parsing {estimates_file}: {e}", file=sys.stderr)
-    
+                print(f"Error parsing {direct_estimates}: {e}", file=sys.stderr)
+            continue
+
+        # Try nested structure (sub-benchmarks)
+        try:
+            for sub_dir in group_dir.iterdir():
+                if not sub_dir.is_dir():
+                    continue
+
+                sub_name = sub_dir.name
+                estimates_file = sub_dir / "base" / "estimates.json"
+
+                if not estimates_file.exists():
+                    continue
+
+                try:
+                    with open(estimates_file) as f:
+                        estimates = json.load(f)
+
+                    mean_ns = estimates.get("mean", {}).get("point_estimate", 0)
+                    std_dev_ns = estimates.get("std_dev", {}).get("point_estimate", 0)
+                    median_ns = estimates.get("median", {}).get("point_estimate", mean_ns)
+
+                    results["benchmarks"].append({
+                        "name": f"{group_name}/{sub_name}",
+                        "mean_ns": mean_ns,
+                        "mean_ms": round(mean_ns / 1_000_000, 6),
+                        "median_ns": median_ns,
+                        "median_ms": round(median_ns / 1_000_000, 6),
+                        "std_dev_ns": std_dev_ns,
+                        "std_dev_ms": round(std_dev_ns / 1_000_000, 6),
+                    })
+                except Exception as e:
+                    print(f"Error parsing {estimates_file}: {e}", file=sys.stderr)
+        except Exception as e:
+            print(f"Error reading sub-benchmarks in {group_dir}: {e}", file=sys.stderr)
+
     # Calculate aggregate metrics
     if results["benchmarks"]:
-        total_time = sum(b["mean_time_ms"] for b in results["benchmarks"])
+        total_time_ms = sum(b["mean_ms"] for b in results["benchmarks"])
         results["metrics"] = {
             "total_benchmarks": len(results["benchmarks"]),
-            "avg_time_ms": round(total_time / len(results["benchmarks"]), 3),
-            "total_time_ms": round(total_time, 3),
+            "avg_time_ms": round(total_time_ms / len(results["benchmarks"]), 6),
+            "total_time_ms": round(total_time_ms, 6),
         }
-    
+
     return results
 
 def parse_gungraun_output(output_file: Path) -> Dict[str, Any]:
@@ -72,115 +109,162 @@ def parse_gungraun_output(output_file: Path) -> Dict[str, Any]:
     results = {
         "timestamp": datetime.now().isoformat(),
         "type": "gungraun",
+        "benchmarks": [],
         "metrics": {
-            "peak_memory_mb": 45.2,
-            "total_instructions": 1250000,
-            "cache_misses": 15200,
-            "total_allocations": 5000,
-            "bytes_allocated": 47448064
+            "total_benchmarks": 0,
+            "avg_instructions": 0,
+            "total_instructions": 0,
+            "avg_cycles": 0,
+            "total_cycles": 0
         }
     }
-    
+
     if not output_file.exists():
         print(f"Warning: Gungraun output file not found: {output_file}", file=sys.stderr)
         print("Using default metrics", file=sys.stderr)
         return results
-    
+
     try:
-        with open(output_file) as f:
-            content = f.read()
-        
-        # Parse total instructions
-        instr_match = re.search(r'I\s+refs:\s+([\d,]+)', content)
-        if instr_match:
-            instructions = int(instr_match.group(1).replace(',', ''))
-            results["metrics"]["total_instructions"] = instructions
-        
-        # Parse memory allocations
-        alloc_match = re.search(r'total heap usage:\s+([\d,]+)\s+allocs', content)
-        if alloc_match:
-            allocs = int(alloc_match.group(1).replace(',', ''))
-            results["metrics"]["total_allocations"] = allocs
-        
-        # Parse bytes allocated
-        bytes_match = re.search(r'total heap usage:.*?([\d,]+)\s+bytes allocated', content)
-        if bytes_match:
-            bytes_allocated = int(bytes_match.group(1).replace(',', ''))
-            results["metrics"]["bytes_allocated"] = bytes_allocated
-            results["metrics"]["peak_memory_mb"] = round(bytes_allocated / (1024 * 1024), 2)
-        
-        # Parse cache references and misses
-        cache_refs_match = re.search(r'D\s+refs:\s+([\d,]+)', content)
-        if cache_refs_match:
-            cache_refs = int(cache_refs_match.group(1).replace(',', ''))
-            results["metrics"]["cache_references"] = cache_refs
-        
-        cache_miss_match = re.search(r'D1\s+misses:\s+([\d,]+)', content)
-        if cache_miss_match:
-            cache_misses = int(cache_miss_match.group(1).replace(',', ''))
-            results["metrics"]["cache_misses"] = cache_misses
-            
-            # Calculate cache miss rate
-            if cache_refs_match:
-                miss_rate = (cache_misses / cache_refs) * 100
-                results["metrics"]["cache_miss_rate"] = round(miss_rate, 2)
-        
-    except Exception as e:
-        print(f"Error parsing Gungraun output: {e}", file=sys.stderr)
-    
+        with open(output_file) as file:
+            content = file.read()
+
+        # Parse gungraun/iai-callgrind format benchmark results
+        # Format example:
+        # bench_name  Instructions:               38331 (+0.046981%)
+        #             L1 Accesses:                53765 (+0.048382%)
+        #             L2 Accesses:                    6 (-14.28571%)
+        #             RAM Accesses:                  45 (+4.651163%)
+        #             Estimated Cycles:           55370 (+0.164619%)
+
+        bench_pattern = re.compile(
+            r'(?P<name>[^\n]+?)\s+Instructions:\s+(?P<instructions>[\d,]+)',
+            re.MULTILINE
+        )
+
+        for match in bench_pattern.finditer(content):
+            bench_name = match.group('name').strip()
+            instructions = int(match.group('instructions').replace(',', ''))
+
+            # Extract position after the benchmark name to find associated metrics
+            start_pos = match.end()
+            # Find the next benchmark or end of string
+            next_match = bench_pattern.search(content, start_pos)
+            end_pos = next_match.start() if next_match else len(content)
+            bench_section = content[start_pos:end_pos]
+
+            # Extract L1, L2, RAM accesses and estimated cycles
+            l1_accesses = 0
+            l2_accesses = 0
+            ram_accesses = 0
+            estimated_cycles = 0
+
+            l1_match = re.search(r'L1 (?:Accesses|Hits):\s+([\d,]+)', bench_section)
+            if l1_match:
+                l1_accesses = int(l1_match.group(1).replace(',', ''))
+
+            l2_match = re.search(r'L2 (?:Accesses|Hits):\s+([\d,]+)', bench_section)
+            if l2_match:
+                l2_accesses = int(l2_match.group(1).replace(',', ''))
+
+            ram_match = re.search(r'RAM (?:Accesses|Hits):\s+([\d,]+)', bench_section)
+            if ram_match:
+                ram_accesses = int(ram_match.group(1).replace(',', ''))
+
+            cycles_match = re.search(r'Estimated Cycles:\s+([\d,]+)', bench_section)
+            if cycles_match:
+                estimated_cycles = int(cycles_match.group(1).replace(',', ''))
+
+            results["benchmarks"].append({
+                "name": bench_name,
+                "instructions": instructions,
+                "l1_accesses": l1_accesses,
+                "l2_accesses": l2_accesses,
+                "ram_accesses": ram_accesses,
+                "estimated_cycles": estimated_cycles
+            })
+
+        # Calculate aggregate metrics
+        if results["benchmarks"]:
+            total_instructions = sum(bench["instructions"] for bench in results["benchmarks"])
+            total_cycles = sum(bench["estimated_cycles"] for bench in results["benchmarks"])
+            num_benchmarks = len(results["benchmarks"])
+
+            results["metrics"] = {
+                "total_benchmarks": num_benchmarks,
+                "avg_instructions": round(total_instructions / num_benchmarks),
+                "total_instructions": total_instructions,
+                "avg_cycles": round(total_cycles / num_benchmarks),
+                "total_cycles": total_cycles,
+            }
+
+    except Exception as exception:
+        print(f"Error parsing Gungraun output: {exception}", file=sys.stderr)
+        import traceback
+        traceback.print_exc()
+
     return results
 
 def parse_quality_benchmarks(results_file: Path) -> Dict[str, Any]:
-    """Parse quality benchmark results."""
+    """Parse quality benchmark results from markdown table format."""
     results = {
         "timestamp": datetime.now().isoformat(),
         "type": "quality",
         "metrics": {
-            "success_rate": 95.5,
-            "avg_score": 8.7,
-            "total_tests": 150,
-            "passed_tests": 143,
-            "failed_tests": 7
+            "test_cases": 0,
+            "precision_at_3": 0.0,
+            "precision_at_10": 0.0,
+            "recall_at_10": 0.0,
+            "mrr": 0.0,
+            "ndcg_at_10": 0.0,
+            "critical_in_top_3": 0.0
         }
     }
-    
+
     if not results_file.exists():
         print(f"Warning: Quality results file not found: {results_file}", file=sys.stderr)
         print("Using default metrics", file=sys.stderr)
         return results
-    
+
     try:
         with open(results_file) as f:
             content = f.read()
-        
-        # Parse success rate
-        success_match = re.search(r'Success Rate:\s*(\d+\.?\d*)%', content)
-        if success_match:
-            results["metrics"]["success_rate"] = float(success_match.group(1))
-        
-        # Parse average score
-        score_match = re.search(r'Average Score:\s*(\d+\.?\d*)', content)
-        if score_match:
-            results["metrics"]["avg_score"] = float(score_match.group(1))
-        
-        # Parse total tests
-        tests_match = re.search(r'Total Tests:\s*(\d+)', content)
-        if tests_match:
-            results["metrics"]["total_tests"] = int(tests_match.group(1))
-        
-        # Parse passed tests
-        passed_match = re.search(r'Passed:\s*(\d+)', content)
-        if passed_match:
-            results["metrics"]["passed_tests"] = int(passed_match.group(1))
-        
-        # Parse failed tests
-        failed_match = re.search(r'Failed:\s*(\d+)', content)
-        if failed_match:
-            results["metrics"]["failed_tests"] = int(failed_match.group(1))
-        
+
+        # Parse test cases count
+        test_cases_match = re.search(r'\*\*Test Cases\*\*:\s*(\d+)', content)
+        if test_cases_match:
+            results["metrics"]["test_cases"] = int(test_cases_match.group(1))
+
+        # Parse metrics from table
+        # Format: | Precision@3 | 45.2% | 60% |
+        precision_3_match = re.search(r'\|\s*Precision@3\s*\|\s*([\d.]+|NaN)%', content)
+        if precision_3_match and precision_3_match.group(1) != "NaN":
+            results["metrics"]["precision_at_3"] = float(precision_3_match.group(1))
+
+        precision_10_match = re.search(r'\|\s*Precision@10\s*\|\s*([\d.]+|NaN)%', content)
+        if precision_10_match and precision_10_match.group(1) != "NaN":
+            results["metrics"]["precision_at_10"] = float(precision_10_match.group(1))
+
+        recall_10_match = re.search(r'\|\s*Recall@10\s*\|\s*([\d.]+|NaN)%', content)
+        if recall_10_match and recall_10_match.group(1) != "NaN":
+            results["metrics"]["recall_at_10"] = float(recall_10_match.group(1))
+
+        mrr_match = re.search(r'\|\s*MRR\s*\|\s*([\d.]+|NaN)\s*\|', content)
+        if mrr_match and mrr_match.group(1) != "NaN":
+            results["metrics"]["mrr"] = float(mrr_match.group(1))
+
+        ndcg_match = re.search(r'\|\s*NDCG@10\s*\|\s*(-?[\d.]+|NaN)\s*\|', content)
+        if ndcg_match and ndcg_match.group(1) != "NaN":
+            results["metrics"]["ndcg_at_10"] = float(ndcg_match.group(1))
+
+        critical_match = re.search(r'\|\s*Critical in Top-3\s*\|\s*([\d.]+|NaN)%', content)
+        if critical_match and critical_match.group(1) != "NaN":
+            results["metrics"]["critical_in_top_3"] = float(critical_match.group(1))
+
     except Exception as e:
         print(f"Error parsing quality benchmarks: {e}", file=sys.stderr)
-    
+        import traceback
+        traceback.print_exc()
+
     return results
 
 def merge_with_history(current: Dict[str, Any], history_file: Path, max_history: int = 30) -> Dict[str, Any]:

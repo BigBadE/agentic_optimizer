@@ -50,12 +50,24 @@ jobs:
 
       - name: Run Gungraun benchmarks
         run: |
-          cargo run --profile ci-release --bin perf-bench -- --output gungraun-results.md
-          echo " Gungraun benchmarks completed"
-          if [ -f gungraun-results.md ]; then
+          # Run gungraun benchmarks (requires Valgrind)
+          cargo bench --profile ci-release -p merlin-routing --bench gungraun_integration --bench gungraun_routing > gungraun-output.txt 2>&1 || true
+          echo "✅ Gungraun benchmarks completed"
+          if [ -f gungraun-output.txt ]; then
+            echo "📊 Preview of raw output:"
+            head -30 gungraun-output.txt
+          else
+            echo "⚠️ Warning: gungraun-output.txt not found"
+          fi
+
+      - name: Format Gungraun results to markdown
+        run: |
+          if [ -f gungraun-output.txt ]; then
+            python3 scripts/format-gungraun.py gungraun-output.txt gungraun-results.md
+            echo "📊 Preview of formatted markdown:"
             head -30 gungraun-results.md
           else
-            echo " Warning: gungraun-results.md not found"
+            echo "⚠️ Skipping format: gungraun-output.txt not found"
           fi
 
       - name: Upload results artifact
@@ -63,7 +75,9 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: gungraun-benchmark-results
-          path: gungraun-results.md
+          path: |
+            gungraun-output.txt
+            gungraun-results.md
           retention-days: 90
           if-no-files-found: warn
 
@@ -82,10 +96,10 @@ jobs:
           python-version: '3.11'
 
       - name: Parse benchmark results
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('gungraun-results.md') != ''
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('gungraun-output.txt') != ''
         run: |
           python3 scripts/parse-benchmarks.py \
-            --gungraun-output gungraun-results.md \
+            --gungraun-output gungraun-output.txt \
             --output-dir /tmp/benchmark-data \
             --history-dir .benchmark-history
 

@@ -1,0 +1,25 @@
+# Test Case: GPU Text Rendering
+name = "GPU Text Rendering"
+description = "Query about debugging text rendering artifacts"
+query = "debug text rendering artifacts on GPU backend"
+project_root = "benchmarks/test_repositories/valor"
+
+[[expected]]
+path = "crates/renderer/wgpu_backend/src/text.rs"
+priority = "critical"
+reason = "GPU text rendering"
+
+[[expected]]
+path = "crates/renderer/wgpu_backend/src/state/text.rs"
+priority = "critical"
+reason = "Text rendering state"
+
+[[expected]]
+path = "crates/renderer/src/display_list.rs"
+priority = "high"
+reason = "Display list"
+
+[[expected]]
+path = "crates/css/modules/text/src/lib.rs"
+priority = "medium"
+reason = "CSS text module"

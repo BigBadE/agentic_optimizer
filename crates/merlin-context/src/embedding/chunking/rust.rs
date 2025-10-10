@@ -93,19 +93,28 @@ fn process_rust_item(
             return end_line + 1;
         }
 
-        // If we can't split it properly, skip it (too large and no good split points)
-        tracing::warn!("Skipping large chunk {chunk_id} ({tokens} tokens) - no good split points");
+        // Force split by line count if no good split points found
+        tracing::warn!(
+            "Force-splitting large chunk {chunk_id} ({tokens} tokens) by line count - no optimal split points"
+        );
+        let forced_chunks =
+            force_split_by_line_count(file_path, lines, start_idx, end_idx, chunk_id);
+        chunks.extend(forced_chunks);
         return end_line + 1;
     }
 
     // Only add if meets minimum token requirement
     if !buffer.trim().is_empty() && tokens >= MIN_CHUNK_TOKENS {
+        let total_lines = lines.len();
+        let start_line = current_line + 1;
+        let end_line_1 = (end_line + 1).min(total_lines);
+        let start_line_clamped = start_line.max(1).min(end_line_1);
         chunks.push(FileChunk::new(
             file_path.to_owned(),
             mem::take(buffer),
             chunk_id.to_owned(),
-            current_line + 1,
-            end_line + 1,
+            start_line_clamped,
+            end_line_1,
         ));
     }
     // If below minimum, just skip it (will be part of surrounding context)
@@ -249,12 +258,16 @@ fn chunk_impl_into_functions(
             let tokens = estimate_tokens(&buffer);
 
             if tokens >= MIN_CHUNK_TOKENS {
+                let total_lines = lines.len();
+                let start_line = fn_start + 1;
+                let end_line_1 = (fn_end + 1).min(total_lines);
+                let start_line_clamped = start_line.max(1).min(end_line_1);
                 chunks.push(FileChunk::new(
                     file_path.to_owned(),
                     mem::take(&mut buffer),
                     fn_id,
-                    fn_start + 1,
-                    fn_end + 1,
+                    start_line_clamped,
+                    end_line_1,
                 ));
             }
             // Skip functions below minimum
@@ -301,24 +314,12 @@ fn force_split_large_chunk(
                 file_path,
                 base_id,
                 part_num,
+                total_lines: lines.len(),
             };
             emit_chunk_from_range(&meta, lines, chunk_start, empty_idx, &mut chunks);
             rebuild_buffer_after_split(lines, empty_idx, line_idx, &mut buffer, &mut line_count);
             part_num += 1;
             chunk_start = empty_idx + 1;
-            last_empty_line = None;
-        }
-
-        if should_emit_on_empty_line(lines[line_idx], tokens) {
-            let meta = EmitMeta {
-                file_path,
-                base_id,
-                part_num,
-            };
-            emit_chunk(&meta, &mut buffer, chunk_start, line_idx, &mut chunks);
-            part_num += 1;
-            line_count = 0;
-            chunk_start = line_idx + 1;
             last_empty_line = None;
         }
     }
@@ -327,9 +328,9 @@ fn force_split_large_chunk(
         file_path,
         base_id,
         part_num,
+        total_lines: lines.len(),
     };
     flush_remaining(&meta, buffer, chunk_start, end_idx, &mut chunks);
-
     chunks
 }
 
@@ -343,14 +344,11 @@ fn should_force_split(tokens: usize, last_empty: Option<(usize, usize)>) -> Opti
     None
 }
 
-fn should_emit_on_empty_line(line: &str, tokens: usize) -> bool {
-    line.trim().is_empty() && (MIN_CHUNK_TOKENS..=MAX_CHUNK_TOKENS).contains(&tokens)
-}
-
 struct EmitMeta<'life> {
     file_path: &'life str,
     base_id: &'life str,
     part_num: usize,
+    total_lines: usize,
 }
 
 fn emit_chunk_from_range(
@@ -367,12 +365,16 @@ fn emit_chunk_from_range(
         }
         split_content.push_str(line);
     }
+    let total_lines = lines.len();
+    let start_line = start + 1;
+    let end_line_1 = (end + 1).min(total_lines);
+    let start_line_clamped = start_line.max(1).min(end_line_1);
     chunks.push(FileChunk::new(
         meta.file_path.to_owned(),
         split_content,
         format!("{} (part {})", meta.base_id, meta.part_num),
-        start + 1,
-        end + 1,
+        start_line_clamped,
+        end_line_1,
     ));
 }
 
@@ -394,22 +396,6 @@ fn rebuild_buffer_after_split(
     }
 }
 
-fn emit_chunk(
-    meta: &EmitMeta,
-    buffer: &mut String,
-    chunk_start: usize,
-    end_line: usize,
-    chunks: &mut Vec<FileChunk>,
-) {
-    chunks.push(FileChunk::new(
-        meta.file_path.to_owned(),
-        mem::take(buffer),
-        format!("{} (part {})", meta.base_id, meta.part_num),
-        chunk_start + 1,
-        end_line + 1,
-    ));
-}
-
 fn flush_remaining(
     meta: &EmitMeta,
     buffer: String,
@@ -420,19 +406,98 @@ fn flush_remaining(
     if !buffer.is_empty() {
         let tokens = estimate_tokens(&buffer);
         if tokens >= MIN_CHUNK_TOKENS {
+            let start_line = chunk_start + 1;
+            let end_line_1 = (end_idx + 1).min(meta.total_lines);
+            let start_line_clamped = start_line.max(1).min(end_line_1);
             chunks.push(FileChunk::new(
                 meta.file_path.to_owned(),
                 buffer,
                 format!("{} (part {})", meta.base_id, meta.part_num),
-                chunk_start + 1,
-                end_idx + 1,
+                start_line_clamped,
+                end_line_1,
             ));
         } else if let Some(last_chunk) = chunks.last_mut() {
             last_chunk.content.push('\n');
             last_chunk.content.push_str(&buffer);
-            last_chunk.end_line = end_idx + 1;
+            let new_end = end_idx + 1;
+            if new_end > last_chunk.end_line {
+                last_chunk.end_line = new_end.min(meta.total_lines);
+            }
         }
     }
+}
+
+/// Force split a chunk by line count when no good split points exist
+/// This ensures we never skip large chunks entirely
+fn force_split_by_line_count(
+    file_path: &str,
+    lines: &[&str],
+    start_idx: usize,
+    end_idx: usize,
+    base_id: &str,
+) -> Vec<FileChunk> {
+    let mut chunks = Vec::default();
+    let mut part_num = 1;
+    let mut current_start = start_idx;
+    let mut buffer = String::default();
+
+    while current_start <= end_idx {
+        buffer.clear();
+        let mut current_end = current_start;
+
+        // Build chunks dynamically, ensuring they don't exceed MAX_CHUNK_TOKENS
+        while current_end <= end_idx {
+            if current_end > current_start {
+                buffer.push('\n');
+            }
+            buffer.push_str(lines[current_end]);
+
+            let tokens = estimate_tokens(&buffer);
+
+            // If adding this line would exceed MAX, back up and emit the chunk
+            if tokens > MAX_CHUNK_TOKENS && current_end > current_start {
+                // Remove the last line we added
+                if let Some(pos) = buffer.rfind('\n') {
+                    buffer.truncate(pos);
+                }
+                current_end -= 1;
+                break;
+            }
+
+            // If we're at MAX or close to it, emit the chunk
+            if tokens >= MAX_CHUNK_TOKENS * 9 / 10 {
+                break;
+            }
+
+            current_end += 1;
+        }
+
+        // Ensure we make progress even with huge single lines
+        if current_end == current_start {
+            current_end = current_start;
+        }
+
+        let final_tokens = estimate_tokens(&buffer);
+
+        // Only add if not empty and meets minimum
+        if !buffer.trim().is_empty() && final_tokens >= MIN_CHUNK_TOKENS {
+            let total_lines = lines.len();
+            let start_line = current_start + 1;
+            let end_line_1 = (current_end + 1).min(total_lines);
+            let start_line_clamped = start_line.max(1).min(end_line_1);
+            chunks.push(FileChunk::new(
+                file_path.to_owned(),
+                buffer.clone(),
+                format!("{base_id} (forced part {part_num})"),
+                start_line_clamped,
+                end_line_1,
+            ));
+        }
+        part_num += 1;
+        current_start = current_end + 1;
+    }
+
+    chunks
 }
 
 /// Extract identifier from Rust item declaration

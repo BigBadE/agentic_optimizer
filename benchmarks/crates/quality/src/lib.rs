@@ -21,7 +21,9 @@ use merlin_core::{FileContext, Query};
 use merlin_languages::{Language, LanguageProvider, create_backend};
 use metrics::{AggregateMetrics, BenchmarkMetrics};
 use std::collections::HashMap;
-use std::path::Path;
+use std::fs::create_dir_all;
+use std::path::{Path, PathBuf};
+use std::process::Command;
 use std::sync::Arc;
 use test_case::TestCase;
 use tokio::sync::Mutex;
@@ -43,6 +45,14 @@ pub async fn run_benchmarks_async(test_cases_dir: &Path) -> Result<Vec<Benchmark
         {
             let test_case = TestCase::from_file(entry.path())
                 .with_context(|| format!("Failed to load test case: {}", entry.path().display()))?;
+
+            // Setup repository if needed
+            if let Some(repo_config) = &test_case.repository {
+                setup_repository(&test_case.project_root, repo_config).with_context(|| {
+                    format!("Failed to setup repository for test: {}", test_case.name)
+                })?;
+            }
+
             test_cases.push(test_case);
         }
     }
@@ -254,6 +264,106 @@ fn mock_search(_query: &str) -> Vec<String> {
         "crates/css/modules/core/src/lib.rs".to_owned(),
         "crates/css/orchestrator/src/lib.rs".to_owned(),
     ]
+}
+
+/// Setup repository by cloning if needed and checking out specific commit
+///
+/// # Errors
+/// Returns error if git commands fail
+fn setup_repository(project_root: &str, config: &test_case::RepositoryConfig) -> Result<()> {
+    let repo_path = PathBuf::from(project_root);
+
+    // Clone if repository doesn't exist
+    if !repo_path.exists() {
+        eprintln!("Cloning repository: {} -> {}", config.url, project_root);
+
+        // Create parent directory if needed
+        if let Some(parent) = repo_path.parent() {
+            create_dir_all(parent).with_context(|| {
+                format!("Failed to create parent directory: {}", parent.display())
+            })?;
+        }
+
+        let clone_output = Command::new("git")
+            .args(["clone", &config.url, project_root])
+            .output()
+            .context("Failed to execute git clone")?;
+
+        if !clone_output.status.success() {
+            let stderr = String::from_utf8_lossy(&clone_output.stderr);
+            anyhow::bail!("Git clone failed: {stderr}");
+        }
+    }
+
+    // Verify it's a git repository
+    if !repo_path.join(".git").exists() {
+        anyhow::bail!("Directory exists but is not a git repository: {project_root}");
+    }
+
+    // Stash any local changes
+    let stash_output = Command::new("git")
+        .current_dir(&repo_path)
+        .args(["stash", "push", "-u", "-m", "Quality benchmark auto-stash"])
+        .output()
+        .context("Failed to execute git stash")?;
+
+    if !stash_output.status.success() {
+        let stderr = String::from_utf8_lossy(&stash_output.stderr);
+        eprintln!("Warning: git stash failed (might be nothing to stash): {stderr}");
+    }
+
+    // Checkout the specific commit
+    eprintln!("Checking out commit: {} in {}", config.commit, project_root);
+    let checkout_output = Command::new("git")
+        .current_dir(&repo_path)
+        .args(["checkout", &config.commit])
+        .output()
+        .context("Failed to execute git checkout")?;
+
+    if !checkout_output.status.success() {
+        let stderr = String::from_utf8_lossy(&checkout_output.stderr);
+        anyhow::bail!("Git checkout failed: {stderr}");
+    }
+
+    Ok(())
+}
+
+/// Restore repository to previous state (pop stash if needed)
+///
+/// # Errors
+/// Returns error if git commands fail
+fn restore_repository(project_root: &str) -> Result<()> {
+    let repo_path = PathBuf::from(project_root);
+
+    if !repo_path.join(".git").exists() {
+        return Ok(()); // Not a git repo, nothing to restore
+    }
+
+    // Check if there's a stash
+    let stash_list_output = Command::new("git")
+        .current_dir(&repo_path)
+        .args(["stash", "list"])
+        .output()
+        .context("Failed to execute git stash list")?;
+
+    let stash_list = String::from_utf8_lossy(&stash_list_output.stdout);
+
+    // Only pop if there's a stash with our marker message
+    if stash_list.contains("Quality benchmark auto-stash") {
+        eprintln!("Restoring stashed changes in {project_root}");
+        let pop_output = Command::new("git")
+            .current_dir(&repo_path)
+            .args(["stash", "pop"])
+            .output()
+            .context("Failed to execute git stash pop")?;
+
+        if !pop_output.status.success() {
+            let stderr = String::from_utf8_lossy(&pop_output.stderr);
+            eprintln!("Warning: git stash pop failed: {stderr}");
+        }
+    }
+
+    Ok(())
 }
 
 /// Generate markdown report from benchmark results

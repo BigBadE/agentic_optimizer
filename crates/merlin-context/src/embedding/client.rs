@@ -194,18 +194,42 @@ impl EmbeddingClient {
             .ok_or_else(|| Error::Other("No embeddings returned".into()))
     }
 
-    /// Embed multiple texts in batch
+    /// Embed multiple texts in batch (sends all at once for better performance)
     ///
     /// # Errors
     /// Returns an error if any embedding generation fails
     pub async fn embed_batch(&self, texts: Vec<String>) -> Result<Vec<Embedding>> {
-        let mut embeddings = Vec::default();
+        use ollama_rs::generation::embeddings::request::GenerateEmbeddingsRequest;
 
-        for text in texts {
-            embeddings.push(self.embed(&text).await?);
+        if texts.is_empty() {
+            return Ok(Vec::default());
         }
 
-        Ok(embeddings)
+        // If single text, use regular embed
+        if texts.len() == 1 {
+            return Ok(vec![self.embed(&texts[0]).await?]);
+        }
+
+        // For multiple texts, send as batch
+        let request = GenerateEmbeddingsRequest::new(self.model.clone(), texts.into());
+
+        let response = self
+            .ollama
+            .generate_embeddings(request)
+            .await
+            .map_err(|error| {
+                let error_str = format!("{error:?}");
+                if error_str.contains("model") && error_str.contains("not found") {
+                    Error::Other(format!(
+                        "Embedding model '{}' not found. Run: ollama pull {}",
+                        self.model, self.model
+                    ))
+                } else {
+                    Error::Other(format!("Batch embedding generation failed: {error}"))
+                }
+            })?;
+
+        Ok(response.embeddings)
     }
 }
 

@@ -1,15 +1,19 @@
 //! Vector search manager with persistent caching.
 
+use futures::stream::{FuturesUnordered, StreamExt as _};
 use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
 use std::collections::{HashMap, HashSet};
+use std::env;
+use std::env::current_dir;
 use std::fs;
 use std::hash::{Hash as _, Hasher as _};
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 use std::time::{Duration, SystemTime};
+use tokio::task::spawn_blocking;
 use tracing::{info, warn};
 
 use crate::context_inclusion::MIN_SIMILARITY_SCORE;
@@ -21,6 +25,8 @@ use bincode::{Decode, Encode, decode_from_slice, encode_to_vec};
 use merlin_core::{Error, Result};
 
 type ChunkResult = (PathBuf, FileChunk, Vec<f32>, String, u64);
+type FileChunksData = (PathBuf, String, Vec<FileChunk>, u64);
+type FileChunkMap = HashMap<PathBuf, Vec<(usize, FileChunk, u64)>>;
 
 /// Helper struct to hold vector score data
 struct VectorScoreData {
@@ -117,7 +123,7 @@ impl VectorSearchManager {
 
     /// Create a new vector search manager
     pub fn new(project_root: PathBuf) -> Self {
-        let cache_path = project_root.join(".merlin").join("embeddings.bin");
+        let cache_path = Self::resolve_cache_path(&project_root);
 
         Self {
             store: VectorStore::default(),
@@ -128,6 +134,33 @@ impl VectorSearchManager {
             project_root,
             cache_path,
         }
+    }
+
+    /// Resolve cache path with environment override support
+    ///
+    /// Env variables (checked in order):
+    /// - `MERLIN_VECTOR_CACHE_FILE`: absolute file path to cache file
+    /// - `MERLIN_VECTOR_CACHE_ROOT`: directory under which a stable subdir is used: vector/<hash>/embeddings.bin
+    fn resolve_cache_path(project_root: &PathBuf) -> PathBuf {
+        if let Ok(file_override) = env::var("MERLIN_VECTOR_CACHE_FILE") {
+            let path = PathBuf::from(file_override);
+            info!("Using MERLIN_VECTOR_CACHE_FILE: {}", path.display());
+            return path;
+        }
+
+        if let Ok(root_override) = env::var("MERLIN_VECTOR_CACHE_ROOT") {
+            let mut hasher = DefaultHasher::new();
+            project_root.hash(&mut hasher);
+            let hash = hasher.finish();
+            let path = PathBuf::from(root_override)
+                .join("vector")
+                .join(format!("{hash:016x}"))
+                .join("embeddings.bin");
+            info!("Using MERLIN_VECTOR_CACHE_ROOT: {}", path.display());
+            return path;
+        }
+
+        project_root.join(".merlin").join("embeddings.bin")
     }
 
     /// Initialize vector store by loading from cache or generating embeddings
@@ -144,7 +177,10 @@ impl VectorSearchManager {
             return Err(model_error);
         }
 
-        spinner.set_message("Loading embedding cache...");
+        spinner.set_message(format!(
+            "Loading embedding cache (path: {})...",
+            self.cache_path.display()
+        ));
 
         // Try to load from cache first
         if let Ok(cache) = self.load_cache()
@@ -157,6 +193,29 @@ impl VectorSearchManager {
         self.initialize_from_scratch(&spinner).await?;
 
         Ok(())
+    }
+
+    /// Build a fallback cache path in the workspace target directory
+    ///
+    /// # Errors
+    /// Returns an error if cwd cannot be determined
+    fn fallback_cache_path(project_root: &PathBuf) -> Result<PathBuf> {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash as _, Hasher as _};
+
+        let mut hasher = DefaultHasher::new();
+        project_root.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        let cwd_path =
+            current_dir().map_err(|error_var| Error::Other(format!("cwd error: {error_var}")))?;
+        let path = cwd_path
+            .join("target")
+            .join(".agentic-cache")
+            .join("vector")
+            .join(format!("{hash:016x}"))
+            .join("embeddings.bin");
+        Ok(path)
     }
 
     /// Create a configured progress spinner
@@ -949,60 +1008,6 @@ impl VectorSearchManager {
         files
     }
 
-    /// Embed a single file and return chunks with embeddings
-    async fn embed_single_file(
-        relative_path: PathBuf,
-        absolute_path: PathBuf,
-        client: &EmbeddingClient,
-    ) -> Vec<ChunkResult> {
-        let content = match fs::read_to_string(&absolute_path) {
-            Ok(content) => content,
-            Err(error) => {
-                warn!(
-                    "Warning: Failed to read {}: {error}",
-                    relative_path.display()
-                );
-                return Vec::default();
-            }
-        };
-
-        // Skip empty files
-        if content.trim().is_empty() {
-            return Vec::default();
-        }
-
-        // Compute content hash once for the entire file
-        let content_hash = Self::compute_file_hash(&content);
-
-        // Chunk the file
-        let chunks = chunk_file(&relative_path, &content);
-        let mut chunk_results: Vec<ChunkResult> = Vec::default();
-
-        for chunk in chunks {
-            let preview = generate_preview(&chunk.content, 200);
-
-            match client.embed(&chunk.content).await {
-                Ok(embedding) => {
-                    chunk_results.push((
-                        relative_path.clone(),
-                        chunk,
-                        embedding,
-                        preview,
-                        content_hash,
-                    ));
-                }
-                Err(error) => {
-                    warn!(
-                        "Warning: Failed to embed chunk in {}: {error}",
-                        relative_path.display()
-                    );
-                }
-            }
-        }
-
-        chunk_results
-    }
-
     /// Process embedding results for a single file
     fn process_chunk_results(&mut self, chunk_results: Vec<ChunkResult>) -> usize {
         if chunk_results.is_empty() {
@@ -1038,94 +1043,210 @@ impl VectorSearchManager {
         chunk_count
     }
 
-    /// Embed a batch of files (chunked)
+    /// Embed a batch of files (chunked) - optimized version
     ///
     /// # Errors
     /// Returns an error if any embedding task fails
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Complex pipeline with multiple phases"
+    )]
     async fn embed_files(&mut self, files: Vec<PathBuf>, spinner: &ProgressBar) -> Result<()> {
-        // Process files in small batches to balance speed and resource usage
-        // Small batches (2-3 files) prevent Ollama from being overwhelmed while
-        // still providing some parallelism
-        const BATCH_SIZE: usize = 3;
+        const CHUNK_BATCH_SIZE: usize = 50;
+        const CHECKPOINT_INTERVAL_CHUNKS: usize = 500;
 
         let total_files = files.len();
-        let mut processed_files = 0;
-        let mut total_chunks = 0;
+        let mut processed_files = 0; // for info only
+        let mut processed_chunks: usize = 0;
 
-        // Create shared client for all files
+        info!(
+            "Starting optimized embedding pipeline for {} files",
+            total_files
+        );
+
+        // Phase 1: Parallel file reading and chunking (CPU-bound)
+        spinner.set_message("Reading and chunking files...");
+        let file_chunks_data = Self::parallel_read_and_chunk(files, &self.project_root).await;
+
+        info!("Chunked {} files into chunks", file_chunks_data.len());
+
+        // Phase 2: Cross-file chunk batching and embedding (I/O-bound)
         let client = EmbeddingClient::default();
+        let mut all_chunk_results = Vec::new();
+        let mut chunk_queue = Vec::new();
+        let mut file_chunk_map: FileChunkMap = HashMap::new();
 
-        for file_batch in files.chunks(BATCH_SIZE) {
-            // Process batch - up to 3 files concurrently
-            let batch_results = match file_batch.len() {
-                3 => {
-                    let (result1, result2, result3) = tokio::join!(
-                        Self::embed_single_file(
-                            file_batch[0].clone(),
-                            self.project_root.join(&file_batch[0]),
-                            &client
-                        ),
-                        Self::embed_single_file(
-                            file_batch[1].clone(),
-                            self.project_root.join(&file_batch[1]),
-                            &client
-                        ),
-                        Self::embed_single_file(
-                            file_batch[2].clone(),
-                            self.project_root.join(&file_batch[2]),
-                            &client
-                        ),
-                    );
-                    vec![result1, result2, result3]
+        // Collect all chunks with their file association
+        for (relative_path, _content, chunks, content_hash) in file_chunks_data {
+            for (idx, chunk) in chunks.into_iter().enumerate() {
+                file_chunk_map
+                    .entry(relative_path.clone())
+                    .or_default()
+                    .push((idx, chunk.clone(), content_hash));
+                chunk_queue.push((relative_path.clone(), chunk, content_hash));
+            }
+        }
+
+        let total_chunks = chunk_queue.len();
+        info!("Total chunks to embed: {}", total_chunks);
+
+        // Embed chunks in mega-batches
+        let mut embedded_count = 0;
+        for batch_start in (0..chunk_queue.len()).step_by(CHUNK_BATCH_SIZE) {
+            let batch_end = (batch_start + CHUNK_BATCH_SIZE).min(chunk_queue.len());
+            let batch = &chunk_queue[batch_start..batch_end];
+
+            let chunk_texts: Vec<String> = batch
+                .iter()
+                .map(|(_, chunk, _)| chunk.content.clone())
+                .collect();
+
+            spinner.set_message(format!(
+                "Embedding chunks (requesting)... {}/{} ({:.1}%)",
+                embedded_count,
+                total_chunks,
+                (embedded_count as f32 / total_chunks as f32) * 100.0
+            ));
+
+            let embeddings = match client.embed_batch(chunk_texts).await {
+                Ok(embs) => embs,
+                Err(error) => {
+                    warn!("Failed to embed batch: {error}");
+                    continue;
                 }
-                2 => {
-                    let (result1, result2) = tokio::join!(
-                        Self::embed_single_file(
-                            file_batch[0].clone(),
-                            self.project_root.join(&file_batch[0]),
-                            &client
-                        ),
-                        Self::embed_single_file(
-                            file_batch[1].clone(),
-                            self.project_root.join(&file_batch[1]),
-                            &client
-                        ),
-                    );
-                    vec![result1, result2]
-                }
-                1 => {
-                    vec![
-                        Self::embed_single_file(
-                            file_batch[0].clone(),
-                            self.project_root.join(&file_batch[0]),
-                            &client,
-                        )
-                        .await,
-                    ]
-                }
-                _ => Vec::new(),
             };
 
-            // Process all results from batch
-            for chunk_results in batch_results {
-                if !chunk_results.is_empty() {
-                    let chunk_count = self.process_chunk_results(chunk_results);
-                    total_chunks += chunk_count;
-                }
-                processed_files += 1;
+            // Store results
+            for ((relative_path, chunk, content_hash), embedding) in
+                batch.iter().zip(embeddings.into_iter())
+            {
+                let preview = generate_preview(&chunk.content, 200);
+                all_chunk_results.push((
+                    relative_path.clone(),
+                    chunk.clone(),
+                    embedding,
+                    preview,
+                    *content_hash,
+                ));
             }
 
-            // Update progress after each batch
+            embedded_count += batch.len();
+        }
+
+        info!(
+            "Successfully embedded {} chunks (received from model)",
+            all_chunk_results.len()
+        );
+
+        // Phase 3: Process results and update indices
+        spinner.set_message("Building search indices and writing cache...");
+        let mut next_checkpoint = CHECKPOINT_INTERVAL_CHUNKS;
+        for chunk_result in all_chunk_results {
+            let chunk_count = self.process_chunk_results(vec![chunk_result]);
+            processed_chunks += chunk_count;
+            processed_files = file_chunk_map.len();
+
+            // Progressive cache saving by chunks without modulo
+            if processed_chunks >= next_checkpoint {
+                spinner.set_message(format!(
+                    "Checkpointing cache ({processed_chunks} / {total_chunks} chunks)..."
+                ));
+                if let Err(error) = self.save_cache() {
+                    warn!("Failed to save checkpoint: {error}");
+                } else {
+                    info!("Checkpoint saved at {processed_chunks} chunks");
+                }
+                next_checkpoint = processed_chunks.saturating_add(CHECKPOINT_INTERVAL_CHUNKS);
+            }
+
+            // Update progress display for processed chunks
             spinner.set_message(format!(
-                "Embedding files... {processed_files}/{total_files} ({total_chunks} chunks)"
+                "Embedding chunks... {processed_chunks}/{total_chunks} ({:.1}%)",
+                (processed_chunks as f32 / total_chunks as f32) * 100.0
             ));
         }
 
         // Finalize BM25 index (compute IDF scores)
         self.bm25.finalize();
-        info!("  BM25 index finalized with {} documents", self.bm25.len());
+        info!("BM25 index finalized with {} documents", self.bm25.len());
+
+        // Ensure final cache save at the end of embedding
+        if let Err(error) = self.save_cache() {
+            warn!("Failed to save final cache: {error}");
+        }
+
+        spinner.set_message(format!(
+            "Completed: {processed_files} files, {processed_chunks} chunks"
+        ));
 
         Ok(())
+    }
+
+    /// Parallel file reading and chunking using blocking tasks
+    async fn parallel_read_and_chunk(
+        files: Vec<PathBuf>,
+        project_root: &Path,
+    ) -> Vec<FileChunksData> {
+        const MAX_CONCURRENT_READS: usize = 20;
+
+        let mut tasks = FuturesUnordered::new();
+        let mut results = Vec::new();
+        let mut file_iter = files.into_iter();
+
+        // Start initial batch
+        for _ in 0..MAX_CONCURRENT_READS {
+            if let Some(relative_path) = file_iter.next() {
+                let absolute_path = project_root.join(&relative_path);
+                let relative_clone = relative_path.clone();
+
+                tasks.push(spawn_blocking(move || {
+                    Self::read_and_chunk_file(relative_clone, &absolute_path)
+                }));
+            }
+        }
+
+        // Process results and spawn new tasks
+        while let Some(result) = tasks.next().await {
+            if let Ok(Some(file_data)) = result {
+                results.push(file_data);
+            }
+
+            // Spawn next task to maintain concurrency
+            if let Some(relative_path) = file_iter.next() {
+                let absolute_path = project_root.join(&relative_path);
+                let relative_clone = relative_path.clone();
+
+                tasks.push(spawn_blocking(move || {
+                    Self::read_and_chunk_file(relative_clone, &absolute_path)
+                }));
+            }
+        }
+
+        results
+    }
+
+    /// Read and chunk a single file (CPU-bound, runs in blocking task)
+    fn read_and_chunk_file(relative_path: PathBuf, absolute_path: &Path) -> Option<FileChunksData> {
+        let content = match fs::read_to_string(absolute_path) {
+            Ok(content) => content,
+            Err(error) => {
+                warn!("Failed to read {}: {error}", relative_path.display());
+                return None;
+            }
+        };
+
+        if content.trim().is_empty() {
+            return None;
+        }
+
+        let content_hash = Self::compute_file_hash(&content);
+        let chunks = chunk_file(&relative_path, &content);
+
+        if chunks.is_empty() {
+            return None;
+        }
+
+        Some((relative_path, content, chunks, content_hash))
     }
 
     /// Validate cache entries and return (valid, invalid)
@@ -1186,34 +1307,67 @@ impl VectorSearchManager {
     ///
     /// # Errors
     /// Returns an error if the cache directory cannot be created or serialization fails
-    fn save_cache(&self) -> Result<()> {
-        // Create cache directory if needed
-        if let Some(parent) = self.cache_path.parent() {
-            fs::create_dir_all(parent).map_err(|error| {
-                Error::Other(format!("Failed to create cache directory: {error}"))
-            })?;
+    fn save_cache(&mut self) -> Result<()> {
+        self.ensure_cache_dir()?;
+        let embeddings = self.prepare_embeddings();
+        let cache = VectorCache {
+            version: VectorCache::VERSION,
+            embeddings,
+        };
+        info!(
+            "  Saving cache with {} embeddings to {}",
+            cache.embeddings.len(),
+            self.cache_path.display()
+        );
+        let bytes = encode_to_vec(&cache, bincode_config())
+            .map_err(|error| Error::Other(format!("Failed to serialize cache: {error}")))?;
+        self.write_cache_bytes(&bytes)?;
+        info!("  ✓ Cache saved successfully ({} bytes)", bytes.len());
+        Ok(())
+    }
+
+    /// Ensure the cache directory exists; falls back to a workspace cache path if creation fails
+    ///
+    /// # Errors
+    /// Returns an error if both primary and fallback cache directory creation fail
+    fn ensure_cache_dir(&mut self) -> Result<()> {
+        if let Some(parent) = self.cache_path.parent()
+            && fs::create_dir_all(parent).is_err()
+        {
+            let fallback = Self::fallback_cache_path(&self.project_root)?;
+            if let Some(fallback_parent) = fallback.parent() {
+                fs::create_dir_all(fallback_parent).map_err(|error| {
+                    Error::Other(format!(
+                        "Failed to create fallback cache directory: {error}"
+                    ))
+                })?;
+            }
+            info!(
+                "Falling back to cache path: {} (was: {})",
+                fallback.display(),
+                self.cache_path.display()
+            );
+            self.cache_path = fallback;
         }
+        Ok(())
+    }
 
-        let mut embeddings = Vec::default();
-
+    fn prepare_embeddings(&self) -> Vec<CachedEmbedding> {
+        let mut result = Vec::with_capacity(self.store.len());
         for entry in self.store.iter() {
             let chunk_path_str = entry.path.to_str().unwrap_or("");
-
             let Some((path_str, range)) = chunk_path_str.rsplit_once(':') else {
                 continue;
             };
-
             let Some((start_str, end_str)) = range.split_once('-') else {
                 continue;
             };
-
             let Ok(start_line) = start_str.parse::<usize>() else {
                 continue;
             };
             let Ok(end_line) = end_str.parse::<usize>() else {
                 continue;
             };
-
             let path = PathBuf::from(path_str);
             let modified = self
                 .file_times
@@ -1221,8 +1375,7 @@ impl VectorSearchManager {
                 .copied()
                 .unwrap_or(SystemTime::UNIX_EPOCH);
             let content_hash = self.file_hashes.get(&path).copied().unwrap_or(0);
-
-            embeddings.push(CachedEmbedding {
+            result.push(CachedEmbedding {
                 path,
                 chunk_id: format!("{start_line}-{end_line}"),
                 start_line,
@@ -1233,25 +1386,29 @@ impl VectorSearchManager {
                 content_hash,
             });
         }
+        result
+    }
 
-        let cache = VectorCache {
-            version: VectorCache::VERSION,
-            embeddings,
-        };
-
-        info!(
-            "  Saving cache with {} embeddings to {}",
-            cache.embeddings.len(),
-            self.cache_path.display()
-        );
-
-        let data = encode_to_vec(&cache, bincode_config())
-            .map_err(|error| Error::Other(format!("Failed to serialize cache: {error}")))?;
-        let data_len = data.len();
-        fs::write(&self.cache_path, data)
-            .map_err(|error| Error::Other(format!("Failed to write cache: {error}")))?;
-
-        info!("  ✓ Cache saved successfully ({} bytes)", data_len);
+    /// Write cache bytes to current `cache_path`, falling back if needed
+    ///
+    /// # Errors
+    /// Returns an error if both primary and fallback writes fail
+    fn write_cache_bytes(&mut self, data: &[u8]) -> Result<()> {
+        if fs::write(&self.cache_path, data).is_err() {
+            let fallback = Self::fallback_cache_path(&self.project_root)?;
+            if let Some(parent) = fallback.parent() {
+                fs::create_dir_all(parent).map_err(|error| {
+                    Error::Other(format!(
+                        "Failed to create fallback cache directory: {error}"
+                    ))
+                })?;
+            }
+            info!("Retrying cache write to fallback: {}", fallback.display());
+            fs::write(&fallback, data).map_err(|error| {
+                Error::Other(format!("Failed to write fallback cache: {error}"))
+            })?;
+            self.cache_path = fallback;
+        }
         Ok(())
     }
 
@@ -1263,5 +1420,17 @@ impl VectorSearchManager {
     /// Check if the store is empty
     pub fn is_empty(&self) -> bool {
         self.store.is_empty()
+    }
+}
+
+impl Drop for VectorSearchManager {
+    fn drop(&mut self) {
+        if !self.store.is_empty() {
+            if let Err(error) = self.save_cache() {
+                warn!("Failed to save cache on drop: {error}");
+            } else {
+                info!("Cache saved on drop");
+            }
+        }
     }
 }

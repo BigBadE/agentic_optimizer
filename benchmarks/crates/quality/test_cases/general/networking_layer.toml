@@ -2,7 +2,11 @@
 name = "Networking Layer"
 description = "Query about network requests and protocols"
 query = "how are network requests handled"
-project_root = "benchmarks/test_repositories/valor"
+project_root = "benchmarks/crates/quality/test_repositories/valor"
+
+[repository]
+url = "https://github.com/BigBadE/Valor.git"
+commit = "367ecde76cfe1a587256f9c6f318a56afee5ac17"
 
 # Expected relevant files
 [[expected]]

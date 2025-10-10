@@ -2,7 +2,11 @@
 name = "DOM Mutation Performance"
 description = "Optimize DOM mutation operations"
 query = "optimize performance of frequent DOM appendChild calls"
-project_root = "benchmarks/test_repositories/valor"
+project_root = "benchmarks/crates/quality/test_repositories/valor"
+
+[repository]
+url = "https://github.com/BigBadE/Valor.git"
+commit = "367ecde76cfe1a587256f9c6f318a56afee5ac17"
 
 # Expected relevant files
 [[expected]]

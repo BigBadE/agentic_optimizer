@@ -2,7 +2,11 @@
 name = "Block Formatting Context"
 description = "Query about block formatting context"
 query = "how does block formatting context work"
-project_root = "benchmarks/test_repositories/valor"
+project_root = "benchmarks/crates/quality/test_repositories/valor"
+
+[repository]
+url = "https://github.com/BigBadE/Valor.git"
+commit = "367ecde76cfe1a587256f9c6f318a56afee5ac17"
 
 [[expected]]
 path = "crates/css/modules/core/src/9_visual_formatting/part_9_4_1_block_formatting_context.rs"

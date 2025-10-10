@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master ]
     paths:
-      - 'quality-results.md'
+      - 'benchmarks/data/quality-results.md'
   workflow_dispatch:
 
 concurrency:
@@ -18,7 +18,6 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
-  CARGO_INCREMENTAL: 0
 
 jobs:
   quality-benchmark:
@@ -34,22 +33,22 @@ jobs:
       - name: Check for quality results
         id: check_results
         run: |
-          if [ ! -f quality-results.md ]; then
+          if [ ! -f benchmarks/data/quality-results.md ]; then
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No quality-results.md found. Run benchmarks locally first:"
-            echo "  cargo run --release --bin quality-bench -- --output quality-results.md"
+            echo "⚠️ No benchmarks/data/quality-results.md found. Run benchmarks locally first:"
+            echo "  bash scripts/benchmark.sh"
             exit 1
           else
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "✅ Found quality-results.md"
-            head -20 quality-results.md
+            echo "✅ Found benchmarks/data/quality-results.md"
+            head -20 benchmarks/data/quality-results.md
           fi
 
       - name: Upload results artifact
         uses: actions/upload-artifact@v4
         with:
           name: quality-benchmark-results
-          path: quality-results.md
+          path: benchmarks/data/quality-results.md
           retention-days: 90
 
       - name: Prepare gh-pages workspace
@@ -67,13 +66,14 @@ jobs:
           python-version: '3.11'
 
       - name: Parse benchmark results to JSON
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
           python3 scripts/parse-benchmarks.py \
-            --quality-results quality-results.md \
+            --quality-results benchmarks/data/quality-results.md \
             --output-dir benchmark-data
 
       - name: Upload parsed JSON
-        if: always()
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/upload-artifact@v4
         with:
           name: quality-json-results
@@ -117,5 +117,5 @@ jobs:
           git pull --rebase origin gh-pages || true
           git push origin gh-pages
 
-      # Don't remove quality-results.md - keep it for manual review and re-runs
+      # Don't remove benchmarks/data/quality-results.md - keep it for manual review and re-runs
 

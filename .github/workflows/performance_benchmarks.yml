@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master ]
     paths:
-      - 'benchmark-data/criterion/latest.json'
+      - 'benchmarks/data/criterion/latest.json'
   workflow_dispatch:
 
 concurrency:
@@ -18,10 +18,11 @@ permissions:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0
 
 jobs:
   performance-benchmark:
-    name: Publish Performance Benchmarks
+    name: Run Performance Benchmarks
     runs-on: ubuntu-latest
 
     steps:
@@ -30,33 +31,26 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for benchmark JSON
+      - name: Check for criterion results
         id: check_results
         run: |
-          if [ ! -f benchmark-data/criterion/latest.json ]; then
+          if [ ! -f benchmarks/data/criterion/latest.json ]; then
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "❌ No benchmark JSON found at benchmark-data/criterion/latest.json"
-            echo ""
-            echo "To generate benchmark results locally:"
-            echo "  1. cargo bench -p merlin-benchmarks-criterion"
-            echo "  2. python3 scripts/parse-benchmarks.py --criterion-dir target/criterion --output-dir benchmark-data"
-            echo "  3. git add benchmark-data/criterion/latest.json"
-            echo "  4. git commit -m 'Update performance benchmarks'"
+            echo "⚠️ No benchmarks/data/criterion/latest.json found. Run benchmarks locally first:"
+            echo "  bash scripts/benchmark.sh"
             exit 1
           else
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "✅ Found benchmark JSON"
-            cat benchmark-data/criterion/latest.json | head -30
+            echo "✅ Found benchmarks/data/criterion/latest.json"
+            head -20 benchmarks/data/criterion/latest.json
           fi
 
       - name: Upload results artifact
-        if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: performance-benchmark-results
-          path: benchmark-data/criterion/latest.json
+          name: criterion-benchmark-results
+          path: benchmarks/data/criterion/latest.json
           retention-days: 90
-          if-no-files-found: warn
 
       - name: Prepare gh-pages workspace
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -67,7 +61,7 @@ jobs:
           fetch-depth: 0
 
       - name: Publish performance results to gh-pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmark-data/criterion/latest.json') != ''
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmarks/data/criterion/latest.json') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
@@ -78,11 +72,11 @@ jobs:
           # Create directories
           mkdir -p data/criterion
 
-          # Copy pre-generated JSON data
-          if [ -f ../benchmark-data/criterion/latest.json ]; then
-            cp ../benchmark-data/criterion/latest.json data/criterion/
+          # Copy pre-generated JSON data from committed file
+          if [ -f ../benchmarks/data/criterion/latest.json ]; then
+            cp ../benchmarks/data/criterion/latest.json data/criterion/
             # Also save timestamped version for history
-            cp ../benchmark-data/criterion/latest.json "data/criterion/${ts}.json"
+            cp ../benchmarks/data/criterion/latest.json "data/criterion/${ts}.json"
           fi
 
           # Generate dashboard if it doesn't exist
@@ -101,3 +95,5 @@ jobs:
           git commit -m "Update performance benchmark results: ${ts}" || echo "No changes to commit"
           git pull --rebase origin gh-pages || true
           git push origin gh-pages
+
+      # Don't remove benchmarks/data/criterion/latest.json - keep it for history and re-runs

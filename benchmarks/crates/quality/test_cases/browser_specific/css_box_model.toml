@@ -2,7 +2,11 @@
 name = "Box Model Bug Fix"
 description = "Query about margin collapse calculation"
 query = "where is margin collapse calculated for adjacent elements"
-project_root = "benchmarks/test_repositories/valor"
+project_root = "benchmarks/crates/quality/test_repositories/valor"
+
+[repository]
+url = "https://github.com/BigBadE/Valor.git"
+commit = "367ecde76cfe1a587256f9c6f318a56afee5ac17"
 
 [[expected]]
 path = "crates/css/modules/core/src/8_box_model/part_8_3_1_collapsing_margins.rs"

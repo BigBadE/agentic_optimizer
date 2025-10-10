@@ -2,7 +2,11 @@
 name = "Web Font Loading"
 description = "Query about implementing web font loading"
 query = "add support for @font-face and web font loading"
-project_root = "benchmarks/test_repositories/valor"
+project_root = "benchmarks/crates/quality/test_repositories/valor"
+
+[repository]
+url = "https://github.com/BigBadE/Valor.git"
+commit = "367ecde76cfe1a587256f9c6f318a56afee5ac17"
 
 [[expected]]
 path = "crates/css/modules/fonts/src/lib.rs"

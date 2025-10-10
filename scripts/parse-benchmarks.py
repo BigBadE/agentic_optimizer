@@ -109,6 +109,11 @@ def parse_criterion_results(criterion_dir: Path) -> Dict[str, Any]:
 
     return results
 
+def strip_ansi_codes(text: str) -> str:
+    """Remove ANSI color codes from text."""
+    ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
+    return ansi_escape.sub('', text)
+
 def parse_gungraun_output(output_file: Path) -> Dict[str, Any]:
     """Parse Gungraun benchmark output."""
     results = {
@@ -132,6 +137,9 @@ def parse_gungraun_output(output_file: Path) -> Dict[str, Any]:
     try:
         with open(output_file) as file:
             content = file.read()
+
+        # Strip ANSI color codes before parsing
+        content = strip_ansi_codes(content)
 
         # Parse gungraun/iai-callgrind format benchmark results
         # Format example:
@@ -275,49 +283,9 @@ def parse_quality_benchmarks(results_file: Path) -> Dict[str, Any]:
 
     return results
 
-def merge_with_history(current: Dict[str, Any], history_file: Path, max_history: int = 30) -> Dict[str, Any]:
-    """Merge current results with historical data."""
-    history = []
-    
-    # Load existing history
-    if history_file.exists():
-        try:
-            with open(history_file) as f:
-                data = json.load(f)
-                history = data.get("history", [])
-        except Exception as e:
-            print(f"Warning: Could not load history from {history_file}: {e}", file=sys.stderr)
-    
-    # Add current metrics to history
-    if current.get("metrics"):
-        history_entry = {
-            "timestamp": current["timestamp"],
-            **current["metrics"]
-        }
-        history.append(history_entry)
-    
-    # Keep only last N entries
-    history = history[-max_history:]
-    
-    # Calculate changes from previous run
-    if len(history) >= 2:
-        prev = history[-2]
-        curr = history[-1]
-        
-        for key in curr.keys():
-            if key != "timestamp" and isinstance(curr[key], (int, float)):
-                prev_val = prev.get(key, 0)
-                if prev_val > 0:
-                    change = ((curr[key] - prev_val) / prev_val) * 100
-                    current["metrics"][f"{key}_change"] = round(change, 2)
-                    current["metrics"][f"prev_{key}"] = prev_val
-    
-    current["history"] = history
-    return current
-
 def main():
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Parse benchmark results and generate JSON")
     parser.add_argument("--criterion-dir", type=Path, default=Path("target/criterion"),
                        help="Path to Criterion output directory")
@@ -327,59 +295,32 @@ def main():
                        help="Path to quality benchmark results")
     parser.add_argument("--output-dir", type=Path, default=Path("gh-pages/data"),
                        help="Output directory for JSON files")
-    parser.add_argument("--history-dir", type=Path, default=Path(".benchmark-history"),
-                       help="Directory for historical data")
-    
+
     args = parser.parse_args()
-    
-    # Create output directories
+
+    # Create output directory
     args.output_dir.mkdir(parents=True, exist_ok=True)
-    args.history_dir.mkdir(parents=True, exist_ok=True)
     
     # Parse Criterion results
     criterion_results = parse_criterion_results(args.criterion_dir)
-    criterion_with_history = merge_with_history(
-        criterion_results,
-        args.history_dir / "perf-history.json"
-    )
 
     output_file = args.output_dir / "perf-latest.json"
     with open(output_file, 'w') as f:
-        json.dump(criterion_with_history, f, indent=2)
-
-    # Save history
-    with open(args.history_dir / "perf-history.json", 'w') as f:
-        json.dump(criterion_with_history, f, indent=2)
+        json.dump(criterion_results, f, indent=2)
 
     # Parse Gungraun results
     gungraun_results = parse_gungraun_output(args.gungraun_output)
-    gungraun_with_history = merge_with_history(
-        gungraun_results,
-        args.history_dir / "gungraun-history.json"
-    )
 
     output_file = args.output_dir / "gungraun-latest.json"
     with open(output_file, 'w') as f:
-        json.dump(gungraun_with_history, f, indent=2)
-
-    # Save history
-    with open(args.history_dir / "gungraun-history.json", 'w') as f:
-        json.dump(gungraun_with_history, f, indent=2)
+        json.dump(gungraun_results, f, indent=2)
 
     # Parse quality benchmarks
     quality_results = parse_quality_benchmarks(args.quality_results)
-    quality_with_history = merge_with_history(
-        quality_results,
-        args.history_dir / "quality-history.json"
-    )
 
     output_file = args.output_dir / "quality-latest.json"
     with open(output_file, 'w') as f:
-        json.dump(quality_with_history, f, indent=2)
-
-    # Save history
-    with open(args.history_dir / "quality-history.json", 'w') as f:
-        json.dump(quality_with_history, f, indent=2)
+        json.dump(quality_results, f, indent=2)
 
 if __name__ == "__main__":
     main()

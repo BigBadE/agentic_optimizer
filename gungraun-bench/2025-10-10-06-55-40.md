@@ -1,3 +1,0 @@
-# Gungraun Benchmark Results
-
-No benchmarks found in output.

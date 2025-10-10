@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master ]
     paths:
-      - 'benchmark-data/perf-latest.json'
+      - 'benchmark-data/criterion/latest.json'
   workflow_dispatch:
 
 concurrency:
@@ -33,20 +33,20 @@ jobs:
       - name: Check for benchmark JSON
         id: check_results
         run: |
-          if [ ! -f benchmark-data/perf-latest.json ]; then
+          if [ ! -f benchmark-data/criterion/latest.json ]; then
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "❌ No benchmark JSON found at benchmark-data/perf-latest.json"
+            echo "❌ No benchmark JSON found at benchmark-data/criterion/latest.json"
             echo ""
             echo "To generate benchmark results locally:"
-            echo "  1. cargo bench --workspace"
+            echo "  1. cargo bench -p merlin-benchmarks-criterion"
             echo "  2. python3 scripts/parse-benchmarks.py --criterion-dir target/criterion --output-dir benchmark-data"
-            echo "  3. git add benchmark-data/perf-latest.json"
+            echo "  3. git add benchmark-data/criterion/latest.json"
             echo "  4. git commit -m 'Update performance benchmarks'"
             exit 1
           else
             echo "exists=true" >> $GITHUB_OUTPUT
             echo "✅ Found benchmark JSON"
-            cat benchmark-data/perf-latest.json | head -30
+            cat benchmark-data/criterion/latest.json | head -30
           fi
 
       - name: Upload results artifact
@@ -54,7 +54,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: performance-benchmark-results
-          path: benchmark-data/perf-latest.json
+          path: benchmark-data/criterion/latest.json
           retention-days: 90
           if-no-files-found: warn
 
@@ -67,7 +67,7 @@ jobs:
           fetch-depth: 0
 
       - name: Publish performance results to gh-pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmark-data/perf-latest.json') != ''
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmark-data/criterion/latest.json') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
@@ -76,13 +76,13 @@ jobs:
           cd gh-pages
 
           # Create directories
-          mkdir -p data
+          mkdir -p data/criterion
 
           # Copy pre-generated JSON data
-          if [ -f ../benchmark-data/perf-latest.json ]; then
-            cp ../benchmark-data/perf-latest.json data/
+          if [ -f ../benchmark-data/criterion/latest.json ]; then
+            cp ../benchmark-data/criterion/latest.json data/criterion/
             # Also save timestamped version for history
-            cp ../benchmark-data/perf-latest.json "data/perf-${ts}.json"
+            cp ../benchmark-data/criterion/latest.json "data/criterion/${ts}.json"
           fi
 
           # Generate dashboard if it doesn't exist

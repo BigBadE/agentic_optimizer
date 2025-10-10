@@ -293,32 +293,38 @@ def main():
                        help="Path to Gungraun output file")
     parser.add_argument("--quality-results", type=Path, default=Path("quality-results.md"),
                        help="Path to quality benchmark results")
-    parser.add_argument("--output-dir", type=Path, default=Path("gh-pages/data"),
+    parser.add_argument("--output-dir", type=Path, default=Path("benchmark-data"),
                        help="Output directory for JSON files")
 
     args = parser.parse_args()
 
-    # Create output directory
-    args.output_dir.mkdir(parents=True, exist_ok=True)
-    
+    # Create output directories
+    criterion_dir = args.output_dir / "criterion"
+    gungraun_dir = args.output_dir / "gungraun"
+    quality_dir = args.output_dir / "quality"
+
+    criterion_dir.mkdir(parents=True, exist_ok=True)
+    gungraun_dir.mkdir(parents=True, exist_ok=True)
+    quality_dir.mkdir(parents=True, exist_ok=True)
+
     # Parse Criterion results
     criterion_results = parse_criterion_results(args.criterion_dir)
 
-    output_file = args.output_dir / "perf-latest.json"
+    output_file = criterion_dir / "latest.json"
     with open(output_file, 'w') as f:
         json.dump(criterion_results, f, indent=2)
 
     # Parse Gungraun results
     gungraun_results = parse_gungraun_output(args.gungraun_output)
 
-    output_file = args.output_dir / "gungraun-latest.json"
+    output_file = gungraun_dir / "latest.json"
     with open(output_file, 'w') as f:
         json.dump(gungraun_results, f, indent=2)
 
     # Parse quality benchmarks
     quality_results = parse_quality_benchmarks(args.quality_results)
 
-    output_file = args.output_dir / "quality-latest.json"
+    output_file = quality_dir / "latest.json"
     with open(output_file, 'w') as f:
         json.dump(quality_results, f, indent=2)
 

@@ -1,44 +1,44 @@
 # Performance Benchmark Results
 
-**Date**: 2025-10-10 02:33:41
+**Date**: 2025-10-10 11:36:17
 
 ## Summary
 
 **Total Benchmarks**: 27
 
-**Average Time**: 0.462 ms
+**Average Time**: 0.549 ms
 
 ## Benchmark Results
 
 | Benchmark | Mean | Median | Std Dev |
 |-----------|------|--------|--------|
-| `complexity_analysis/complex` | 39.6 ns | 39.6 ns | 0.3 ns |
-| `complexity_analysis/medium` | 48.3 ns | 48.3 ns | 0.1 ns |
-| `complexity_analysis/simple` | 19.0 ns | 19.0 ns | 0.1 ns |
-| `concurrent_requests/1_concurrent` | 736.180 μs | 734.571 μs | 5.304 μs |
-| `concurrent_requests/2_concurrent` | 733.177 μs | 732.848 μs | 2.362 μs |
-| `concurrent_requests/4_concurrent` | 732.948 μs | 731.999 μs | 3.649 μs |
-| `concurrent_requests/8_concurrent` | 736.250 μs | 733.434 μs | 6.114 μs |
-| `config_overhead/default_config` | 147.2 ns | 147.2 ns | 0.1 ns |
-| `config_overhead/orchestrator_with_config` | 836.8 ns | 836.7 ns | 1.1 ns |
-| `end_to_end_request/code_modification` | 734.488 μs | 734.022 μs | 3.713 μs |
-| `end_to_end_request/complex_refactor` | 735.401 μs | 735.122 μs | 4.019 μs |
-| `end_to_end_request/simple_query` | 719.446 μs | 714.367 μs | 10.573 μs |
-| `memory_usage/multiple_requests` | 738.439 μs | 737.951 μs | 3.582 μs |
-| `memory_usage/orchestrator_creation` | 800.4 ns | 800.7 ns | 1.4 ns |
-| `request_analysis/complex` | 730.725 μs | 729.727 μs | 6.591 μs |
-| `request_analysis/medium` | 736.941 μs | 734.363 μs | 9.713 μs |
-| `request_analysis/simple` | 721.667 μs | 717.858 μs | 18.146 μs |
-| `request_throughput/100_requests` | 744.418 μs | 740.434 μs | 9.419 μs |
-| `request_throughput/10_requests` | 735.675 μs | 734.827 μs | 6.409 μs |
-| `request_throughput/50_requests` | 733.513 μs | 733.161 μs | 3.690 μs |
-| `task_decomposition/add error handling` | 736.250 μs | 730.672 μs | 13.819 μs |
-| `task_decomposition/create a new rest api endpoint with validation` | 728.911 μs | 728.593 μs | 4.870 μs |
-| `task_decomposition/implement a comprehensive test suite for the authentication modu` | 730.097 μs | 728.167 μs | 6.736 μs |
-| `task_graph/10_tasks` | 1.278 μs | 1.274 μs | 14.4 ns |
-| `task_graph/20_tasks` | 2.519 μs | 2.506 μs | 35.5 ns |
-| `task_graph/50_tasks` | 6.099 μs | 6.098 μs | 6.2 ns |
-| `task_graph/5_tasks` | 657.6 ns | 649.2 ns | 16.2 ns |
+| `complexity_analysis/complex` | 40.4 ns | 39.9 ns | 1.1 ns |
+| `complexity_analysis/medium` | 70.3 ns | 67.5 ns | 15.8 ns |
+| `complexity_analysis/simple` | 21.8 ns | 21.2 ns | 3.3 ns |
+| `concurrent_requests/1_concurrent` | 773.383 μs | 768.326 μs | 21.747 μs |
+| `concurrent_requests/2_concurrent` | 774.913 μs | 774.970 μs | 11.824 μs |
+| `concurrent_requests/4_concurrent` | 796.458 μs | 794.227 μs | 20.748 μs |
+| `concurrent_requests/8_concurrent` | 769.631 μs | 767.719 μs | 13.148 μs |
+| `config_overhead/default_config` | 153.3 ns | 152.3 ns | 3.0 ns |
+| `config_overhead/orchestrator_with_config` | 1.106 μs | 1.123 μs | 58.8 ns |
+| `end_to_end_request/code_modification` | 781.588 μs | 771.158 μs | 24.919 μs |
+| `end_to_end_request/complex_refactor` | 767.110 μs | 764.519 μs | 13.455 μs |
+| `end_to_end_request/simple_query` | 748.440 μs | 738.955 μs | 22.673 μs |
+| `memory_usage/multiple_requests` | 797.504 μs | 791.274 μs | 25.186 μs |
+| `memory_usage/orchestrator_creation` | 853.3 ns | 835.1 ns | 46.2 ns |
+| `request_analysis/complex` | 763.612 μs | 760.616 μs | 15.182 μs |
+| `request_analysis/medium` | 764.349 μs | 761.674 μs | 12.733 μs |
+| `request_analysis/simple` | 772.269 μs | 763.328 μs | 29.609 μs |
+| `request_throughput/100_requests` | 840.778 μs | 840.547 μs | 60.716 μs |
+| `request_throughput/10_requests` | 775.650 μs | 773.204 μs | 22.259 μs |
+| `request_throughput/50_requests` | 2.376 ms | 897.437 μs | 5.298 ms |
+| `task_decomposition/add error handling` | 759.900 μs | 754.820 μs | 12.681 μs |
+| `task_decomposition/create a new rest api endpoint with validation` | 781.962 μs | 765.423 μs | 73.294 μs |
+| `task_decomposition/implement a comprehensive test suite for the authentication modu` | 762.928 μs | 760.860 μs | 12.376 μs |
+| `task_graph/10_tasks` | 1.294 μs | 1.289 μs | 20.3 ns |
+| `task_graph/20_tasks` | 2.491 μs | 2.479 μs | 33.0 ns |
+| `task_graph/50_tasks` | 6.130 μs | 6.070 μs | 132.9 ns |
+| `task_graph/5_tasks` | 679.6 ns | 657.6 ns | 61.2 ns |
 
 ## Viewing Results
 

@@ -8,9 +8,9 @@ import re
 import sys
 from pathlib import Path
 from datetime import datetime
-from typing import Dict, List, Any, Optional
+from typing import Dict, List, Any, Optional, Tuple
 
-def parse_criterion_results(criterion_dir: Path) -> Dict[str, Any]:
+def parse_criterion_results(criterion_dir: Path) -> Tuple[Dict[str, Any], bool]:
     """Parse Criterion benchmark results from target/criterion directory.
 
     Note: This requires that criterion benchmarks have been run locally and
@@ -32,7 +32,7 @@ def parse_criterion_results(criterion_dir: Path) -> Dict[str, Any]:
     # Look for benchmark groups
     if not criterion_dir.exists():
         print(f"Warning: Criterion directory not found: {criterion_dir}", file=sys.stderr)
-        return results
+        return results, False
 
     for group_dir in criterion_dir.iterdir():
         if not group_dir.is_dir() or group_dir.name == "report":
@@ -107,14 +107,14 @@ def parse_criterion_results(criterion_dir: Path) -> Dict[str, Any]:
             "total_time_ms": round(total_time_ms, 6),
         }
 
-    return results
+    return results, bool(results["benchmarks"])  # valid only if at least one benchmark parsed
 
 def strip_ansi_codes(text: str) -> str:
     """Remove ANSI color codes from text."""
     ansi_escape = re.compile(r'\x1b\[[0-9;]*m')
     return ansi_escape.sub('', text)
 
-def parse_gungraun_output(output_file: Path) -> Dict[str, Any]:
+def parse_gungraun_output(output_file: Path) -> Tuple[Dict[str, Any], bool]:
     """Parse Gungraun benchmark output."""
     results = {
         "timestamp": datetime.now().isoformat(),
@@ -132,7 +132,7 @@ def parse_gungraun_output(output_file: Path) -> Dict[str, Any]:
     if not output_file.exists():
         print(f"Warning: Gungraun output file not found: {output_file}", file=sys.stderr)
         print("Using default metrics", file=sys.stderr)
-        return results
+        return results, False
 
     try:
         with open(output_file) as file:
@@ -220,7 +220,7 @@ def parse_gungraun_output(output_file: Path) -> Dict[str, Any]:
 
     return results
 
-def parse_quality_benchmarks(results_file: Path) -> Dict[str, Any]:
+def parse_quality_benchmarks(results_file: Path) -> Tuple[Dict[str, Any], bool]:
     """Parse quality benchmark results from markdown table format."""
     results = {
         "timestamp": datetime.now().isoformat(),
@@ -239,7 +239,7 @@ def parse_quality_benchmarks(results_file: Path) -> Dict[str, Any]:
     if not results_file.exists():
         print(f"Warning: Quality results file not found: {results_file}", file=sys.stderr)
         print("Using default metrics", file=sys.stderr)
-        return results
+        return results, False
 
     try:
         with open(results_file) as f:
@@ -308,25 +308,31 @@ def main():
     quality_dir.mkdir(parents=True, exist_ok=True)
 
     # Parse Criterion results
-    criterion_results = parse_criterion_results(args.criterion_dir)
-
-    output_file = criterion_dir / "latest.json"
-    with open(output_file, 'w') as f:
-        json.dump(criterion_results, f, indent=2)
+    criterion_results, criterion_valid = parse_criterion_results(args.criterion_dir)
+    if criterion_valid:
+        output_file = criterion_dir / "latest.json"
+        with open(output_file, 'w') as f:
+            json.dump(criterion_results, f, indent=2)
+    else:
+        print("Skipping criterion output (no benchmarks parsed)", file=sys.stderr)
 
     # Parse Gungraun results
-    gungraun_results = parse_gungraun_output(args.gungraun_output)
-
-    output_file = gungraun_dir / "latest.json"
-    with open(output_file, 'w') as f:
-        json.dump(gungraun_results, f, indent=2)
+    gungraun_results, gungraun_valid = parse_gungraun_output(args.gungraun_output)
+    if gungraun_valid:
+        output_file = gungraun_dir / "latest.json"
+        with open(output_file, 'w') as f:
+            json.dump(gungraun_results, f, indent=2)
+    else:
+        print("Skipping gungraun output (no benchmarks parsed)", file=sys.stderr)
 
     # Parse quality benchmarks
-    quality_results = parse_quality_benchmarks(args.quality_results)
-
-    output_file = quality_dir / "latest.json"
-    with open(output_file, 'w') as f:
-        json.dump(quality_results, f, indent=2)
+    quality_results, quality_valid = parse_quality_benchmarks(args.quality_results)
+    if quality_valid:
+        output_file = quality_dir / "latest.json"
+        with open(output_file, 'w') as f:
+            json.dump(quality_results, f, indent=2)
+    else:
+        print("Skipping quality output (only default metrics available)", file=sys.stderr)
 
 if __name__ == "__main__":
     main()

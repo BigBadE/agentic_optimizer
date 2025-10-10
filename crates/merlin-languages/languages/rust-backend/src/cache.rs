@@ -1,6 +1,7 @@
 //! Caching and persistence for rust-analyzer state.
 
 use std::collections::HashMap;
+use std::env;
 use std::fs::{self as filesystem, File};
 use std::io::{BufReader, BufWriter};
 use std::path::{Path, PathBuf};
@@ -37,20 +38,17 @@ impl WorkspaceCache {
 
     /// Get the cache file path for a project
     fn cache_path(project_root: &Path) -> PathBuf {
-        #[cfg(test)]
-        {
-            // In tests, use a local .cache directory to avoid permission issues
-            let cache_dir = project_root.join(".cache");
-            cache_dir.join("rust-analyzer.cache")
+        // If MERLIN_FOLDER is set, prefer it. Otherwise default to project/.merlin
+        if let Ok(folder) = env::var("MERLIN_FOLDER") {
+            return PathBuf::from(folder)
+                .join("cache")
+                .join("rust-analyzer.cache");
         }
 
-        #[cfg(not(test))]
-        {
-            let cache_dir = project_root
-                .join("../../../../../target")
-                .join(".agentic-cache");
-            cache_dir.join("rust-analyzer.cache")
-        }
+        project_root
+            .join(".merlin")
+            .join("cache")
+            .join("rust-analyzer.cache")
     }
 
     /// Save the cache to disk

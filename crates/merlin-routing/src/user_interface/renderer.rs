@@ -66,55 +66,40 @@ impl Renderer {
     pub fn render(&self, frame: &mut Frame, ctx: &RenderCtx<'_>) {
         let main_area = frame.area();
 
-        // Calculate dynamic heights based on content
-        let task_tree_height = Self::calculate_task_tree_height(&ctx.ui_ctx);
-        let input_height = ctx.input.input_area().lines().len().clamp(1, 10) as u16 + 2;
-
-        // Vertical split: task tree at top, focused task in middle, input at bottom
-        let chunks = Layout::default()
+        // Flexible vertical split: allocate a stable portion to input to keep it visible,
+        // and split the remaining area between task tree and focused details.
+        // Bottom input gets 20% of the height, top+middle get 80%.
+        let primary_split = Layout::default()
             .direction(Direction::Vertical)
             .constraints([
-                Constraint::Length(task_tree_height),
-                Constraint::Min(10),
-                Constraint::Length(input_height),
+                Constraint::Percentage(80), // Task tree + details
+                Constraint::Percentage(20), // Input area
             ])
             .split(main_area);
 
+        let top_middle_area = primary_split[0];
+        let input_area = primary_split[1];
+
+        // Split the top section between task tree (45%) and focused details (55%)
+        let top_split = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Percentage(45), // Task tree
+                Constraint::Percentage(55), // Focused details
+            ])
+            .split(top_middle_area);
+
         // Top: Full-width task tree
-        self.render_task_tree_full(frame, chunks[0], &ctx.ui_ctx, ctx.focused);
+        self.render_task_tree_full(frame, top_split[0], &ctx.ui_ctx, ctx.focused);
 
         // Middle: Focused task details with logs and TODOs
-        self.render_focused_detail_section(frame, chunks[1], &ctx.ui_ctx, ctx.focused);
+        self.render_focused_detail_section(frame, top_split[1], &ctx.ui_ctx, ctx.focused);
 
         // Bottom: Input area
-        self.render_input_area(frame, chunks[2], ctx.input, ctx.focused);
+        self.render_input_area(frame, input_area, ctx.input, ctx.focused);
     }
 
     // Rendering methods
-
-    /// Calculate the height needed for the task tree
-    fn calculate_task_tree_height(ui_ctx: &UiCtx<'_>) -> u16 {
-        let visible_tasks = ui_ctx.task_manager.get_visible_tasks();
-        if visible_tasks.is_empty() {
-            return 5; // Minimum height for empty state
-        }
-
-        // Count lines needed: each task + progress + logs
-        let mut line_count = 0;
-        for task_id in &visible_tasks {
-            if let Some(task) = ui_ctx.task_manager.get_task(*task_id) {
-                line_count += 1; // Task line
-                if task.progress.is_some() {
-                    line_count += 1; // Progress bar
-                }
-                if task.status == TaskStatus::Running && !task.output_lines.is_empty() {
-                    line_count += task.output_lines.len().min(3); // Up to 3 log lines
-                }
-            }
-        }
-
-        (line_count as u16 + 4).min(20) // Add borders, cap at 20
-    }
 
     /// Renders full-width task tree at the top
     fn render_task_tree_full(

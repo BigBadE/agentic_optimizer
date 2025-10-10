@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event, KeyCode, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyModifiers};
 use crossterm::terminal;
 use ratatui::{Terminal, backend::CrosstermBackend};
 use std::io;
@@ -7,6 +7,7 @@ use std::time::Duration;
 use tokio::sync::mpsc;
 
 use super::event_handler::EventHandler;
+use super::event_source::{CrosstermEventSource, InputEventSource};
 use super::events::UiEvent;
 use super::input::InputManager;
 use super::persistence::TaskPersistence;
@@ -39,7 +40,12 @@ pub struct TuiApp {
     pending_input: Option<String>,
     /// Optional task persistence handler for saving/loading tasks
     persistence: Option<TaskPersistence>,
+    /// Source of input events (abstracted for testing)
+    event_source: Box<dyn InputEventSource + Send>,
 }
+
+// Note: all input is sourced from `event_source` to allow test injection without
+// altering application behavior.
 
 impl TuiApp {
     /// Creates a new `TuiApp`
@@ -92,11 +98,18 @@ impl TuiApp {
             focused_pane: FocusedPane::Input,
             pending_input: None,
             persistence,
+            event_source: Box::new(CrosstermEventSource),
         };
 
         let channel = super::UiChannel { sender };
 
         Ok((app, channel))
+    }
+
+    /// Replaces the input event source. Useful for tests to inject a synthetic source
+    /// that mirrors crossterm semantics.
+    pub fn set_event_source(&mut self, source: Box<dyn InputEventSource + Send>) {
+        self.event_source = source;
     }
 
     /// Loads tasks asynchronously
@@ -145,10 +158,8 @@ impl TuiApp {
             self.render()?;
         }
 
-        if event::poll(Duration::from_millis(50))
-            .map_err(|err| RoutingError::Other(err.to_string()))?
-        {
-            let events = Self::collect_input_events()?;
+        if self.event_source.poll(Duration::from_millis(50)) {
+            let events = self.collect_input_events();
             let should_quit = self.process_input_events(events);
             self.render()?;
             return Ok(should_quit);
@@ -240,21 +251,22 @@ impl TuiApp {
         had_events
     }
 
-    /// Collects input events from the terminal.
+    /// Collects input events from the terminal (via the configured event source).
     ///
     /// # Errors
-    /// Returns an error if reading or polling events fails.
-    fn collect_input_events() -> Result<Vec<Event>> {
+    /// Returns a vector of collected events (blocking for the first, then draining immediately available ones).
+    fn collect_input_events(&mut self) -> Vec<Event> {
         let mut events = Vec::default();
-        events.push(event::read().map_err(|err| RoutingError::Other(err.to_string()))?);
+        // blocking read of at least one event
+        let first = self.event_source.read();
+        events.push(first);
 
-        while event::poll(Duration::from_millis(0))
-            .map_err(|err| RoutingError::Other(err.to_string()))?
-        {
-            events.push(event::read().map_err(|err| RoutingError::Other(err.to_string()))?);
+        // drain the buffer of any immediately available events
+        while self.event_source.poll(Duration::from_millis(0)) {
+            events.push(self.event_source.read());
         }
 
-        Ok(events)
+        events
     }
 
     /// Processes a batch of input events and returns true if the app should quit
@@ -386,7 +398,7 @@ impl TuiApp {
         if should_wrap {
             let terminal_width = self.terminal.size().map(|size| size.width).unwrap_or(80);
             let input_width = (f32::from(terminal_width) * 0.7) as usize;
-            let max_line_width = input_width - 4;
+            let max_line_width = input_width.saturating_sub(4);
             self.input_manager.auto_wrap(max_line_width);
         }
     }

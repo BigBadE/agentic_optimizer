@@ -24,6 +24,7 @@ mod common;
 use common::*;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use merlin_routing::TaskId;
+use merlin_routing::user_interface::event_source::InputEventSource;
 use merlin_routing::user_interface::events::TaskProgress;
 use merlin_routing::user_interface::output_tree::OutputTree;
 use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskStatus};
@@ -37,11 +38,12 @@ use merlin_routing::user_interface::{
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Cell;
+use std::collections::VecDeque;
 use std::fs;
 use std::path::PathBuf;
+use std::thread;
+use std::time::Duration;
 use std::time::Instant;
-use tui_textarea::Input;
-
 /// Configuration for a snapshot test
 pub struct SnapshotTest {
     /// Name of the test (used for snapshot filename)
@@ -58,6 +60,81 @@ pub struct SnapshotTest {
     pub input: InputManager,
 }
 
+// ============================================================================
+// Test Event Source and Input Application
+// ============================================================================
+
+#[derive(Default)]
+struct TestEventSource {
+    queue: VecDeque<Event>,
+}
+
+impl TestEventSource {
+    fn enqueue(&mut self, event: Event) {
+        self.queue.push_back(event);
+    }
+}
+
+impl InputEventSource for TestEventSource {
+    fn poll(&mut self, timeout: Duration) -> bool {
+        if !self.queue.is_empty() {
+            return true;
+        }
+        if timeout.is_zero() {
+            return false;
+        }
+        // Simple sleep to emulate blocking wait
+        thread::sleep(timeout);
+        !self.queue.is_empty()
+    }
+
+    fn read(&mut self) -> Event {
+        loop {
+            if let Some(event) = self.queue.pop_front() {
+                return event;
+            }
+            // Busy-wait with small sleep
+            thread::sleep(Duration::from_millis(1));
+        }
+    }
+}
+
+/// Applies queued events to the `InputManager` with semantics matching the app:
+/// - Perform a blocking read once (guaranteeing at least one event)
+/// - Drain immediately available events with poll(0)
+/// - For each key event, feed it into the input area and perform wrapping for text edits
+fn apply_events_to_input(
+    input: &mut InputManager,
+    terminal_width: u16,
+    source: &mut dyn InputEventSource,
+) {
+    // Read at least one event
+    let mut events = Vec::new();
+    events.push(source.read());
+
+    // Drain any immediately available events
+    while source.poll(Duration::from_millis(0)) {
+        events.push(source.read());
+    }
+
+    for event in events {
+        if let Event::Key(key) = event {
+            let should_wrap = matches!(
+                key.code,
+                KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete
+            );
+
+            input.input_area_mut().input(Event::Key(key));
+
+            if should_wrap {
+                let input_width = (f32::from(terminal_width) * 0.7) as usize;
+                let max_line_width = input_width.saturating_sub(4);
+                input.auto_wrap(max_line_width);
+            }
+        }
+    }
+}
+
 impl SnapshotTest {
     /// Create a new snapshot test
     pub fn new(name: impl Into<String>) -> Self {
@@ -66,7 +143,7 @@ impl SnapshotTest {
             task_manager: TaskManager::default(),
             state: UiState::default(),
             focused: FocusedPane::Input,
-            terminal_size: (100, 30),
+            terminal_size: (80, 24),
             input: InputManager::default(),
         }
     }
@@ -107,14 +184,18 @@ impl SnapshotTest {
         self
     }
 
-    /// Simulate typing text into the input field
+    /// Simulate typing text into the input field using the same buffering semantics as the app's
+    /// input event stream (blocking first read, then draining immediate events). This avoids
+    /// mutating the buffer directly and exercises the same wrapping path.
     #[must_use]
     pub fn with_input_text(mut self, text: &str) -> Self {
+        let mut source = TestEventSource::default();
         for character in text.chars() {
             let key_event = KeyEvent::new(KeyCode::Char(character), KeyModifiers::NONE);
-            let input = Input::from(Event::Key(key_event));
-            self.input.input_area_mut().input(input);
+            source.enqueue(Event::Key(key_event));
         }
+        // consume events with crossterm-like semantics
+        apply_events_to_input(&mut self.input, self.terminal_size.0, &mut source);
         self
     }
 
@@ -247,7 +328,7 @@ fn print_diff(expected: &str, actual: &str) {
 
 #[test]
 fn test_empty_ui_snapshot() {
-    let test = SnapshotTest::new("empty_ui").with_terminal_size(100, 30);
+    let test = SnapshotTest::new("empty_ui").with_terminal_size(80, 24);
     test.assert_snapshot_matches();
 }
 
@@ -267,7 +348,7 @@ fn test_single_running_task_snapshot() {
     };
 
     let test = SnapshotTest::new("single_running_task")
-        .with_terminal_size(100, 30)
+        .with_terminal_size(80, 24)
         .with_task(task_id, task)
         .with_active_task(task_id)
         .with_running_task(task_id);
@@ -296,7 +377,7 @@ fn test_task_with_progress_snapshot() {
     };
 
     let test = SnapshotTest::new("task_with_progress")
-        .with_terminal_size(100, 30)
+        .with_terminal_size(80, 24)
         .with_task(task_id, task)
         .with_active_task(task_id)
         .with_running_task(task_id);
@@ -306,7 +387,7 @@ fn test_task_with_progress_snapshot() {
 
 #[test]
 fn test_multiple_task_statuses_snapshot() {
-    let mut test = SnapshotTest::new("multiple_task_statuses").with_terminal_size(100, 30);
+    let mut test = SnapshotTest::new("multiple_task_statuses").with_terminal_size(80, 24);
 
     // Running task
     let running_id = TaskId::default();
@@ -335,7 +416,7 @@ fn test_hierarchical_tasks_snapshot() {
     let child2_id = TaskId::default();
 
     let test = SnapshotTest::new("hierarchical_tasks")
-        .with_terminal_size(120, 35)
+        .with_terminal_size(80, 24)
         .with_task(parent_id, create_test_task("Parent task"))
         .with_task(child1_id, create_child_task("Child task 1", parent_id))
         .with_task(child2_id, create_child_task("Child task 2", parent_id))
@@ -354,7 +435,7 @@ fn test_pending_tasks_section_snapshot() {
     let pending2_id = TaskId::default();
 
     let test = SnapshotTest::new("pending_tasks_section")
-        .with_terminal_size(120, 40)
+        .with_terminal_size(80, 24)
         .with_task(active_id, create_test_task("Active task"))
         .with_task(pending1_id, create_test_task("Pending task 1"))
         .with_task(pending2_id, create_test_task("Pending task 2"))
@@ -369,7 +450,7 @@ fn test_pending_tasks_section_snapshot() {
 #[test]
 fn test_input_with_text_snapshot() {
     let test = SnapshotTest::new("input_with_text")
-        .with_terminal_size(100, 30)
+        .with_terminal_size(80, 24)
         .with_focused(FocusedPane::Input)
         .with_input_text("Fix the bug in the authentication module");
 

@@ -9,6 +9,8 @@ pub mod events;
 mod text_width;
 
 // Publicly exposed for testing
+/// Input event source abstraction (public so tests can inject events)
+pub mod event_source;
 /// Input management
 pub mod input;
 /// Output tree structure for hierarchical display

@@ -66,47 +66,40 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Parse benchmark results
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+      - name: Parse benchmark results to JSON
         run: |
-          # Copy existing history from gh-pages if it exists
-          if [ -d gh-pages/.benchmark-history ]; then
-            cp -r gh-pages/.benchmark-history .
-          fi
-
           python3 scripts/parse-benchmarks.py \
             --quality-results quality-results.md \
-            --output-dir /tmp/benchmark-data \
-            --history-dir .benchmark-history
+            --output-dir benchmark-data
+
+      - name: Upload parsed JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: quality-json-results
+          path: benchmark-data/quality-latest.json
+          retention-days: 90
+          if-no-files-found: warn
 
       - name: Publish quality results to gh-pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmark-data/quality-latest.json') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
-          
+
           # Switch to gh-pages branch
           cd gh-pages
-          
+
           # Create directories
-          mkdir -p quality-bench data
-          
-          # Copy markdown results
-          cp ../quality-results.md quality-bench/latest.md
-          cp ../quality-results.md "quality-bench/${ts}.md"
-          
-          # Copy parsed JSON data (both latest and history)
-          if [ -f /tmp/benchmark-data/quality-latest.json ]; then
-            cp /tmp/benchmark-data/quality-latest.json data/
+          mkdir -p data
+
+          # Copy pre-generated JSON data
+          if [ -f ../benchmark-data/quality-latest.json ]; then
+            cp ../benchmark-data/quality-latest.json data/
             # Also save timestamped version for history
-            cp /tmp/benchmark-data/quality-latest.json "data/quality-${ts}.json"
+            cp ../benchmark-data/quality-latest.json "data/quality-${ts}.json"
           fi
 
-          # Copy history directory
-          if [ -d ../.benchmark-history ]; then
-            cp -r ../.benchmark-history .
-          fi
-          
           # Generate dashboard if it doesn't exist
           if [ ! -f index.html ]; then
             cd ..
@@ -115,11 +108,11 @@ jobs:
             cp /tmp/dashboard-temp/index.html .
             cp -r /tmp/dashboard-temp/assets .
           fi
-          
+
           # Commit and push
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add quality-bench/ data/ .benchmark-history/ index.html assets/ || true
+          git add data/ index.html assets/ || true
           git commit -m "Update quality benchmark results: ${ts}" || echo "No changes to commit"
           git pull --rebase origin gh-pages || true
           git push origin gh-pages

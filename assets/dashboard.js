@@ -69,59 +69,62 @@ async function loadBenchmarkData() {
 // Update stats grid
 function updateStatsGrid(quality, perf, gungraun) {
     const statsGrid = document.getElementById('statsGrid');
-    
+
     const stats = [];
-    
+
+    // Quality metrics - use actual field names from parse script
     if (quality && quality.metrics) {
         stats.push({
-            label: 'Quality Score',
-            value: quality.metrics.avg_score || 'N/A',
-            change: quality.metrics.change || 0,
+            label: 'Precision@3',
+            value: formatPercent(quality.metrics.precision_at_3 || 0),
+            change: quality.metrics.precision_at_3_change || 0,
             inverse: false
         });
         stats.push({
-            label: 'Success Rate',
-            value: formatPercent(quality.metrics.success_rate || 0),
-            change: quality.metrics.success_rate_change || 0,
+            label: 'Test Cases',
+            value: quality.metrics.test_cases || 0,
+            change: quality.metrics.test_cases_change || 0,
             inverse: false
         });
     }
-    
+
+    // Performance metrics - use actual field names
     if (perf && perf.metrics) {
         stats.push({
-            label: 'Avg Latency',
-            value: (perf.metrics.avg_latency_ms || 0).toFixed(2) + 'ms',
-            change: perf.metrics.latency_change || 0,
+            label: 'Avg Time',
+            value: (perf.metrics.avg_time_ms || 0).toFixed(3) + ' ms',
+            change: perf.metrics.avg_time_ms_change || 0,
             inverse: true
         });
         stats.push({
-            label: 'Throughput',
-            value: formatNumber(perf.metrics.throughput || 0) + ' req/s',
-            change: perf.metrics.throughput_change || 0,
+            label: 'Total Benchmarks',
+            value: perf.metrics.total_benchmarks || 0,
+            change: perf.metrics.total_benchmarks_change || 0,
             inverse: false
         });
     }
-    
+
+    // Gungraun metrics - use actual field names
     if (gungraun && gungraun.metrics) {
         stats.push({
-            label: 'Peak Memory',
-            value: (gungraun.metrics.peak_memory_mb || 0).toFixed(2) + ' MB',
-            change: gungraun.metrics.memory_change || 0,
+            label: 'Avg Instructions',
+            value: formatNumber(gungraun.metrics.avg_instructions || 0),
+            change: gungraun.metrics.avg_instructions_change || 0,
             inverse: true
         });
         stats.push({
-            label: 'Instructions',
-            value: formatNumber(gungraun.metrics.total_instructions || 0),
-            change: gungraun.metrics.instructions_change || 0,
+            label: 'Avg Cycles',
+            value: formatNumber(gungraun.metrics.avg_cycles || 0),
+            change: gungraun.metrics.avg_cycles_change || 0,
             inverse: true
         });
     }
-    
+
     if (stats.length === 0) {
         statsGrid.innerHTML = '<div class="loading"><p>No benchmark data available yet. Run benchmarks to populate this dashboard.</p></div>';
         return;
     }
-    
+
     statsGrid.innerHTML = stats.map(stat => `
         <div class="stat-card">
             <div class="stat-label">${stat.label}</div>
@@ -135,27 +138,28 @@ function updateStatsGrid(quality, perf, gungraun) {
 
 // Update charts
 function updateCharts(quality, perf, gungraun) {
-    // Quality chart
-    if (quality && quality.history) {
+    // Quality chart - use actual field names
+    if (quality && quality.history && quality.history.length > 0) {
         createChart('qualityChart', 'Quality Benchmarks', quality.history, [
-            { label: 'Success Rate (%)', data: 'success_rate', color: '#667eea' },
-            { label: 'Avg Score', data: 'avg_score', color: '#764ba2' }
+            { label: 'Precision@3 (%)', data: 'precision_at_3', color: '#667eea' },
+            { label: 'Recall@10 (%)', data: 'recall_at_10', color: '#764ba2' },
+            { label: 'MRR', data: 'mrr', color: '#f093fb', yAxisID: 'y1' }
         ]);
     }
-    
-    // Performance chart
-    if (perf && perf.history) {
+
+    // Performance chart - use actual field names
+    if (perf && perf.history && perf.history.length > 0) {
         createChart('performanceChart', 'Performance Benchmarks', perf.history, [
-            { label: 'Latency (ms)', data: 'avg_latency_ms', color: '#f093fb' },
-            { label: 'Throughput (req/s)', data: 'throughput', color: '#4facfe' }
+            { label: 'Avg Time (ms)', data: 'avg_time_ms', color: '#f093fb' },
+            { label: 'Total Time (ms)', data: 'total_time_ms', color: '#4facfe', yAxisID: 'y1' }
         ]);
     }
-    
-    // Gungraun chart
-    if (gungraun && gungraun.history) {
+
+    // Gungraun chart - use actual field names
+    if (gungraun && gungraun.history && gungraun.history.length > 0) {
         createChart('gungraunChart', 'Memory & Instructions', gungraun.history, [
-            { label: 'Peak Memory (MB)', data: 'peak_memory_mb', color: '#43e97b' },
-            { label: 'Cache Misses', data: 'cache_misses', color: '#fa709a' }
+            { label: 'Avg Instructions', data: 'avg_instructions', color: '#43e97b' },
+            { label: 'Avg Cycles', data: 'avg_cycles', color: '#fa709a' }
         ]);
     }
 }
@@ -214,25 +218,31 @@ function createChart(canvasId, title, history, datasets) {
 function updateTables(quality, perf, gungraun) {
     if (quality && quality.metrics) {
         updateTable('qualityTableBody', [
-            { metric: 'Success Rate', current: formatPercent(quality.metrics.success_rate || 0), previous: formatPercent(quality.metrics.prev_success_rate || 0) },
-            { metric: 'Average Score', current: (quality.metrics.avg_score || 0).toFixed(2), previous: (quality.metrics.prev_avg_score || 0).toFixed(2) },
-            { metric: 'Total Tests', current: quality.metrics.total_tests || 0, previous: quality.metrics.prev_total_tests || 0 }
+            { metric: 'Test Cases', current: quality.metrics.test_cases || 0, previous: quality.metrics.prev_test_cases || 0 },
+            { metric: 'Precision@3', current: formatPercent(quality.metrics.precision_at_3 || 0), previous: formatPercent(quality.metrics.prev_precision_at_3 || 0) },
+            { metric: 'Precision@10', current: formatPercent(quality.metrics.precision_at_10 || 0), previous: formatPercent(quality.metrics.prev_precision_at_10 || 0) },
+            { metric: 'Recall@10', current: formatPercent(quality.metrics.recall_at_10 || 0), previous: formatPercent(quality.metrics.prev_recall_at_10 || 0) },
+            { metric: 'MRR', current: (quality.metrics.mrr || 0).toFixed(4), previous: (quality.metrics.prev_mrr || 0).toFixed(4) },
+            { metric: 'NDCG@10', current: (quality.metrics.ndcg_at_10 || 0).toFixed(4), previous: (quality.metrics.prev_ndcg_at_10 || 0).toFixed(4) },
+            { metric: 'Critical in Top-3', current: formatPercent(quality.metrics.critical_in_top_3 || 0), previous: formatPercent(quality.metrics.prev_critical_in_top_3 || 0) }
         ]);
     }
-    
+
     if (perf && perf.metrics) {
         updateTable('performanceTableBody', [
-            { metric: 'Avg Latency', current: (perf.metrics.avg_latency_ms || 0).toFixed(2) + ' ms', previous: (perf.metrics.prev_avg_latency_ms || 0).toFixed(2) + ' ms' },
-            { metric: 'P95 Latency', current: (perf.metrics.p95_latency_ms || 0).toFixed(2) + ' ms', previous: (perf.metrics.prev_p95_latency_ms || 0).toFixed(2) + ' ms' },
-            { metric: 'Throughput', current: formatNumber(perf.metrics.throughput || 0) + ' req/s', previous: formatNumber(perf.metrics.prev_throughput || 0) + ' req/s' }
+            { metric: 'Total Benchmarks', current: perf.metrics.total_benchmarks || 0, previous: perf.metrics.prev_total_benchmarks || 0 },
+            { metric: 'Avg Time', current: (perf.metrics.avg_time_ms || 0).toFixed(3) + ' ms', previous: (perf.metrics.prev_avg_time_ms || 0).toFixed(3) + ' ms' },
+            { metric: 'Total Time', current: (perf.metrics.total_time_ms || 0).toFixed(3) + ' ms', previous: (perf.metrics.prev_total_time_ms || 0).toFixed(3) + ' ms' }
         ]);
     }
-    
+
     if (gungraun && gungraun.metrics) {
         updateTable('gungraunTableBody', [
-            { metric: 'Peak Memory', current: (gungraun.metrics.peak_memory_mb || 0).toFixed(2) + ' MB', previous: (gungraun.metrics.prev_peak_memory_mb || 0).toFixed(2) + ' MB' },
+            { metric: 'Total Benchmarks', current: gungraun.metrics.total_benchmarks || 0, previous: gungraun.metrics.prev_total_benchmarks || 0 },
+            { metric: 'Avg Instructions', current: formatNumber(gungraun.metrics.avg_instructions || 0), previous: formatNumber(gungraun.metrics.prev_avg_instructions || 0) },
             { metric: 'Total Instructions', current: formatNumber(gungraun.metrics.total_instructions || 0), previous: formatNumber(gungraun.metrics.prev_total_instructions || 0) },
-            { metric: 'Cache Misses', current: formatNumber(gungraun.metrics.cache_misses || 0), previous: formatNumber(gungraun.metrics.prev_cache_misses || 0) }
+            { metric: 'Avg Cycles', current: formatNumber(gungraun.metrics.avg_cycles || 0), previous: formatNumber(gungraun.metrics.prev_avg_cycles || 0) },
+            { metric: 'Total Cycles', current: formatNumber(gungraun.metrics.total_cycles || 0), previous: formatNumber(gungraun.metrics.prev_total_cycles || 0) }
         ]);
     }
 }
@@ -262,23 +272,75 @@ function updateTable(tableBodyId, rows) {
 function updateDetailedResults(quality, perf, gungraun) {
     const container = document.getElementById('detailedResults');
     if (!container) return;
-    
+
     let html = '';
-    
-    if (quality) {
-        html += `<h3>Quality Benchmarks</h3><pre>${JSON.stringify(quality, null, 2)}</pre>`;
+
+    // Performance benchmarks - show top 10 slowest
+    if (perf && perf.benchmarks && perf.benchmarks.length > 0) {
+        const sorted = [...perf.benchmarks].sort((a, b) => b.mean_ms - a.mean_ms);
+        const top10 = sorted.slice(0, 10);
+
+        html += '<h3>Top 10 Slowest Performance Benchmarks</h3>';
+        html += '<table class="metric-table"><thead><tr>';
+        html += '<th>Benchmark</th><th>Mean Time</th><th>Median Time</th><th>Std Dev</th>';
+        html += '</tr></thead><tbody>';
+
+        top10.forEach(bench => {
+            html += '<tr>';
+            html += `<td>${bench.name}</td>`;
+            html += `<td>${bench.mean_ms.toFixed(3)} ms</td>`;
+            html += `<td>${bench.median_ms.toFixed(3)} ms</td>`;
+            html += `<td>±${bench.std_dev_ms.toFixed(3)} ms</td>`;
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
     }
-    if (perf) {
-        html += `<h3>Performance Benchmarks</h3><pre>${JSON.stringify(perf, null, 2)}</pre>`;
+
+    // Gungraun benchmarks - show top 10 most instruction-heavy
+    if (gungraun && gungraun.benchmarks && gungraun.benchmarks.length > 0) {
+        const sorted = [...gungraun.benchmarks].sort((a, b) => b.instructions - a.instructions);
+        const top10 = sorted.slice(0, 10);
+
+        html += '<h3>Top 10 Most Instruction-Heavy Benchmarks (Gungraun)</h3>';
+        html += '<table class="metric-table"><thead><tr>';
+        html += '<th>Benchmark</th><th>Instructions</th><th>Cycles</th><th>L1 Accesses</th><th>L2 Accesses</th><th>RAM Accesses</th>';
+        html += '</tr></thead><tbody>';
+
+        top10.forEach(bench => {
+            html += '<tr>';
+            html += `<td>${bench.name}</td>`;
+            html += `<td>${formatNumber(bench.instructions)}</td>`;
+            html += `<td>${formatNumber(bench.estimated_cycles)}</td>`;
+            html += `<td>${formatNumber(bench.l1_accesses)}</td>`;
+            html += `<td>${formatNumber(bench.l2_accesses)}</td>`;
+            html += `<td>${formatNumber(bench.ram_accesses)}</td>`;
+            html += '</tr>';
+        });
+
+        html += '</tbody></table>';
     }
-    if (gungraun) {
-        html += `<h3>Gungraun Benchmarks</h3><pre>${JSON.stringify(gungraun, null, 2)}</pre>`;
+
+    // Quality metrics summary
+    if (quality && quality.metrics) {
+        html += '<h3>Quality Metrics Summary</h3>';
+        html += '<table class="metric-table"><thead><tr>';
+        html += '<th>Metric</th><th>Value</th>';
+        html += '</tr></thead><tbody>';
+        html += `<tr><td>Test Cases</td><td>${quality.metrics.test_cases || 0}</td></tr>`;
+        html += `<tr><td>Precision@3</td><td>${formatPercent(quality.metrics.precision_at_3 || 0)}</td></tr>`;
+        html += `<tr><td>Precision@10</td><td>${formatPercent(quality.metrics.precision_at_10 || 0)}</td></tr>`;
+        html += `<tr><td>Recall@10</td><td>${formatPercent(quality.metrics.recall_at_10 || 0)}</td></tr>`;
+        html += `<tr><td>MRR</td><td>${(quality.metrics.mrr || 0).toFixed(4)}</td></tr>`;
+        html += `<tr><td>NDCG@10</td><td>${(quality.metrics.ndcg_at_10 || 0).toFixed(4)}</td></tr>`;
+        html += `<tr><td>Critical in Top-3</td><td>${formatPercent(quality.metrics.critical_in_top_3 || 0)}</td></tr>`;
+        html += '</tbody></table>';
     }
-    
+
     if (!html) {
         html = '<p>No detailed results available.</p>';
     }
-    
+
     container.innerHTML = html;
 }
 

@@ -1,0 +1,289 @@
+Index: gungraun-output.txt
+===================================================================
+diff --git a/gungraun-output.txt b/gungraun-output.txt
+deleted file mode 100644
+--- a/gungraun-output.txt	(revision 188779cbb7a927059924e645f89e68a19d49ebdf)
++++ /dev/null	(revision 188779cbb7a927059924e645f89e68a19d49ebdf)
+@@ -1,281 +0,0 @@
+-[1m[92m   Compiling[0m proc-macro2 v1.0.101
+-[1m[92m   Compiling[0m quote v1.0.41
+-[1m[92m   Compiling[0m unicode-ident v1.0.19
+-[1m[92m   Compiling[0m libc v0.2.177
+-[1m[92m   Compiling[0m cfg-if v1.0.3
+-[1m[92m   Compiling[0m smallvec v1.15.1
+-[1m[92m   Compiling[0m serde_core v1.0.228
+-[1m[92m   Compiling[0m log v0.4.28
+-[1m[92m   Compiling[0m parking_lot_core v0.9.12
+-[1m[92m   Compiling[0m itoa v1.0.15
+-[1m[92m   Compiling[0m scopeguard v1.2.0
+-[1m[92m   Compiling[0m lock_api v0.4.14
+-[1m[92m   Compiling[0m bytes v1.10.1
+-[1m[92m   Compiling[0m syn v2.0.106
+-[1m[92m   Compiling[0m signal-hook-registry v1.4.6
+-[1m[92m   Compiling[0m mio v1.0.4
+-[1m[92m   Compiling[0m parking_lot v0.12.5
+-[1m[92m   Compiling[0m pin-project-lite v0.2.16
+-[1m[92m   Compiling[0m stable_deref_trait v1.2.1
+-[1m[92m   Compiling[0m futures-core v0.3.31
+-[1m[92m   Compiling[0m bitflags v2.9.4
+-[1m[92m   Compiling[0m serde v1.0.228
+-[1m[92m   Compiling[0m socket2 v0.6.0
+-[1m[92m   Compiling[0m find-msvc-tools v0.1.3
+-[1m[92m   Compiling[0m equivalent v1.0.2
+-[1m[92m   Compiling[0m shlex v1.3.0
+-[1m[92m   Compiling[0m once_cell v1.21.3
+-[1m[92m   Compiling[0m cc v1.2.40
+-[1m[92m   Compiling[0m pkg-config v0.3.32
+-[1m[92m   Compiling[0m futures-sink v0.3.31
+-[1m[92m   Compiling[0m vcpkg v0.2.15
+-[1m[92m   Compiling[0m memchr v2.7.6
+-[1m[92m   Compiling[0m serde_json v1.0.145
+-[1m[92m   Compiling[0m fnv v1.0.7
+-[1m[92m   Compiling[0m http v1.3.1
+-[1m[92m   Compiling[0m openssl-sys v0.9.109
+-[1m[92m   Compiling[0m writeable v0.6.1
+-[1m[92m   Compiling[0m synstructure v0.13.2
+-[1m[92m   Compiling[0m ryu v1.0.20
+-[1m[92m   Compiling[0m slab v0.4.11
+-[1m[92m   Compiling[0m litemap v0.8.0
+-[1m[92m   Compiling[0m pin-utils v0.1.0
+-[1m[92m   Compiling[0m icu_properties_data v2.0.1
+-[1m[92m   Compiling[0m hashbrown v0.16.0
+-[1m[92m   Compiling[0m icu_normalizer_data v2.0.0
+-[1m[92m   Compiling[0m http-body v1.0.1
+-[1m[92m   Compiling[0m tracing-core v0.1.34
+-[1m[92m   Compiling[0m foreign-types-shared v0.1.1
+-[1m[92m   Compiling[0m percent-encoding v2.3.2
+-[1m[92m   Compiling[0m futures-io v0.3.31
+-[1m[92m   Compiling[0m httparse v1.10.1
+-[1m[92m   Compiling[0m indexmap v2.11.4
+-[1m[92m   Compiling[0m openssl v0.10.73
+-[1m[92m   Compiling[0m zerofrom-derive v0.1.6
+-[1m[92m   Compiling[0m yoke-derive v0.8.0
+-[1m[92m   Compiling[0m serde_derive v1.0.228
+-[1m[92m   Compiling[0m zerovec-derive v0.11.1
+-[1m[92m   Compiling[0m tokio-macros v2.5.0
+-[1m[92m   Compiling[0m zerofrom v0.1.6
+-[1m[92m   Compiling[0m yoke v0.8.0
+-[1m[92m   Compiling[0m displaydoc v0.2.5
+-[1m[92m   Compiling[0m tokio v1.47.1
+-[1m[92m   Compiling[0m zerovec v0.11.4
+-[1m[92m   Compiling[0m zerotrie v0.2.2
+-[1m[92m   Compiling[0m futures-task v0.3.31
+-[1m[92m   Compiling[0m futures-util v0.3.31
+-[1m[92m   Compiling[0m tinystr v0.8.1
+-[1m[92m   Compiling[0m icu_locale_core v2.0.0
+-[1m[92m   Compiling[0m potential_utf v0.1.3
+-[1m[92m   Compiling[0m icu_collections v2.0.0
+-[1m[92m   Compiling[0m icu_provider v2.0.0
+-[1m[92m   Compiling[0m openssl-macros v0.1.1
+-[1m[92m   Compiling[0m tracing v0.1.41
+-[1m[92m   Compiling[0m foreign-types v0.3.2
+-[1m[92m   Compiling[0m native-tls v0.2.14
+-[1m[92m   Compiling[0m tower-service v0.3.3
+-[1m[92m   Compiling[0m atomic-waker v1.1.2
+-[1m[92m   Compiling[0m try-lock v0.2.5
+-[1m[92m   Compiling[0m rustversion v1.0.22
+-[1m[92m   Compiling[0m want v0.3.1
+-[1m[92m   Compiling[0m icu_properties v2.0.1
+-[1m[92m   Compiling[0m icu_normalizer v2.0.0
+-[1m[92m   Compiling[0m tokio-util v0.7.16
+-[1m[92m   Compiling[0m h2 v0.4.12
+-[1m[92m   Compiling[0m futures-channel v0.3.31
+-[1m[92m   Compiling[0m either v1.15.0
+-[1m[92m   Compiling[0m openssl-probe v0.1.6
+-[1m[92m   Compiling[0m idna_adapter v1.2.1
+-[1m[92m   Compiling[0m hyper v1.7.0
+-[1m[92m   Compiling[0m form_urlencoded v1.2.2
+-[1m[92m   Compiling[0m sync_wrapper v1.0.2
+-[1m[92m   Compiling[0m tower-layer v0.3.3
+-[1m[92m   Compiling[0m crossbeam-utils v0.8.21
+-[1m[92m   Compiling[0m strsim v0.11.1
+-[1m[92m   Compiling[0m base64 v0.22.1
+-[1m[92m   Compiling[0m ipnet v2.11.0
+-[1m[92m   Compiling[0m ident_case v1.0.1
+-[1m[92m   Compiling[0m signal-hook v0.3.18
+-[1m[92m   Compiling[0m utf8_iter v1.0.4
+-[1m[92m   Compiling[0m darling_core v0.20.11
+-[1m[92m   Compiling[0m idna v1.1.0
+-[1m[92m   Compiling[0m hyper-util v0.1.17
+-[1m[92m   Compiling[0m tower v0.5.2
+-[1m[92m   Compiling[0m tokio-native-tls v0.3.1
+-[1m[92m   Compiling[0m itertools v0.13.0
+-[1m[92m   Compiling[0m http-body-util v0.1.3
+-[1m[92m   Compiling[0m thiserror v2.0.17
+-[1m[92m   Compiling[0m foldhash v0.1.5
+-[1m[92m   Compiling[0m winnow v0.7.13
+-[1m[92m   Compiling[0m allocator-api2 v0.2.21
+-[1m[92m   Compiling[0m rustix v0.38.44
+-[1m[92m   Compiling[0m zerocopy v0.8.27
+-[1m[92m   Compiling[0m iri-string v0.7.8
+-[1m[92m   Compiling[0m zeroize v1.8.2
+-[1m[92m   Compiling[0m rustls-pki-types v1.12.0
+-[1m[92m   Compiling[0m hashbrown v0.15.5
+-[1m[92m   Compiling[0m darling_macro v0.20.11
+-[1m[92m   Compiling[0m toml_parser v1.0.4
+-[1m[92m   Compiling[0m hyper-tls v0.6.0
+-[1m[92m   Compiling[0m tower-http v0.6.6
+-[1m[92m   Compiling[0m url v2.5.7
+-[1m[92m   Compiling[0m serde_urlencoded v0.7.1
+-[1m[92m   Compiling[0m zerocopy-derive v0.8.27
+-[1m[92m   Compiling[0m thiserror-impl v2.0.17
+-[1m[92m   Compiling[0m toml_datetime v0.7.3
+-[1m[92m   Compiling[0m serde_spanned v1.0.3
+-[1m[92m   Compiling[0m encoding_rs v0.8.35
+-[1m[92m   Compiling[0m paste v1.0.15
+-[1m[92m   Compiling[0m autocfg v1.5.0
+-[1m[92m   Compiling[0m semver v1.0.27
+-[1m[92m   Compiling[0m getrandom v0.3.3
+-[1m[92m   Compiling[0m heck v0.5.0
+-[1m[92m   Compiling[0m mime v0.3.17
+-[1m[92m   Compiling[0m instability v0.3.9
+-[1m[92m   Compiling[0m linux-raw-sys v0.4.15
+-[1m[92m   Compiling[0m toml_writer v1.0.4
+-[1m[92m   Compiling[0m reqwest v0.12.23
+-[1m[92m   Compiling[0m toml v0.9.8
+-[1m[92m   Compiling[0m strum_macros v0.26.4
+-[1m[92m   Compiling[0m rustc_version v0.4.1
+-[1m[92m   Compiling[0m num-traits v0.2.19
+-[1m[92m   Compiling[0m crossbeam-epoch v0.9.18
+-[1m[92m   Compiling[0m signal-hook-mio v0.2.4
+-[1m[92m   Compiling[0m darling v0.20.11
+-[1m[92m   Compiling[0m castaway v0.2.4
+-[1m[92m   Compiling[0m derive_more-impl v2.0.1
+-[1m[92m   Compiling[0m async-trait v0.1.89
+-[1m[92m   Compiling[0m indoc v2.0.6
+-[1m[92m   Compiling[0m rustix v1.1.2
+-[1m[92m   Compiling[0m unicode-width v0.2.0
+-[1m[92m   Compiling[0m crc32fast v1.5.0
+-[1m[92m   Compiling[0m unicode-width v0.1.14
+-[1m[92m   Compiling[0m static_assertions v1.1.0
+-[1m[92m   Compiling[0m rayon-core v1.13.0
+-[1m[92m   Compiling[0m unicode-segmentation v1.12.0
+-[1m[92m   Compiling[0m compact_str v0.8.1
+-[1m[92m   Compiling[0m unicode-truncate v1.1.0
+-[1m[92m   Compiling[0m merlin-core v0.1.0 (/home/runner/work/agentic_optimizer/agentic_optimizer/crates/merlin-core)
+-[1m[92m   Compiling[0m half v2.7.0
+-[1m[92m   Compiling[0m strum v0.26.3
+-[1m[92m   Compiling[0m crossterm v0.28.1
+-[1m[92m   Compiling[0m crossbeam-deque v0.8.6
+-[1m[92m   Compiling[0m gungraun-macros v0.7.0
+-[1m[92m   Compiling[0m lru v0.12.5
+-[1m[92m   Compiling[0m proc-macro-error-attr2 v2.0.0
+-[1m[92m   Compiling[0m anstyle v1.0.13
+-[1m[92m   Compiling[0m simd-adler32 v0.3.7
+-[1m[92m   Compiling[0m linux-raw-sys v0.11.0
+-[1m[92m   Compiling[0m adler2 v2.0.1
+-[1m[92m   Compiling[0m cassowary v0.3.0
+-[1m[92m   Compiling[0m regex-syntax v0.8.6
+-[1m[92m   Compiling[0m plotters-backend v0.3.7
+-[1m[92m   Compiling[0m ciborium-io v0.2.2
+-[1m[92m   Compiling[0m gungraun-runner v0.17.0
+-[1m[92m   Compiling[0m clap_lex v0.7.5
+-[1m[92m   Compiling[0m ciborium-ll v0.2.2
+-[1m[92m   Compiling[0m clap_builder v4.5.48
+-[1m[92m   Compiling[0m plotters-svg v0.3.7
+-[1m[92m   Compiling[0m ratatui v0.29.0
+-[1m[92m   Compiling[0m regex-automata v0.4.11
+-[1m[92m   Compiling[0m miniz_oxide v0.8.9
+-[1m[92m   Compiling[0m proc-macro-error2 v2.0.1
+-[1m[92m   Compiling[0m derive_more v2.0.1
+-[1m[92m   Compiling[0m fixedbitset v0.5.7
+-[1m[92m   Compiling[0m smawk v0.3.2
+-[1m[92m   Compiling[0m cast v0.3.0
+-[1m[92m   Compiling[0m unicode-linebreak v0.1.5
+-[1m[92m   Compiling[0m fastrand v2.3.0
+-[1m[92m   Compiling[0m same-file v1.0.6
+-[1m[92m   Compiling[0m gungraun v0.17.0
+-[1m[92m   Compiling[0m walkdir v2.5.0
+-[1m[92m   Compiling[0m tempfile v3.23.0
+-[1m[92m   Compiling[0m textwrap v0.16.2
+-[1m[92m   Compiling[0m criterion-plot v0.6.0
+-[1m[92m   Compiling[0m rayon v1.11.0
+-[1m[92m   Compiling[0m petgraph v0.8.3
+-[1m[92m   Compiling[0m plotters v0.3.7
+-[1m[92m   Compiling[0m flate2 v1.1.4
+-[1m[92m   Compiling[0m regex v1.11.3
+-[1m[92m   Compiling[0m tui-textarea v0.7.0
+-[1m[92m   Compiling[0m clap v4.5.48
+-[1m[92m   Compiling[0m ciborium v0.2.2
+-[1m[92m   Compiling[0m uuid v1.18.1
+-[1m[92m   Compiling[0m merlin-providers v0.1.0 (/home/runner/work/agentic_optimizer/agentic_optimizer/crates/merlin-providers)
+-[1m[92m   Compiling[0m merlin-local v0.1.0 (/home/runner/work/agentic_optimizer/agentic_optimizer/crates/merlin-local)
+-[1m[92m   Compiling[0m tinytemplate v1.2.1
+-[1m[92m   Compiling[0m bincode v1.3.3
+-[1m[92m   Compiling[0m anes v0.1.6
+-[1m[92m   Compiling[0m oorandom v11.1.5
+-[1m[92m   Compiling[0m merlin-routing v0.1.0 (/home/runner/work/agentic_optimizer/agentic_optimizer/crates/merlin-routing)
+-[1m[92m   Compiling[0m criterion v0.7.0
+-[1m[92m    Finished[0m `ci-release` profile [optimized] target(s) in 1m 08s
+-[1m[92m     Running[0m benches/gungraun_integration.rs (target/ci-release/deps/gungraun_integration-9633c61419529031)
+-[32mgungraun_integration::integration_group::gungraun_e2e_simple_query[0m
+-[90m  [0mInstructions:                       [1m99473[0m|N/A                  ([90m*********[0m)
+-[90m  [0mL1 Hits:                           [1m136013[0m|N/A                  ([90m*********[0m)
+-[90m  [0mLL Hits:                              [1m887[0m|N/A                  ([90m*********[0m)
+-[90m  [0mRAM Hits:                            [1m1912[0m|N/A                  ([90m*********[0m)
+-[90m  [0mTotal read+write:                  [1m138812[0m|N/A                  ([90m*********[0m)
+-[90m  [0mEstimated Cycles:                  [1m207368[0m|N/A                  ([90m*********[0m)
+-[32mgungraun_integration::integration_group::gungraun_e2e_code_modification[0m
+-[90m  [0mInstructions:                      [1m100507[0m|N/A                  ([90m*********[0m)
+-[90m  [0mL1 Hits:                           [1m137128[0m|N/A                  ([90m*********[0m)
+-[90m  [0mLL Hits:                              [1m907[0m|N/A                  ([90m*********[0m)
+-[90m  [0mRAM Hits:                            [1m1908[0m|N/A                  ([90m*********[0m)
+-[90m  [0mTotal read+write:                  [1m139943[0m|N/A                  ([90m*********[0m)
+-[90m  [0mEstimated Cycles:                  [1m208443[0m|N/A                  ([90m*********[0m)
+-[32mgungraun_integration::integration_group::gungraun_e2e_complex_refactor[0m
+-[90m  [0mInstructions:                      [1m125886[0m|N/A                  ([90m*********[0m)
+-[90m  [0mL1 Hits:                           [1m170326[0m|N/A                  ([90m*********[0m)
+-[90m  [0mLL Hits:                              [1m921[0m|N/A                  ([90m*********[0m)
+-[90m  [0mRAM Hits:                            [1m1977[0m|N/A                  ([90m*********[0m)
+-[90m  [0mTotal read+write:                  [1m173224[0m|N/A                  ([90m*********[0m)
+-[90m  [0mEstimated Cycles:                  [1m244126[0m|N/A                  ([90m*********[0m)
+-[32mgungraun_integration::integration_group::gungraun_sequential_requests[0m
+-[90m  [0mInstructions:                      [1m145130[0m|N/A                  ([90m*********[0m)
+-[90m  [0mL1 Hits:                           [1m194828[0m|N/A                  ([90m*********[0m)
+-[90m  [0mLL Hits:                              [1m965[0m|N/A                  ([90m*********[0m)
+-[90m  [0mRAM Hits:                            [1m1973[0m|N/A                  ([90m*********[0m)
+-[90m  [0mTotal read+write:                  [1m197766[0m|N/A                  ([90m*********[0m)
+-[90m  [0mEstimated Cycles:                  [1m268708[0m|N/A                  ([90m*********[0m)
+-
+-Gungraun result: [1;32mOk[0m. 4 without regressions; 0 regressed; 0 filtered; 4 benchmarks finished in 1.60335s
+-[1m[92m     Running[0m benches/gungraun_routing.rs (target/ci-release/deps/gungraun_routing-c1b968ed97de491d)
+-[32mgungraun_routing::routing_group::gungraun_analyze_simple_request[0m
+-[90m  [0mInstructions:                       [1m98915[0m|N/A                  ([90m*********[0m)
+-[90m  [0mL1 Hits:                           [1m135235[0m|N/A                  ([90m*********[0m)
+-[90m  [0mLL Hits:                              [1m896[0m|N/A                  ([90m*********[0m)
+-[90m  [0mRAM Hits:                            [1m1910[0m|N/A                  ([90m*********[0m)
+-[90m  [0mTotal read+write:                  [1m138041[0m|N/A                  ([90m*********[0m)
+-[90m  [0mEstimated Cycles:                  [1m206565[0m|N/A                  ([90m*********[0m)
+-[32mgungraun_routing::routing_group::gungraun_analyze_medium_request[0m
+-[90m  [0mInstructions:                      [1m120751[0m|N/A                  ([90m*********[0m)
+-[90m  [0mL1 Hits:                           [1m163838[0m|N/A                  ([90m*********[0m)
+-[90m  [0mLL Hits:                              [1m912[0m|N/A                  ([90m*********[0m)
+-[90m  [0mRAM Hits:                            [1m1969[0m|N/A                  ([90m*********[0m)
+-[90m  [0mTotal read+write:                  [1m166719[0m|N/A                  ([90m*********[0m)
+-[90m  [0mEstimated Cycles:                  [1m237313[0m|N/A                  ([90m*********[0m)
+-[32mgungraun_routing::routing_group::gungraun_analyze_complex_request[0m
+-[90m  [0mInstructions:                      [1m105901[0m|N/A                  ([90m*********[0m)
+-[90m  [0mL1 Hits:                           [1m143525[0m|N/A                  ([90m*********[0m)
+-[90m  [0mLL Hits:                              [1m908[0m|N/A                  ([90m*********[0m)
+-[90m  [0mRAM Hits:                            [1m1920[0m|N/A                  ([90m*********[0m)
+-[90m  [0mTotal read+write:                  [1m146353[0m|N/A                  ([90m*********[0m)
+-[90m  [0mEstimated Cycles:                  [1m215265[0m|N/A                  ([90m*********[0m)
+-[32mgungraun_routing::routing_group::gungraun_create_orchestrator[0m
+-[90m  [0mInstructions:                        [1m6193[0m|N/A                  ([90m*********[0m)
+-[90m  [0mL1 Hits:                             [1m8587[0m|N/A                  ([90m*********[0m)
+-[90m  [0mLL Hits:                               [1m24[0m|N/A                  ([90m*********[0m)
+-[90m  [0mRAM Hits:                              [1m95[0m|N/A                  ([90m*********[0m)
+-[90m  [0mTotal read+write:                    [1m8706[0m|N/A                  ([90m*********[0m)
+-[90m  [0mEstimated Cycles:                   [1m12032[0m|N/A                  ([90m*********[0m)
+-[32mgungraun_routing::routing_group::gungraun_create_config[0m
+-[90m  [0mInstructions:                         [1m935[0m|N/A                  ([90m*********[0m)
+-[90m  [0mL1 Hits:                             [1m1322[0m|N/A                  ([90m*********[0m)
+-[90m  [0mLL Hits:                                [1m1[0m|N/A                  ([90m*********[0m)
+-[90m  [0mRAM Hits:                              [1m18[0m|N/A                  ([90m*********[0m)
+-[90m  [0mTotal read+write:                    [1m1341[0m|N/A                  ([90m*********[0m)
+-[90m  [0mEstimated Cycles:                    [1m1957[0m|N/A                  ([90m*********[0m)
+-
+-Gungraun result: [1;32mOk[0m. 5 without regressions; 0 regressed; 0 filtered; 5 benchmarks finished in 1.76525s
+\ No newline at end of file

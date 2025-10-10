@@ -48,9 +48,9 @@ function getChangeClass(change, inverse = false) {
 async function loadBenchmarkData() {
     try {
         const [qualityData, perfData, gungraunData] = await Promise.all([
-            fetch('data/quality-latest.json').then(r => r.ok ? r.json() : null).catch(() => null),
-            fetch('data/perf-latest.json').then(r => r.ok ? r.json() : null).catch(() => null),
-            fetch('data/gungraun-latest.json').then(r => r.ok ? r.json() : null).catch(() => null)
+            fetch('data/quality/latest.json').then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch('data/criterion/latest.json').then(r => r.ok ? r.json() : null).catch(() => null),
+            fetch('data/gungraun/latest.json').then(r => r.ok ? r.json() : null).catch(() => null)
         ]);
 
         // Store data globally for filtering

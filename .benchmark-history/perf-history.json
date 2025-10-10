@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-10-10T06:37:36.496536",
+  "timestamp": "2025-10-10T06:41:07.778086",
   "type": "criterion",
   "benchmarks": [],
   "metrics": {
@@ -22,6 +22,12 @@
     },
     {
       "timestamp": "2025-10-10T06:37:36.496536",
+      "total_benchmarks": 0,
+      "avg_time_ms": 0,
+      "total_time_ms": 0
+    },
+    {
+      "timestamp": "2025-10-10T06:41:07.778086",
       "total_benchmarks": 0,
       "avg_time_ms": 0,
       "total_time_ms": 0

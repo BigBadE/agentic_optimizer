@@ -52,20 +52,8 @@ jobs:
         run: |
           cargo bench --profile ci-release -p merlin-routing --bench gungraun_integration --bench gungraun_routing 2>&1 | tee gungraun-output.txt || true
 
-      - name: Format Gungraun results to markdown
-        run: |
-          python3 scripts/format-gungraun.py gungraun-output.txt gungraun-results.md
-
-      - name: Upload results artifact
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: gungraun-benchmark-results
-          path: |
-            gungraun-output.txt
-            gungraun-results.md
-          retention-days: 90
-          if-no-files-found: warn
+      - name: Test
+        run: cat gungraun-output.txt
 
       - name: Prepare gh-pages workspace
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -88,7 +76,6 @@ jobs:
             --output-dir benchmark-data
 
       - name: Upload parsed JSON
-        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: gungraun-json-results

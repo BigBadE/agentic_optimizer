@@ -69,6 +69,11 @@ jobs:
       - name: Parse benchmark results
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         run: |
+          # Copy existing history from gh-pages if it exists
+          if [ -d gh-pages/.benchmark-history ]; then
+            cp -r gh-pages/.benchmark-history .
+          fi
+
           python3 scripts/parse-benchmarks.py \
             --quality-results quality-results.md \
             --output-dir /tmp/benchmark-data \
@@ -90,9 +95,16 @@ jobs:
           cp ../quality-results.md quality-bench/latest.md
           cp ../quality-results.md "quality-bench/${ts}.md"
           
-          # Copy parsed JSON data
+          # Copy parsed JSON data (both latest and history)
           if [ -f /tmp/benchmark-data/quality-latest.json ]; then
             cp /tmp/benchmark-data/quality-latest.json data/
+            # Also save timestamped version for history
+            cp /tmp/benchmark-data/quality-latest.json "data/quality-${ts}.json"
+          fi
+
+          # Copy history directory
+          if [ -d ../.benchmark-history ]; then
+            cp -r ../.benchmark-history .
           fi
           
           # Generate dashboard if it doesn't exist
@@ -107,16 +119,10 @@ jobs:
           # Commit and push
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add quality-bench/ data/ index.html assets/ || true
+          git add quality-bench/ data/ .benchmark-history/ index.html assets/ || true
           git commit -m "Update quality benchmark results: ${ts}" || echo "No changes to commit"
+          git pull --rebase origin gh-pages || true
           git push origin gh-pages
 
-      - name: Remove quality-results.md from repo
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        run: |
-          git config user.name 'github-actions[bot]'
-          git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git rm quality-results.md
-          git commit -m "chore: remove quality-results.md after publishing to gh-pages [skip ci]"
-          git push origin master
+      # Don't remove quality-results.md - keep it for manual review and re-runs
 

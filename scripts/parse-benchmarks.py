@@ -11,7 +11,13 @@ from datetime import datetime
 from typing import Dict, List, Any, Optional
 
 def parse_criterion_results(criterion_dir: Path) -> Dict[str, Any]:
-    """Parse Criterion benchmark results from target/criterion directory."""
+    """Parse Criterion benchmark results from target/criterion directory.
+
+    Note: This requires that criterion benchmarks have been run locally and
+    the target/criterion directory exists. The benchmark.yml workflow does NOT
+    run benchmarks - it expects perf-results.md to be generated locally and
+    committed, which triggers the workflow.
+    """
     results = {
         "timestamp": datetime.now().isoformat(),
         "type": "criterion",
@@ -26,7 +32,6 @@ def parse_criterion_results(criterion_dir: Path) -> Dict[str, Any]:
     # Look for benchmark groups
     if not criterion_dir.exists():
         print(f"Warning: Criterion directory not found: {criterion_dir}", file=sys.stderr)
-        print("Using default metrics", file=sys.stderr)
         return results
 
     for group_dir in criterion_dir.iterdir():
@@ -136,14 +141,15 @@ def parse_gungraun_output(output_file: Path) -> Dict[str, Any]:
         #             RAM Accesses:                  45 (+4.651163%)
         #             Estimated Cycles:           55370 (+0.164619%)
 
+        # More flexible pattern - allow various whitespace and formats
         bench_pattern = re.compile(
-            r'(?P<name>[^\n]+?)\s+Instructions:\s+(?P<instructions>[\d,]+)',
+            r'([a-zA-Z_][a-zA-Z0-9_/:\-]*)\s+Instructions:\s*([\d,]+)',
             re.MULTILINE
         )
 
         for match in bench_pattern.finditer(content):
-            bench_name = match.group('name').strip()
-            instructions = int(match.group('instructions').replace(',', ''))
+            bench_name = match.group(1).strip()
+            instructions = int(match.group(2).replace(',', ''))
 
             # Extract position after the benchmark name to find associated metrics
             start_pos = match.end()
@@ -328,62 +334,50 @@ def main():
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.history_dir.mkdir(parents=True, exist_ok=True)
     
-    print("📊 Parsing benchmark results...")
-    
     # Parse Criterion results
-    print("  - Parsing Criterion benchmarks...")
     criterion_results = parse_criterion_results(args.criterion_dir)
     criterion_with_history = merge_with_history(
         criterion_results,
         args.history_dir / "perf-history.json"
     )
-    
+
     output_file = args.output_dir / "perf-latest.json"
     with open(output_file, 'w') as f:
         json.dump(criterion_with_history, f, indent=2)
-    print(f"    ✅ Saved to {output_file}")
-    
+
     # Save history
     with open(args.history_dir / "perf-history.json", 'w') as f:
         json.dump(criterion_with_history, f, indent=2)
-    
+
     # Parse Gungraun results
-    print("  - Parsing Gungraun benchmarks...")
     gungraun_results = parse_gungraun_output(args.gungraun_output)
     gungraun_with_history = merge_with_history(
         gungraun_results,
         args.history_dir / "gungraun-history.json"
     )
-    
+
     output_file = args.output_dir / "gungraun-latest.json"
     with open(output_file, 'w') as f:
         json.dump(gungraun_with_history, f, indent=2)
-    print(f"    ✅ Saved to {output_file}")
-    
+
     # Save history
     with open(args.history_dir / "gungraun-history.json", 'w') as f:
         json.dump(gungraun_with_history, f, indent=2)
-    
+
     # Parse quality benchmarks
-    print("  - Parsing quality benchmarks...")
     quality_results = parse_quality_benchmarks(args.quality_results)
     quality_with_history = merge_with_history(
         quality_results,
         args.history_dir / "quality-history.json"
     )
-    
+
     output_file = args.output_dir / "quality-latest.json"
     with open(output_file, 'w') as f:
         json.dump(quality_with_history, f, indent=2)
-    print(f"    ✅ Saved to {output_file}")
-    
+
     # Save history
     with open(args.history_dir / "quality-history.json", 'w') as f:
         json.dump(quality_with_history, f, indent=2)
-    
-    print("\n✅ All benchmark results parsed successfully!")
-    print(f"📁 Output directory: {args.output_dir}")
-    print(f"📁 History directory: {args.history_dir}")
 
 if __name__ == "__main__":
     main()

@@ -22,14 +22,15 @@ def parse_gungraun_terminal_output(content: str) -> List[Dict[str, Any]]:
     #             RAM Accesses:                  45 (+4.651163%)
     #             Estimated Cycles:           55370 (+0.164619%)
 
+    # More flexible pattern - allow various whitespace and formats
     bench_pattern = re.compile(
-        r'(?P<name>[^\n]+?)\s+Instructions:\s+(?P<instructions>[\d,]+)',
+        r'([a-zA-Z_][a-zA-Z0-9_/:\-]*)\s+Instructions:\s*([\d,]+)',
         re.MULTILINE
     )
 
     for match in bench_pattern.finditer(content):
-        bench_name = match.group('name').strip()
-        instructions = int(match.group('instructions').replace(',', ''))
+        bench_name = match.group(1).strip()
+        instructions = int(match.group(2).replace(',', ''))
 
         # Extract position after the benchmark name to find associated metrics
         start_pos = match.end()

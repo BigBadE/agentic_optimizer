@@ -50,25 +50,11 @@ jobs:
 
       - name: Run Gungraun benchmarks
         run: |
-          # Run gungraun benchmarks (requires Valgrind)
-          cargo bench --profile ci-release -p merlin-routing --bench gungraun_integration --bench gungraun_routing > gungraun-output.txt 2>&1 || true
-          echo "✅ Gungraun benchmarks completed"
-          if [ -f gungraun-output.txt ]; then
-            echo "📊 Preview of raw output:"
-            head -30 gungraun-output.txt
-          else
-            echo "⚠️ Warning: gungraun-output.txt not found"
-          fi
+          cargo bench --profile ci-release -p merlin-routing --bench gungraun_integration --bench gungraun_routing 2>&1 | tee gungraun-output.txt || true
 
       - name: Format Gungraun results to markdown
         run: |
-          if [ -f gungraun-output.txt ]; then
-            python3 scripts/format-gungraun.py gungraun-output.txt gungraun-results.md
-            echo "📊 Preview of formatted markdown:"
-            head -30 gungraun-results.md
-          else
-            echo "⚠️ Skipping format: gungraun-output.txt not found"
-          fi
+          python3 scripts/format-gungraun.py gungraun-output.txt gungraun-results.md
 
       - name: Upload results artifact
         if: always()

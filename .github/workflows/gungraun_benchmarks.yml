@@ -81,47 +81,40 @@ jobs:
         with:
           python-version: '3.11'
 
-      - name: Parse benchmark results
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('gungraun-output.txt') != ''
+      - name: Parse benchmark results to JSON
         run: |
-          # Copy existing history from gh-pages if it exists
-          if [ -d gh-pages/.benchmark-history ]; then
-            cp -r gh-pages/.benchmark-history .
-          fi
-
           python3 scripts/parse-benchmarks.py \
             --gungraun-output gungraun-output.txt \
-            --output-dir /tmp/benchmark-data \
-            --history-dir .benchmark-history
+            --output-dir benchmark-data
+
+      - name: Upload parsed JSON
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: gungraun-json-results
+          path: benchmark-data/gungraun-latest.json
+          retention-days: 90
+          if-no-files-found: warn
 
       - name: Publish Gungraun results to gh-pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('gungraun-results.md') != ''
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmark-data/gungraun-latest.json') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
-          
+
           # Switch to gh-pages branch
           cd gh-pages
-          
+
           # Create directories
-          mkdir -p gungraun-bench data
-          
-          # Copy markdown results
-          cp ../gungraun-results.md gungraun-bench/latest.md
-          cp ../gungraun-results.md "gungraun-bench/${ts}.md"
-          
-          # Copy parsed JSON data (both latest and history)
-          if [ -f /tmp/benchmark-data/gungraun-latest.json ]; then
-            cp /tmp/benchmark-data/gungraun-latest.json data/
+          mkdir -p data
+
+          # Copy pre-generated JSON data
+          if [ -f ../benchmark-data/gungraun-latest.json ]; then
+            cp ../benchmark-data/gungraun-latest.json data/
             # Also save timestamped version for history
-            cp /tmp/benchmark-data/gungraun-latest.json "data/gungraun-${ts}.json"
+            cp ../benchmark-data/gungraun-latest.json "data/gungraun-${ts}.json"
           fi
 
-          # Copy history directory
-          if [ -d ../.benchmark-history ]; then
-            cp -r ../.benchmark-history .
-          fi
-          
           # Generate dashboard if it doesn't exist
           if [ ! -f index.html ]; then
             cd ..
@@ -130,11 +123,11 @@ jobs:
             cp /tmp/dashboard-temp/index.html .
             cp -r /tmp/dashboard-temp/assets .
           fi
-          
+
           # Commit and push
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add gungraun-bench/ data/ .benchmark-history/ index.html assets/ || true
+          git add data/ index.html assets/ || true
           git commit -m "Update Gungraun benchmark results: ${ts}" || echo "No changes to commit"
           git pull --rebase origin gh-pages || true
           git push origin gh-pages

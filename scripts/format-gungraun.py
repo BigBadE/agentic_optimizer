@@ -23,8 +23,9 @@ def parse_gungraun_terminal_output(content: str) -> List[Dict[str, Any]]:
     #             Estimated Cycles:           55370 (+0.164619%)
 
     # More flexible pattern - allow various whitespace and formats
+    # Handles both old format (name Instructions: value) and new format (name\n  Instructions: value)
     bench_pattern = re.compile(
-        r'([a-zA-Z_][a-zA-Z0-9_/:\-]*)\s+Instructions:\s*([\d,]+)',
+        r'([a-zA-Z_][a-zA-Z0-9_/::\-]+)\s*\n?\s*Instructions:\s*([\d,]+)',
         re.MULTILINE
     )
 
@@ -49,7 +50,8 @@ def parse_gungraun_terminal_output(content: str) -> List[Dict[str, Any]]:
         if l1_match:
             l1_accesses = int(l1_match.group(1).replace(',', ''))
 
-        l2_match = re.search(r'L2 (?:Accesses|Hits):\s+([\d,]+)', bench_section)
+        # Handle both "L2 Accesses/Hits" and "LL Hits" (last level cache)
+        l2_match = re.search(r'(?:L2|LL) (?:Accesses|Hits):\s+([\d,]+)', bench_section)
         if l2_match:
             l2_accesses = int(l2_match.group(1).replace(',', ''))
 

@@ -4,7 +4,7 @@ on:
   push:
     branches: [ master ]
     paths:
-      - 'perf-results.md'
+      - 'benchmark-data/perf-latest.json'
   workflow_dispatch:
 
 concurrency:
@@ -30,26 +30,33 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for performance results
+      - name: Check for benchmark JSON
         id: check_results
         run: |
-          if [ ! -f perf-results.md ]; then
+          if [ ! -f benchmark-data/perf-latest.json ]; then
             echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No perf-results.md found. Run benchmarks locally first:"
-            echo "  cargo run --release --bin perf-bench -- --output perf-results.md"
+            echo "❌ No benchmark JSON found at benchmark-data/perf-latest.json"
+            echo ""
+            echo "To generate benchmark results locally:"
+            echo "  1. cargo bench --workspace"
+            echo "  2. python3 scripts/parse-benchmarks.py --criterion-dir target/criterion --output-dir benchmark-data"
+            echo "  3. git add benchmark-data/perf-latest.json"
+            echo "  4. git commit -m 'Update performance benchmarks'"
             exit 1
           else
             echo "exists=true" >> $GITHUB_OUTPUT
-            echo "✅ Found perf-results.md"
-            head -20 perf-results.md
+            echo "✅ Found benchmark JSON"
+            cat benchmark-data/perf-latest.json | head -30
           fi
 
       - name: Upload results artifact
+        if: always()
         uses: actions/upload-artifact@v4
         with:
           name: performance-benchmark-results
-          path: perf-results.md
+          path: benchmark-data/perf-latest.json
           retention-days: 90
+          if-no-files-found: warn
 
       - name: Prepare gh-pages workspace
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -59,53 +66,25 @@ jobs:
           path: gh-pages
           fetch-depth: 0
 
-      - name: Setup Python
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Parse benchmark results
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        run: |
-          # Copy existing history from gh-pages if it exists
-          if [ -d gh-pages/.benchmark-history ]; then
-            cp -r gh-pages/.benchmark-history .
-          fi
-
-          python3 scripts/parse-benchmarks.py \
-            --criterion-dir target/criterion \
-            --output-dir /tmp/benchmark-data \
-            --history-dir .benchmark-history
-
       - name: Publish performance results to gh-pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmark-data/perf-latest.json') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
-          
+
           # Switch to gh-pages branch
           cd gh-pages
-          
+
           # Create directories
-          mkdir -p perf-bench data
-          
-          # Copy markdown results
-          cp ../perf-results.md perf-bench/latest.md
-          cp ../perf-results.md "perf-bench/${ts}.md"
-          
-          # Copy parsed JSON data (both latest and history)
-          if [ -f /tmp/benchmark-data/perf-latest.json ]; then
-            cp /tmp/benchmark-data/perf-latest.json data/
+          mkdir -p data
+
+          # Copy pre-generated JSON data
+          if [ -f ../benchmark-data/perf-latest.json ]; then
+            cp ../benchmark-data/perf-latest.json data/
             # Also save timestamped version for history
-            cp /tmp/benchmark-data/perf-latest.json "data/perf-${ts}.json"
+            cp ../benchmark-data/perf-latest.json "data/perf-${ts}.json"
           fi
 
-          # Copy history directory
-          if [ -d ../.benchmark-history ]; then
-            cp -r ../.benchmark-history .
-          fi
-          
           # Generate dashboard if it doesn't exist
           if [ ! -f index.html ]; then
             cd ..
@@ -114,13 +93,11 @@ jobs:
             cp /tmp/dashboard-temp/index.html .
             cp -r /tmp/dashboard-temp/assets .
           fi
-          
+
           # Commit and push
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
-          git add perf-bench/ data/ .benchmark-history/ index.html assets/ || true
+          git add data/ index.html assets/ || true
           git commit -m "Update performance benchmark results: ${ts}" || echo "No changes to commit"
           git pull --rebase origin gh-pages || true
           git push origin gh-pages
-
-      # Don't remove perf-results.md - keep it for manual review and re-runs

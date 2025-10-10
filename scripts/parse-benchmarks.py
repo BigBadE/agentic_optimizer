@@ -218,7 +218,7 @@ def parse_gungraun_output(output_file: Path) -> Tuple[Dict[str, Any], bool]:
         import traceback
         traceback.print_exc()
 
-    return results
+    return results, bool(results["benchmarks"])  # valid only if at least one benchmark parsed
 
 def parse_quality_benchmarks(results_file: Path) -> Tuple[Dict[str, Any], bool]:
     """Parse quality benchmark results from markdown table format."""

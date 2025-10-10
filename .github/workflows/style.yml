@@ -22,14 +22,12 @@ jobs:
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
-        with:
-          clean: true
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
           profile: debug
-          components: rustc-codegen-cranelift-preview, clippy, rustfmt
+          components: clippy, rustfmt
 
       - name: Cache test
         run: cargo build --verbose

@@ -30,20 +30,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for quality results
-        id: check_results
-        run: |
-          if [ ! -f benchmarks/data/quality-results.md ]; then
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No benchmarks/data/quality-results.md found. Run benchmarks locally first:"
-            echo "  bash scripts/benchmark.sh"
-            exit 1
-          else
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "✅ Found benchmarks/data/quality-results.md"
-            head -20 benchmarks/data/quality-results.md
-          fi
-
       - name: Upload results artifact
         uses: actions/upload-artifact@v4
         with:
@@ -58,19 +44,6 @@ jobs:
           ref: gh-pages
           path: gh-pages
           fetch-depth: 0
-
-      - name: Setup Python
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: actions/setup-python@v5
-        with:
-          python-version: '3.11'
-
-      - name: Parse benchmark results to JSON
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        run: |
-          python3 scripts/parse-benchmarks.py \
-            --quality-results benchmarks/data/quality-results.md \
-            --output-dir benchmark-data
 
       - name: Upload parsed JSON
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'

@@ -52,9 +52,6 @@ jobs:
         run: |
           cargo bench -p merlin-benchmarks-gungraun --bench gungraun_integration --bench gungraun_routing 2>&1 | tee gungraun-output.txt || true
 
-      - name: Test
-        run: cat gungraun-output.txt
-
       - name: Prepare gh-pages workspace
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
         uses: actions/checkout@v4

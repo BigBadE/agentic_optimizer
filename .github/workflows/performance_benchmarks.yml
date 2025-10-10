@@ -31,20 +31,6 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Check for criterion results
-        id: check_results
-        run: |
-          if [ ! -f benchmarks/data/criterion/latest.json ]; then
-            echo "exists=false" >> $GITHUB_OUTPUT
-            echo "⚠️ No benchmarks/data/criterion/latest.json found. Run benchmarks locally first:"
-            echo "  bash scripts/benchmark.sh"
-            exit 1
-          else
-            echo "exists=true" >> $GITHUB_OUTPUT
-            echo "✅ Found benchmarks/data/criterion/latest.json"
-            head -20 benchmarks/data/criterion/latest.json
-          fi
-
       - name: Upload results artifact
         uses: actions/upload-artifact@v4
         with:

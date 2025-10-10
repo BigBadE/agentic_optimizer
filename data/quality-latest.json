@@ -1,21 +1,25 @@
 {
-  "timestamp": "2025-10-10T02:56:12.024652",
+  "timestamp": "2025-10-10T05:44:13.906410",
   "type": "quality",
   "metrics": {
-    "success_rate": 95.5,
-    "avg_score": 8.7,
-    "total_tests": 150,
-    "passed_tests": 143,
-    "failed_tests": 7
+    "test_cases": 40,
+    "precision_at_3": 14.2,
+    "precision_at_10": 8.2,
+    "recall_at_10": 19.3,
+    "mrr": 0.285,
+    "ndcg_at_10": 0.189,
+    "critical_in_top_3": 18.8
   },
   "history": [
     {
-      "timestamp": "2025-10-10T02:56:12.024652",
-      "success_rate": 95.5,
-      "avg_score": 8.7,
-      "total_tests": 150,
-      "passed_tests": 143,
-      "failed_tests": 7
+      "timestamp": "2025-10-10T05:44:13.906410",
+      "test_cases": 40,
+      "precision_at_3": 14.2,
+      "precision_at_10": 8.2,
+      "recall_at_10": 19.3,
+      "mrr": 0.285,
+      "ndcg_at_10": 0.189,
+      "critical_in_top_3": 18.8
     }
   ]
 }

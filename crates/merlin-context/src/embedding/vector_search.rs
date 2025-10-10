@@ -1003,9 +1003,9 @@ impl VectorSearchManager {
     }
 
     /// Process embedding results for a single file
-    fn process_chunk_results(&mut self, chunk_results: Vec<ChunkResult>, total_chunks: &mut usize) {
+    fn process_chunk_results(&mut self, chunk_results: Vec<ChunkResult>) -> usize {
         if chunk_results.is_empty() {
-            return;
+            return 0;
         }
 
         let relative_path = &chunk_results[0].0;
@@ -1020,6 +1020,8 @@ impl VectorSearchManager {
             self.file_hashes.insert(relative_path.clone(), content_hash);
         }
 
+        let chunk_count = chunk_results.len();
+
         for (path, chunk, embedding, preview, _hash) in chunk_results {
             let chunk_path = format!("{}:{}-{}", path.display(), chunk.start_line, chunk.end_line);
 
@@ -1030,9 +1032,9 @@ impl VectorSearchManager {
             // Add to BM25 index
             self.bm25
                 .add_document(PathBuf::from(chunk_path), &chunk.content);
-
-            *total_chunks += 1;
         }
+
+        chunk_count
     }
 
     /// Embed a batch of files (chunked)
@@ -1056,13 +1058,14 @@ impl VectorSearchManager {
                 tasks.spawn(Self::embed_single_file(relative_path, absolute_path));
             }
 
-            // Collect results
+            // Collect results from the batch
+            let mut batch_chunks = 0;
+
             while let Some(result) = tasks.join_next().await {
                 match result {
                     Ok(chunk_results) if !chunk_results.is_empty() => {
-                        self.process_chunk_results(chunk_results, &mut total_chunks);
-                        processed_files += 1;
-                        spinner.set_message(format!("Embedding files... {processed_files}/{total_files} ({total_chunks} chunks)"));
+                        let chunk_count = self.process_chunk_results(chunk_results);
+                        batch_chunks += chunk_count;
                     }
                     Err(task_error) => {
                         warn!("    Task error: {task_error}");
@@ -1070,6 +1073,14 @@ impl VectorSearchManager {
                     Ok(_) => {} // Empty results, skip
                 }
             }
+
+            // Update display once per batch instead of per file
+            // Always increment by batch size to track all files, not just successful ones
+            total_chunks += batch_chunks;
+            processed_files += file_batch.len();
+            spinner.set_message(format!(
+                "Embedding files... {processed_files}/{total_files} ({total_chunks} chunks)"
+            ));
         }
 
         // Finalize BM25 index (compute IDF scores)

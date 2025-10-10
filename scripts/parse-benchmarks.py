@@ -73,57 +73,95 @@ def parse_criterion_results(criterion_dir: Path) -> Dict[str, Any]:
     return results
 
 def parse_gungraun_output(output_file: Path) -> Dict[str, Any]:
-    """Parse Gungraun benchmark output."""
+    """Parse Gungraun benchmark output from raw text or markdown format."""
     results = {
         "timestamp": datetime.now().isoformat(),
         "type": "gungraun",
+        "benchmarks": [],
         "metrics": {}
     }
 
     if not output_file.exists():
         raise FileNotFoundError(f"Gungraun output file not found: {output_file}")
-    
+
     with open(output_file) as f:
         content = f.read()
 
-    # Parse total instructions
-    instr_match = re.search(r'I\s+refs:\s+([\d,]+)', content)
-    if not instr_match:
-        raise ValueError("Could not find instruction references (I refs) in Gungraun output")
-    instructions = int(instr_match.group(1).replace(',', ''))
-    results["metrics"]["total_instructions"] = instructions
+    # Parse gungraun output format:
+    # benchmark_name
+    #   Instructions:                       98915|N/A                  (*********)
+    #   L1 Hits:                           135249|N/A                  (*********)
+    #   LL Hits:                              873|N/A                  (*********)
+    #   RAM Hits:                            1919|N/A                  (*********)
+    #   Total read+write:                  138041|N/A                  (*********)
+    #   Estimated Cycles:                  206779|N/A                  (*********)
 
-    # Parse memory allocations
-    alloc_match = re.search(r'total heap usage:\s+([\d,]+)\s+allocs', content)
-    if not alloc_match:
-        raise ValueError("Could not find total allocations in Gungraun output")
-    allocs = int(alloc_match.group(1).replace(',', ''))
-    results["metrics"]["total_allocations"] = allocs
+    bench_pattern = re.compile(
+        r'([a-zA-Z_][a-zA-Z0-9_/::\-]+)\s*\n\s*Instructions:\s*([\d,]+)',
+        re.MULTILINE
+    )
 
-    # Parse bytes allocated
-    bytes_match = re.search(r'total heap usage:.*?([\d,]+)\s+bytes allocated', content)
-    if not bytes_match:
-        raise ValueError("Could not find bytes allocated in Gungraun output")
-    bytes_allocated = int(bytes_match.group(1).replace(',', ''))
-    results["metrics"]["bytes_allocated"] = bytes_allocated
-    results["metrics"]["peak_memory_mb"] = round(bytes_allocated / (1024 * 1024), 2)
+    for match in bench_pattern.finditer(content):
+        bench_name = match.group(1).strip()
+        instructions = int(match.group(2).replace(',', ''))
 
-    # Parse cache references and misses
-    cache_refs_match = re.search(r'D\s+refs:\s+([\d,]+)', content)
-    if not cache_refs_match:
-        raise ValueError("Could not find data references (D refs) in Gungraun output")
-    cache_refs = int(cache_refs_match.group(1).replace(',', ''))
-    results["metrics"]["cache_references"] = cache_refs
+        # Extract section for this benchmark
+        start_pos = match.end()
+        next_match = bench_pattern.search(content, start_pos)
+        end_pos = next_match.start() if next_match else len(content)
+        bench_section = content[start_pos:end_pos]
 
-    cache_miss_match = re.search(r'D1\s+misses:\s+([\d,]+)', content)
-    if not cache_miss_match:
-        raise ValueError("Could not find D1 cache misses in Gungraun output")
-    cache_misses = int(cache_miss_match.group(1).replace(',', ''))
-    results["metrics"]["cache_misses"] = cache_misses
+        # Extract metrics
+        l1_hits = 0
+        ll_hits = 0
+        ram_hits = 0
+        estimated_cycles = 0
 
-    # Calculate cache miss rate
-    miss_rate = (cache_misses / cache_refs) * 100
-    results["metrics"]["cache_miss_rate"] = round(miss_rate, 2)
+        l1_match = re.search(r'L1 (?:Accesses|Hits):\s*([\d,]+)', bench_section)
+        if l1_match:
+            l1_hits = int(l1_match.group(1).replace(',', ''))
+
+        ll_match = re.search(r'(?:LL|L2) (?:Accesses|Hits):\s*([\d,]+)', bench_section)
+        if ll_match:
+            ll_hits = int(ll_match.group(1).replace(',', ''))
+
+        ram_match = re.search(r'RAM (?:Accesses|Hits):\s*([\d,]+)', bench_section)
+        if ram_match:
+            ram_hits = int(ram_match.group(1).replace(',', ''))
+
+        cycles_match = re.search(r'Estimated Cycles:\s*([\d,]+)', bench_section)
+        if cycles_match:
+            estimated_cycles = int(cycles_match.group(1).replace(',', ''))
+
+        results["benchmarks"].append({
+            "name": bench_name,
+            "instructions": instructions,
+            "l1_hits": l1_hits,
+            "ll_hits": ll_hits,
+            "ram_hits": ram_hits,
+            "estimated_cycles": estimated_cycles
+        })
+
+    if not results["benchmarks"]:
+        raise ValueError(f"No Gungraun benchmarks found in {output_file} - check output format")
+
+    # Calculate aggregate metrics
+    total_instructions = sum(b["instructions"] for b in results["benchmarks"])
+    total_cycles = sum(b["estimated_cycles"] for b in results["benchmarks"])
+    total_l1 = sum(b["l1_hits"] for b in results["benchmarks"])
+    total_ll = sum(b["ll_hits"] for b in results["benchmarks"])
+    total_ram = sum(b["ram_hits"] for b in results["benchmarks"])
+
+    results["metrics"] = {
+        "total_benchmarks": len(results["benchmarks"]),
+        "total_instructions": total_instructions,
+        "avg_instructions": total_instructions // len(results["benchmarks"]),
+        "total_cycles": total_cycles,
+        "avg_cycles": total_cycles // len(results["benchmarks"]),
+        "total_l1_hits": total_l1,
+        "total_ll_hits": total_ll,
+        "total_ram_hits": total_ram,
+    }
 
     return results
 
@@ -215,79 +253,106 @@ def merge_with_history(current: Dict[str, Any], history_file: Path, max_history:
 
 def main():
     import argparse
-    
+
     parser = argparse.ArgumentParser(description="Parse benchmark results and generate JSON")
-    parser.add_argument("--criterion-dir", type=Path, default=Path("target/criterion"),
-                       help="Path to Criterion output directory")
-    parser.add_argument("--gungraun-output", type=Path, default=Path("gungraun-results.md"),
-                       help="Path to Gungraun output file")
-    parser.add_argument("--quality-results", type=Path, default=Path("quality-results.md"),
-                       help="Path to quality benchmark results")
+    parser.add_argument("--criterion-dir", type=Path,
+                       help="Path to Criterion output directory (optional)")
+    parser.add_argument("--gungraun-output", type=Path,
+                       help="Path to Gungraun output file (optional)")
+    parser.add_argument("--quality-results", type=Path,
+                       help="Path to quality benchmark results (optional)")
     parser.add_argument("--output-dir", type=Path, default=Path("gh-pages/data"),
                        help="Output directory for JSON files")
     parser.add_argument("--history-dir", type=Path, default=Path(".benchmark-history"),
                        help="Directory for historical data")
-    
+
     args = parser.parse_args()
-    
+
     # Create output directories
     args.output_dir.mkdir(parents=True, exist_ok=True)
     args.history_dir.mkdir(parents=True, exist_ok=True)
-    
+
     print("Parsing benchmark results...")
 
-    # Parse Criterion results
-    print("  - Parsing Criterion benchmarks...")
-    criterion_results = parse_criterion_results(args.criterion_dir)
-    criterion_with_history = merge_with_history(
-        criterion_results,
-        args.history_dir / "perf-history.json"
-    )
+    parsed_count = 0
 
-    output_file = args.output_dir / "perf-latest.json"
-    with open(output_file, 'w') as f:
-        json.dump(criterion_with_history, f, indent=2)
-    print(f"    [OK] Saved to {output_file}")
-    
-    # Save history
-    with open(args.history_dir / "perf-history.json", 'w') as f:
-        json.dump(criterion_with_history, f, indent=2)
-    
-    # Parse Gungraun results
-    print("  - Parsing Gungraun benchmarks...")
-    gungraun_results = parse_gungraun_output(args.gungraun_output)
-    gungraun_with_history = merge_with_history(
-        gungraun_results,
-        args.history_dir / "gungraun-history.json"
-    )
-    
-    output_file = args.output_dir / "gungraun-latest.json"
-    with open(output_file, 'w') as f:
-        json.dump(gungraun_with_history, f, indent=2)
-    print(f"    [OK] Saved to {output_file}")
-    
-    # Save history
-    with open(args.history_dir / "gungraun-history.json", 'w') as f:
-        json.dump(gungraun_with_history, f, indent=2)
-    
-    # Parse quality benchmarks
-    print("  - Parsing quality benchmarks...")
-    quality_results = parse_quality_benchmarks(args.quality_results)
-    quality_with_history = merge_with_history(
-        quality_results,
-        args.history_dir / "quality-history.json"
-    )
-    
-    output_file = args.output_dir / "quality-latest.json"
-    with open(output_file, 'w') as f:
-        json.dump(quality_with_history, f, indent=2)
-    print(f"    [OK] Saved to {output_file}")
-    
-    # Save history
-    with open(args.history_dir / "quality-history.json", 'w') as f:
-        json.dump(quality_with_history, f, indent=2)
-    
-    print("\n[OK] All benchmark results parsed successfully!")
+    # Parse Criterion results (optional)
+    if args.criterion_dir:
+        print("  - Parsing Criterion benchmarks...")
+        try:
+            criterion_results = parse_criterion_results(args.criterion_dir)
+            criterion_with_history = merge_with_history(
+                criterion_results,
+                args.history_dir / "perf-history.json"
+            )
+
+            output_file = args.output_dir / "perf-latest.json"
+            with open(output_file, 'w') as f:
+                json.dump(criterion_with_history, f, indent=2)
+            print(f"    [OK] Saved to {output_file}")
+
+            # Save history
+            with open(args.history_dir / "perf-history.json", 'w') as f:
+                json.dump(criterion_with_history, f, indent=2)
+
+            parsed_count += 1
+        except Exception as e:
+            print(f"    [ERROR] Failed to parse Criterion results: {e}", file=sys.stderr)
+
+    # Parse Gungraun results (optional)
+    if args.gungraun_output:
+        print("  - Parsing Gungraun benchmarks...")
+        try:
+            gungraun_results = parse_gungraun_output(args.gungraun_output)
+            gungraun_with_history = merge_with_history(
+                gungraun_results,
+                args.history_dir / "gungraun-history.json"
+            )
+
+            output_file = args.output_dir / "gungraun-latest.json"
+            with open(output_file, 'w') as f:
+                json.dump(gungraun_with_history, f, indent=2)
+            print(f"    [OK] Saved to {output_file}")
+
+            # Save history
+            with open(args.history_dir / "gungraun-history.json", 'w') as f:
+                json.dump(gungraun_with_history, f, indent=2)
+
+            parsed_count += 1
+        except Exception as e:
+            print(f"    [ERROR] Failed to parse Gungraun results: {e}", file=sys.stderr)
+
+    # Parse quality benchmarks (optional)
+    if args.quality_results:
+        print("  - Parsing quality benchmarks...")
+        try:
+            quality_results = parse_quality_benchmarks(args.quality_results)
+            quality_with_history = merge_with_history(
+                quality_results,
+                args.history_dir / "quality-history.json"
+            )
+
+            output_file = args.output_dir / "quality-latest.json"
+            with open(output_file, 'w') as f:
+                json.dump(quality_with_history, f, indent=2)
+            print(f"    [OK] Saved to {output_file}")
+
+            # Save history
+            with open(args.history_dir / "quality-history.json", 'w') as f:
+                json.dump(quality_with_history, f, indent=2)
+
+            parsed_count += 1
+        except Exception as e:
+            print(f"    [ERROR] Failed to parse quality results: {e}", file=sys.stderr)
+
+    if parsed_count == 0:
+        print("\n[ERROR] No benchmark results were parsed. Specify at least one of:", file=sys.stderr)
+        print("  --criterion-dir", file=sys.stderr)
+        print("  --gungraun-output", file=sys.stderr)
+        print("  --quality-results", file=sys.stderr)
+        sys.exit(1)
+
+    print(f"\n[OK] Successfully parsed {parsed_count} benchmark result(s)!")
     print(f"Output directory: {args.output_dir}")
     print(f"History directory: {args.history_dir}")
 

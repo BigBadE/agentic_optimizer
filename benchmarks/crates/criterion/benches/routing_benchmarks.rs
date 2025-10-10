@@ -31,6 +31,7 @@ fn bench_request_analysis(criterion: &mut Criterion) {
 
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
+    let runtime = create_runtime();
 
     let test_cases = vec![
         ("simple", "Add a comment to main function"),
@@ -51,7 +52,6 @@ fn bench_request_analysis(criterion: &mut Criterion) {
             &request,
             |bencher, &request| {
                 bencher.iter(|| {
-                    let runtime = create_runtime();
                     runtime
                         .block_on(async { orchestrator.analyze_request(black_box(request)).await })
                 });
@@ -66,6 +66,10 @@ fn bench_request_analysis(criterion: &mut Criterion) {
 fn bench_task_decomposition(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("task_decomposition");
 
+    let config = RoutingConfig::default();
+    let orchestrator = RoutingOrchestrator::new(config);
+    let runtime = create_runtime();
+
     let requests = vec![
         "Add error handling",
         "Create a new REST API endpoint with validation",
@@ -74,43 +78,10 @@ fn bench_task_decomposition(criterion: &mut Criterion) {
 
     for request in requests {
         group.bench_function(request, |bencher| {
-            let config = RoutingConfig::default();
-            let orchestrator = RoutingOrchestrator::new(config);
-
             bencher.iter(|| {
-                let runtime = create_runtime();
                 runtime.block_on(async { orchestrator.analyze_request(black_box(request)).await })
             });
         });
-    }
-
-    group.finish();
-}
-
-/// Benchmark complexity analysis (synchronous operation)
-fn bench_complexity_analysis(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("complexity_analysis");
-
-    let test_cases = vec![
-        ("simple", "Add a comment"),
-        ("medium", "Refactor module with error handling"),
-        ("complex", "Create OAuth2 system with JWT"),
-    ];
-
-    for (name, query) in test_cases {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(name),
-            &query,
-            |bencher, &query| {
-                bencher.iter(|| {
-                    // Analyze complexity of the query
-                    let char_count = query.chars().count();
-                    let word_count = query.split_whitespace().count();
-                    // Simplified complexity check
-                    black_box((char_count, word_count))
-                });
-            },
-        );
     }
 
     group.finish();
@@ -122,7 +93,7 @@ fn bench_task_graph(criterion: &mut Criterion) {
 
     let mut group = criterion.benchmark_group("task_graph");
 
-    let task_counts = vec![5, 10, 20, 50];
+    let task_counts = vec![5, 10, 20];
 
     for count in task_counts {
         group.bench_with_input(
@@ -144,12 +115,11 @@ fn bench_task_graph(criterion: &mut Criterion) {
 criterion_group! {
     name = benches;
     config = Criterion::default()
-        .measurement_time(Duration::from_secs(5))
-        .warm_up_time(Duration::from_secs(2))
-        .sample_size(20);
+        .measurement_time(Duration::from_secs(2))
+        .warm_up_time(Duration::from_millis(500))
+        .sample_size(10);
     targets = bench_request_analysis,
              bench_task_decomposition,
-             bench_complexity_analysis,
              bench_task_graph
 }
 

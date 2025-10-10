@@ -1,9 +1,0 @@
-# Agentic Optimizer Configuration Example
-# Copy this to config.toml and fill in your API keys
-
-[providers]
-openrouter_key = "sk-or-..."
-
-# Model tiers for different complexity tasks
-high_model = "anthropic/claude-sonnet-4-20250514"
-medium_model = "anthropic/claude-3.5-sonnet"

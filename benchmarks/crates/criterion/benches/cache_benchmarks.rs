@@ -9,8 +9,9 @@
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use merlin_core::{Response, TokenUsage};
-use merlin_routing::{CacheConfig, ResponseCache};
+use merlin_routing::ResponseCache;
 use std::hint::black_box;
+use std::time::Duration;
 
 fn create_test_response(text: &str) -> Response {
     Response {
@@ -25,7 +26,7 @@ fn create_test_response(text: &str) -> Response {
 fn bench_cache_put(c: &mut Criterion) {
     let mut group = c.benchmark_group("cache_put");
 
-    for size in &[10, 100, 1000] {
+    for size in &[10, 100] {
         group.throughput(Throughput::Elements(*size as u64));
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             b.iter(|| {
@@ -74,56 +75,14 @@ fn bench_cache_get_miss(c: &mut Criterion) {
     });
 }
 
-fn bench_cache_clear_expired(c: &mut Criterion) {
-    c.bench_function("cache_clear_expired", |b| {
-        b.iter(|| {
-            let config = CacheConfig {
-                enabled: true,
-                ttl_hours: 0, // Expire immediately
-                max_size_mb: 100,
-                similarity_threshold: 0.95,
-            };
-            let mut cache = ResponseCache::new(config);
-
-            // Add entries that will expire
-            for i in 0..100 {
-                let query = format!("query_{i}");
-                let response = create_test_response(&format!("response_{i}"));
-                cache.put(query, response);
-            }
-
-            cache.clear_expired();
-        });
-    });
+criterion_group! {
+    name = benches;
+    config = Criterion::default()
+        .measurement_time(Duration::from_secs(2))
+        .warm_up_time(Duration::from_millis(500))
+        .sample_size(10);
+    targets = bench_cache_put,
+             bench_cache_get_hit,
+             bench_cache_get_miss
 }
-
-fn bench_cache_eviction(c: &mut Criterion) {
-    c.bench_function("cache_eviction", |b| {
-        b.iter(|| {
-            let config = CacheConfig {
-                enabled: true,
-                ttl_hours: 24,
-                max_size_mb: 1, // Small size to trigger eviction
-                similarity_threshold: 0.95,
-            };
-            let mut cache = ResponseCache::new(config);
-
-            // Add entries that will trigger eviction
-            for i in 0..1000 {
-                let query = format!("query_{i}");
-                let response = create_test_response(&format!("response_{i}"));
-                cache.put(black_box(query), black_box(response));
-            }
-        });
-    });
-}
-
-criterion_group!(
-    benches,
-    bench_cache_put,
-    bench_cache_get_hit,
-    bench_cache_get_miss,
-    bench_cache_clear_expired,
-    bench_cache_eviction
-);
 criterion_main!(benches);

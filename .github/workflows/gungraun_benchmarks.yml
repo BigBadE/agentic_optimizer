@@ -50,7 +50,7 @@ jobs:
 
       - name: Run Gungraun benchmarks
         run: |
-          cargo bench --profile ci-release -p merlin-benchmarks-gungraun --bench gungraun_integration --bench gungraun_routing 2>&1 | tee gungraun-output.txt || true
+          cargo bench -p merlin-benchmarks-gungraun --bench gungraun_integration --bench gungraun_routing 2>&1 | tee gungraun-output.txt || true
 
       - name: Test
         run: cat gungraun-output.txt

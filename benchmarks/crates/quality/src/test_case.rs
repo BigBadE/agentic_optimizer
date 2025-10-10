@@ -19,12 +19,24 @@ pub struct TestCase {
     pub query: String,
     /// Project root directory
     pub project_root: String,
+    /// Repository configuration (optional, for auto-cloning)
+    #[serde(default)]
+    pub repository: Option<RepositoryConfig>,
     /// Expected relevant files
     #[serde(default)]
     pub expected: Vec<ExpectedFile>,
     /// Files that should NOT appear
     #[serde(default)]
     pub excluded: Vec<ExcludedFile>,
+}
+
+/// Repository configuration for test cases
+#[derive(Debug, Clone, Deserialize)]
+pub struct RepositoryConfig {
+    /// Repository URL (e.g., `<https://github.com/user/repo.git>`)
+    pub url: String,
+    /// Specific commit hash to pin to
+    pub commit: String,
 }
 
 /// Expected file entry from TOML

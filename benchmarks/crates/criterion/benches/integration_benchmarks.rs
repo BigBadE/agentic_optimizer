@@ -16,7 +16,6 @@
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use std::hint::black_box;
 use tokio::runtime::Runtime;
-use tokio::spawn;
 
 /// Helper to create runtime or panic (benchmarks expect setup to succeed)
 fn create_runtime() -> Runtime {
@@ -31,6 +30,7 @@ fn bench_end_to_end_request(criterion: &mut Criterion) {
 
     let config = RoutingConfig::default();
     let orchestrator = RoutingOrchestrator::new(config);
+    let runtime = create_runtime();
 
     let test_cases = vec![
         ("simple_query", "What does the main function do?"),
@@ -51,88 +51,8 @@ fn bench_end_to_end_request(criterion: &mut Criterion) {
             &request,
             |bencher, &request| {
                 bencher.iter(|| {
-                    let runtime = create_runtime();
                     runtime
                         .block_on(async { orchestrator.analyze_request(black_box(request)).await })
-                });
-            },
-        );
-    }
-
-    group.finish();
-}
-
-/// Benchmark memory usage patterns
-fn bench_memory_usage(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("memory_usage");
-
-    group.bench_function("orchestrator_creation", |bencher| {
-        bencher.iter(|| {
-            let config = RoutingConfig::default();
-            black_box(RoutingOrchestrator::new(config))
-        });
-    });
-
-    group.bench_function("multiple_requests", |bencher| {
-        let config = RoutingConfig::default();
-        let orchestrator = RoutingOrchestrator::new(config);
-        let requests = vec![
-            "Add a comment",
-            "Fix the bug",
-            "Refactor the code",
-            "Add tests",
-            "Update documentation",
-        ];
-
-        bencher.iter(|| {
-            let runtime = create_runtime();
-            for request in &requests {
-                runtime.block_on(async {
-                    drop(orchestrator.analyze_request(black_box(request)).await);
-                });
-            }
-        });
-    });
-
-    group.finish();
-}
-
-/// Helper function to process concurrent requests
-async fn process_concurrent_requests(requests: &[String]) {
-    let handles: Vec<_> = requests
-        .iter()
-        .map(|request| {
-            let req = request.clone();
-            spawn(async move {
-                // Simulate concurrent request processing
-                black_box(req.len())
-            })
-        })
-        .collect();
-
-    for handle in handles {
-        drop(handle.await);
-    }
-}
-
-/// Benchmark concurrent request handling
-fn bench_concurrent_requests(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("concurrent_requests");
-
-    let concurrency_levels = vec![1, 2, 4, 8];
-
-    for level in concurrency_levels {
-        group.bench_with_input(
-            BenchmarkId::from_parameter(format!("{level}_concurrent")),
-            &level,
-            |bencher, &level| {
-                let config = RoutingConfig::default();
-                let _orchestrator = RoutingOrchestrator::new(config);
-                let requests: Vec<_> = (0..level).map(|idx| format!("Request {idx}")).collect();
-
-                bencher.iter(|| {
-                    let runtime = create_runtime();
-                    runtime.block_on(process_concurrent_requests(&requests));
                 });
             },
         );
@@ -152,7 +72,8 @@ async fn process_requests_sequentially(orchestrator: &RoutingOrchestrator, reque
 fn bench_request_throughput(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("request_throughput");
 
-    let batch_sizes = vec![10, 50, 100];
+    let batch_sizes = vec![5, 10];
+    let runtime = create_runtime();
 
     for size in batch_sizes {
         group.throughput(Throughput::Elements(size as u64));
@@ -165,7 +86,6 @@ fn bench_request_throughput(criterion: &mut Criterion) {
                 let requests: Vec<_> = (0..size).map(|idx| format!("Add feature {idx}")).collect();
 
                 bencher.iter(|| {
-                    let runtime = create_runtime();
                     runtime.block_on(process_requests_sequentially(&orchestrator, &requests));
                 });
             },
@@ -175,35 +95,14 @@ fn bench_request_throughput(criterion: &mut Criterion) {
     group.finish();
 }
 
-/// Benchmark configuration overhead
-fn bench_config_overhead(criterion: &mut Criterion) {
-    let mut group = criterion.benchmark_group("config_overhead");
-
-    group.bench_function("default_config", |bencher| {
-        bencher.iter(|| black_box(RoutingConfig::default()));
-    });
-
-    group.bench_function("orchestrator_with_config", |bencher| {
-        bencher.iter(|| {
-            let config = RoutingConfig::default();
-            black_box(RoutingOrchestrator::new(config))
-        });
-    });
-
-    group.finish();
-}
-
 criterion_group! {
     name = integration_benches;
     config = Criterion::default()
-        .measurement_time(Duration::from_secs(7))
-        .warm_up_time(Duration::from_secs(2))
-        .sample_size(15);
+        .measurement_time(Duration::from_secs(2))
+        .warm_up_time(Duration::from_millis(500))
+        .sample_size(10);
     targets = bench_end_to_end_request,
-             bench_memory_usage,
-             bench_concurrent_requests,
-             bench_request_throughput,
-             bench_config_overhead
+             bench_request_throughput
 }
 
 criterion_main!(integration_benches);

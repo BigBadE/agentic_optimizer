@@ -2,7 +2,11 @@
 name = "API Endpoints Implementation"
 description = "Query about REST API endpoints and routing"
 query = "how are API endpoints defined and routed"
-project_root = "benchmarks/test_repositories/valor"
+project_root = "benchmarks/crates/quality/test_repositories/valor"
+
+[repository]
+url = "https://github.com/BigBadE/Valor.git"
+commit = "367ecde76cfe1a587256f9c6f318a56afee5ac17"
 
 # Expected relevant files
 [[expected]]

@@ -1,50 +1,13 @@
 //! End-to-end tests that drive the TUI app via an injected input event source.
 
+mod common;
+
 #[cfg(test)]
 mod tests {
+    use super::common::TestEventSource;
     use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
-    use merlin_routing::user_interface::{event_source::InputEventSource, TuiApp};
     use merlin_routing::Result;
-    use std::collections::VecDeque;
-    use std::thread;
-    use std::time::Duration;
-
-    #[derive(Default)]
-    struct TestEventSource {
-        queue: VecDeque<Event>,
-    }
-
-    impl TestEventSource {
-        fn with_events(events: impl IntoIterator<Item = Event>) -> Self {
-            let mut source = Self::default();
-            for event_item in events {
-                source.queue.push_back(event_item);
-            }
-            source
-        }
-    }
-
-    impl InputEventSource for TestEventSource {
-        fn poll(&mut self, timeout: Duration) -> bool {
-            if !self.queue.is_empty() {
-                return true;
-            }
-            if timeout.is_zero() {
-                return false;
-            }
-            thread::sleep(timeout);
-            !self.queue.is_empty()
-        }
-
-        fn read(&mut self) -> Event {
-            loop {
-                if let Some(event_item) = self.queue.pop_front() {
-                    return event_item;
-                }
-                thread::sleep(Duration::from_millis(1));
-            }
-        }
-    }
+    use merlin_routing::user_interface::TuiApp;
 
     /// End-to-end input submission through the TUI event pipeline.
     ///
@@ -73,7 +36,10 @@ mod tests {
 
         // Drive one tick; it should read events, update input, and submit on Enter
         let should_quit = app.tick()?;
-        assert!(!should_quit, "App should not request quit on simple input submission");
+        assert!(
+            !should_quit,
+            "App should not request quit on simple input submission"
+        );
 
         let submitted = app.take_pending_input();
         assert_eq!(submitted.as_deref(), Some("hello"));

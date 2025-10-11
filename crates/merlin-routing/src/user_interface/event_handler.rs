@@ -140,6 +140,7 @@ impl<'handler> EventHandler<'handler> {
         if let Some(persistence) = self.persistence
             && let Some(task) = self.task_manager.get_task(task_id)
         {
+            // Silently ignore save errors - persistence is best-effort
             drop(persistence.save_task(task_id, task));
         }
 
@@ -164,6 +165,7 @@ impl<'handler> EventHandler<'handler> {
         if let Some(persistence) = self.persistence
             && let Some(task) = self.task_manager.get_task(task_id)
         {
+            // Silently ignore save errors - persistence is best-effort
             drop(persistence.save_task(task_id, task));
         }
     }

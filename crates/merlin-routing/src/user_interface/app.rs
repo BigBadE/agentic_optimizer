@@ -1,6 +1,7 @@
 use crossterm::event::{Event, KeyCode, KeyModifiers};
 use crossterm::terminal;
-use ratatui::{Terminal, backend::CrosstermBackend};
+use ratatui::Terminal;
+use ratatui::backend::{Backend, CrosstermBackend};
 use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
@@ -21,9 +22,9 @@ use crossterm::event::{KeyEvent, KeyEventKind};
 use std::time::Instant;
 
 /// Main TUI application
-pub struct TuiApp {
+pub struct TuiApp<B: Backend> {
     /// Terminal instance used to render the UI
-    terminal: Terminal<CrosstermBackend<io::Stdout>>,
+    terminal: Terminal<B>,
     /// Channel receiving UI events from background tasks
     event_receiver: mpsc::UnboundedReceiver<UiEvent>,
     /// Manages tasks and their ordering/visibility
@@ -47,8 +48,8 @@ pub struct TuiApp {
 // Note: all input is sourced from `event_source` to allow test injection without
 // altering application behavior.
 
-impl TuiApp {
-    /// Creates a new `TuiApp`
+impl TuiApp<CrosstermBackend<io::Stdout>> {
+    /// Creates a new `TuiApp` with Crossterm backend
     ///
     /// # Errors
     /// Returns an error if terminal initialization or clearing fails.
@@ -106,6 +107,52 @@ impl TuiApp {
         Ok((app, channel))
     }
 
+    /// Enables raw mode
+    ///
+    /// # Errors
+    /// Returns an error if enabling raw mode fails.
+    pub fn enable_raw_mode(&self) -> Result<()> {
+        terminal::enable_raw_mode().map_err(|err| RoutingError::Other(err.to_string()))
+    }
+
+    /// Disables raw mode
+    ///
+    /// # Errors
+    /// Returns an error if disabling raw mode or clearing the terminal fails.
+    pub fn disable_raw_mode(&mut self) -> Result<()> {
+        terminal::disable_raw_mode().map_err(|err| RoutingError::Other(err.to_string()))?;
+        self.terminal
+            .clear()
+            .map_err(|err| RoutingError::Other(err.to_string()))
+    }
+}
+
+impl<B: Backend> TuiApp<B> {
+    /// Creates a test-friendly `TuiApp` with a generic backend (for testing only)
+    ///
+    /// # Errors
+    /// Returns an error if the app initialization fails
+    pub fn new_for_test(terminal: Terminal<B>) -> Result<(Self, super::UiChannel)> {
+        let (sender, receiver) = mpsc::unbounded_channel();
+
+        let app = Self {
+            terminal,
+            event_receiver: receiver,
+            task_manager: TaskManager::default(),
+            state: UiState::default(),
+            input_manager: InputManager::default(),
+            renderer: Renderer::new(Theme::default()),
+            focused_pane: FocusedPane::Input,
+            pending_input: None,
+            persistence: None,
+            event_source: Box::new(CrosstermEventSource),
+        };
+
+        let channel = super::UiChannel { sender };
+
+        Ok((app, channel))
+    }
+
     /// Replaces the input event source. Useful for tests to inject a synthetic source
     /// that mirrors crossterm semantics.
     pub fn set_event_source(&mut self, source: Box<dyn InputEventSource + Send>) {
@@ -126,25 +173,6 @@ impl TuiApp {
 
             self.state.loading_tasks = false;
         }
-    }
-
-    /// Enables raw mode
-    ///
-    /// # Errors
-    /// Returns an error if enabling raw mode fails.
-    pub fn enable_raw_mode(&self) -> Result<()> {
-        terminal::enable_raw_mode().map_err(|err| RoutingError::Other(err.to_string()))
-    }
-
-    /// Disables raw mode
-    ///
-    /// # Errors
-    /// Returns an error if disabling raw mode or clearing the terminal fails.
-    pub fn disable_raw_mode(&mut self) -> Result<()> {
-        terminal::disable_raw_mode().map_err(|err| RoutingError::Other(err.to_string()))?;
-        self.terminal
-            .clear()
-            .map_err(|err| RoutingError::Other(err.to_string()))
     }
 
     /// Processes one tick of the event loop
@@ -232,6 +260,36 @@ impl TuiApp {
         }
 
         context
+    }
+
+    /// Gets a reference to the terminal backend (for testing only)
+    pub fn backend(&self) -> &B {
+        self.terminal.backend()
+    }
+
+    /// Gets mutable access to task manager for test setup (for testing only)
+    pub fn task_manager_mut(&mut self) -> &mut TaskManager {
+        &mut self.task_manager
+    }
+
+    /// Gets mutable access to UI state for test setup (for testing only)
+    pub fn state_mut(&mut self) -> &mut UiState {
+        &mut self.state
+    }
+
+    /// Sets the focused pane (for testing only)
+    pub fn set_focused_pane(&mut self, pane: FocusedPane) {
+        self.focused_pane = pane;
+    }
+
+    /// Gets the current input text (for testing only)
+    pub fn get_input_text(&self) -> String {
+        self.input_manager.input_area().lines().join("\n")
+    }
+
+    /// Gets the input lines (for testing only)
+    pub fn get_input_lines(&self) -> Vec<String> {
+        self.input_manager.input_area().lines().to_vec()
     }
 
     // Private methods
@@ -348,7 +406,7 @@ impl TuiApp {
     /// Handles Ctrl-N to insert a manual newline in the input pane
     fn handle_ctrl_n(&mut self) {
         if self.focused_pane == FocusedPane::Input {
-            self.input_manager.input_area_mut().insert_newline();
+            self.input_manager.insert_newline_at_cursor();
             self.input_manager.record_manual_newline();
         }
     }
@@ -358,7 +416,7 @@ impl TuiApp {
         match self.focused_pane {
             FocusedPane::Input => {
                 if shift_pressed {
-                    self.input_manager.input_area_mut().insert_newline();
+                    self.input_manager.insert_newline_at_cursor();
                     self.input_manager.record_manual_newline();
                     false
                 } else {
@@ -388,19 +446,12 @@ impl TuiApp {
 
     /// Handles key events when the input pane is focused
     fn handle_input_key(&mut self, key: &KeyEvent) {
-        let should_wrap = matches!(
-            key.code,
-            KeyCode::Char(_) | KeyCode::Backspace | KeyCode::Delete
-        );
+        let terminal_width = self.terminal.size().map(|size| size.width).unwrap_or(80);
+        let input_width = (f32::from(terminal_width) * 0.7) as usize;
+        let max_line_width = input_width.saturating_sub(4);
 
-        self.input_manager.input_area_mut().input(Event::Key(*key));
-
-        if should_wrap {
-            let terminal_width = self.terminal.size().map(|size| size.width).unwrap_or(80);
-            let input_width = (f32::from(terminal_width) * 0.7) as usize;
-            let max_line_width = input_width.saturating_sub(4);
-            self.input_manager.auto_wrap(max_line_width);
-        }
+        self.input_manager
+            .handle_input(&Event::Key(*key), Some(max_line_width));
     }
 
     /// Handles key events when the output pane is focused

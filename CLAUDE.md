@@ -14,6 +14,13 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Terminal UI for real-time progress monitoring
 - Interactive agent with conversation context
 
+## Testing Guidelines
+
+**IMPORTANT**: When writing or modifying tests, especially for UI components and input handling:
+- **Never directly manipulate** `InputManager` or `TuiApp` internal state
+- **Always use event sources** to inject test input
+- See **[TESTS.md](./TESTS.md)** for detailed testing patterns and examples
+
 ## Essential Development Commands
 
 ### Building and Running

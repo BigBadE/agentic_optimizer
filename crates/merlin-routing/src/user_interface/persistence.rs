@@ -19,6 +19,7 @@ struct SerializableTask {
     description: String,
     status: String,
     output_text: String,
+    output_lines: Vec<String>,
     start_time: SystemTime,
     end_time: Option<SystemTime>,
     parent_id: Option<TaskId>,
@@ -59,6 +60,9 @@ impl TaskPersistence {
     ///
     /// Returns an error if the task directory cannot be created or the task file cannot be written
     pub fn save_task(&self, task_id: TaskId, task: &TaskDisplay) -> io::Result<()> {
+        // Ensure the tasks directory exists
+        filesystem::create_dir_all(&self.tasks_dir)?;
+
         let status_str = task_status_to_string(task.status);
 
         // Convert Instant to SystemTime by calculating elapsed time from task start
@@ -77,6 +81,7 @@ impl TaskPersistence {
             description: task.description.clone(),
             status: status_str.to_string(),
             output_text: task.output_tree.to_text(),
+            output_lines: task.output_lines.clone(),
             start_time,
             end_time,
             parent_id: task.parent_id,
@@ -186,7 +191,7 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
         description: serializable.description,
         status,
         progress: None,
-        output_lines: Vec::default(),
+        output_lines: serializable.output_lines,
         start_time,
         end_time,
         parent_id: serializable.parent_id,

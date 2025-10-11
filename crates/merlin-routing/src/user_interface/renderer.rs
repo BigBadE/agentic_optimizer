@@ -1,32 +1,21 @@
 use ratatui::{
     Frame,
-    layout::{Alignment, Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Layout, Rect},
     style::{Color, Modifier, Style},
     text::{Line, Span},
     widgets::{Block, Borders, Padding, Paragraph, Wrap},
 };
 // Formatting helpers are implemented via push methods to avoid extra allocations
 use super::input::InputManager;
-use super::output_tree;
 use super::state::UiState;
 use super::task_manager::{TaskManager, TaskStatus};
 use super::theme::Theme;
-use crate::TaskId;
 use std::time::Instant;
 use textwrap::wrap;
 
 /// Handles rendering of the TUI
 pub struct Renderer {
     theme: Theme,
-}
-
-// Parameter structs used to reduce argument count and improve clarity
-struct NodeFormatParams {
-    is_selected: bool,
-    prefix: String,
-    icon: String,
-    content: String,
-    available_width: usize,
 }
 
 /// Shared UI context used to reduce argument count for render helpers
@@ -66,37 +55,47 @@ impl Renderer {
     pub fn render(&self, frame: &mut Frame, ctx: &RenderCtx<'_>) {
         let main_area = frame.area();
 
-        // Flexible vertical split: allocate a stable portion to input to keep it visible,
-        // and split the remaining area between task tree and focused details.
-        // Bottom input gets 20% of the height, top+middle get 80%.
-        let primary_split = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(80), // Task tree + details
-                Constraint::Percentage(20), // Input area
-            ])
-            .split(main_area);
+        // Check if we have a running task with progress to determine dynamic sizing
+        let has_running_task_with_progress = ctx
+            .ui_ctx
+            .task_manager
+            .iter_tasks()
+            .any(|(_, task)| task.status == TaskStatus::Running && task.progress.is_some());
 
-        let top_middle_area = primary_split[0];
-        let input_area = primary_split[1];
+        // Determine task panel height dynamically
+        let task_height = if has_running_task_with_progress {
+            Constraint::Min(5) // Larger for running tasks with progress
+        } else {
+            Constraint::Min(3) // Minimal for completed tasks
+        };
 
-        // Split the top section between task tree (45%) and focused details (55%)
-        let top_split = Layout::default()
-            .direction(Direction::Vertical)
-            .constraints([
-                Constraint::Percentage(45), // Task tree
-                Constraint::Percentage(55), // Focused details
-            ])
-            .split(top_middle_area);
+        // If no task is selected, use minimal space for tasks panel
+        if ctx.ui_ctx.state.active_task_id.is_none() {
+            let primary_split = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    task_height,                // Task tree (dynamic)
+                    Constraint::Percentage(80), // Input area (take most space)
+                ])
+                .split(main_area);
 
-        // Top: Full-width task tree
-        self.render_task_tree_full(frame, top_split[0], &ctx.ui_ctx, ctx.focused);
+            self.render_task_tree_full(frame, primary_split[0], &ctx.ui_ctx, ctx.focused);
+            self.render_input_area(frame, primary_split[1], ctx.input, ctx.focused);
+        } else {
+            // With selection, split between tasks, focused details, and input
+            let primary_split = Layout::default()
+                .direction(Direction::Vertical)
+                .constraints([
+                    task_height,                // Task tree (dynamic)
+                    Constraint::Percentage(60), // Focused details
+                    Constraint::Percentage(20), // Input area
+                ])
+                .split(main_area);
 
-        // Middle: Focused task details with logs and TODOs
-        self.render_focused_detail_section(frame, top_split[1], &ctx.ui_ctx, ctx.focused);
-
-        // Bottom: Input area
-        self.render_input_area(frame, input_area, ctx.input, ctx.focused);
+            self.render_task_tree_full(frame, primary_split[0], &ctx.ui_ctx, ctx.focused);
+            self.render_focused_detail_section(frame, primary_split[1], &ctx.ui_ctx, ctx.focused);
+            self.render_input_area(frame, primary_split[2], ctx.input, ctx.focused);
+        }
     }
 
     // Rendering methods
@@ -121,6 +120,7 @@ impl Renderer {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .title("─── Tasks ")
                     .border_style(Style::default().fg(border_color)),
             )
             .wrap(Wrap { trim: false });
@@ -143,16 +143,7 @@ impl Renderer {
         };
 
         let Some(active_task_id) = ui_ctx.state.active_task_id else {
-            let help_text = Paragraph::new("No task selected\n\nPress Ctrl+T to select a task")
-                .style(Style::default().fg(Color::DarkGray))
-                .block(
-                    Block::default()
-                        .borders(Borders::ALL)
-                        .border_style(Style::default().fg(border_color))
-                        .padding(Padding::horizontal(1)),
-                )
-                .alignment(Alignment::Center);
-            frame.render_widget(help_text, area);
+            // When no task selected, the focused box is omitted by caller; nothing to render
             return;
         };
 
@@ -160,7 +151,7 @@ impl Renderer {
             return;
         };
 
-        let mut text = format!("Focused task: {}\n", task.description);
+        let mut text = String::new();
 
         if let Some(progress) = &task.progress
             && let Some(total) = progress.total
@@ -184,7 +175,6 @@ impl Renderer {
             text.push_str("s)\n");
         }
 
-        text.push('\n');
         text.push_str(&Self::build_tree_text(
             task,
             area.width,
@@ -196,6 +186,7 @@ impl Renderer {
             .block(
                 Block::default()
                     .borders(Borders::ALL)
+                    .title(format!("─── Focused - {} ", task.description))
                     .border_style(Style::default().fg(border_color))
                     .padding(Padding::horizontal(1)),
             )
@@ -204,140 +195,73 @@ impl Renderer {
         frame.render_widget(paragraph, area);
     }
 
-    /// Builds task tree lines for rendering
+    /// Builds task list lines for rendering (top tasks panel)
     fn build_task_tree_lines(&self, ui_ctx: &UiCtx<'_>, area: Rect) -> Vec<Line<'static>> {
-        let visible_tasks = ui_ctx.task_manager.get_visible_tasks();
         let mut lines = Vec::default();
 
-        for task_id in &visible_tasks {
-            let Some(task) = ui_ctx.task_manager.get_task(*task_id) else {
-                continue;
-            };
+        // Get all tasks sorted by start time (oldest first - newest at bottom)
+        let mut all_tasks: Vec<_> = ui_ctx.task_manager.iter_tasks().collect();
+        all_tasks.sort_by(|(_, task_a), (_, task_b)| {
+            task_a.start_time.cmp(&task_b.start_time) // Chronological order
+        });
 
-            let depth = Self::calculate_task_depth(*task_id, ui_ctx.task_manager);
-            let indent = "  ".repeat(depth);
+        if all_tasks.is_empty() {
+            lines.push(Line::from(vec![Span::styled(
+                " No tasks",
+                Style::default().fg(Color::DarkGray),
+            )]));
+            return lines;
+        }
 
+        // Show only one task - either the selected one or the most recent
+        let task_to_show = ui_ctx.state.active_task_id.map_or_else(
+            || all_tasks.last(),
+            |selected_id| all_tasks.iter().find(|(id, _)| *id == selected_id),
+        );
+
+        if let Some((task_id, task)) = task_to_show {
             let status_icon = Self::get_task_status_icon(task);
-            let collapse_indicator = if ui_ctx.task_manager.has_children(*task_id) {
-                if ui_ctx.task_manager.is_collapsed(*task_id) {
-                    " ▶"
-                } else {
-                    ""
-                }
-            } else {
-                ""
-            };
-
-            // Show subtask TODOs if any
-            let todo_indicator = if ui_ctx.task_manager.has_children(*task_id) {
-                let child_count = ui_ctx
-                    .task_manager
-                    .task_order()
-                    .iter()
-                    .filter(|&&id| {
-                        ui_ctx
-                            .task_manager
-                            .get_task(id)
-                            .is_some_and(|child_task| child_task.parent_id == Some(*task_id))
-                    })
-                    .count();
-                if child_count > 0 {
-                    format!("  ({child_count} subtasks)")
-                } else {
-                    String::new()
-                }
-            } else {
-                String::new()
-            };
-
             let is_selected = ui_ctx.state.active_task_id == Some(*task_id);
-            let task_line = format!(
-                "{indent}├─ [{status_icon}] {}{}{}",
-                task.description, collapse_indicator, todo_indicator
-            );
+
+            // Show status with task description
+            let task_line = format!("└─ [{status_icon}] {}", task.description);
 
             let style = if is_selected {
                 Style::default()
                     .fg(self.theme.highlight())
                     .add_modifier(Modifier::BOLD)
             } else {
-                match task.status {
-                    TaskStatus::Running => Style::default()
-                        .fg(self.theme.text())
-                        .add_modifier(Modifier::BOLD),
-                    TaskStatus::Completed => Style::default().fg(self.theme.success()),
-                    TaskStatus::Failed => Style::default().fg(self.theme.error()),
-                }
+                Style::default().fg(self.theme.text())
             };
 
             lines.push(Line::from(vec![Span::styled(task_line, style)]));
 
-            if let Some(progress) = &task.progress {
-                let progress_line = Self::render_progress_bar_line(progress, depth + 1, area.width);
+            // Show progress bar for running tasks with progress
+            if task.status == TaskStatus::Running
+                && let Some(progress) = &task.progress
+            {
+                let progress_line = Self::render_progress_bar_line(progress, 1, area.width);
                 lines.push(progress_line);
             }
 
-            if task.status == TaskStatus::Running {
-                Self::add_running_task_info(&mut lines, task, &indent);
+            // Show task position indicator if there are multiple tasks
+            if all_tasks.len() > 1 {
+                let current_index = all_tasks
+                    .iter()
+                    .position(|(id, _)| *id == *task_id)
+                    .unwrap_or(0);
+                let total = all_tasks.len();
+                lines.push(Line::from(vec![Span::styled(
+                    format!(" ({}/{} tasks)", current_index + 1, total),
+                    Style::default().fg(Color::DarkGray),
+                )]));
             }
-        }
-
-        if lines.is_empty() {
-            lines.push(Line::from("No tasks running"));
         }
 
         lines
     }
 
-    /// Adds running task info (logs, elapsed time) to lines
-    fn add_running_task_info(
-        lines: &mut Vec<Line<'static>>,
-        task: &super::task_manager::TaskDisplay,
-        indent: &str,
-    ) {
-        let elapsed = task
-            .end_time
-            .unwrap_or_else(Instant::now)
-            .duration_since(task.start_time)
-            .as_secs_f64();
-
-        if let Some(last_output) = task.output_lines.last() {
-            let log_line = format!("{indent}   ⤷ log: {last_output}");
-            lines.push(Line::from(vec![Span::styled(
-                log_line,
-                Style::default().fg(Color::DarkGray),
-            )]));
-        }
-
-        if elapsed > 5.0 {
-            let time_line = format!("{indent}   ({elapsed:.0}s)");
-            lines.push(Line::from(vec![Span::styled(
-                time_line,
-                Style::default().fg(Color::DarkGray),
-            )]));
-        }
-    }
-
-    /// Calculates task depth in hierarchy
-    fn calculate_task_depth(task_id: TaskId, task_manager: &TaskManager) -> usize {
-        let mut depth = 0;
-        let mut current_id = task_id;
-
-        while let Some(task) = task_manager.get_task(current_id) {
-            if let Some(parent_id) = task.parent_id {
-                depth += 1;
-                current_id = parent_id;
-            } else {
-                break;
-            }
-
-            if depth > 10 {
-                break;
-            }
-        }
-
-        depth
-    }
+    // Removed unused helper functions to satisfy clippy
 
     /// Gets status icon for task
     fn get_task_status_icon(task: &super::task_manager::TaskDisplay) -> &'static str {
@@ -368,7 +292,7 @@ impl Renderer {
             || {
                 let spinner = Self::get_spinner();
                 let message = &progress.message;
-                let line = format!("{indent}  {spinner} {message}");
+                let line = format!("{indent} {spinner} {message}");
                 Line::from(vec![Span::styled(line, Style::default().fg(Color::Cyan))])
             },
             |total| {
@@ -378,7 +302,7 @@ impl Renderer {
                 let empty = bar_width.saturating_sub(filled);
 
                 let bar = format!(
-                    "{}  ({percent}% {}{})",
+                    "{} ({percent}% {}{})",
                     indent,
                     "▓".repeat(filled),
                     "░".repeat(empty)
@@ -436,57 +360,24 @@ impl Renderer {
     fn build_tree_text(
         task: &super::task_manager::TaskDisplay,
         width: u16,
-        focused_pane: FocusedPane,
+        _focused_pane: FocusedPane,
     ) -> String {
-        let visible_nodes = task.output_tree.flatten_visible_nodes();
-        let selected_idx = task.output_tree.selected_index();
         let available_width = width.saturating_sub(4) as usize;
-
-        if visible_nodes.is_empty() {
+        if task.output_lines.is_empty() {
             return "No output yet...".to_owned();
         }
 
-        visible_nodes
+        task.output_lines
             .iter()
-            .enumerate()
-            .flat_map(|(idx, (node_ref, depth))| {
-                let is_selected = idx == selected_idx && focused_pane == FocusedPane::Output;
-                let prefix = output_tree::build_tree_prefix(
-                    *depth,
-                    node_ref.is_last,
-                    &node_ref.parent_states,
-                );
-                let is_collapsed = task.output_tree.is_collapsed(node_ref.node);
-                let icon = node_ref.node.get_icon(is_collapsed).to_string();
-                let content = node_ref.node.get_content();
-
-                Self::format_tree_node(&NodeFormatParams {
-                    is_selected,
-                    prefix,
-                    icon,
-                    content,
-                    available_width,
-                })
+            .filter(|line| !line.trim_start().starts_with("Prompt:"))
+            .flat_map(|line| {
+                wrap(line, available_width)
+                    .into_iter()
+                    .map(|cow| cow.to_string())
+                    .collect::<Vec<_>>()
             })
             .collect::<Vec<_>>()
             .join("\n")
-    }
-
-    fn format_tree_node(params: &NodeFormatParams) -> Vec<String> {
-        let selector = if params.is_selected { "► " } else { "  " };
-        let line_prefix = format!(
-            "{selector}{prefix}{icon} ",
-            prefix = params.prefix,
-            icon = params.icon
-        );
-        let prefix_width = line_prefix.len();
-
-        let content_width = params.available_width - prefix_width;
-        if content_width < 20 {
-            return vec![format!("{}{}", line_prefix, params.content)];
-        }
-
-        wrap_tree_content(&line_prefix, &params.content, content_width, prefix_width)
     }
 }
 
@@ -503,23 +394,4 @@ pub enum FocusedPane {
 
 // Helper functions
 
-/// Wraps content lines for a tree node while preserving a prefix width
-fn wrap_tree_content(
-    line_prefix: &str,
-    content: &str,
-    content_width: usize,
-    prefix_width: usize,
-) -> Vec<String> {
-    let wrapped = wrap(content, content_width);
-    wrapped
-        .into_iter()
-        .enumerate()
-        .map(|(index, line)| {
-            if index == 0 {
-                format!("{line_prefix}{line}")
-            } else {
-                format!("{}  {}", " ".repeat(prefix_width), line)
-            }
-        })
-        .collect()
-}
+// removed old wrap_tree_content and node formatting; focused output prints raw text

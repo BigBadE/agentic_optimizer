@@ -1,24 +1,24 @@
 ┌─── Tasks ────────────────────────────────────────────────────────────────────┐
-│ No tasks                                                                     │
+│ No tasks running                                                             │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─── Input ────────────────────────────────────────────────────────────────────┐
-│ Fix the bug in the authentication module                                     │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
+│ error handling for expired and invalid tokens, update all the API            │
+│ endpoints to work with the new auth system, write integration tests for the  │
+│ authentication flow, and update the documentation to reflect these changes.  │
 └──────────────────────────────────────────────────────────────────────────────┘

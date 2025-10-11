@@ -282,7 +282,7 @@ impl OutputTree {
     /// Navigation methods
     /// Move selection up
     pub fn move_up(&mut self) {
-        if self.selected_index > 0 {
+        if self.selected_index > 1 {
             self.selected_index -= 1;
         }
     }
@@ -291,7 +291,12 @@ impl OutputTree {
     pub fn move_down(&mut self) {
         let visible_count = self.flatten_visible_nodes().len();
         if self.selected_index + 1 < visible_count {
-            self.selected_index += 1;
+            // Skip index 0 (root) when moving down from start
+            if self.selected_index == 0 && visible_count > 1 {
+                self.selected_index = 1;
+            } else {
+                self.selected_index += 1;
+            }
         }
     }
 
@@ -303,18 +308,29 @@ impl OutputTree {
     /// Move selection to end
     pub fn move_to_end(&mut self) {
         let visible_count = self.flatten_visible_nodes().len();
-        self.selected_index = visible_count - 1;
+        self.selected_index = visible_count.saturating_sub(1);
     }
 
     /// Move selection up by page
     pub fn page_up(&mut self, page_size: usize) {
-        self.selected_index -= page_size;
+        self.selected_index = self.selected_index.saturating_sub(page_size);
+        if self.selected_index == 0 {
+            // Do not land on root if there are more nodes
+            let visible_count = self.flatten_visible_nodes().len();
+            if visible_count > 1 {
+                self.selected_index = 1;
+            }
+        }
     }
 
     /// Move selection down by page
     pub fn page_down(&mut self, page_size: usize) {
         let visible_count = self.flatten_visible_nodes().len();
-        self.selected_index = (self.selected_index + page_size).min(visible_count - 1);
+        self.selected_index =
+            (self.selected_index + page_size).min(visible_count.saturating_sub(1));
+        if self.selected_index == 0 && visible_count > 1 {
+            self.selected_index = 1;
+        }
     }
 
     /// Expand the currently selected node

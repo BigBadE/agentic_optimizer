@@ -1,23 +1,23 @@
 ┌─── Tasks ────────────────────────────────────────────────────────────────────┐
-│ No tasks                                                                     │
+│└─ [▶] Wrapping demo                                                          │
+│ ⤷ log: Initial log entry indicating that the process has started successfu...│
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+│                                                                              │
+└──────────────────────────────────────────────────────────────────────────────┘
+┌─── Focused - Wrapping demo ──────────────────────────────────────────────────┐
+│ Initial log entry indicating that the process has started successfully and   │
+│ will continue with an extremely verbose description that should be truncated │
+│ in the tasks panel to avoid overflowing the box width and maintain a clean   │
+│ UI                                                                           │
+│                                                                              │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─── Input ────────────────────────────────────────────────────────────────────┐
-│ Fix the bug in the authentication module                                     │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │

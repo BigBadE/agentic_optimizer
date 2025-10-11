@@ -17,7 +17,7 @@ use crate::config::Config;
 use crate::interactive::{
     InteractiveFlags, chat_loop, handle_interactive_agent, print_chat_header,
 };
-use crate::utils::display_response_metrics;
+use crate::utils::{display_response_metrics, get_merlin_folder};
 
 /// Run interactive chat session with a single provider-backed agent.
 ///
@@ -246,6 +246,55 @@ pub async fn handle_interactive(
     ui: UiMode,
     local_only: bool,
 ) -> Result<()> {
+    // Initialize tracing based on UI mode BEFORE creating orchestrator
+    if matches!(ui, UiMode::Tui) {
+        // TUI mode - log to file
+        use std::fs;
+        use std::sync::Arc;
+        use tracing_subscriber::{
+            EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
+        };
+
+        let merlin_dir = get_merlin_folder(&project);
+        fs::create_dir_all(&merlin_dir)?;
+
+        let debug_log = merlin_dir.join("debug.log");
+        if debug_log.exists() {
+            fs::remove_file(&debug_log)?;
+        }
+
+        let log_file = fs::OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(&debug_log)?;
+
+        Registry::default()
+            .with(
+                EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| "merlin_context=info,agentic_optimizer=info".into()),
+            )
+            .with(
+                fmt::layer()
+                    .with_writer(Arc::new(log_file))
+                    .with_ansi(false)
+                    .with_target(true)
+                    .with_level(true),
+            )
+            .init();
+    } else {
+        // Plain modes - log to stdout
+        use tracing_subscriber::{
+            EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
+        };
+        Registry::default()
+            .with(
+                EnvFilter::try_from_default_env()
+                    .unwrap_or_else(|_| "agentic_optimizer=info".into()),
+            )
+            .with(fmt::layer())
+            .init();
+    }
+
     // Create routing configuration
     let mut config = RoutingConfig::default();
     config.validation.enabled = !matches!(validation, Validation::Disabled);

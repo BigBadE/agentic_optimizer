@@ -81,7 +81,7 @@ pub mod user_interface;
 /// Validation pipeline and stages
 pub mod validator;
 
-pub use agent::{AgentExecutor, SelfAssessor, StepTracker};
+pub use agent::{AgentExecutor, ContextFetcher, SelfAssessor, StepTracker};
 pub use analyzer::{
     Action, ComplexityEstimator, Intent, IntentExtractor, LocalTaskAnalyzer, Scope, TaskAnalyzer,
     TaskDecomposer,

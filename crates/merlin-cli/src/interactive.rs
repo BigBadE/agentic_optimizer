@@ -14,7 +14,7 @@ use std::time::SystemTime;
 use tokio::spawn;
 
 use crate::cli::UiMode;
-use crate::utils::{cleanup_old_tasks, try_write_log};
+use crate::utils::{cleanup_old_tasks, get_merlin_folder, try_write_log};
 
 /// Flags for interactive mode configuration
 pub struct InteractiveFlags {
@@ -122,14 +122,9 @@ async fn run_plain_interactive(
 /// Returns error if file operations fail
 fn init_tui_logging(merlin_dir: &Path, project: &Path, local_only: bool) -> Result<fs::File> {
     let debug_log = merlin_dir.join("debug.log");
-    if debug_log.exists() {
-        fs::remove_file(&debug_log)?;
-    }
-    let mut log_file = fs::OpenOptions::new()
-        .create(true)
-        .write(true)
-        .truncate(true)
-        .open(&debug_log)?;
+
+    // Open existing debug.log (already created by handle_interactive)
+    let mut log_file = fs::OpenOptions::new().append(true).open(&debug_log)?;
 
     writeln!(
         log_file,
@@ -146,6 +141,7 @@ fn init_tui_logging(merlin_dir: &Path, project: &Path, local_only: bool) -> Resu
             "Multi-Model"
         }
     )?;
+
     Ok(log_file)
 }
 
@@ -224,8 +220,8 @@ async fn run_tui_interactive(
     local_only: bool,
     _verbose: bool,
 ) -> Result<()> {
-    // Create .merlin directory for logs and task storage
-    let merlin_dir = project.join(".merlin");
+    // Create merlin directory for logs and task storage (respects MERLIN_FOLDER)
+    let merlin_dir = get_merlin_folder(&project);
     fs::create_dir_all(&merlin_dir)?;
 
     let mut log_file = init_tui_logging(&merlin_dir, &project, local_only)?;

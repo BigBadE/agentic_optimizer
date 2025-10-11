@@ -3,6 +3,7 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
+use tokio::sync::Mutex;
 
 use crate::{
     ExecutionContext, ExecutionMode, ModelRouter, ModelTier, Result, RoutingError, SubtaskSpec,
@@ -15,7 +16,7 @@ use merlin_providers::{AnthropicProvider, GroqProvider, OpenRouterProvider};
 use std::env;
 use std::fmt::Write as _;
 
-use super::{SelfAssessor, StepTracker};
+use super::{ContextFetcher, SelfAssessor, StepTracker};
 
 /// Type alias for boxed future returning `TaskResult`
 type BoxedTaskFuture<'future> = Pin<Box<dyn Future<Output = Result<TaskResult>> + Send + 'future>>;
@@ -27,6 +28,7 @@ pub struct AgentExecutor {
     validator: Arc<dyn Validator>,
     tool_registry: Arc<ToolRegistry>,
     step_tracker: StepTracker,
+    context_fetcher: Arc<Mutex<ContextFetcher>>,
 }
 
 struct ExecInputs<'life> {
@@ -44,12 +46,14 @@ impl AgentExecutor {
         router: Arc<dyn ModelRouter>,
         validator: Arc<dyn Validator>,
         tool_registry: Arc<ToolRegistry>,
+        context_fetcher: ContextFetcher,
     ) -> Self {
         Self {
             router,
             validator,
             tool_registry,
             step_tracker: StepTracker::default(),
+            context_fetcher: Arc::new(Mutex::new(context_fetcher)),
         }
     }
 
@@ -71,6 +75,17 @@ impl AgentExecutor {
         ui_channel: &UiChannel,
         task_id: TaskId,
     ) -> Result<TaskDecision> {
+        // Report assessment stage
+        ui_channel.send(UiEvent::TaskProgress {
+            task_id,
+            progress: super::super::user_interface::events::TaskProgress {
+                stage: "Assessing".to_owned(),
+                current: 0,
+                total: None,
+                message: "Analyzing task complexity".to_owned(),
+            },
+        });
+
         let assessor = SelfAssessor::new(Arc::clone(provider));
         let query = Query::new(format!(
             "Analyze this task and decide if you can complete it immediately or if it needs decomposition:\n\n\"{}\"",
@@ -119,7 +134,17 @@ impl AgentExecutor {
         let provider = Self::create_provider(&decision.tier)?;
 
         // Step 3: Build context
-        let context = Self::build_context(&task);
+        ui_channel.send(UiEvent::TaskProgress {
+            task_id,
+            progress: super::super::user_interface::events::TaskProgress {
+                stage: "Building Context".to_owned(),
+                current: 0,
+                total: None,
+                message: "Analyzing query and gathering relevant files...".to_owned(),
+            },
+        });
+
+        let context = self.build_context(&task).await?;
 
         // Step 4: Create query with tool descriptions
         let query = self.create_query_with_tools(&task)?;
@@ -313,10 +338,17 @@ impl AgentExecutor {
     }
 
     /// Build context from task requirements
-    fn build_context(_task: &Task) -> Context {
-        // In a real implementation, would read required files and add to context
+    ///
+    /// # Errors
+    /// Returns an error if context building fails
+    async fn build_context(&self, task: &Task) -> Result<Context> {
+        let mut fetcher = self.context_fetcher.lock().await;
+        let query = Query::new(&task.description);
 
-        Context::new("You are a helpful coding assistant with access to tools.")
+        fetcher
+            .build_context_for_query(&query)
+            .await
+            .map_err(|err| RoutingError::Other(format!("Failed to build context: {err}")))
     }
 
     /// Check if a request is simple enough to skip assessment
@@ -422,6 +454,16 @@ impl AgentExecutor {
 
                     TaskAction::GatherContext { needs } => {
                         // Task needs more context before proceeding
+                        ui_channel.send(UiEvent::TaskProgress {
+                            task_id,
+                            progress: super::super::user_interface::events::TaskProgress {
+                                stage: "Gathering Context".to_owned(),
+                                current: 0,
+                                total: Some(needs.len() as u64),
+                                message: format!("Fetching: {}", needs.join(", ")),
+                            },
+                        });
+
                         ui_channel.send(UiEvent::TaskOutput {
                             task_id,
                             output: format!("Gathering context: {}", needs.join(", ")),
@@ -456,6 +498,16 @@ impl AgentExecutor {
             let task_id = task.id;
             let start = Instant::now();
 
+            ui_channel.send(UiEvent::TaskProgress {
+                task_id,
+                progress: super::super::user_interface::events::TaskProgress {
+                    stage: "Decomposing".to_owned(),
+                    current: 0,
+                    total: Some(subtasks.len() as u64),
+                    message: format!("Breaking into {} subtasks", subtasks.len()),
+                },
+            });
+
             ui_channel.send(UiEvent::TaskOutput {
                 task_id,
                 output: format!("Decomposing into {} subtasks", subtasks.len()),
@@ -466,8 +518,20 @@ impl AgentExecutor {
 
             // For now, only support sequential execution to avoid Send issues
             // Parallel execution can be added later with proper Send bounds
-            for spec in subtasks {
+            let total_subtasks = subtasks.len();
+            for (index, spec) in subtasks.into_iter().enumerate() {
                 let subtask = Task::new(spec.description).with_complexity(spec.complexity);
+
+                // Update progress
+                ui_channel.send(UiEvent::TaskProgress {
+                    task_id,
+                    progress: super::super::user_interface::events::TaskProgress {
+                        stage: "Executing".to_owned(),
+                        current: index as u64,
+                        total: Some(total_subtasks as u64),
+                        message: format!("Subtask {}/{}", index + 1, total_subtasks),
+                    },
+                });
 
                 ui_channel.send(UiEvent::TaskOutput {
                     task_id,
@@ -547,8 +611,9 @@ mod tests {
         let router = Arc::new(StrategyRouter::with_default_strategies());
         let validator = Arc::new(ValidationPipeline::with_default_stages());
         let tool_registry = Arc::new(ToolRegistry::default());
+        let context_fetcher = ContextFetcher::new(PathBuf::from("."));
 
-        let executor = AgentExecutor::new(router, validator, tool_registry);
+        let executor = AgentExecutor::new(router, validator, tool_registry, context_fetcher);
 
         // Just verify it was created successfully
         assert!(

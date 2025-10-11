@@ -1,7 +1,6 @@
-use indicatif::{ProgressBar, ProgressStyle};
+use merlin_core::prompts::load_prompt;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
-use std::time::Duration;
 use tokio::spawn;
 use tokio::task::{JoinError, spawn_blocking};
 use walkdir::{DirEntry, WalkDir};
@@ -23,8 +22,14 @@ type FileScoreInfo = (PathBuf, f32, Option<f32>, Option<f32>);
 type ProcessSearchResultsReturn = (Vec<PrioritizedFile>, Vec<FileScoreInfo>);
 type FileChunksMap = HashMap<PathBuf, Vec<(usize, usize, f32)>>;
 
-/// Default system prompt used when constructing the base context.
-const DEFAULT_SYSTEM_PROMPT: &str = "You are a helpful coding assistant. You help users understand and modify their codebase.\n\nWhen making changes:\n1. Be precise and accurate\n2. Explain your reasoning\n3. Provide complete, working code\n4. Follow the existing code style\n\nYou have access to the user's codebase context below.";
+/// Loads the default system prompt from the prompts directory
+///
+/// # Panics
+/// Panics if the `coding_assistant` prompt cannot be loaded (should never happen as prompts are embedded)
+fn load_default_system_prompt() -> String {
+    load_prompt("coding_assistant")
+        .unwrap_or_else(|err| panic!("Failed to load coding_assistant prompt: {err}"))
+}
 
 /// Directories ignored during project scan.
 const IGNORED_DIRS: &[&str] = &[
@@ -145,7 +150,7 @@ impl ContextBuilder {
             self.max_files
         );
 
-        Ok(Context::new(DEFAULT_SYSTEM_PROMPT).with_files(files))
+        Ok(Context::new(load_default_system_prompt()).with_files(files))
     }
 
     /// Use hybrid search to intelligently gather context
@@ -250,7 +255,12 @@ impl ContextBuilder {
         }
         tracing::info!("=====================================");
 
-        Ok(context_mgr.into_files())
+        let files = context_mgr.into_files();
+
+        // Log context usage breakdown
+        Self::log_context_breakdown(&files, query_text);
+
+        Ok(files)
     }
 
     /// Collect a list of readable code files under the project root.
@@ -571,15 +581,7 @@ impl ContextBuilder {
     /// # Errors
     /// Returns an error if hybrid search fails
     async fn perform_hybrid_search(&self, query_text: &str) -> Result<Vec<SearchResult>> {
-        let spinner = ProgressBar::new_spinner();
-        spinner.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.cyan} {msg}")
-                .unwrap_or_else(|_| ProgressStyle::default_spinner()),
-        );
-        spinner.enable_steady_tick(Duration::from_millis(100));
-
-        spinner.set_message("Running hybrid search (BM25 + Vector)...");
+        tracing::info!("Running hybrid search (BM25 + Vector)...");
         tracing::info!("Using hybrid BM25 + Vector search for context");
 
         let semantic_matches = if let Some(manager) = &self.vector_manager {
@@ -611,7 +613,7 @@ impl ContextBuilder {
             }
         }
 
-        spinner.finish_with_message("Hybrid search complete");
+        tracing::info!("Hybrid search complete");
         Ok(semantic_matches)
     }
 
@@ -722,5 +724,77 @@ impl ContextBuilder {
             .collect();
 
         (search_prioritized, file_scores)
+    }
+
+    /// Log a visual breakdown of context usage
+    fn log_context_breakdown(files: &[FileContext], query_text: &str) {
+        const BAR_WIDTH: usize = 50;
+
+        // Calculate token counts for each component
+        let system_prompt = load_default_system_prompt();
+        let system_prompt_tokens = system_prompt.len() / 4;
+        let user_input_tokens = query_text.len() / 4;
+        let context_tokens: usize = files.iter().map(|f| f.content.len() / 4).sum();
+
+        // For now, we don't track past conversation, so set to 0
+        // This can be updated when conversation history is implemented
+        let conversation_tokens = 0;
+
+        let total_tokens =
+            system_prompt_tokens + user_input_tokens + context_tokens + conversation_tokens;
+
+        // Create visual bar chart
+        let system_bar = (system_prompt_tokens * BAR_WIDTH / total_tokens).max(1);
+        let user_bar = (user_input_tokens * BAR_WIDTH / total_tokens).max(1);
+        let files_bar = (context_tokens * BAR_WIDTH / total_tokens).max(1);
+        let conv_bar = if conversation_tokens > 0 {
+            (conversation_tokens * BAR_WIDTH / total_tokens).max(1)
+        } else {
+            0
+        };
+
+        tracing::info!("=====================================");
+        tracing::info!("CONTEXT USAGE BREAKDOWN");
+        tracing::info!("=====================================");
+        tracing::info!("Total tokens: ~{}", total_tokens);
+        tracing::info!("");
+        tracing::info!(
+            "System Prompt: {:>6} tokens ({:>5.1}%) {}",
+            system_prompt_tokens,
+            (system_prompt_tokens as f64 / total_tokens as f64) * 100.0,
+            "█".repeat(system_bar)
+        );
+        tracing::info!(
+            "User Input:    {:>6} tokens ({:>5.1}%) {}",
+            user_input_tokens,
+            (user_input_tokens as f64 / total_tokens as f64) * 100.0,
+            "█".repeat(user_bar)
+        );
+        tracing::info!(
+            "Files:         {:>6} tokens ({:>5.1}%) {}",
+            context_tokens,
+            (context_tokens as f64 / total_tokens as f64) * 100.0,
+            "█".repeat(files_bar)
+        );
+        if conversation_tokens > 0 {
+            tracing::info!(
+                "Conversation:  {:>6} tokens ({:>5.1}%) {}",
+                conversation_tokens,
+                (conversation_tokens as f64 / total_tokens as f64) * 100.0,
+                "█".repeat(conv_bar)
+            );
+        }
+        tracing::info!("=====================================");
+        tracing::info!("File breakdown: {} files included", files.len());
+        for (index, file) in files.iter().enumerate() {
+            let tokens = file.content.len() / 4;
+            tracing::info!(
+                "  {}. {} - {} tokens",
+                index + 1,
+                file.path.display(),
+                tokens
+            );
+        }
+        tracing::info!("=====================================");
     }
 }

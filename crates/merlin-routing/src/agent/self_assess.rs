@@ -2,7 +2,7 @@ use crate::{
     Complexity, ExecutionContext, ExecutionMode, Result, RoutingError, SubtaskSpec, Task,
     TaskAction, TaskDecision,
 };
-use merlin_core::{Context, ModelProvider, Query};
+use merlin_core::{Context, ModelProvider, Query, prompts::load_prompt};
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 use std::sync::Arc;
@@ -49,21 +49,14 @@ impl SelfAssessor {
         Self::parse_decision(&response.text, task)
     }
 
+    /// Build assessment prompt for a task
+    ///
+    /// # Panics
+    /// Panics if the `task_assessment` prompt cannot be loaded (should never happen as prompts are embedded)
     fn build_assessment_prompt(task: &Task, _context: &ExecutionContext) -> String {
-        format!(
-            r#"Task: "{}"
-
-You must respond with ONLY valid JSON. No explanations, no markdown, just JSON.
-
-For simple requests like greetings, respond:
-{{"action": "COMPLETE", "reasoning": "Simple greeting", "confidence": 0.95, "details": {{"result": "Hi! How can I help you today?"}}}}
-
-For complex tasks, respond:
-{{"action": "DECOMPOSE", "reasoning": "Needs multiple steps", "confidence": 0.9, "details": {{"subtasks": [{{"description": "Step 1", "complexity": "Simple"}}], "execution_mode": "Sequential"}}}}
-
-JSON:"#,
-            task.description
-        )
+        let template = load_prompt("task_assessment")
+            .unwrap_or_else(|err| panic!("Failed to load task_assessment prompt: {err}"));
+        template.replace("{task_description}", &task.description)
     }
 
     /// Parse an assessment response into a decision (public for executor)

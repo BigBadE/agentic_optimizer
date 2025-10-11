@@ -14,9 +14,10 @@
 )]
 
 use merlin_routing::{
-    AgentExecutor, Complexity, ExecutionMode, StrategyRouter, SubtaskSpec, Task, TaskAction,
-    TaskDecision, ToolRegistry, UiChannel, ValidationPipeline,
+    AgentExecutor, Complexity, ContextFetcher, ExecutionMode, StrategyRouter, SubtaskSpec, Task,
+    TaskAction, TaskDecision, ToolRegistry, UiChannel, ValidationPipeline,
 };
+use std::path::PathBuf;
 use std::sync::Arc;
 #[tokio::test]
 #[ignore = "Requires Ollama running locally"]
@@ -24,8 +25,9 @@ async fn test_simple_task_skips_assessment() {
     let router = Arc::new(StrategyRouter::with_default_strategies());
     let validator = Arc::new(ValidationPipeline::with_default_stages());
     let tool_registry = Arc::new(ToolRegistry::default());
+    let context_fetcher = ContextFetcher::new(PathBuf::from("."));
 
-    let mut executor = AgentExecutor::new(router, validator, tool_registry);
+    let mut executor = AgentExecutor::new(router, validator, tool_registry, context_fetcher);
 
     let task = Task::new("hi".to_owned());
 

@@ -489,16 +489,45 @@ impl<B: Backend> TuiApp<B> {
             return;
         };
 
+        // Calculate max scroll based on task output (approximate)
+        let text_lines = task
+            .output_lines
+            .iter()
+            .map(|line| line.lines().count())
+            .sum::<usize>() as u16;
+        let viewport_height = 10u16; // Approximate viewport height
+        let max_scroll = text_lines.saturating_sub(viewport_height);
+
         match key.code {
-            KeyCode::Up | KeyCode::Char('k') => task.output_tree.move_up(),
-            KeyCode::Down | KeyCode::Char('j') => task.output_tree.move_down(),
+            // Arrow keys and vim-style navigation scroll the text output
+            KeyCode::Up | KeyCode::Char('k') => {
+                self.state.output_scroll_offset = self.state.output_scroll_offset.saturating_sub(1);
+            }
+            KeyCode::Down | KeyCode::Char('j') => {
+                let new_offset = self.state.output_scroll_offset.saturating_add(1);
+                self.state.output_scroll_offset = new_offset.min(max_scroll);
+            }
+            // Right/Left expand/collapse output tree
             KeyCode::Right | KeyCode::Char('l') => task.output_tree.expand_selected(),
             KeyCode::Left | KeyCode::Char('h') => task.output_tree.collapse_selected(),
+            // Space toggles output tree node
             KeyCode::Char(' ') => task.output_tree.toggle_selected(),
-            KeyCode::Home => task.output_tree.move_to_start(),
-            KeyCode::End => task.output_tree.move_to_end(),
-            KeyCode::PageUp => task.output_tree.page_up(10),
-            KeyCode::PageDown => task.output_tree.page_down(10),
+            // Home/End scroll to top/bottom of output
+            KeyCode::Home => {
+                self.state.output_scroll_offset = 0;
+            }
+            KeyCode::End => {
+                self.state.output_scroll_offset = max_scroll;
+            }
+            // PageUp/PageDown for faster scrolling
+            KeyCode::PageUp => {
+                self.state.output_scroll_offset =
+                    self.state.output_scroll_offset.saturating_sub(10);
+            }
+            KeyCode::PageDown => {
+                let new_offset = self.state.output_scroll_offset.saturating_add(10);
+                self.state.output_scroll_offset = new_offset.min(max_scroll);
+            }
             _ => {}
         }
     }
@@ -561,6 +590,9 @@ impl<B: Backend> TuiApp<B> {
             text: input.clone(),
             timestamp: Instant::now(),
         });
+
+        // Set processing status
+        self.state.processing_status = Some("[Processing...]".to_string());
 
         self.pending_input = Some(input);
         self.input_manager.clear();

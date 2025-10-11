@@ -20,6 +20,10 @@ pub struct UiState {
     pub conversation_history: Vec<ConversationEntry>,
     /// Emoji display mode
     pub emoji_mode: EmojiMode,
+    /// Status message to display when processing input
+    pub processing_status: Option<String>,
+    /// Vertical scroll offset for the output pane
+    pub output_scroll_offset: u16,
 }
 
 impl UiState {

@@ -3,12 +3,20 @@
 use anyhow::Result;
 use merlin_core::{Response, TokenUsage};
 use merlin_routing::{MessageLevel, UiChannel, UiEvent};
+use std::env;
 use std::fs;
 use std::io::Write as _;
-use std::path::Path;
+use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 
 const MAX_TASKS: usize = 50;
+
+/// Get the Merlin folder path, respecting `MERLIN_FOLDER` environment variable
+///
+/// If `MERLIN_FOLDER` is set, use it. Otherwise default to `project/.merlin`
+pub fn get_merlin_folder(project_root: &Path) -> PathBuf {
+    env::var("MERLIN_FOLDER").map_or_else(|_| project_root.join(".merlin"), PathBuf::from)
+}
 
 /// Calculate estimated cost based on token usage.
 pub fn calculate_cost(usage: &TokenUsage) -> f64 {

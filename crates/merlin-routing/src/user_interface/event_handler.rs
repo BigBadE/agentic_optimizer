@@ -108,6 +108,9 @@ impl<'handler> EventHandler<'handler> {
         self.task_manager.add_task(task_id, task_display);
         self.state.active_running_tasks.insert(task_id);
 
+        // Clear processing status since task has started
+        self.state.processing_status = None;
+
         // Ensure parent is not collapsed
         if let Some(parent_id) = parent_id {
             self.task_manager.expand_task(parent_id);
@@ -237,5 +240,7 @@ impl<'handler> EventHandler<'handler> {
             self.state.selected_task_index = pos;
         }
         self.state.active_task_id = Some(task_id);
+        // Reset scroll offset when switching tasks
+        self.state.output_scroll_offset = 0;
     }
 }

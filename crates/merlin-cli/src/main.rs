@@ -15,9 +15,8 @@
 )]
 
 use anyhow::Result;
-use tracing_subscriber::{
-    EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
-};
+use clap::Parser as _;
+use cli::{Cli, Commands};
 
 mod cli;
 mod config;
@@ -25,16 +24,8 @@ mod handlers;
 mod interactive;
 mod utils;
 
-use clap::Parser as _;
-use cli::{Cli, Commands};
-
 #[tokio::main]
 async fn main() -> Result<()> {
-    Registry::default()
-        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| "agentic_optimizer=info".into()))
-        .with(fmt::layer())
-        .init();
-
     let cli = Cli::parse();
 
     match cli.command {

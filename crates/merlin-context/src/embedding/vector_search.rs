@@ -1,7 +1,6 @@
 //! Vector search manager with persistent caching.
 
 use futures::stream::{FuturesUnordered, StreamExt as _};
-use indicatif::{ProgressBar, ProgressStyle};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::hash_map::DefaultHasher;
@@ -11,7 +10,7 @@ use std::fs;
 use std::hash::{Hash as _, Hasher as _};
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
-use std::time::{Duration, SystemTime};
+use std::time::SystemTime;
 use tokio::task::spawn_blocking;
 use tracing::{info, warn};
 
@@ -161,54 +160,35 @@ impl VectorSearchManager {
     /// # Errors
     /// Returns an error if embedding model is unavailable or embedding/cache IO fails
     pub async fn initialize(&mut self) -> Result<()> {
-        let spinner = Self::create_spinner();
-
         // Check if embedding model is available
-        spinner.set_message("Checking embedding model availability...");
+        tracing::info!("Checking embedding model availability...");
         if let Err(model_error) = self.client.ensure_model_available().await {
-            spinner.finish_and_clear();
             return Err(model_error);
         }
 
-        spinner.set_message(format!(
+        tracing::info!(
             "Loading embedding cache (path: {})...",
             self.cache_path.display()
-        ));
+        );
 
         // Try to load from cache first
         if let Ok(cache) = self.load_cache()
-            && self.try_initialize_from_cache(cache, &spinner).await?
+            && self.try_initialize_from_cache(cache).await?
         {
             return Ok(());
         }
 
         // No valid cache - embed entire codebase
-        self.initialize_from_scratch(&spinner).await?;
+        self.initialize_from_scratch().await?;
 
         Ok(())
-    }
-
-    /// Create a configured progress spinner
-    fn create_spinner() -> ProgressBar {
-        let spinner = ProgressBar::new_spinner();
-        spinner.set_style(
-            ProgressStyle::default_spinner()
-                .template("{spinner:.cyan} {msg}")
-                .unwrap_or_else(|_| ProgressStyle::default_spinner()),
-        );
-        spinner.enable_steady_tick(Duration::from_millis(100));
-        spinner
     }
 
     /// Try to initialize from cached embeddings
     ///
     /// # Errors
     /// Returns an error if embedding operations fail
-    async fn try_initialize_from_cache(
-        &mut self,
-        cache: VectorCache,
-        spinner: &ProgressBar,
-    ) -> Result<bool> {
+    async fn try_initialize_from_cache(&mut self, cache: VectorCache) -> Result<bool> {
         info!(
             "  Cache file found with {} embeddings (version: {})",
             cache.embeddings.len(),
@@ -224,12 +204,9 @@ impl VectorSearchManager {
             return Ok(false);
         }
 
-        spinner.set_message(format!(
-            "Validating {} cached embeddings...",
-            cache.embeddings.len()
-        ));
+        tracing::info!("Validating {} cached embeddings...", cache.embeddings.len());
 
-        self.process_cached_embeddings(&cache, spinner).await?;
+        self.process_cached_embeddings(&cache).await?;
 
         Ok(true)
     }
@@ -238,11 +215,7 @@ impl VectorSearchManager {
     ///
     /// # Errors
     /// Returns an error if embedding operations fail
-    async fn process_cached_embeddings(
-        &mut self,
-        cache: &VectorCache,
-        spinner: &ProgressBar,
-    ) -> Result<()> {
+    async fn process_cached_embeddings(&mut self, cache: &VectorCache) -> Result<()> {
         let (valid, invalid) = self.validate_cache_entries(&cache.embeddings);
 
         // Add valid entries to store and BM25 index
@@ -256,7 +229,7 @@ impl VectorSearchManager {
         // Handle new and invalid files
         let (new_files, _new_count, _invalid_count) = self.identify_new_files(cache);
 
-        self.update_cache_with_changes(new_files, invalid, spinner, cache)
+        self.update_cache_with_changes(new_files, invalid, cache)
             .await?;
 
         self.save_cache()?;
@@ -307,7 +280,6 @@ impl VectorSearchManager {
         &mut self,
         new_files: Vec<PathBuf>,
         invalid: Vec<PathBuf>,
-        spinner: &ProgressBar,
         cache: &VectorCache,
     ) -> Result<()> {
         let new_count = new_files.len();
@@ -315,24 +287,21 @@ impl VectorSearchManager {
 
         if !new_files.is_empty() {
             info!("  Found {new_count} new files to embed");
-            spinner.set_message(format!("Embedding {new_count} new files..."));
-            self.embed_files(new_files, spinner).await?;
+            tracing::info!("Embedding {new_count} new files...");
+            self.embed_files(new_files).await?;
         }
 
         if !invalid.is_empty() {
-            spinner.set_message(format!("Re-embedding {invalid_count} modified files..."));
-            self.embed_files(invalid, spinner).await?;
-            spinner.finish_with_message(format!(
+            tracing::info!("Re-embedding {invalid_count} modified files...");
+            self.embed_files(invalid).await?;
+            tracing::info!(
                 "✓ Loaded cache + updated {} files",
                 invalid_count + new_count
-            ));
+            );
         } else if new_count > 0 {
-            spinner.finish_with_message(format!("✓ Loaded cache + added {new_count} new files"));
+            tracing::info!("✓ Loaded cache + added {new_count} new files");
         } else {
-            spinner.finish_with_message(format!(
-                "✓ Loaded {} embeddings from cache",
-                cache.embeddings.len()
-            ));
+            tracing::info!("✓ Loaded {} embeddings from cache", cache.embeddings.len());
         }
 
         Ok(())
@@ -342,20 +311,17 @@ impl VectorSearchManager {
     ///
     /// # Errors
     /// Returns an error if embedding operations fail
-    async fn initialize_from_scratch(&mut self, spinner: &ProgressBar) -> Result<()> {
+    async fn initialize_from_scratch(&mut self) -> Result<()> {
         info!("  No valid cache found - building from scratch");
-        spinner.set_message("Building embedding index for codebase...");
+        tracing::info!("Building embedding index for codebase...");
         let files = self.collect_source_files();
 
         info!("  Found {} source files to embed", files.len());
-        spinner.set_message(format!("Embedding {} source files...", files.len()));
-        self.embed_files(files, spinner).await?;
+        tracing::info!("Embedding {} source files...", files.len());
+        self.embed_files(files).await?;
 
         info!("  Embedded {} files total", self.store.len());
-        spinner.finish_with_message(format!(
-            "✓ Indexed {} files with embeddings",
-            self.store.len()
-        ));
+        tracing::info!("✓ Indexed {} files with embeddings", self.store.len());
 
         info!("  Saving cache to disk...");
         self.save_cache()?;
@@ -1021,7 +987,7 @@ impl VectorSearchManager {
         clippy::too_many_lines,
         reason = "Complex pipeline with multiple phases"
     )]
-    async fn embed_files(&mut self, files: Vec<PathBuf>, spinner: &ProgressBar) -> Result<()> {
+    async fn embed_files(&mut self, files: Vec<PathBuf>) -> Result<()> {
         const CHUNK_BATCH_SIZE: usize = 50;
         const CHECKPOINT_INTERVAL_CHUNKS: usize = 500;
 
@@ -1035,7 +1001,7 @@ impl VectorSearchManager {
         );
 
         // Phase 1: Parallel file reading and chunking (CPU-bound)
-        spinner.set_message("Reading and chunking files...");
+        tracing::info!("Reading and chunking files...");
         let file_chunks_data = Self::parallel_read_and_chunk(files, &self.project_root).await;
 
         info!("Chunked {} files into chunks", file_chunks_data.len());
@@ -1061,7 +1027,6 @@ impl VectorSearchManager {
         info!("Total chunks to embed: {}", total_chunks);
 
         // Embed chunks in mega-batches
-        let mut embedded_count = 0;
         for batch_start in (0..chunk_queue.len()).step_by(CHUNK_BATCH_SIZE) {
             let batch_end = (batch_start + CHUNK_BATCH_SIZE).min(chunk_queue.len());
             let batch = &chunk_queue[batch_start..batch_end];
@@ -1070,13 +1035,6 @@ impl VectorSearchManager {
                 .iter()
                 .map(|(_, chunk, _)| chunk.content.clone())
                 .collect();
-
-            spinner.set_message(format!(
-                "Embedding chunks (requesting)... {}/{} ({:.1}%)",
-                embedded_count,
-                total_chunks,
-                (embedded_count as f32 / total_chunks as f32) * 100.0
-            ));
 
             let embeddings = match client.embed_batch(chunk_texts).await {
                 Ok(embs) => embs,
@@ -1099,8 +1057,6 @@ impl VectorSearchManager {
                     *content_hash,
                 ));
             }
-
-            embedded_count += batch.len();
         }
 
         info!(
@@ -1109,7 +1065,7 @@ impl VectorSearchManager {
         );
 
         // Phase 3: Process results and update indices
-        spinner.set_message("Building search indices and writing cache...");
+        tracing::info!("Building search indices and writing cache...");
         let mut next_checkpoint = CHECKPOINT_INTERVAL_CHUNKS;
         for chunk_result in all_chunk_results {
             let chunk_count = self.process_chunk_results(vec![chunk_result]);
@@ -1118,9 +1074,6 @@ impl VectorSearchManager {
 
             // Progressive cache saving by chunks without modulo
             if processed_chunks >= next_checkpoint {
-                spinner.set_message(format!(
-                    "Checkpointing cache ({processed_chunks} / {total_chunks} chunks)..."
-                ));
                 if let Err(error) = self.save_cache() {
                     warn!("Failed to save checkpoint: {error}");
                 } else {
@@ -1128,12 +1081,6 @@ impl VectorSearchManager {
                 }
                 next_checkpoint = processed_chunks.saturating_add(CHECKPOINT_INTERVAL_CHUNKS);
             }
-
-            // Update progress display for processed chunks
-            spinner.set_message(format!(
-                "Embedding chunks... {processed_chunks}/{total_chunks} ({:.1}%)",
-                (processed_chunks as f32 / total_chunks as f32) * 100.0
-            ));
         }
 
         // Finalize BM25 index (compute IDF scores)
@@ -1145,9 +1092,7 @@ impl VectorSearchManager {
             warn!("Failed to save final cache: {error}");
         }
 
-        spinner.set_message(format!(
-            "Completed: {processed_files} files, {processed_chunks} chunks"
-        ));
+        tracing::info!("Completed: {processed_files} files, {processed_chunks} chunks");
 
         Ok(())
     }

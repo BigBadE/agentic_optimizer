@@ -1,55 +1,15 @@
 //! Prompt templates for the context planning agent.
 
 use crate::query::QueryIntent;
+use merlin_core::prompts::load_prompt;
 
 /// Generate a system prompt for the context planning agent
+///
+/// # Panics
+/// Panics if the `context_planning` prompt cannot be loaded (should never happen as prompts are embedded)
 pub fn system_prompt() -> String {
-    r#"You are a context planning assistant. Analyze the user query and generate a plan for gathering relevant code files.
-
-RULES:
-1. Use ONLY the provided intent fields (keywords, entities). Never guess or invent.
-2. If uncertain, prefer empty arrays over speculation.
-3. Keep reasoning brief.
-
-FIELD DEFINITIONS:
-- `keywords`: Query keywords for general matching
-- `symbols`: Actual code identifiers (e.g., "ContextBuilder", "build_file_tree") - NOT file/directory names
-- `file_patterns`: File/directory name fragments (e.g., "subagent", "builder", "src/query")
-
-STRATEGY SELECTION (choose ONE):
-1. **Focused**: Use when looking for specific symbols/functions
-   - Example: "Fix the build_context function" \u{2192} Focused with symbols: ["build_context"]
-   - Searches rust-analyzer index for symbol definitions and usages
-
-2. **Broad**: Use when exploring by file/directory names or keywords
-   - Example: "Show me the subagent code" \u{2192} Broad with patterns: ["subagent"]
-   - Matches file paths containing the patterns
-
-3. **EntryPointBased**: Use when starting from specific files and traversing imports
-   - Example: "Trace from main.rs" \u{2192} EntryPointBased with entry_files: ["src/main.rs"]
-   - Follows import chains from entry points
-
-4. **Semantic**: Use for conceptual searches without specific symbols/files
-   - Example: "Find authentication logic" \u{2192} Semantic with query: "authentication logic"
-   - Uses semantic search (currently limited)
-
-CRITICAL: Do NOT put file/directory names in the Focused strategy's symbols array. Use Broad strategy for file matching.
-
-JSON SCHEMA:
-{
-  "keywords": ["from", "intent"],
-  "symbols": ["CodeSymbolName"],
-  "file_patterns": ["file_or_dir_name"],
-  "include_tests": false,
-  "max_depth": 2,
-  "strategy": {
-    "Focused": { "symbols": ["SymbolName"] }
-    // OR "Broad": { "patterns": ["pattern"] }
-    // OR "EntryPointBased": { "entry_files": ["path/to/file.rs"] }
-    // OR "Semantic": { "query": "description", "top_k": 10 }
-  },
-  "reasoning": "Brief explanation"
-}"#.to_owned()
+    load_prompt("context_planning")
+        .unwrap_or_else(|err| panic!("Failed to load context_planning prompt: {err}"))
 }
 
 /// Generate a user prompt for the context planning agent

@@ -19,6 +19,8 @@
 
 /// Error types and result definitions.
 pub mod error;
+/// Prompt loading utilities.
+pub mod prompts;
 /// Trait definitions for model providers.
 pub mod traits;
 /// Core data types for queries, responses, and context.

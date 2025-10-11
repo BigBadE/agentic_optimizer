@@ -1,3 +1,4 @@
+use std::env;
 use std::path::PathBuf;
 use std::slice::from_ref;
 use std::sync::Arc;
@@ -9,10 +10,10 @@ use tracing::{info, warn};
 
 use crate::user_interface::events::{MessageLevel, UiEvent};
 use crate::{
-    AgentExecutor, ConflictAwareTaskGraph, ExecutorPool, ListFilesTool, LocalTaskAnalyzer,
-    ModelRouter, ReadFileTool, Result, RoutingConfig, RoutingError, RunCommandTool, StrategyRouter,
-    Task, TaskAnalysis, TaskAnalyzer, TaskGraph, TaskResult, ToolRegistry, UiChannel,
-    ValidationPipeline, Validator, WorkspaceState, WriteFileTool,
+    AgentExecutor, ConflictAwareTaskGraph, ContextFetcher, ExecutorPool, ListFilesTool,
+    LocalTaskAnalyzer, ModelRouter, ReadFileTool, Result, RoutingConfig, RoutingError,
+    RunCommandTool, StrategyRouter, Task, TaskAnalysis, TaskAnalyzer, TaskGraph, TaskResult,
+    ToolRegistry, UiChannel, ValidationPipeline, Validator, WorkspaceState, WriteFileTool,
 };
 
 /// High-level orchestrator that coordinates all routing components
@@ -26,6 +27,11 @@ pub struct RoutingOrchestrator {
 }
 
 impl RoutingOrchestrator {
+    /// Get the Merlin folder path, respecting `MERLIN_FOLDER` environment variable
+    fn get_merlin_folder(project_root: &PathBuf) -> PathBuf {
+        env::var("MERLIN_FOLDER").map_or_else(|_| project_root.join(".merlin"), PathBuf::from)
+    }
+
     /// Creates a new routing orchestrator with the given configuration.
     ///
     /// Initializes analyzer, router, validator, and workspace with default implementations.
@@ -103,11 +109,15 @@ impl RoutingOrchestrator {
                 .with_tool(Arc::new(RunCommandTool::new(workspace_root))),
         );
 
+        // Create context fetcher for building context
+        let context_fetcher = ContextFetcher::new(self.workspace.root_path().clone());
+
         // Create agent executor
         let mut executor = AgentExecutor::new(
             Arc::clone(&self.router),
             Arc::clone(&self.validator),
             tool_registry,
+            context_fetcher,
         );
 
         // Execute with streaming
@@ -193,7 +203,8 @@ impl RoutingOrchestrator {
     /// Returns an error if directory creation or file write fails.
     async fn write_tasks_snapshot(&self, tasks: &[Task]) -> Result<PathBuf> {
         let root = self.workspace.root_path().clone();
-        let dir = root.join(".merlin").join("tasks");
+        let merlin_dir = Self::get_merlin_folder(&root);
+        let dir = merlin_dir.join("tasks");
         fs::create_dir_all(&dir).await?;
 
         let now = SystemTime::now()

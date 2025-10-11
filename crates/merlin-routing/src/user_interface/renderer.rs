@@ -80,7 +80,7 @@ impl Renderer {
                 .split(main_area);
 
             self.render_task_tree_full(frame, primary_split[0], &ctx.ui_ctx, ctx.focused);
-            self.render_input_area(frame, primary_split[1], ctx.input, ctx.focused);
+            self.render_input_area(frame, primary_split[1], ctx.input, ctx);
         } else {
             // With selection, split between tasks, focused details, and input
             let primary_split = Layout::default()
@@ -94,7 +94,7 @@ impl Renderer {
 
             self.render_task_tree_full(frame, primary_split[0], &ctx.ui_ctx, ctx.focused);
             self.render_focused_detail_section(frame, primary_split[1], &ctx.ui_ctx, ctx.focused);
-            self.render_input_area(frame, primary_split[2], ctx.input, ctx.focused);
+            self.render_input_area(frame, primary_split[2], ctx.input, ctx);
         }
     }
 
@@ -181,6 +181,13 @@ impl Renderer {
             FocusedPane::Output,
         ));
 
+        // Calculate content height and clamp scroll offset
+        // Account for borders (2) and padding (2)
+        let content_height = area.height.saturating_sub(4);
+        let text_lines = text.lines().count() as u16;
+        let max_scroll = text_lines.saturating_sub(content_height);
+        let clamped_scroll = ui_ctx.state.output_scroll_offset.min(max_scroll);
+
         let paragraph = Paragraph::new(text)
             .style(Style::default().fg(self.theme.text()))
             .block(
@@ -190,7 +197,8 @@ impl Renderer {
                     .border_style(Style::default().fg(border_color))
                     .padding(Padding::horizontal(1)),
             )
-            .wrap(Wrap { trim: false });
+            .wrap(Wrap { trim: false })
+            .scroll((clamped_scroll, 0));
 
         frame.render_widget(paragraph, area);
     }
@@ -223,8 +231,16 @@ impl Renderer {
             let status_icon = Self::get_task_status_icon(task);
             let is_selected = ui_ctx.state.active_task_id == Some(*task_id);
 
-            // Show status with task description
-            let task_line = format!("└─ [{status_icon}] {}", task.description);
+            // Show status with task description and optional stage
+            let task_line = task.progress.as_ref().map_or_else(
+                || format!("└─ [{status_icon}] {}", task.description),
+                |progress| {
+                    format!(
+                        "└─ [{status_icon}] {} [{}]",
+                        task.description, progress.stage
+                    )
+                },
+            );
 
             let style = if is_selected {
                 Style::default()
@@ -326,26 +342,32 @@ impl Renderer {
         frame: &mut Frame,
         area: Rect,
         input_manager: &InputManager,
-        focused_pane: FocusedPane,
+        ctx: &RenderCtx<'_>,
     ) {
         let mut input_area = input_manager.input_area().clone();
 
-        let border_color = if focused_pane == FocusedPane::Input {
+        let border_color = if ctx.focused == FocusedPane::Input {
             self.theme.focused_border()
         } else {
             self.theme.unfocused_border()
         };
 
-        let cursor_style = if focused_pane == FocusedPane::Input {
+        let cursor_style = if ctx.focused == FocusedPane::Input {
             Style::default().add_modifier(Modifier::REVERSED)
         } else {
             Style::default()
         };
 
+        // Create title with optional status indicator
+        let title = ctx.ui_ctx.state.processing_status.as_ref().map_or_else(
+            || "─── Input ".to_string(),
+            |status| format!("─── Input {status} "),
+        );
+
         input_area.set_block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("─── Input ")
+                .title(title)
                 .border_style(Style::default().fg(border_color))
                 .padding(Padding::horizontal(1)),
         );

@@ -10,8 +10,8 @@ use super::scheduler::ConflictAwareTaskGraph;
 use super::state::WorkspaceState;
 use crate::user_interface::UiChannel;
 use crate::{
-    AgentExecutor, ListFilesTool, ModelRouter, ReadFileTool, Result, RoutingError, RunCommandTool,
-    Task, TaskResult, ToolRegistry, Validator, WriteFileTool,
+    AgentExecutor, ContextFetcher, ListFilesTool, ModelRouter, ReadFileTool, Result, RoutingError,
+    RunCommandTool, Task, TaskResult, ToolRegistry, Validator, WriteFileTool,
 };
 
 /// Parallel task executor with concurrency limits
@@ -183,11 +183,12 @@ impl ExecutorPool {
                 .with_tool(Arc::new(ReadFileTool::new(workspace_root.clone())))
                 .with_tool(Arc::new(WriteFileTool::new(workspace_root.clone())))
                 .with_tool(Arc::new(ListFilesTool::new(workspace_root.clone())))
-                .with_tool(Arc::new(RunCommandTool::new(workspace_root))),
+                .with_tool(Arc::new(RunCommandTool::new(workspace_root.clone()))),
         );
 
-        // Create AgentExecutor and a headless UI channel
-        let mut executor = AgentExecutor::new(router, validator, tool_registry);
+        // Create context fetcher and AgentExecutor
+        let context_fetcher = ContextFetcher::new(workspace_root);
+        let mut executor = AgentExecutor::new(router, validator, tool_registry, context_fetcher);
         let (sender, _receiver) = mpsc::unbounded_channel();
         let ui_channel = UiChannel::from_sender(sender);
 

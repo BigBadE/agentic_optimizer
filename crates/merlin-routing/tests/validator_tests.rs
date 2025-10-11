@@ -415,7 +415,11 @@ async fn test_concurrent_validation() {
     }
 
     for handle in handles {
-        drop(handle.await.expect("task should complete"));
+        let inner = handle.await.expect("task should complete");
+        assert!(
+            inner.is_ok(),
+            "validation task returned an error: {inner:?}"
+        );
     }
 }
 

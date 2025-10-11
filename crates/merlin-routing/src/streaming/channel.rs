@@ -1,5 +1,6 @@
 use super::StreamingEvent;
 use tokio::sync::mpsc;
+use tracing::warn;
 
 /// Channel for streaming execution events
 #[derive(Clone)]
@@ -17,7 +18,9 @@ impl StreamingChannel {
     ///
     /// Events are dropped if the receiver has been closed.
     pub fn send(&self, event: StreamingEvent) {
-        drop(self.sender.send(event));
+        if let Err(error) = self.sender.send(event) {
+            warn!("Failed to send streaming event: {}", error);
+        }
     }
 }
 

@@ -287,7 +287,12 @@ fn test_cache_directory_creation() {
         .join("embeddings.bin");
     assert!(cache_path.to_str().is_some(), "Cache path should be valid");
 
-    drop(manager);
+    // New manager should be empty before initialization
+    assert!(
+        manager.is_empty(),
+        "New VectorSearchManager should be empty"
+    );
+    // Explicit scope end will drop manager; no manual drop() call needed
 }
 
 #[tokio::test]

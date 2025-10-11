@@ -2,6 +2,7 @@
 //! Provides event handling, state management, rendering, and persistence.
 use crate::{TaskId, TaskResult};
 use tokio::sync::mpsc;
+use tracing::warn;
 
 // Public modules
 /// Event types for UI updates
@@ -51,7 +52,9 @@ impl UiChannel {
 
     /// Sends a UI event
     pub fn send(&self, event: UiEvent) {
-        drop(self.sender.send(event));
+        if let Err(error) = self.sender.send(event) {
+            warn!("Failed to send UI event: {}", error);
+        }
     }
 
     /// Sends a task started event

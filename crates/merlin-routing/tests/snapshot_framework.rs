@@ -116,7 +116,9 @@ impl SnapshotTest {
     /// Render the UI and get the buffer as a string
     fn render_to_string(&mut self) -> String {
         // Force a render by calling tick (but with no events pending)
-        drop(self.app.tick());
+        if let Err(error) = self.app.tick() {
+            panic!("tick failed: {error}");
+        }
 
         // Extract buffer from the app's backend
         let buffer = self.app.backend().buffer();

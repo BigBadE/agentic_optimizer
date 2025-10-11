@@ -6,6 +6,7 @@ use std::io;
 use std::path::PathBuf;
 use std::time::Duration;
 use tokio::sync::mpsc;
+use tracing::warn;
 
 use super::event_handler::EventHandler;
 use super::event_source::{CrosstermEventSource, InputEventSource};
@@ -381,7 +382,9 @@ impl<B: Backend> TuiApp<B> {
 
         if let Some(persistence) = &self.persistence {
             let dir = persistence.get_tasks_dir();
-            drop(new_theme.save(dir));
+            if let Err(error) = new_theme.save(dir) {
+                warn!("Failed to save theme: {}", error);
+            }
         }
     }
 
@@ -683,7 +686,9 @@ impl<B: Backend> TuiApp<B> {
 
         if let Some(persistence) = &self.persistence {
             for id in &to_delete {
-                drop(persistence.delete_task_file(*id));
+                if let Err(error) = persistence.delete_task_file(*id) {
+                    warn!("Failed to delete task file for {:?}: {}", id, error);
+                }
             }
         }
 

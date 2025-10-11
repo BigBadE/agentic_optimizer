@@ -207,7 +207,9 @@ pub fn test_with_events(events: impl IntoIterator<Item = Event>) -> TuiApp<TestB
     let (mut app, _) = create_test_app(80, 24).expect("Failed to create app");
     let source = TestEventSource::with_events(events);
     app.set_event_source(Box::new(source));
-    drop(app.tick());
+    if let Err(error) = app.tick() {
+        panic!("tick failed: {error}");
+    }
     app
 }
 
@@ -230,7 +232,9 @@ pub fn test_with_typing(text: &str) -> TuiApp<TestBackend> {
 
         let source = TestEventSource::with_events(events);
         app.set_event_source(Box::new(source));
-        drop(app.tick());
+        if let Err(error) = app.tick() {
+            panic!("tick failed: {error}");
+        }
     }
 
     app

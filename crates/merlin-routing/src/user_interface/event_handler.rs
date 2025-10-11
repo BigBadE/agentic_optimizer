@@ -6,6 +6,7 @@ use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo};
 use crate::{TaskId, TaskResult};
 use serde_json::Value;
 use std::time::Instant;
+use tracing::warn;
 
 /// Handles UI events and updates task manager and state
 pub struct EventHandler<'handler> {
@@ -139,9 +140,9 @@ impl<'handler> EventHandler<'handler> {
 
         if let Some(persistence) = self.persistence
             && let Some(task) = self.task_manager.get_task(task_id)
+            && let Err(save_err) = persistence.save_task(task_id, task)
         {
-            // Silently ignore save errors - persistence is best-effort
-            drop(persistence.save_task(task_id, task));
+            warn!("Failed to save completed task {:?}: {}", task_id, save_err);
         }
 
         self.state.conversation_history.push(ConversationEntry {
@@ -164,9 +165,9 @@ impl<'handler> EventHandler<'handler> {
 
         if let Some(persistence) = self.persistence
             && let Some(task) = self.task_manager.get_task(task_id)
+            && let Err(save_err) = persistence.save_task(task_id, task)
         {
-            // Silently ignore save errors - persistence is best-effort
-            drop(persistence.save_task(task_id, task));
+            warn!("Failed to save failed task {:?}: {}", task_id, save_err);
         }
     }
 

@@ -50,7 +50,7 @@ fn render_and_get_text(
     input: &InputManager,
     focused: FocusedPane,
 ) -> String {
-    drop(terminal.draw(|frame| {
+    let draw_result = terminal.draw(|frame| {
         let renderer = Renderer::new(Theme::default());
         let ctx = RenderCtx {
             ui_ctx: UiCtx {
@@ -61,7 +61,8 @@ fn render_and_get_text(
             focused,
         };
         renderer.render(frame, &ctx);
-    }));
+    });
+    assert!(draw_result.is_ok(), "terminal.draw failed: {draw_result:?}");
 
     get_buffer_text(terminal)
 }
@@ -484,8 +485,7 @@ fn test_render_small_terminal() {
         };
         renderer.render(frame, &ctx);
     });
-
-    drop(result);
+    assert!(result.is_ok(), "terminal.draw failed: {result:?}");
 }
 
 #[test]
@@ -514,8 +514,7 @@ fn test_render_very_large_terminal() {
         };
         renderer.render(frame, &ctx);
     });
-
-    drop(result);
+    assert!(result.is_ok(), "terminal.draw failed: {result:?}");
 }
 
 #[test]

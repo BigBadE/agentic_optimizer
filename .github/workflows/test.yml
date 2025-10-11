@@ -35,6 +35,7 @@ jobs:
         uses: ./.github/actions/setup-rust
         with:
           profile: debug
+          components: clippy, rustfmt
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov

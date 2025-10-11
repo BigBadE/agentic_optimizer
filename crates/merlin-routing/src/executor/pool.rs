@@ -126,14 +126,14 @@ impl ExecutorPool {
 
                 join_set.spawn(async move {
                     let result = Self::execute_task(task, router, validator, workspace).await;
-                    drop(permit);
-                    result
+                    (result, permit)
                 });
             }
 
-            if let Some(result) = join_set.join_next().await {
-                let task_result =
-                    result.map_err(|err| RoutingError::ExecutionFailed(err.to_string()))??;
+            if let Some(joined) = join_set.join_next().await {
+                let (task_result_res, _permit) =
+                    joined.map_err(|err| RoutingError::ExecutionFailed(err.to_string()))?;
+                let task_result = task_result_res?;
                 running.remove(&task_result.task_id);
                 completed.insert(task_result.task_id);
                 results.push(task_result);
@@ -193,14 +193,14 @@ impl ExecutorPool {
 
                 join_set.spawn(async move {
                     let result = Self::execute_task(task, router, validator, workspace).await;
-                    drop(permit);
-                    result
+                    (result, permit)
                 });
             }
 
-            if let Some(result) = join_set.join_next().await {
-                let task_result =
-                    result.map_err(|err| RoutingError::ExecutionFailed(err.to_string()))??;
+            if let Some(joined) = join_set.join_next().await {
+                let (task_result_res, _permit) =
+                    joined.map_err(|err| RoutingError::ExecutionFailed(err.to_string()))?;
+                let task_result = task_result_res?;
                 running.remove(&task_result.task_id);
                 completed.insert(task_result.task_id);
                 results.push(task_result);

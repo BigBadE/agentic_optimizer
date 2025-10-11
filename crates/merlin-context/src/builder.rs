@@ -1,4 +1,3 @@
-use merlin_core::prompts::load_prompt;
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::spawn;
@@ -6,13 +5,14 @@ use tokio::task::{JoinError, spawn_blocking};
 use walkdir::{DirEntry, WalkDir};
 
 use core::result::Result as CoreResult;
+use merlin_core::prompts::load_prompt;
 use merlin_core::{Context, Error, FileContext, Query, Result};
 use merlin_languages::LanguageProvider;
 
 use crate::context_inclusion::{
     ContextManager, FilePriority, MAX_CONTEXT_TOKENS, PrioritizedFile, add_prioritized_files,
 };
-use crate::embedding::{SearchResult, VectorSearchManager};
+use crate::embedding::{ProgressCallback, SearchResult, VectorSearchManager};
 use crate::fs_utils::is_source_file;
 use crate::query::{QueryAnalyzer, QueryIntent};
 
@@ -56,6 +56,8 @@ pub struct ContextBuilder {
     language_backend_initialized: bool,
     /// Vector search manager for semantic search
     vector_manager: Option<VectorSearchManager>,
+    /// Optional progress callback for embedding operations
+    progress_callback: Option<ProgressCallback>,
 }
 
 impl ContextBuilder {
@@ -68,6 +70,7 @@ impl ContextBuilder {
             language_backend: None,
             language_backend_initialized: false,
             vector_manager: None,
+            progress_callback: None,
         }
     }
 
@@ -85,6 +88,13 @@ impl ContextBuilder {
     #[must_use]
     pub fn with_language_backend(mut self, backend: Box<dyn LanguageProvider>) -> Self {
         self.language_backend = Some(backend);
+        self
+    }
+
+    /// Set a progress callback for embedding operations
+    #[must_use]
+    pub fn with_progress_callback(mut self, callback: ProgressCallback) -> Self {
+        self.progress_callback = Some(callback);
         self
     }
 
@@ -113,19 +123,13 @@ impl ContextBuilder {
             // Step 2: Initialize backend and vector search IN PARALLEL
             self.initialize_systems_parallel().await?;
 
-            // Step 3: Use subagent to generate context plan (backend is required)
-            if self.language_backend.is_some() && self.language_backend_initialized {
-                let agent_files = self.use_subagent_for_context(&intent, &query.text).await?;
-                tracing::info!(
-                    "Intelligent context fetching found {} files",
-                    agent_files.len()
-                );
-                agent_files
-            } else {
-                return Err(Error::Other(
-                    "Language backend not initialized. This should not happen.".into(),
-                ));
-            }
+            // Step 3: Use hybrid search for context (vector search works without backend)
+            let agent_files = self.use_subagent_for_context(&intent, &query.text).await?;
+            tracing::info!(
+                "Intelligent context fetching found {} files",
+                agent_files.len()
+            );
+            agent_files
         } else {
             // User provided specific files
             let mut collected = Vec::new();
@@ -150,23 +154,21 @@ impl ContextBuilder {
             self.max_files
         );
 
+        // Log context usage breakdown
+        Self::log_context_breakdown(&files, &query.text);
+
         Ok(Context::new(load_default_system_prompt()).with_files(files))
     }
 
     /// Use hybrid search to intelligently gather context
     ///
     /// # Errors
-    /// Returns an error if language backend is not initialized or hybrid search fails
+    /// Returns an error if hybrid search fails
     async fn use_subagent_for_context(
         &self,
         _intent: &QueryIntent,
         query_text: &str,
     ) -> Result<Vec<FileContext>> {
-        // Initialize the language backend if needed
-        if !self.language_backend_initialized {
-            return Err(Error::Other("Language backend not initialized".into()));
-        }
-
         // Perform hybrid search
         let semantic_matches = self.perform_hybrid_search(query_text).await?;
 
@@ -256,9 +258,6 @@ impl ContextBuilder {
         tracing::info!("=====================================");
 
         let files = context_mgr.into_files();
-
-        // Log context usage breakdown
-        Self::log_context_breakdown(&files, query_text);
 
         Ok(files)
     }
@@ -489,6 +488,42 @@ impl ContextBuilder {
         }
     }
 
+    /// Initialize backend with timeout
+    async fn initialize_backend_with_timeout(
+        backend: Option<Box<dyn LanguageProvider>>,
+        project_root: PathBuf,
+    ) -> (Option<Box<dyn LanguageProvider>>, Result<()>) {
+        use tokio::time::{Duration, timeout};
+
+        let backend_task = spawn_blocking(move || {
+            tracing::info!("Initializing rust-analyzer...");
+            let mut backend_mut = backend;
+            if let Some(ref mut backend_ref) = backend_mut {
+                tracing::info!("Initializing language backend...");
+                let result = backend_ref.initialize(&project_root);
+                (backend_mut, result)
+            } else {
+                (backend_mut, Ok(()))
+            }
+        });
+
+        // Timeout after 30 seconds
+        match timeout(Duration::from_secs(30), backend_task).await {
+            Ok(Ok(result)) => result,
+            Ok(Err(join_error)) => {
+                tracing::error!("Backend task join error: {join_error}");
+                (None, Err(Error::Other("Backend task panicked".into())))
+            }
+            Err(_timeout) => {
+                tracing::warn!("Backend initialization timed out after 30s");
+                (
+                    None,
+                    Err(Error::Other("Backend initialization timeout".into())),
+                )
+            }
+        }
+    }
+
     /// Initializes systems (language backend and vector search) in parallel.
     ///
     /// # Errors
@@ -504,27 +539,22 @@ impl ContextBuilder {
 
         tracing::info!("Initializing systems in parallel...");
 
-        // Rust-analyzer initialization (CPU-bound, blocking)
+        // Rust-analyzer initialization (CPU-bound, blocking) with timeout
         let backend_handle = needs_backend_init.then(|| {
-            let mut backend = self.language_backend.take();
+            let backend = self.language_backend.take();
             let project_root = self.project_root.clone();
 
-            spawn_blocking(move || {
-                tracing::info!("Initializing rust-analyzer...");
-                if let Some(ref mut backend_mut) = backend {
-                    tracing::info!("Initializing language backend...");
-                    let result = backend_mut.initialize(&project_root);
-                    (backend, result)
-                } else {
-                    (backend, Ok(()))
-                }
-            })
+            spawn(async move { Self::initialize_backend_with_timeout(backend, project_root).await })
         });
 
         // Vector search initialization (I/O-bound, async)
         let vector_handle = needs_vector_init.then(|| {
             tracing::info!("Building embedding index...");
             let mut manager = VectorSearchManager::new(self.project_root.clone());
+
+            if let Some(callback) = self.progress_callback.clone() {
+                manager = manager.with_progress_callback(callback);
+            }
 
             spawn(async move {
                 let result = manager.initialize().await;
@@ -564,6 +594,11 @@ impl ContextBuilder {
         if self.vector_manager.is_none() {
             tracing::info!("Initializing vector search...");
             let mut manager = VectorSearchManager::new(self.project_root.clone());
+
+            if let Some(callback) = self.progress_callback.clone() {
+                manager = manager.with_progress_callback(callback);
+            }
+
             manager.initialize().await?;
             self.vector_manager = Some(manager);
         }

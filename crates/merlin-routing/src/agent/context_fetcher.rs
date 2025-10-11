@@ -1,13 +1,15 @@
 use regex::Regex;
 use std::collections::HashSet;
 use std::fmt::Write as _;
+use std::mem::replace;
 use std::path::{Path, PathBuf};
 use tokio::fs::read_to_string;
 use tracing::{debug, info};
 
 use crate::{Result, RoutingError};
-use merlin_context::{ContextBuilder, VectorSearchManager};
+use merlin_context::{ContextBuilder, ProgressCallback, VectorSearchManager};
 use merlin_core::{Context, FileContext, Query};
+use merlin_languages::{Language, create_backend};
 
 /// Extracts file references and builds contextual information for tasks
 pub struct ContextFetcher {
@@ -19,17 +21,35 @@ pub struct ContextFetcher {
     vector_manager: Option<VectorSearchManager>,
     /// Whether to use vector search for context enrichment
     use_vector_search: bool,
+    /// Optional progress callback for embedding operations
+    progress_callback: Option<ProgressCallback>,
 }
 
 impl ContextFetcher {
     /// Create a new context fetcher
     pub fn new(project_root: PathBuf) -> Self {
+        // Try to create a language backend (Rust for now)
+        let mut builder = ContextBuilder::new(project_root.clone());
+
+        if let Ok(backend) = create_backend(Language::Rust) {
+            builder = builder.with_language_backend(backend);
+            debug!("Language backend (Rust) initialized for context fetcher");
+        } else {
+            debug!("Failed to initialize language backend, will use vector search only");
+        }
+
         Self {
-            project_root: project_root.clone(),
-            context_builder: Some(ContextBuilder::new(project_root)),
+            project_root,
+            context_builder: Some(builder),
             vector_manager: None,
             use_vector_search: false,
+            progress_callback: None,
         }
+    }
+
+    /// Get the project root path
+    pub fn project_root(&self) -> &PathBuf {
+        &self.project_root
     }
 
     /// Enable vector search for semantic context retrieval
@@ -44,6 +64,13 @@ impl ContextFetcher {
     #[must_use]
     pub fn without_context_builder(mut self) -> Self {
         self.context_builder = None;
+        self
+    }
+
+    /// Set a progress callback for embedding operations
+    #[must_use]
+    pub fn with_progress_callback(mut self, callback: ProgressCallback) -> Self {
+        self.progress_callback = Some(callback);
         self
     }
 
@@ -154,6 +181,11 @@ impl ContextFetcher {
 
         // Use context builder if available
         if let Some(builder) = &mut self.context_builder {
+            if let Some(callback) = self.progress_callback.clone() {
+                *builder = replace(builder, ContextBuilder::new(self.project_root.clone()))
+                    .with_progress_callback(callback);
+            }
+
             let context = builder
                 .build_context(query)
                 .await

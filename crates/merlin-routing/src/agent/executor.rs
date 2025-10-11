@@ -1,5 +1,6 @@
 use serde_json::Value;
 use std::future::Future;
+use std::mem::replace;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
@@ -9,6 +10,7 @@ use crate::{
     ExecutionContext, ExecutionMode, ModelRouter, ModelTier, Result, RoutingError, SubtaskSpec,
     Task, TaskAction, TaskDecision, TaskId, TaskResult, TaskState, ToolRegistry, UiChannel,
     UiEvent, ValidationResult, Validator, streaming::StepType,
+    user_interface::events::TaskProgress,
 };
 use merlin_core::{Context, ModelProvider, Query, Response, TokenUsage};
 use merlin_local::LocalModelProvider;
@@ -136,7 +138,7 @@ impl AgentExecutor {
         // Step 3: Build context
         ui_channel.send(UiEvent::TaskProgress {
             task_id,
-            progress: super::super::user_interface::events::TaskProgress {
+            progress: TaskProgress {
                 stage: "Building Context".to_owned(),
                 current: 0,
                 total: None,
@@ -144,7 +146,7 @@ impl AgentExecutor {
             },
         });
 
-        let context = self.build_context(&task).await?;
+        let context = self.build_context(&task, &ui_channel).await?;
 
         // Step 4: Create query with tool descriptions
         let query = self.create_query_with_tools(&task)?;
@@ -337,13 +339,36 @@ impl AgentExecutor {
         }
     }
 
-    /// Build context from task requirements
+    /// Build context for a task
     ///
     /// # Errors
     /// Returns an error if context building fails
-    async fn build_context(&self, task: &Task) -> Result<Context> {
+    async fn build_context(&self, task: &Task, ui_channel: &UiChannel) -> Result<Context> {
+        let query = Query::new(task.description.clone());
+        let task_id = task.id;
+        let ui_clone = ui_channel.clone();
+
+        let progress_callback = Arc::new(move |stage: &str, current: u64, total: Option<u64>| {
+            ui_clone.send(UiEvent::TaskProgress {
+                task_id,
+                progress: TaskProgress {
+                    stage: stage.to_owned(),
+                    current,
+                    total,
+                    message: format!(
+                        "{} ({}/{})",
+                        stage,
+                        current,
+                        total.map_or_else(|| "?".to_owned(), |total_val| total_val.to_string())
+                    ),
+                },
+            });
+        });
+
         let mut fetcher = self.context_fetcher.lock().await;
-        let query = Query::new(&task.description);
+        let project_root = fetcher.project_root().clone();
+        *fetcher = replace(&mut *fetcher, ContextFetcher::new(project_root))
+            .with_progress_callback(progress_callback);
 
         fetcher
             .build_context_for_query(&query)

@@ -1,5 +1,5 @@
 use std::env;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::slice::from_ref;
 use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
@@ -28,7 +28,7 @@ pub struct RoutingOrchestrator {
 
 impl RoutingOrchestrator {
     /// Get the Merlin folder path, respecting `MERLIN_FOLDER` environment variable
-    fn get_merlin_folder(project_root: &PathBuf) -> PathBuf {
+    fn get_merlin_folder(project_root: &Path) -> PathBuf {
         env::var("MERLIN_FOLDER").map_or_else(|_| project_root.join(".merlin"), PathBuf::from)
     }
 

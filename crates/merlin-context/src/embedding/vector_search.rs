@@ -10,6 +10,7 @@ use std::fs;
 use std::hash::{Hash as _, Hasher as _};
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
+use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::task::spawn_blocking;
 use tracing::{info, warn};
@@ -25,6 +26,9 @@ use merlin_core::{Error, Result};
 type ChunkResult = (PathBuf, FileChunk, Vec<f32>, String, u64);
 type FileChunksData = (PathBuf, String, Vec<FileChunk>, u64);
 type FileChunkMap = HashMap<PathBuf, Vec<(usize, FileChunk, u64)>>;
+
+/// Progress callback for embedding operations
+pub type ProgressCallback = Arc<dyn Fn(&str, u64, Option<u64>) + Send + Sync>;
 
 /// Helper struct to hold vector score data
 struct VectorScoreData {
@@ -109,6 +113,8 @@ pub struct VectorSearchManager {
     project_root: PathBuf,
     /// Cache file path
     cache_path: PathBuf,
+    /// Optional progress callback
+    progress_callback: Option<ProgressCallback>,
 }
 
 impl VectorSearchManager {
@@ -131,6 +137,21 @@ impl VectorSearchManager {
             client: EmbeddingClient::default(),
             project_root,
             cache_path,
+            progress_callback: None,
+        }
+    }
+
+    /// Set a progress callback for embedding operations
+    #[must_use]
+    pub fn with_progress_callback(mut self, callback: ProgressCallback) -> Self {
+        self.progress_callback = Some(callback);
+        self
+    }
+
+    /// Report progress if callback is set
+    fn report_progress(&self, stage: &str, current: u64, total: Option<u64>) {
+        if let Some(callback) = &self.progress_callback {
+            callback(stage, current, total);
         }
     }
 
@@ -162,9 +183,7 @@ impl VectorSearchManager {
     pub async fn initialize(&mut self) -> Result<()> {
         // Check if embedding model is available
         tracing::info!("Checking embedding model availability...");
-        if let Err(model_error) = self.client.ensure_model_available().await {
-            return Err(model_error);
-        }
+        self.client.ensure_model_available().await?;
 
         tracing::info!(
             "Loading embedding cache (path: {})...",
@@ -232,7 +251,7 @@ impl VectorSearchManager {
         self.update_cache_with_changes(new_files, invalid, cache)
             .await?;
 
-        self.save_cache()?;
+        self.save_cache_async().await?;
         Ok(())
     }
 
@@ -288,11 +307,13 @@ impl VectorSearchManager {
         if !new_files.is_empty() {
             info!("  Found {new_count} new files to embed");
             tracing::info!("Embedding {new_count} new files...");
+            self.report_progress("Embedding new files", 0, Some(new_count as u64));
             self.embed_files(new_files).await?;
         }
 
         if !invalid.is_empty() {
             tracing::info!("Re-embedding {invalid_count} modified files...");
+            self.report_progress("Re-embedding modified files", 0, Some(invalid_count as u64));
             self.embed_files(invalid).await?;
             tracing::info!(
                 "✓ Loaded cache + updated {} files",
@@ -318,13 +339,15 @@ impl VectorSearchManager {
 
         info!("  Found {} source files to embed", files.len());
         tracing::info!("Embedding {} source files...", files.len());
+        self.report_progress("Embedding", 0, Some(files.len() as u64));
         self.embed_files(files).await?;
 
         info!("  Embedded {} files total", self.store.len());
         tracing::info!("✓ Indexed {} files with embeddings", self.store.len());
 
         info!("  Saving cache to disk...");
-        self.save_cache()?;
+        self.report_progress("Saving cache", 0, None);
+        self.save_cache_async().await?;
         info!("  ✓ Cache saved");
 
         Ok(())
@@ -1002,9 +1025,15 @@ impl VectorSearchManager {
 
         // Phase 1: Parallel file reading and chunking (CPU-bound)
         tracing::info!("Reading and chunking files...");
+        self.report_progress("Reading files", 0, Some(total_files as u64));
         let file_chunks_data = Self::parallel_read_and_chunk(files, &self.project_root).await;
 
         info!("Chunked {} files into chunks", file_chunks_data.len());
+        self.report_progress(
+            "Chunking complete",
+            file_chunks_data.len() as u64,
+            Some(total_files as u64),
+        );
 
         // Phase 2: Cross-file chunk batching and embedding (I/O-bound)
         let client = EmbeddingClient::default();
@@ -1025,6 +1054,7 @@ impl VectorSearchManager {
 
         let total_chunks = chunk_queue.len();
         info!("Total chunks to embed: {}", total_chunks);
+        self.report_progress("Embedding chunks", 0, Some(total_chunks as u64));
 
         // Embed chunks in mega-batches
         for batch_start in (0..chunk_queue.len()).step_by(CHUNK_BATCH_SIZE) {
@@ -1057,6 +1087,12 @@ impl VectorSearchManager {
                     *content_hash,
                 ));
             }
+
+            self.report_progress(
+                "Embedding chunks",
+                all_chunk_results.len() as u64,
+                Some(total_chunks as u64),
+            );
         }
 
         info!(
@@ -1066,6 +1102,7 @@ impl VectorSearchManager {
 
         // Phase 3: Process results and update indices
         tracing::info!("Building search indices and writing cache...");
+        self.report_progress("Building indices", 0, Some(all_chunk_results.len() as u64));
         let mut next_checkpoint = CHECKPOINT_INTERVAL_CHUNKS;
         for chunk_result in all_chunk_results {
             let chunk_count = self.process_chunk_results(vec![chunk_result]);
@@ -1074,7 +1111,7 @@ impl VectorSearchManager {
 
             // Progressive cache saving by chunks without modulo
             if processed_chunks >= next_checkpoint {
-                if let Err(error) = self.save_cache() {
+                if let Err(error) = self.save_cache_async().await {
                     warn!("Failed to save checkpoint: {error}");
                 } else {
                     info!("Checkpoint saved at {processed_chunks} chunks");
@@ -1088,11 +1125,17 @@ impl VectorSearchManager {
         info!("BM25 index finalized with {} documents", self.bm25.len());
 
         // Ensure final cache save at the end of embedding
-        if let Err(error) = self.save_cache() {
+        self.report_progress("Saving cache", 0, None);
+        if let Err(error) = self.save_cache_async().await {
             warn!("Failed to save final cache: {error}");
         }
 
         tracing::info!("Completed: {processed_files} files, {processed_chunks} chunks");
+        self.report_progress(
+            "Complete",
+            processed_chunks as u64,
+            Some(processed_chunks as u64),
+        );
 
         Ok(())
     }
@@ -1218,11 +1261,40 @@ impl VectorSearchManager {
         Ok(cache)
     }
 
-    /// Save cache to disk
+    /// Save cache to disk (async version)
     ///
     /// # Errors
     /// Returns an error if the cache directory cannot be created or serialization fails
-    fn save_cache(&self) -> Result<()> {
+    async fn save_cache_async(&self) -> Result<()> {
+        self.ensure_cache_dir()?;
+        let embeddings = self.prepare_embeddings();
+        let cache = VectorCache {
+            version: VectorCache::VERSION,
+            embeddings,
+        };
+        info!(
+            "  Saving cache with {} embeddings to {}",
+            cache.embeddings.len(),
+            self.cache_path.display()
+        );
+
+        let bytes = spawn_blocking(move || {
+            encode_to_vec(&cache, bincode_config())
+                .map_err(|error| Error::Other(format!("Failed to serialize cache: {error}")))
+        })
+        .await
+        .map_err(|error| Error::Other(format!("Task join error: {error}")))??;
+
+        self.write_cache_bytes_async(&bytes).await?;
+        info!("  ✓ Cache saved successfully ({} bytes)", bytes.len());
+        Ok(())
+    }
+
+    /// Save cache to disk (sync version for Drop)
+    ///
+    /// # Errors
+    /// Returns an error if the cache directory cannot be created or serialization fails
+    fn save_cache_sync(&self) -> Result<()> {
         self.ensure_cache_dir()?;
         let embeddings = self.prepare_embeddings();
         let cache = VectorCache {
@@ -1236,7 +1308,7 @@ impl VectorSearchManager {
         );
         let bytes = encode_to_vec(&cache, bincode_config())
             .map_err(|error| Error::Other(format!("Failed to serialize cache: {error}")))?;
-        self.write_cache_bytes(&bytes)?;
+        self.write_cache_bytes_sync(&bytes)?;
         info!("  ✓ Cache saved successfully ({} bytes)", bytes.len());
         Ok(())
     }
@@ -1291,11 +1363,39 @@ impl VectorSearchManager {
         result
     }
 
-    /// Write cache bytes to current `cache_path`
+    /// Write cache bytes to current `cache_path` (async version)
     ///
     /// # Errors
     /// Returns an error if the write fails even after ensuring parent dir exists
-    fn write_cache_bytes(&self, data: &[u8]) -> Result<()> {
+    async fn write_cache_bytes_async(&self, data: &[u8]) -> Result<()> {
+        use tokio::fs as async_fs;
+
+        let cache_path = self.cache_path.clone();
+        let data_vec = data.to_vec();
+
+        if let Err(write_error) = async_fs::write(&cache_path, &data_vec).await {
+            if let Some(parent) = cache_path.parent() {
+                async_fs::create_dir_all(parent).await.map_err(|error| {
+                    Error::Other(format!("Failed to create cache directory: {error}"))
+                })?;
+            }
+            async_fs::write(&cache_path, &data_vec)
+                .await
+                .map_err(|error| {
+                    Error::Other(format!(
+                        "Failed to write cache to {}: {error}. Prior error: {write_error}",
+                        cache_path.display()
+                    ))
+                })?;
+        }
+        Ok(())
+    }
+
+    /// Write cache bytes to current `cache_path` (sync version for Drop)
+    ///
+    /// # Errors
+    /// Returns an error if the write fails even after ensuring parent dir exists
+    fn write_cache_bytes_sync(&self, data: &[u8]) -> Result<()> {
         if let Err(write_error) = fs::write(&self.cache_path, data) {
             if let Some(parent) = self.cache_path.parent() {
                 fs::create_dir_all(parent).map_err(|error| {
@@ -1326,7 +1426,7 @@ impl VectorSearchManager {
 impl Drop for VectorSearchManager {
     fn drop(&mut self) {
         if !self.store.is_empty() {
-            if let Err(error) = self.save_cache() {
+            if let Err(error) = self.save_cache_sync() {
                 warn!("Failed to save cache on drop: {error}");
             } else {
                 info!("Cache saved on drop");

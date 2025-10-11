@@ -24,4 +24,6 @@ pub mod query;
 pub mod subagent;
 
 pub use builder::ContextBuilder;
-pub use embedding::{EmbeddingClient, SearchResult, VectorSearchManager, VectorStore};
+pub use embedding::{
+    EmbeddingClient, ProgressCallback, SearchResult, VectorSearchManager, VectorStore,
+};

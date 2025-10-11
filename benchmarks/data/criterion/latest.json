@@ -1,5 +1,5 @@
 {
-  "timestamp": "2025-10-10T17:13:12.178571",
+  "timestamp": "2025-10-11T02:24:35.138284",
   "type": "criterion",
   "benchmarks": [
     {
@@ -22,39 +22,39 @@
     },
     {
       "name": "cache_get_hit",
-      "mean_ns": 18148.21413585575,
-      "mean_ms": 0.018148,
-      "median_ns": 18128.33501174891,
-      "median_ms": 0.018128,
-      "std_dev_ns": 41.530246213301446,
-      "std_dev_ms": 4.2e-05
+      "mean_ns": 18135.107450823467,
+      "mean_ms": 0.018135,
+      "median_ns": 18032.467692959537,
+      "median_ms": 0.018032,
+      "std_dev_ns": 321.19312339295624,
+      "std_dev_ms": 0.000321
     },
     {
       "name": "cache_get_miss",
-      "mean_ns": 6107.552030781315,
-      "mean_ms": 0.006108,
-      "median_ns": 6002.931957821322,
-      "median_ms": 0.006003,
-      "std_dev_ns": 255.13735387037963,
-      "std_dev_ms": 0.000255
+      "mean_ns": 6019.6912264272205,
+      "mean_ms": 0.00602,
+      "median_ns": 6012.648735746157,
+      "median_ms": 0.006013,
+      "std_dev_ns": 19.022844072400176,
+      "std_dev_ms": 1.9e-05
     },
     {
       "name": "cache_put/10",
-      "mean_ns": 3156.272930690601,
-      "mean_ms": 0.003156,
-      "median_ns": 3160.284322280396,
-      "median_ms": 0.00316,
-      "std_dev_ns": 16.575689000608822,
-      "std_dev_ms": 1.7e-05
+      "mean_ns": 2785.432314836494,
+      "mean_ms": 0.002785,
+      "median_ns": 2780.2583313821897,
+      "median_ms": 0.00278,
+      "std_dev_ns": 13.662727084756138,
+      "std_dev_ms": 1.4e-05
     },
     {
       "name": "cache_put/100",
-      "mean_ns": 30350.675398133968,
-      "mean_ms": 0.030351,
-      "median_ns": 30214.030869286435,
-      "median_ms": 0.030214,
-      "std_dev_ns": 437.88724308909855,
-      "std_dev_ms": 0.000438
+      "mean_ns": 29407.45855270855,
+      "mean_ms": 0.029407,
+      "median_ns": 29348.286923286923,
+      "median_ms": 0.029348,
+      "std_dev_ns": 208.07497983758952,
+      "std_dev_ms": 0.000208
     },
     {
       "name": "complexity_analysis/complex",
@@ -148,48 +148,48 @@
     },
     {
       "name": "daily_report/10",
-      "mean_ns": 1487.9474037859302,
-      "mean_ms": 0.001488,
-      "median_ns": 1487.3012173839015,
-      "median_ms": 0.001487,
-      "std_dev_ns": 13.034240579803985,
-      "std_dev_ms": 1.3e-05
-    },
-    {
-      "name": "daily_report/100",
-      "mean_ns": 11426.537573781607,
-      "mean_ms": 0.011427,
-      "median_ns": 11432.919059583633,
-      "median_ms": 0.011433,
-      "std_dev_ns": 150.2959353583526,
-      "std_dev_ms": 0.00015
-    },
-    {
-      "name": "end_to_end_request/code_modification",
-      "mean_ns": 1148.7894878989434,
-      "mean_ms": 0.001149,
-      "median_ns": 1147.3380016578813,
-      "median_ms": 0.001147,
-      "std_dev_ns": 6.190693766355038,
+      "mean_ns": 1462.6000438178712,
+      "mean_ms": 0.001463,
+      "median_ns": 1460.6315534763671,
+      "median_ms": 0.001461,
+      "std_dev_ns": 5.725001966397377,
       "std_dev_ms": 6e-06
     },
     {
+      "name": "daily_report/100",
+      "mean_ns": 11050.472650407683,
+      "mean_ms": 0.01105,
+      "median_ns": 11047.328605200946,
+      "median_ms": 0.011047,
+      "std_dev_ns": 27.7535722153871,
+      "std_dev_ms": 2.8e-05
+    },
+    {
+      "name": "end_to_end_request/code_modification",
+      "mean_ns": 1107.851639126795,
+      "mean_ms": 0.001108,
+      "median_ns": 1105.4817270671638,
+      "median_ms": 0.001105,
+      "std_dev_ns": 6.995137759937434,
+      "std_dev_ms": 7e-06
+    },
+    {
       "name": "end_to_end_request/complex_refactor",
-      "mean_ns": 3202.667280186595,
-      "mean_ms": 0.003203,
-      "median_ns": 3202.0144582070934,
-      "median_ms": 0.003202,
-      "std_dev_ns": 24.0549328232227,
-      "std_dev_ms": 2.4e-05
+      "mean_ns": 3124.7413916634623,
+      "mean_ms": 0.003125,
+      "median_ns": 3121.8855836012467,
+      "median_ms": 0.003122,
+      "std_dev_ns": 9.149124720006203,
+      "std_dev_ms": 9e-06
     },
     {
       "name": "end_to_end_request/simple_query",
-      "mean_ns": 1001.5215784607883,
-      "mean_ms": 0.001002,
-      "median_ns": 994.0506311782908,
-      "median_ms": 0.000994,
-      "std_dev_ns": 21.79843418484071,
-      "std_dev_ms": 2.2e-05
+      "mean_ns": 977.7402329359414,
+      "mean_ms": 0.000978,
+      "median_ns": 976.9680995955949,
+      "median_ms": 0.000977,
+      "std_dev_ns": 2.4120754030162352,
+      "std_dev_ms": 2e-06
     },
     {
       "name": "memory_usage/multiple_requests",
@@ -220,48 +220,48 @@
     },
     {
       "name": "metrics_recording/10",
-      "mean_ns": 1728.5083054618894,
-      "mean_ms": 0.001729,
-      "median_ns": 1728.418849549031,
-      "median_ms": 0.001728,
-      "std_dev_ns": 9.224227285081755,
-      "std_dev_ms": 9e-06
+      "mean_ns": 1516.825210639462,
+      "mean_ms": 0.001517,
+      "median_ns": 1495.5889992040552,
+      "median_ms": 0.001496,
+      "std_dev_ns": 43.055280023848546,
+      "std_dev_ms": 4.3e-05
     },
     {
       "name": "metrics_recording/100",
-      "mean_ns": 15250.512829223115,
-      "mean_ms": 0.015251,
-      "median_ns": 15205.181714934697,
-      "median_ms": 0.015205,
-      "std_dev_ns": 138.34082754617674,
-      "std_dev_ms": 0.000138
+      "mean_ns": 14727.040907309429,
+      "mean_ms": 0.014727,
+      "median_ns": 14726.61865569273,
+      "median_ms": 0.014727,
+      "std_dev_ns": 39.01656991604014,
+      "std_dev_ms": 3.9e-05
     },
     {
       "name": "request_analysis/complex",
-      "mean_ns": 1474.5624036752974,
-      "mean_ms": 0.001475,
-      "median_ns": 1476.6835291557877,
-      "median_ms": 0.001477,
-      "std_dev_ns": 8.206515706353484,
-      "std_dev_ms": 8e-06
+      "mean_ns": 1475.918977548397,
+      "mean_ms": 0.001476,
+      "median_ns": 1470.8412827278262,
+      "median_ms": 0.001471,
+      "std_dev_ns": 15.692340418067236,
+      "std_dev_ms": 1.6e-05
     },
     {
       "name": "request_analysis/medium",
-      "mean_ns": 2935.4941065315015,
-      "mean_ms": 0.002935,
-      "median_ns": 2905.273609443778,
-      "median_ms": 0.002905,
-      "std_dev_ns": 78.87943412609788,
-      "std_dev_ms": 7.9e-05
+      "mean_ns": 2774.861593994662,
+      "mean_ms": 0.002775,
+      "median_ns": 2767.863226644259,
+      "median_ms": 0.002768,
+      "std_dev_ns": 15.53563267036239,
+      "std_dev_ms": 1.6e-05
     },
     {
       "name": "request_analysis/simple",
-      "mean_ns": 1023.5754861806911,
-      "mean_ms": 0.001024,
-      "median_ns": 1021.4402225476422,
-      "median_ms": 0.001021,
-      "std_dev_ns": 5.332779374367363,
-      "std_dev_ms": 5e-06
+      "mean_ns": 1021.3280443948413,
+      "mean_ms": 0.001021,
+      "median_ns": 1008.3843750000001,
+      "median_ms": 0.001008,
+      "std_dev_ns": 28.786761446897444,
+      "std_dev_ms": 2.9e-05
     },
     {
       "name": "request_throughput/100_requests",
@@ -274,12 +274,12 @@
     },
     {
       "name": "request_throughput/10_requests",
-      "mean_ns": 11743.487447596386,
-      "mean_ms": 0.011743,
-      "median_ns": 11766.374571243163,
-      "median_ms": 0.011766,
-      "std_dev_ns": 71.03612322926108,
-      "std_dev_ms": 7.1e-05
+      "mean_ns": 11583.348347529125,
+      "mean_ms": 0.011583,
+      "median_ns": 11544.245526557748,
+      "median_ms": 0.011544,
+      "std_dev_ns": 106.7498254328381,
+      "std_dev_ms": 0.000107
     },
     {
       "name": "request_throughput/50_requests",
@@ -292,57 +292,57 @@
     },
     {
       "name": "request_throughput/5_requests",
-      "mean_ns": 5947.067089509004,
-      "mean_ms": 0.005947,
-      "median_ns": 5953.3316435732795,
-      "median_ms": 0.005953,
-      "std_dev_ns": 57.62154790803645,
-      "std_dev_ms": 5.8e-05
+      "mean_ns": 5852.464852698719,
+      "mean_ms": 0.005852,
+      "median_ns": 5838.746633131767,
+      "median_ms": 0.005839,
+      "std_dev_ns": 44.2614625758178,
+      "std_dev_ms": 4.4e-05
     },
     {
       "name": "task_decomposition/add error handling",
-      "mean_ns": 1534.5667024449135,
-      "mean_ms": 0.001535,
-      "median_ns": 1525.637487407656,
-      "median_ms": 0.001526,
-      "std_dev_ns": 22.048445484263933,
-      "std_dev_ms": 2.2e-05
+      "mean_ns": 1485.6266104696338,
+      "mean_ms": 0.001486,
+      "median_ns": 1481.355708245243,
+      "median_ms": 0.001481,
+      "std_dev_ns": 9.58533991508396,
+      "std_dev_ms": 1e-05
     },
     {
       "name": "task_decomposition/create a new rest api endpoint with validation",
-      "mean_ns": 1183.9231036303613,
-      "mean_ms": 0.001184,
-      "median_ns": 1185.5447821560583,
-      "median_ms": 0.001186,
-      "std_dev_ns": 4.520995512653925,
-      "std_dev_ms": 5e-06
+      "mean_ns": 1159.7117085680504,
+      "mean_ms": 0.00116,
+      "median_ns": 1158.814310443966,
+      "median_ms": 0.001159,
+      "std_dev_ns": 7.388569496533143,
+      "std_dev_ms": 7e-06
     },
     {
       "name": "task_decomposition/implement a comprehensive test suite for the authentication modu",
-      "mean_ns": 1374.4163629197183,
-      "mean_ms": 0.001374,
-      "median_ns": 1369.9060323905242,
-      "median_ms": 0.00137,
-      "std_dev_ns": 17.500755147012114,
-      "std_dev_ms": 1.8e-05
+      "mean_ns": 1310.6556041329761,
+      "mean_ms": 0.001311,
+      "median_ns": 1308.9754231477136,
+      "median_ms": 0.001309,
+      "std_dev_ns": 2.9275033646523303,
+      "std_dev_ms": 3e-06
     },
     {
       "name": "task_graph/10_tasks",
-      "mean_ns": 1596.1812604189315,
-      "mean_ms": 0.001596,
-      "median_ns": 1593.340889323766,
-      "median_ms": 0.001593,
-      "std_dev_ns": 11.902362897491571,
-      "std_dev_ms": 1.2e-05
+      "mean_ns": 1387.627948189617,
+      "mean_ms": 0.001388,
+      "median_ns": 1387.951364590623,
+      "median_ms": 0.001388,
+      "std_dev_ns": 1.3355210738597763,
+      "std_dev_ms": 1e-06
     },
     {
       "name": "task_graph/20_tasks",
-      "mean_ns": 3134.8201188285298,
-      "mean_ms": 0.003135,
-      "median_ns": 3129.6855590062114,
-      "median_ms": 0.00313,
-      "std_dev_ns": 23.084907730161333,
-      "std_dev_ms": 2.3e-05
+      "mean_ns": 2753.285850201447,
+      "mean_ms": 0.002753,
+      "median_ns": 2751.6829128440368,
+      "median_ms": 0.002752,
+      "std_dev_ns": 5.106167773793308,
+      "std_dev_ms": 5e-06
     },
     {
       "name": "task_graph/50_tasks",
@@ -355,12 +355,12 @@
     },
     {
       "name": "task_graph/5_tasks",
-      "mean_ns": 805.0290740984983,
-      "mean_ms": 0.000805,
-      "median_ns": 801.9070660775521,
-      "median_ms": 0.000802,
-      "std_dev_ns": 8.45693284910856,
-      "std_dev_ms": 8e-06
+      "mean_ns": 712.0742126052874,
+      "mean_ms": 0.000712,
+      "median_ns": 712.1064796658693,
+      "median_ms": 0.000712,
+      "std_dev_ns": 0.7120174722163879,
+      "std_dev_ms": 1e-06
     },
     {
       "name": "weekly_report",
@@ -374,8 +374,8 @@
   ],
   "metrics": {
     "total_benchmarks": 41,
-    "avg_time_ms": 0.099875,
-    "total_time_ms": 4.094862
+    "avg_time_ms": 0.099779,
+    "total_time_ms": 4.090929
   },
   "history": [
     {
@@ -383,6 +383,12 @@
       "total_benchmarks": 41,
       "avg_time_ms": 0.099875,
       "total_time_ms": 4.094862
+    },
+    {
+      "timestamp": "2025-10-11T02:24:35.138284",
+      "total_benchmarks": 41,
+      "avg_time_ms": 0.099779,
+      "total_time_ms": 4.090929
     }
   ]
 }

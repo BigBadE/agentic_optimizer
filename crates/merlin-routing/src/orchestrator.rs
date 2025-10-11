@@ -1,17 +1,18 @@
-use std::env::var;
+use std::path::PathBuf;
+use std::slice::from_ref;
 use std::sync::Arc;
-use std::time::{Duration, Instant};
-use tokio::time::sleep;
+use std::time::{SystemTime, UNIX_EPOCH};
 
-use merlin_core::{Context, FileContext, ModelProvider, Query, Response, TokenUsage};
-use merlin_local::LocalModelProvider;
-use merlin_providers::{AnthropicProvider, GroqProvider, OpenRouterProvider};
+use serde_json::to_string_pretty;
+use tokio::fs;
+use tracing::{info, warn};
 
+use crate::user_interface::events::{MessageLevel, UiEvent};
 use crate::{
     AgentExecutor, ConflictAwareTaskGraph, ExecutorPool, ListFilesTool, LocalTaskAnalyzer,
-    ModelRouter, ModelTier, ReadFileTool, Result, RoutingConfig, RoutingError, RunCommandTool,
-    StrategyRouter, Task, TaskAnalysis, TaskAnalyzer, TaskGraph, TaskResult, ToolRegistry,
-    UiChannel, ValidationPipeline, ValidationResult, Validator, WorkspaceState, WriteFileTool,
+    ModelRouter, ReadFileTool, Result, RoutingConfig, RoutingError, RunCommandTool, StrategyRouter,
+    Task, TaskAnalysis, TaskAnalyzer, TaskGraph, TaskResult, ToolRegistry, UiChannel,
+    ValidationPipeline, Validator, WorkspaceState, WriteFileTool,
 };
 
 /// High-level orchestrator that coordinates all routing components
@@ -25,8 +26,6 @@ pub struct RoutingOrchestrator {
 }
 
 impl RoutingOrchestrator {
-    const ENV_OPENROUTER_API_KEY: &'static str = "OPENROUTER_API_KEY";
-    const ENV_ANTHROPIC_API_KEY: &'static str = "ANTHROPIC_API_KEY";
     /// Creates a new routing orchestrator with the given configuration.
     ///
     /// Initializes analyzer, router, validator, and workspace with default implementations.
@@ -54,28 +53,6 @@ impl RoutingOrchestrator {
             validator,
             workspace,
         }
-    }
-
-    /// Attempt to escalate to a higher tier and generate a response
-    ///
-    /// # Errors
-    /// Returns an error if provider interaction fails
-    async fn try_escalate(
-        &self,
-        tier: &ModelTier,
-        query: &Query,
-        context: &Context,
-    ) -> Result<Option<Response>> {
-        let Some(higher_tier) = tier.escalate() else {
-            return Ok(None);
-        };
-
-        let escalated_provider = self.create_provider(&higher_tier)?;
-        let result = escalated_provider
-            .generate(query, context)
-            .await
-            .map_err(|error| RoutingError::Other(error.to_string()))?;
-        Ok(Some(result))
     }
 
     /// Sets a custom task analyzer.
@@ -117,20 +94,13 @@ impl RoutingOrchestrator {
         ui_channel: UiChannel,
     ) -> Result<TaskResult> {
         // Create tool registry with workspace tools
+        let workspace_root = self.workspace.root_path().clone();
         let tool_registry = Arc::new(
             ToolRegistry::default()
-                .with_tool(Arc::new(ReadFileTool::new(
-                    self.config.workspace.root_path.clone(),
-                )))
-                .with_tool(Arc::new(WriteFileTool::new(
-                    self.config.workspace.root_path.clone(),
-                )))
-                .with_tool(Arc::new(ListFilesTool::new(
-                    self.config.workspace.root_path.clone(),
-                )))
-                .with_tool(Arc::new(RunCommandTool::new(
-                    self.config.workspace.root_path.clone(),
-                ))),
+                .with_tool(Arc::new(ReadFileTool::new(workspace_root.clone())))
+                .with_tool(Arc::new(WriteFileTool::new(workspace_root.clone())))
+                .with_tool(Arc::new(ListFilesTool::new(workspace_root.clone())))
+                .with_tool(Arc::new(RunCommandTool::new(workspace_root))),
         );
 
         // Create agent executor
@@ -141,168 +111,24 @@ impl RoutingOrchestrator {
         );
 
         // Execute with streaming
-        executor.execute_streaming(task, ui_channel).await
-    }
+        let task_clone = task.clone();
+        let result = executor.execute_streaming(task, ui_channel.clone()).await?;
 
-    /// Execute a single task with routing and validation (legacy method)
-    ///
-    /// # Errors
-    /// Returns an error if routing, provider execution, or validation fails
-    pub async fn execute_task(&self, task: Task) -> Result<TaskResult> {
-        let start = Instant::now();
-        let decision = self.router.route(&task).await?;
-
-        // Create provider based on tier
-        let provider = self.create_provider(&decision.tier)?;
-
-        // Build context from task requirements
-        let context = self.build_context(&task).await?;
-
-        // Create query
-        let query = Query::new(task.description.clone());
-
-        // Execute with retries and escalation
-        let response = self
-            .execute_with_retry(&provider, &query, &context, &decision.tier)
-            .await?;
-
-        // Validate if enabled
-        let validation = if self.config.validation.enabled {
-            self.validator.validate(&response, &task).await?
-        } else {
-            ValidationResult::default()
-        };
-
-        let duration_ms = start.elapsed().as_millis() as u64;
-
-        Ok(TaskResult {
-            task_id: task.id,
-            response,
-            tier_used: decision.tier.to_string(),
-            tokens_used: TokenUsage::default(),
-            validation,
-            duration_ms,
-        })
-    }
-
-    /// Create a concrete provider for the selected `ModelTier`
-    ///
-    /// # Errors
-    /// Returns an error when the selected tier is disabled or required API keys are not configured
-    fn create_provider(&self, tier: &ModelTier) -> Result<Arc<dyn ModelProvider>> {
-        match tier {
-            ModelTier::Local { model_name } => {
-                if !self.config.tiers.local_enabled {
-                    return Err(RoutingError::NoAvailableTier);
-                }
-                Ok(Arc::new(LocalModelProvider::new(model_name.clone())))
+        // Best-effort: snapshot the submitted task on completion (non-fatal)
+        match self.write_single_task_snapshot(&task_clone).await {
+            Ok(path) => {
+                info!("Saved task snapshot: {}", path.display());
+                ui_channel.send(UiEvent::SystemMessage {
+                    level: MessageLevel::Info,
+                    message: format!("Saved task snapshot: {}", path.display()),
+                });
             }
-            ModelTier::Groq { model_name } => {
-                if !self.config.tiers.groq_enabled {
-                    return Err(RoutingError::NoAvailableTier);
-                }
-                let provider = GroqProvider::new()
-                    .map_err(|error| RoutingError::Other(error.to_string()))?
-                    .with_model(model_name.clone());
-                Ok(Arc::new(provider))
-            }
-            ModelTier::Premium {
-                provider: provider_name,
-                model_name,
-            } => {
-                if !self.config.tiers.premium_enabled {
-                    return Err(RoutingError::NoAvailableTier);
-                }
-
-                match provider_name.as_str() {
-                    "openrouter" => {
-                        let api_key = var(Self::ENV_OPENROUTER_API_KEY).map_err(|_| {
-                            RoutingError::Other(format!("{} not set", Self::ENV_OPENROUTER_API_KEY))
-                        })?;
-                        let provider =
-                            OpenRouterProvider::new(api_key)?.with_model(model_name.clone());
-                        Ok(Arc::new(provider))
-                    }
-                    "anthropic" => {
-                        let api_key = var(Self::ENV_ANTHROPIC_API_KEY).map_err(|_| {
-                            RoutingError::Other(format!("{} not set", Self::ENV_ANTHROPIC_API_KEY))
-                        })?;
-                        let provider = AnthropicProvider::new(api_key)?;
-                        Ok(Arc::new(provider))
-                    }
-                    _ => Err(RoutingError::Other(format!(
-                        "Unknown provider: {provider_name}"
-                    ))),
-                }
-            }
-        }
-    }
-
-    /// Build a `Context` for the given task
-    ///
-    /// # Errors
-    /// Returns an error if reading required files fails
-    async fn build_context(&self, task: &Task) -> Result<Context> {
-        let system_prompt = format!(
-            "You are Merlin, an AI coding agent working directly in the user's codebase at '{}'.\n\n\
-            Your role:\n\
-            - Analyze the existing code structure and patterns\n\
-            - Provide code changes that integrate seamlessly with the existing codebase\n\
-            - Follow the project's coding style and conventions\n\
-            - Give specific, actionable suggestions with file paths and line numbers when relevant\n\
-            - Explain your reasoning when making architectural decisions\n\n\
-            Task: {}\n\n\
-            Provide clear, correct, and contextually appropriate code solutions.",
-            self.workspace.root_path().display(),
-            task.description
-        );
-
-        let mut context = Context::new(&system_prompt);
-
-        for file_path in &task.context_needs.required_files {
-            if let Some(content) = self.workspace.read_file(file_path).await {
-                context = context.with_files(vec![FileContext::new(file_path.clone(), content)]);
+            Err(error) => {
+                warn!("Failed to write task snapshot: {}", error);
             }
         }
 
-        Ok(context)
-    }
-
-    /// Execute with retry and optional escalation on failure
-    ///
-    /// # Errors
-    /// Returns an error if retries are exhausted and escalation also fails
-    pub async fn execute_with_retry(
-        &self,
-        provider: &Arc<dyn ModelProvider>,
-        query: &Query,
-        context: &Context,
-        tier: &ModelTier,
-    ) -> Result<Response> {
-        let mut attempts = 0;
-        let max_retries = self.config.tiers.max_retries;
-
-        loop {
-            match provider.generate(query, context).await {
-                Ok(response) => return Ok(response),
-                Err(error) => {
-                    attempts += 1;
-                    if attempts < max_retries {
-                        // Wait before retry and continue the loop
-                        sleep(Duration::from_millis(1000 * attempts as u64)).await;
-                        continue;
-                    }
-
-                    if let Some(response) = self.try_escalate(tier, query, context).await? {
-                        return Ok(response);
-                    }
-
-                    return Err(RoutingError::Other(format!(
-                        "Failed after {max_retries} retries: {error}"
-                    )));
-                }
-            }
-        }
+        Ok(result)
     }
 
     /// Execute multiple tasks with dependency management
@@ -346,7 +172,49 @@ impl RoutingOrchestrator {
     pub async fn process_request(&self, request: &str) -> Result<Vec<TaskResult>> {
         let analysis = self.analyze_request(request).await?;
 
-        self.execute_tasks(analysis.tasks).await
+        // Persist analyzed tasks to .merlin/tasks for recovery across restarts (non-fatal)
+        if self.write_tasks_snapshot(&analysis.tasks).await.is_err() {
+            // Ignore snapshot persistence failures to avoid breaking request processing
+        }
+
+        let results = self.execute_tasks(analysis.tasks.clone()).await?;
+
+        // After successful completion, persist the tasks snapshot again (non-fatal)
+        if self.write_tasks_snapshot(&analysis.tasks).await.is_err() {
+            // Ignore snapshot persistence failures
+        }
+
+        Ok(results)
+    }
+
+    /// Write the current analyzed tasks to `<workspace>/.merlin/tasks/<timestamp>.json`.
+    ///
+    /// # Errors
+    /// Returns an error if directory creation or file write fails.
+    async fn write_tasks_snapshot(&self, tasks: &[Task]) -> Result<PathBuf> {
+        let root = self.workspace.root_path().clone();
+        let dir = root.join(".merlin").join("tasks");
+        fs::create_dir_all(&dir).await?;
+
+        let now = SystemTime::now()
+            .duration_since(UNIX_EPOCH)
+            .map_err(|err| RoutingError::Other(err.to_string()))?;
+        let filename = format!("{}-tasks.json", now.as_millis());
+        let path = dir.join(filename);
+
+        let json = to_string_pretty(tasks)?;
+        fs::write(&path, json).await?;
+        Ok(path)
+    }
+
+    /// Write a single task snapshot to `<workspace>/.merlin/tasks/<timestamp>.json`.
+    ///
+    /// This avoids requiring `Task: Clone` when only a reference is available.
+    ///
+    /// # Errors
+    /// Returns an error if directory creation or file write fails.
+    async fn write_single_task_snapshot(&self, task: &Task) -> Result<PathBuf> {
+        self.write_tasks_snapshot(from_ref(task)).await
     }
 
     /// Gets the routing configuration.

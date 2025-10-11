@@ -195,6 +195,13 @@ async fn execute_user_task(
                     result.response.tokens_used.total()
                 ),
             );
+            // Extra debug confirmations
+            try_write_log(&ui_channel, &mut log_file, "Task completed successfully.");
+            try_write_log(
+                &ui_channel,
+                &mut log_file,
+                "Attempted to save task snapshot to .merlin/tasks.",
+            );
         }
         Err(error) => {
             try_write_log(&ui_channel, &mut log_file, &format!("Error: {error}"));
@@ -229,13 +236,35 @@ async fn run_tui_interactive(
     // Create TUI with task storage
     let tasks_dir = merlin_dir.join("tasks");
     fs::create_dir_all(&tasks_dir)?;
-    let (mut tui_app, ui_channel) = TuiApp::new_with_storage(tasks_dir)?;
+    let (mut tui_app, ui_channel) = TuiApp::new_with_storage(tasks_dir.clone())?;
 
     // Enable raw mode before loading
     tui_app.enable_raw_mode()?;
 
     // Load tasks in background
     tui_app.load_tasks_async().await;
+
+    // Log how many task files exist on disk and how many were parsed
+    let disk_task_files = fs::read_dir(&tasks_dir).map_or(0, |read_dir| {
+        read_dir
+            .filter_map(Result::ok)
+            .filter(|entry| {
+                entry
+                    .path()
+                    .extension()
+                    .and_then(|ext| ext.to_str())
+                    .is_some_and(|ext_str| ext_str == "gz")
+            })
+            .count()
+    });
+    let parsed_tasks = tui_app.loaded_task_count();
+    writeln!(
+        log_file,
+        "Found {} .gz file(s), parsed {} task(s) from {}",
+        disk_task_files,
+        parsed_tasks,
+        tasks_dir.display(),
+    )?;
 
     // Main event loop - event-driven
     loop {

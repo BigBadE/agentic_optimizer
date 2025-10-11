@@ -1,18 +1,18 @@
 use std::collections::HashSet;
 use std::sync::Arc;
-use std::time::Instant;
 
 use tokio::sync::Semaphore;
+use tokio::sync::mpsc;
 use tokio::task::JoinSet;
-
-use merlin_core::{Context, FileContext, ModelProvider, Query, TokenUsage};
-use merlin_local::LocalModelProvider;
-use merlin_providers::{AnthropicProvider, GroqProvider, OpenRouterProvider};
 
 use super::graph::TaskGraph;
 use super::scheduler::ConflictAwareTaskGraph;
 use super::state::WorkspaceState;
-use crate::{ModelRouter, ModelTier, Result, RoutingError, Task, TaskResult, Validator};
+use crate::user_interface::UiChannel;
+use crate::{
+    AgentExecutor, ListFilesTool, ModelRouter, ReadFileTool, Result, RoutingError, RunCommandTool,
+    Task, TaskResult, ToolRegistry, Validator, WriteFileTool,
+};
 
 /// Parallel task executor with concurrency limits
 pub struct ExecutorPool {
@@ -23,8 +23,6 @@ pub struct ExecutorPool {
 }
 
 impl ExecutorPool {
-    const ENV_OPENROUTER_API_KEY: &'static str = "OPENROUTER_API_KEY";
-    const ENV_ANTHROPIC_API_KEY: &'static str = "ANTHROPIC_API_KEY";
     /// Create a new executor pool
     pub fn new(
         router: Arc<dyn ModelRouter>,
@@ -37,48 +35,6 @@ impl ExecutorPool {
             validator,
             max_concurrent,
             workspace,
-        }
-    }
-
-    /// Create a concrete `ModelProvider` for a specific `ModelTier`.
-    ///
-    /// # Errors
-    /// Returns an error if provider initialization fails or required API keys are missing.
-    fn create_provider_for_tier(tier: &ModelTier) -> Result<Arc<dyn ModelProvider>> {
-        use std::env;
-
-        match tier {
-            ModelTier::Local { model_name } => {
-                Ok(Arc::new(LocalModelProvider::new(model_name.clone())))
-            }
-            ModelTier::Groq { model_name } => {
-                let provider = GroqProvider::new()
-                    .map_err(|err| RoutingError::Other(err.to_string()))?
-                    .with_model(model_name.clone());
-                Ok(Arc::new(provider))
-            }
-            ModelTier::Premium {
-                provider: provider_name,
-                model_name,
-            } => match provider_name.as_str() {
-                "openrouter" => {
-                    let api_key = env::var(Self::ENV_OPENROUTER_API_KEY).map_err(|_| {
-                        RoutingError::Other(format!("{} not set", Self::ENV_OPENROUTER_API_KEY))
-                    })?;
-                    let provider = OpenRouterProvider::new(api_key)?.with_model(model_name.clone());
-                    Ok(Arc::new(provider))
-                }
-                "anthropic" => {
-                    let api_key = env::var(Self::ENV_ANTHROPIC_API_KEY).map_err(|_| {
-                        RoutingError::Other(format!("{} not set", Self::ENV_ANTHROPIC_API_KEY))
-                    })?;
-                    let provider = AnthropicProvider::new(api_key)?;
-                    Ok(Arc::new(provider))
-                }
-                _ => Err(RoutingError::Other(format!(
-                    "Unknown provider: {provider_name}"
-                ))),
-            },
         }
     }
 
@@ -220,60 +176,22 @@ impl ExecutorPool {
         validator: Arc<dyn Validator>,
         workspace: Arc<WorkspaceState>,
     ) -> Result<TaskResult> {
-        let start = Instant::now();
-
-        let routing_decision = router.route(&task).await?;
-
-        // Create provider based on tier
-        let provider = Self::create_provider_for_tier(&routing_decision.tier)?;
-
-        // Build context from task with agent-aware system prompt
-        let system_prompt = format!(
-            "You are Merlin, an AI coding agent working directly in the user's codebase at '{}'.\n\n\
-            Your role:\n\
-            - Analyze the existing code structure and patterns\n\
-            - Provide code changes that integrate seamlessly with the existing codebase\n\
-            - Follow the project's coding style and conventions\n\
-            - Give specific, actionable suggestions with file paths and line numbers when relevant\n\
-            - Explain your reasoning when making architectural decisions\n\n\
-            Task: {}\n\n\
-            Provide clear, correct, and contextually appropriate code solutions.",
-            workspace.root_path().display(),
-            task.description
+        // Build tool registry based on workspace root
+        let workspace_root = workspace.root_path().clone();
+        let tool_registry = Arc::new(
+            ToolRegistry::default()
+                .with_tool(Arc::new(ReadFileTool::new(workspace_root.clone())))
+                .with_tool(Arc::new(WriteFileTool::new(workspace_root.clone())))
+                .with_tool(Arc::new(ListFilesTool::new(workspace_root.clone())))
+                .with_tool(Arc::new(RunCommandTool::new(workspace_root))),
         );
 
-        let mut context = Context::new(&system_prompt);
+        // Create AgentExecutor and a headless UI channel
+        let mut executor = AgentExecutor::new(router, validator, tool_registry);
+        let (sender, _receiver) = mpsc::unbounded_channel();
+        let ui_channel = UiChannel::from_sender(sender);
 
-        // Add files from workspace if specified
-        for file_path in &task.context_needs.required_files {
-            if let Some(content) = workspace.read_file(file_path).await {
-                context = context.with_files(vec![FileContext::new(file_path.clone(), content)]);
-            }
-        }
-
-        // Create query
-        let query = Query::new(task.description.clone());
-
-        // Execute with provider
-        let response = provider
-            .generate(&query, &context)
-            .await
-            .map_err(|err| RoutingError::Other(err.to_string()))?;
-
-        let validation = validator.validate(&response, &task).await?;
-
-        if !validation.passed {
-            return Err(RoutingError::ValidationFailed(validation));
-        }
-
-        Ok(TaskResult {
-            task_id: task.id,
-            response,
-            tier_used: routing_decision.tier.to_string(),
-            tokens_used: TokenUsage::default(),
-            validation,
-            duration_ms: start.elapsed().as_millis() as u64,
-        })
+        executor.execute_streaming(task, ui_channel).await
     }
 }
 

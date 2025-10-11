@@ -117,13 +117,27 @@ impl TaskPersistence {
         }
 
         for entry in filesystem::read_dir(tasks_dir)? {
-            let entry = entry?;
+            let entry = match entry {
+                Ok(val) => val,
+                Err(error) => {
+                    tracing::warn!("Failed to read task dir entry: {}", error);
+                    continue;
+                }
+            };
             let path = entry.path();
 
-            if is_compressed_task_file(&path)
-                && let Some(task_display) = load_single_task(&path)?
-            {
-                tasks.insert(task_display.0, task_display.1);
+            if !is_compressed_task_file(&path) {
+                continue;
+            }
+
+            match load_single_task(&path) {
+                Ok(Some(task_display)) => {
+                    tasks.insert(task_display.0, task_display.1);
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    tracing::warn!("Failed to load task file {:?}: {}", path, error);
+                }
             }
         }
 

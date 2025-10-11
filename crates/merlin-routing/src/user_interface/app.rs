@@ -163,15 +163,20 @@ impl<B: Backend> TuiApp<B> {
     /// Loads tasks asynchronously
     pub async fn load_tasks_async(&mut self) {
         if let Some(persistence) = &self.persistence {
+            let mut loaded_count = 0usize;
             if let Ok(tasks) = persistence.load_all_tasks().await {
+                loaded_count = tasks.len();
                 for (task_id, task_display) in tasks {
                     self.task_manager
                         .insert_task_for_load(task_id, task_display);
                 }
 
                 self.task_manager.rebuild_order();
+
+                // Don't auto-select any task on load - user should manually select
             }
 
+            tracing::info!("Loaded {} tasks from persistence", loaded_count);
             self.state.loading_tasks = false;
         }
     }
@@ -291,6 +296,11 @@ impl<B: Backend> TuiApp<B> {
     /// Gets the input lines (for testing only)
     pub fn get_input_lines(&self) -> Vec<String> {
         self.input_manager.input_area().lines().to_vec()
+    }
+
+    /// Returns the number of loaded tasks currently in the manager
+    pub fn loaded_task_count(&self) -> usize {
+        self.task_manager.task_order().len()
     }
 
     // Private methods

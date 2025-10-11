@@ -99,6 +99,20 @@ impl RoutingOrchestrator {
         task: Task,
         ui_channel: UiChannel,
     ) -> Result<TaskResult> {
+        self.execute_task_streaming_with_history(task, ui_channel, Vec::new())
+            .await
+    }
+
+    /// Execute a task with streaming, tool support, and conversation history
+    ///
+    /// # Errors
+    /// Returns an error if task execution or validation fails, or if a provider interaction returns an error
+    pub async fn execute_task_streaming_with_history(
+        &self,
+        task: Task,
+        ui_channel: UiChannel,
+        conversation_history: Vec<(String, String)>,
+    ) -> Result<TaskResult> {
         // Create tool registry with workspace tools
         let workspace_root = self.workspace.root_path().clone();
         let tool_registry = Arc::new(
@@ -119,6 +133,13 @@ impl RoutingOrchestrator {
             tool_registry,
             context_fetcher,
         );
+
+        // Set conversation history if provided
+        if !conversation_history.is_empty() {
+            executor
+                .set_conversation_history(conversation_history)
+                .await;
+        }
 
         // Execute with streaming
         let task_clone = task.clone();

@@ -229,6 +229,22 @@ impl<B: Backend> TuiApp<B> {
         });
     }
 
+    /// Gets conversation history in (role, content) format for context building
+    pub fn get_conversation_history(&self) -> Vec<(String, String)> {
+        self.state
+            .conversation_history
+            .iter()
+            .map(|entry| {
+                let role = match entry.role {
+                    ConversationRole::User => "user",
+                    ConversationRole::Assistant => "assistant",
+                    ConversationRole::System => "system",
+                };
+                (role.to_owned(), entry.text.clone())
+            })
+            .collect()
+    }
+
     /// Gets the selected task ID
     pub fn get_selected_task_id(&self) -> Option<TaskId> {
         if self.state.active_task_id.is_some() {

@@ -145,14 +145,26 @@ fn init_tui_logging(merlin_dir: &Path, project: &Path, local_only: bool) -> Resu
     Ok(log_file)
 }
 
-/// Execute a task from user input and handle the result
-async fn execute_user_task(
+/// Parameters for task execution
+struct TaskExecutionParams {
     orchestrator: RoutingOrchestrator,
     ui_channel: UiChannel,
-    mut log_file: fs::File,
+    log_file: fs::File,
     user_input: String,
     parent_task_id: Option<TaskId>,
-) {
+    conversation_history: Vec<(String, String)>,
+}
+
+/// Execute a task from user input and handle the result
+async fn execute_user_task(params: TaskExecutionParams) {
+    let TaskExecutionParams {
+        orchestrator,
+        ui_channel,
+        mut log_file,
+        user_input,
+        parent_task_id,
+        conversation_history,
+    } = params;
     let task = Task::new(user_input.clone());
     let task_id = task.id;
 
@@ -171,7 +183,7 @@ async fn execute_user_task(
     });
 
     match orchestrator
-        .execute_task_streaming(task, ui_channel.clone())
+        .execute_task_streaming_with_history(task, ui_channel.clone(), conversation_history)
         .await
     {
         Ok(result) => {
@@ -275,15 +287,17 @@ async fn run_tui_interactive(
             writeln!(log_file, "User: {user_input}")?;
 
             let parent_task_id = tui_app.get_selected_task_id();
+            let conversation_history = tui_app.get_conversation_history();
             let log_clone = log_file.try_clone()?;
 
-            spawn(execute_user_task(
-                orchestrator.clone(),
-                ui_channel.clone(),
-                log_clone,
+            spawn(execute_user_task(TaskExecutionParams {
+                orchestrator: orchestrator.clone(),
+                ui_channel: ui_channel.clone(),
+                log_file: log_clone,
                 user_input,
                 parent_task_id,
-            ));
+                conversation_history,
+            }));
         }
     }
 

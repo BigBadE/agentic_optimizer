@@ -23,6 +23,9 @@ use super::{ContextFetcher, SelfAssessor, StepTracker};
 /// Type alias for boxed future returning `TaskResult`
 type BoxedTaskFuture<'future> = Pin<Box<dyn Future<Output = Result<TaskResult>> + Send + 'future>>;
 
+/// Type alias for conversation history
+type ConversationHistory = Vec<(String, String)>;
+
 /// Agent executor that streams task execution with tool calling
 #[derive(Clone)]
 pub struct AgentExecutor {
@@ -31,6 +34,7 @@ pub struct AgentExecutor {
     tool_registry: Arc<ToolRegistry>,
     step_tracker: StepTracker,
     context_fetcher: Arc<Mutex<ContextFetcher>>,
+    conversation_history: Arc<Mutex<ConversationHistory>>,
 }
 
 struct ExecInputs<'life> {
@@ -56,7 +60,20 @@ impl AgentExecutor {
             tool_registry,
             step_tracker: StepTracker::default(),
             context_fetcher: Arc::new(Mutex::new(context_fetcher)),
+            conversation_history: Arc::new(Mutex::new(Vec::new())),
         }
+    }
+
+    /// Set conversation history for context building
+    pub async fn set_conversation_history(&mut self, history: ConversationHistory) {
+        let mut conv_history = self.conversation_history.lock().await;
+        *conv_history = history;
+    }
+
+    /// Add a message to conversation history
+    pub async fn add_to_conversation(&mut self, role: String, content: String) {
+        let mut conv_history = self.conversation_history.lock().await;
+        conv_history.push((role, content));
     }
 
     fn complete_analysis_step(ui_channel: &UiChannel, task_id: TaskId) {
@@ -370,10 +387,24 @@ impl AgentExecutor {
         *fetcher = replace(&mut *fetcher, ContextFetcher::new(project_root))
             .with_progress_callback(progress_callback);
 
-        fetcher
-            .build_context_for_query(&query)
-            .await
-            .map_err(|err| RoutingError::Other(format!("Failed to build context: {err}")))
+        // Check if we have conversation history
+        let context = {
+            let conv_history = self.conversation_history.lock().await;
+            if conv_history.is_empty() {
+                drop(conv_history);
+                fetcher
+                    .build_context_for_query(&query)
+                    .await
+                    .map_err(|err| RoutingError::Other(format!("Failed to build context: {err}")))?
+            } else {
+                fetcher
+                    .build_context_from_conversation(&conv_history, &query)
+                    .await
+                    .map_err(|err| RoutingError::Other(format!("Failed to build context: {err}")))?
+            }
+        };
+
+        Ok(context)
     }
 
     /// Check if a request is simple enough to skip assessment

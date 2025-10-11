@@ -314,7 +314,7 @@ impl ContextBuilder {
             // Check if chunks overlap when considering context expansion
             // Two chunks overlap if: start - CONTEXT <= current_end + CONTEXT
             let expanded_current_end = current_end + CONTEXT_LINES;
-            let expanded_start = start - CONTEXT_LINES;
+            let expanded_start = start.saturating_sub(CONTEXT_LINES);
 
             if expanded_start <= expanded_current_end {
                 // Merge: extend current chunk

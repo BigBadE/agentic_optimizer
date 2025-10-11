@@ -1,4 +1,12 @@
 //! End-to-end tests that drive the TUI app via an injected input event source.
+#![allow(
+    clippy::unwrap_used,
+    clippy::expect_used,
+    clippy::panic,
+    clippy::missing_panics_doc,
+    clippy::tests_outside_test_module,
+    reason = "Test allows"
+)]
 
 mod common;
 
@@ -15,11 +23,16 @@ mod tests {
     /// Panics if `assert!` conditions fail (e.g., the app unexpectedly requests quit).
     ///
     /// # Errors
-    /// Propagates errors from `TuiApp::new()` and `TuiApp::tick()` if initialization or a render
+    /// Propagates errors from `TuiApp::new_for_test()` and `TuiApp::tick()` if initialization or a render
     /// cycle fails.
     #[test]
     fn test_end_to_end_input_submission() -> Result<()> {
-        let (mut app, _ui) = TuiApp::new()?;
+        use ratatui::Terminal;
+        use ratatui::backend::TestBackend;
+
+        let backend = TestBackend::new(100, 30);
+        let terminal = Terminal::new(backend).expect("Failed to create test terminal");
+        let (mut app, _ui) = TuiApp::new_for_test(terminal)?;
 
         // hello + Enter
         let events = vec![

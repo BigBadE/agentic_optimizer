@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 merlin-core.workspace = true
+merlin-context.workspace = true
 merlin-providers.workspace = true
 merlin-local.workspace = true
 async-trait.workspace = true
@@ -23,6 +24,11 @@ tempfile.workspace = true
 unicode-segmentation.workspace = true
 unicode-width.workspace = true
 tracing.workspace = true
+regex.workspace = true
+
+[dev-dependencies]
+merlin-agent.workspace = true
+merlin-tools.workspace = true
 
 [lints]
 workspace = true

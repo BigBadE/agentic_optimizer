@@ -32,7 +32,7 @@
 //! let orchestrator = RoutingOrchestrator::new(config);
 //!
 //! let task = Task::new("Implement a new feature".to_owned());
-//! let result = orchestrator.execute_task(task).await?;
+//! let results = orchestrator.execute_tasks(vec![task]).await?;
 //! # Ok(())
 //! # }
 //! ```

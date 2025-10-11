@@ -19,14 +19,20 @@
 
 /// Shell execution tool implementation.
 mod bash;
+/// File deletion tool implementation.
+mod delete;
 /// Editing tool implementation.
 mod edit;
+/// Directory listing tool implementation.
+mod list;
 /// File viewing tool implementation.
 mod show;
 /// Core abstractions shared by all tools.
 mod tool;
 
 pub use bash::BashTool;
+pub use delete::DeleteTool;
 pub use edit::EditTool;
+pub use list::ListTool;
 pub use show::ShowTool;
 pub use tool::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};

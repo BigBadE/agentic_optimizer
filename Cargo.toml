@@ -45,6 +45,7 @@ chrono = "0.4"
 uuid = { version = "1.18", features = ["v4", "serde"] }
 petgraph = "0.8"
 futures = "0.3"
+regex = "1.11"
 
 # Still using older versions for tui-textarea support
 ratatui = "0.29"

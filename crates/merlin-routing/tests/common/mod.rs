@@ -25,7 +25,6 @@ use merlin_routing::{Result, TaskId, TaskResult, ValidationResult};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use std::collections::VecDeque;
-use std::thread;
 use std::time::{Duration, Instant};
 
 /// Create a basic test task with sensible defaults
@@ -154,14 +153,9 @@ impl TestEventSource {
 }
 
 impl InputEventSource for TestEventSource {
-    fn poll(&mut self, timeout: Duration) -> bool {
-        if !self.queue.is_empty() {
-            return true;
-        }
-        if timeout.is_zero() {
-            return false;
-        }
-        thread::sleep(timeout);
+    fn poll(&mut self, _timeout: Duration) -> bool {
+        // In tests, return immediately based on queue state
+        // Don't sleep - we want tests to complete quickly
         !self.queue.is_empty()
     }
 

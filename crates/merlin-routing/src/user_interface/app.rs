@@ -1,10 +1,10 @@
-use crossterm::event::{Event, KeyCode, KeyModifiers};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers};
 use crossterm::terminal;
 use ratatui::Terminal;
 use ratatui::backend::{Backend, CrosstermBackend};
 use std::io;
 use std::path::PathBuf;
-use std::time::Duration;
+use std::time::{Duration, Instant};
 use tokio::sync::mpsc;
 use tracing::warn;
 
@@ -19,8 +19,20 @@ use super::task_manager::TaskManager;
 use super::theme::Theme;
 use crate::TaskId;
 use crate::{Result, RoutingError};
-use crossterm::event::{KeyEvent, KeyEventKind};
-use std::time::Instant;
+
+/// No-op event source for testing - always returns no events
+#[derive(Default)]
+struct NoOpEventSource;
+
+impl InputEventSource for NoOpEventSource {
+    fn poll(&mut self, _timeout: Duration) -> bool {
+        false
+    }
+
+    fn read(&mut self) -> Event {
+        Event::Key(KeyEvent::new(KeyCode::Null, KeyModifiers::NONE))
+    }
+}
 
 /// Main TUI application
 pub struct TuiApp<B: Backend> {
@@ -146,7 +158,7 @@ impl<B: Backend> TuiApp<B> {
             focused_pane: FocusedPane::Input,
             pending_input: None,
             persistence: None,
-            event_source: Box::new(CrosstermEventSource),
+            event_source: Box::new(NoOpEventSource),
         };
 
         let channel = super::UiChannel { sender };

@@ -46,6 +46,17 @@ struct ExecInputs<'life> {
     ui_channel: &'life UiChannel,
 }
 
+/// Intent classification for queries
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QueryIntent {
+    /// Conversational query - no file context needed
+    Conversational,
+    /// Code query - needs file context but no modification
+    CodeQuery,
+    /// Code modification - needs file context and write capability
+    CodeModification,
+}
+
 impl AgentExecutor {
     const ENV_OPENROUTER_API_KEY: &'static str = "OPENROUTER_API_KEY";
     const ENV_ANTHROPIC_API_KEY: &'static str = "ANTHROPIC_API_KEY";
@@ -382,7 +393,31 @@ impl AgentExecutor {
     /// # Errors
     /// Returns an error if context building fails
     async fn build_context(&self, task: &Task, ui_channel: &UiChannel) -> Result<Context> {
+        let intent = Self::classify_query_intent(&task.description);
         let query = Query::new(task.description.clone());
+
+        // For conversational queries, skip file fetching and use minimal context
+        if intent == QueryIntent::Conversational {
+            let conv_history = self.conversation_history.lock().await;
+            let system_prompt = if conv_history.is_empty() {
+                "You are a helpful AI assistant. Answer the user's question directly and conversationally.".to_owned()
+            } else {
+                // Include conversation in prompt
+                let mut prompt = String::from(
+                    "You are a helpful AI assistant. Here is the conversation history:\n\n",
+                );
+                for (role, content) in conv_history.iter() {
+                    use std::fmt::Write as _;
+                    let _ = writeln!(prompt, "{role}: {content}");
+                }
+                prompt.push_str("\nAnswer the user's question based on this conversation.");
+                prompt
+            };
+
+            return Ok(Context::new(system_prompt));
+        }
+
+        // For code queries, fetch file context as normal
         let task_id = task.id;
         let ui_clone = ui_channel.clone();
 
@@ -486,18 +521,6 @@ impl AgentExecutor {
             QueryIntent::Conversational
         )
     }
-}
-
-/// Intent classification for queries
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-enum QueryIntent {
-    /// Conversational query - no file context needed
-    Conversational,
-    /// Code query - needs file context but no modification
-    CodeQuery,
-    /// Code modification - needs file context and write capability
-    CodeModification,
-}
 
     /// Execute a task with self-determination (Phase 5.1)
     /// The task assesses itself and decides whether to complete, decompose, or gather context

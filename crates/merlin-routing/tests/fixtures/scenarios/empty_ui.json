@@ -1,0 +1,29 @@
+{
+  "name": "Empty UI",
+  "description": "Tests the UI with no tasks",
+  "config": {
+    "terminal_size": [80, 24],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 10
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "snapshot": "empty_ui.txt",
+          "task_count": 0
+        }
+      }
+    }
+  ]
+}

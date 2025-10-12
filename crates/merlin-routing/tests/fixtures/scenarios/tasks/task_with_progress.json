@@ -1,0 +1,41 @@
+{
+  "name": "Task With Progress",
+  "description": "Tests UI with a task showing progress bar",
+  "config": {
+    "terminal_size": [80, 24],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "background_event",
+        "data": {
+          "event_type": "task_progress",
+          "progress": 42,
+          "total": 100
+        }
+      },
+      "expectations": {
+        "tasks": {
+          "spawned": [
+            {
+              "description": "Building embedding index",
+              "status": "running",
+              "has_progress": true
+            }
+          ]
+        },
+        "ui_state": {
+          "snapshot": "task_with_progress.txt",
+          "task_count": 1,
+          "has_progress": true
+        }
+      }
+    }
+  ]
+}

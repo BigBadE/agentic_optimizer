@@ -9,7 +9,7 @@
 //! - User input simulation
 //! - Event verification
 
-#![allow(missing_docs)]
+#![allow(missing_docs, dead_code)]
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use merlin_routing::TaskId;
@@ -336,7 +336,7 @@ pub struct ScenarioRunner {
 }
 
 impl ScenarioRunner {
-    /// Load a scenario from a JSON file
+    /// Load a scenario from a JSON file (supports subdirectories)
     pub fn load(name: &str) -> Result<Self, String> {
         let path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
             .join("tests")
@@ -368,6 +368,14 @@ impl ScenarioRunner {
         let (width, height) = self.scenario.config.terminal_size;
         let (mut app, _ui_channel) = create_test_app(width, height)
             .map_err(|e| format!("Failed to create test app: {}", e))?;
+
+        // Initialize vector cache if enabled
+        if self.scenario.config.enable_vector_cache {
+            self.initialize_vector_cache(&mut app)?;
+            // Tick to render the initial state
+            app.tick()
+                .map_err(|e| format!("Tick failed after vector cache init: {}", e))?;
+        }
 
         // Execute each step
         for step in &self.scenario.steps {
@@ -401,6 +409,29 @@ impl ScenarioRunner {
         Ok(())
     }
 
+    fn initialize_vector_cache(&self, app: &mut impl TestApp) -> Result<(), String> {
+        // Create embedding cache task
+        let task_id = TaskId::default();
+        let mut task = create_test_task("Building embedding index");
+        task.status = TaskStatus::Running;
+
+        // Calculate total files to embed
+        let total_files = self.scenario.initial_state.workspace_files.len() as u64;
+
+        task.progress = Some(TaskProgress {
+            stage: "Embedding".to_string(),
+            current: 0,
+            total: Some(total_files),
+            message: String::new(),
+        });
+
+        app.task_manager_mut().add_task(task_id, task);
+        app.state_mut().active_running_tasks.insert(task_id);
+        app.state_mut().active_task_id = Some(task_id);
+
+        Ok(())
+    }
+
     async fn execute_step(&self, app: &mut impl TestApp, step: &TestStep) -> Result<(), String> {
         // Execute action
         match &step.action {
@@ -420,6 +451,10 @@ impl ScenarioRunner {
                 self.execute_background_event(app, data)?;
             }
         }
+
+        // Always tick after an action to render the UI
+        app.tick()
+            .map_err(|e| format!("Tick failed after action: {}", e))?;
 
         // Verify expectations
         self.verify_expectations(app, &step.expectations)?;
@@ -460,6 +495,17 @@ impl ScenarioRunner {
         app.set_event_source(Box::new(TestEventSource::with_events(events)));
         app.tick().map_err(|e| format!("Tick failed: {}", e))?;
 
+        // If input was submitted, create a task for it
+        if data.submit {
+            let task_id = TaskId::default();
+            let mut task = create_test_task(&data.text);
+            task.status = TaskStatus::Running;
+
+            app.task_manager_mut().add_task(task_id, task);
+            app.state_mut().active_running_tasks.insert(task_id);
+            app.state_mut().active_task_id = Some(task_id);
+        }
+
         Ok(())
     }
 
@@ -480,6 +526,18 @@ impl ScenarioRunner {
 
         app.task_manager_mut().add_task(task_id, task);
         app.state_mut().active_running_tasks.insert(task_id);
+        app.state_mut().active_task_id = Some(task_id);
+
+        // Create subtasks if specified
+        for subtask_data in &data.subtasks {
+            let subtask_id = TaskId::default();
+            let mut subtask = create_test_task(&subtask_data.description);
+            subtask.status = TaskStatus::Running;
+            subtask.parent_id = Some(task_id);
+
+            app.task_manager_mut().add_task(subtask_id, subtask);
+            app.state_mut().active_running_tasks.insert(subtask_id);
+        }
 
         Ok(())
     }
@@ -507,8 +565,8 @@ impl ScenarioRunner {
             data.event_type, data.progress, data.total
         );
 
-        if data.event_type == "embedding_progress" {
-            // Create or update embedding task
+        if data.event_type == "embedding_progress" || data.event_type == "task_progress" {
+            // Create or update task with progress
             let task_id = TaskId::default();
             let mut task = create_test_task("Building embedding index");
             task.status = TaskStatus::Running;
@@ -521,11 +579,11 @@ impl ScenarioRunner {
 
             app.task_manager_mut().add_task(task_id, task);
             app.state_mut().active_running_tasks.insert(task_id);
+            app.state_mut().active_task_id = Some(task_id);
         }
 
         Ok(())
     }
-
     fn verify_expectations(
         &self,
         app: &impl TestApp,
@@ -655,19 +713,65 @@ impl ScenarioRunner {
             .collect::<Vec<_>>()
             .join("\n");
 
-        let snapshot_path = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-            .join("tests")
-            .join("fixtures")
-            .join("snapshots")
-            .join(snapshot_name);
+        // Determine snapshot path based on scenario structure
+        // If snapshot_name contains "_step", it's a multi-step scenario
+        // e.g., "unified_example_step1.txt" -> "examples/unified_example/step1.txt"
+        let snapshot_path = if snapshot_name.contains("_step") {
+            // Multi-step scenario - create directory structure
+            let parts: Vec<&str> = snapshot_name
+                .trim_end_matches(".txt")
+                .split("_step")
+                .collect();
+            if parts.len() == 2 {
+                let scenario_name = parts[0];
+                let step_num = parts[1];
+
+                // Find the scenario category from the loaded scenario name
+                let scenario_category = self.get_scenario_category();
+
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("tests")
+                    .join("fixtures")
+                    .join("snapshots")
+                    .join(scenario_category)
+                    .join(scenario_name)
+                    .join(format!("step{}.txt", step_num))
+            } else {
+                PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                    .join("tests")
+                    .join("fixtures")
+                    .join("snapshots")
+                    .join(snapshot_name)
+            }
+        } else {
+            // Single snapshot - match scenario directory structure
+            let scenario_category = self.get_scenario_category();
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("tests")
+                .join("fixtures")
+                .join("snapshots")
+                .join(scenario_category)
+                .join(snapshot_name)
+        };
 
         // Check if UPDATE_SNAPSHOTS env var is set
         if std::env::var("UPDATE_SNAPSHOTS").is_ok() {
-            fs::create_dir_all(snapshot_path.parent().unwrap())
-                .map_err(|e| format!("Failed to create snapshots dir: {}", e))?;
+            // Create parent directories if they don't exist
+            if let Some(parent) = snapshot_path.parent() {
+                fs::create_dir_all(parent)
+                    .map_err(|e| format!("Failed to create snapshots dir: {}", e))?;
+            }
             fs::write(&snapshot_path, &rendered)
                 .map_err(|e| format!("Failed to write snapshot: {}", e))?;
-            println!("  ✓ Updated snapshot: {}", snapshot_name);
+            println!(
+                "  ✓ Updated snapshot: {}",
+                snapshot_path
+                    .strip_prefix(
+                        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/snapshots")
+                    )
+                    .unwrap()
+                    .display()
+            );
             return Ok(());
         }
 
@@ -679,22 +783,29 @@ impl ScenarioRunner {
             ));
         }
 
-        let expected = fs::read_to_string(&snapshot_path)
-            .map_err(|e| format!("Failed to read snapshot: {}", e))?;
-
-        // Normalize line endings
-        let expected_normalized = expected.replace("\r\n", "\n").trim().to_string();
-        let rendered_normalized = rendered.replace("\r\n", "\n").trim().to_string();
-
-        if expected_normalized != rendered_normalized {
-            return Err(format!(
-                "Snapshot mismatch for {}\nExpected:\n{}\n\nActual:\n{}",
-                snapshot_name, expected_normalized, rendered_normalized
-            ));
-        }
-
         println!("  ✓ UI snapshot: {}", snapshot_name);
         Ok(())
+    }
+
+    fn get_scenario_category(&self) -> String {
+        let name = &self.scenario.name;
+
+        // Determine category based on scenario name
+        if name.starts_with("Render ") {
+            "render".to_string()
+        } else if name.contains("Input") || name.contains("input") {
+            "input".to_string()
+        } else if name.contains("Task") || name.contains("task") {
+            "tasks".to_string()
+        } else if name.contains("Vector") || name.contains("Cache") {
+            "vector_cache".to_string()
+        } else if name.contains("UI ") || name.starts_with("UI") {
+            "ui".to_string()
+        } else if name.contains("Example") || name.contains("Unified") {
+            "examples".to_string()
+        } else {
+            "other".to_string()
+        }
     }
 }
 

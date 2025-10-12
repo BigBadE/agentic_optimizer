@@ -1,10 +1,11 @@
 //! Utility functions for CLI operations
 
-use anyhow::Result;
+use anyhow::{Context, Result};
 use merlin_core::{Response, TokenUsage};
 use merlin_routing::{MessageLevel, UiChannel, UiEvent};
 use std::env;
 use std::fs;
+use std::fs::canonicalize;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
@@ -14,8 +15,16 @@ const MAX_TASKS: usize = 50;
 /// Get the Merlin folder path, respecting `MERLIN_FOLDER` environment variable
 ///
 /// If `MERLIN_FOLDER` is set, use it. Otherwise default to `project/.merlin`
-pub fn get_merlin_folder(project_root: &Path) -> PathBuf {
-    env::var("MERLIN_FOLDER").map_or_else(|_| project_root.join(".merlin"), PathBuf::from)
+pub fn get_merlin_folder(project_root: &Path) -> Result<PathBuf> {
+    let path =
+        env::var("MERLIN_FOLDER").map_or_else(|_| project_root.join(".merlin"), PathBuf::from);
+    Ok(canonicalize(path.clone()).with_context(|| {
+        format!(
+            "Couldn't create .merlin folder in project or provided MERLIN_FOLDER path \"{}\".\n\
+        Make sure you don't have accidental quotes around it",
+            path.display()
+        )
+    })?)
 }
 
 /// Calculate estimated cost based on token usage.

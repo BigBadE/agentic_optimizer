@@ -10,6 +10,7 @@ thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
 async-trait.workspace = true
+rquickjs.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

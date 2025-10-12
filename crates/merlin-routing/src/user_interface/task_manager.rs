@@ -17,6 +17,7 @@ pub enum TaskStatus {
 }
 
 /// Task display information
+#[derive(Clone)]
 pub struct TaskDisplay {
     /// Description of the task
     pub description: String,
@@ -309,5 +310,16 @@ impl TaskManager {
             current_parent = self.get_parent_id(parent_id);
         }
         false
+    }
+
+    /// Checks if there are any tasks with active progress indicators
+    /// Used to determine if UI should force periodic updates
+    pub fn has_tasks_with_progress(&self) -> bool {
+        self.tasks.values().any(|task| task.progress.is_some())
+    }
+
+    /// Updates an existing task with new data
+    pub fn update_task(&mut self, task_id: TaskId, task: TaskDisplay) {
+        self.tasks.insert(task_id, task);
     }
 }

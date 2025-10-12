@@ -14,10 +14,10 @@ use std::sync::Arc;
 #[async_trait]
 pub trait Tool: Send + Sync {
     /// Name of the tool
-    fn name(&self) -> &str;
+    fn name(&self) -> &'static str;
 
     /// Description of what the tool does
-    fn description(&self) -> &str;
+    fn description(&self) -> &'static str;
 
     /// JSON schema for the tool's arguments
     fn parameters_schema(&self) -> Value;
@@ -69,6 +69,12 @@ impl Default for ToolRegistry {
 pub mod command;
 /// File operation tools (read, write, list)
 pub mod file_ops;
+/// Subagent tool for delegating to weaker models
+pub mod subagent;
+/// TypeScript/JavaScript execution tool
+pub mod typescript;
 
 pub use command::RunCommandTool;
 pub use file_ops::{ListFilesTool, ReadFileTool, WriteFileTool};
+pub use subagent::SubagentTool;
+pub use typescript::TypeScriptTool;

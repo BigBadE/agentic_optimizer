@@ -12,8 +12,9 @@ use crate::user_interface::events::{MessageLevel, UiEvent};
 use crate::{
     AgentExecutor, ConflictAwareTaskGraph, ContextFetcher, ExecutorPool, ListFilesTool,
     LocalTaskAnalyzer, ModelRouter, ReadFileTool, Result, RoutingConfig, RoutingError,
-    RunCommandTool, StrategyRouter, Task, TaskAnalysis, TaskAnalyzer, TaskGraph, TaskResult,
-    ToolRegistry, UiChannel, ValidationPipeline, Validator, WorkspaceState, WriteFileTool,
+    RunCommandTool, StrategyRouter, SubagentTool, Task, TaskAnalysis, TaskAnalyzer, TaskGraph,
+    TaskResult, Tool, ToolRegistry, TypeScriptTool, UiChannel, ValidationPipeline, Validator,
+    WorkspaceState, WriteFileTool,
 };
 
 /// High-level orchestrator that coordinates all routing components
@@ -115,13 +116,27 @@ impl RoutingOrchestrator {
     ) -> Result<TaskResult> {
         // Create tool registry with workspace tools
         let workspace_root = self.workspace.root_path().clone();
-        let tool_registry = Arc::new(
-            ToolRegistry::default()
-                .with_tool(Arc::new(ReadFileTool::new(workspace_root.clone())))
-                .with_tool(Arc::new(WriteFileTool::new(workspace_root.clone())))
-                .with_tool(Arc::new(ListFilesTool::new(workspace_root.clone())))
-                .with_tool(Arc::new(RunCommandTool::new(workspace_root))),
-        );
+
+        // First, create the basic tools
+        let basic_tools: Vec<Arc<dyn Tool>> = vec![
+            Arc::new(ReadFileTool::new(workspace_root.clone())),
+            Arc::new(WriteFileTool::new(workspace_root.clone())),
+            Arc::new(ListFilesTool::new(workspace_root.clone())),
+            Arc::new(RunCommandTool::new(workspace_root)),
+        ];
+
+        // Create advanced tools
+        let ts_tool = Arc::new(TypeScriptTool::new(basic_tools.clone()));
+        let subagent_tool = Arc::new(SubagentTool::new());
+
+        // Build the complete registry
+        let mut tool_registry = ToolRegistry::default();
+        for tool in basic_tools {
+            tool_registry = tool_registry.with_tool(tool);
+        }
+        tool_registry = tool_registry.with_tool(ts_tool);
+        tool_registry = tool_registry.with_tool(subagent_tool);
+        let tool_registry = Arc::new(tool_registry);
 
         // Create context fetcher for building context
         let context_fetcher = ContextFetcher::new(self.workspace.root_path().clone());

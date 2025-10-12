@@ -11,7 +11,8 @@ use super::state::WorkspaceState;
 use crate::user_interface::UiChannel;
 use crate::{
     AgentExecutor, ContextFetcher, ListFilesTool, ModelRouter, ReadFileTool, Result, RoutingError,
-    RunCommandTool, Task, TaskResult, ToolRegistry, Validator, WriteFileTool,
+    RunCommandTool, SubagentTool, Task, TaskResult, Tool, ToolRegistry, TypeScriptTool, Validator,
+    WriteFileTool,
 };
 
 /// Parallel task executor with concurrency limits
@@ -178,13 +179,27 @@ impl ExecutorPool {
     ) -> Result<TaskResult> {
         // Build tool registry based on workspace root
         let workspace_root = workspace.root_path().clone();
-        let tool_registry = Arc::new(
-            ToolRegistry::default()
-                .with_tool(Arc::new(ReadFileTool::new(workspace_root.clone())))
-                .with_tool(Arc::new(WriteFileTool::new(workspace_root.clone())))
-                .with_tool(Arc::new(ListFilesTool::new(workspace_root.clone())))
-                .with_tool(Arc::new(RunCommandTool::new(workspace_root.clone()))),
-        );
+
+        // First, create the basic tools
+        let basic_tools: Vec<Arc<dyn Tool>> = vec![
+            Arc::new(ReadFileTool::new(workspace_root.clone())),
+            Arc::new(WriteFileTool::new(workspace_root.clone())),
+            Arc::new(ListFilesTool::new(workspace_root.clone())),
+            Arc::new(RunCommandTool::new(workspace_root.clone())),
+        ];
+
+        // Create advanced tools
+        let ts_tool = Arc::new(TypeScriptTool::new(basic_tools.clone()));
+        let subagent_tool = Arc::new(SubagentTool::new());
+
+        // Build the complete registry
+        let mut tool_registry = ToolRegistry::default();
+        for tool in basic_tools {
+            tool_registry = tool_registry.with_tool(tool);
+        }
+        tool_registry = tool_registry.with_tool(ts_tool);
+        tool_registry = tool_registry.with_tool(subagent_tool);
+        let tool_registry = Arc::new(tool_registry);
 
         // Create context fetcher and AgentExecutor
         let context_fetcher = ContextFetcher::new(workspace_root);

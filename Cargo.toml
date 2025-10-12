@@ -57,6 +57,7 @@ unicode-width = "0.2"
 
 flate2 = "1.1"
 tempfile = "3.23"
+rquickjs = { version = "0.9", features = ["array-buffer", "classes", "futures", "loader", "macro", "parallel", "properties"] }
 
 # Testing dependencies
 criterion = { version = "0.7", features = ["html_reports", "async_tokio"] }

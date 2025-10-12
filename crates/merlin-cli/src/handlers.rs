@@ -256,7 +256,7 @@ pub async fn handle_interactive(
             EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
         };
 
-        let merlin_dir = get_merlin_folder(&project);
+        let merlin_dir = get_merlin_folder(&project)?;
         fs::create_dir_all(&merlin_dir)?;
 
         let debug_log = merlin_dir.join("debug.log");

@@ -104,7 +104,10 @@ pub use router::{
     StrategyRouter,
 };
 pub use streaming::{StepId, StepType, StreamingChannel, StreamingEvent, TaskStep};
-pub use tools::{ListFilesTool, ReadFileTool, RunCommandTool, Tool, ToolRegistry, WriteFileTool};
+pub use tools::{
+    ListFilesTool, ReadFileTool, RunCommandTool, SubagentTool, Tool, ToolRegistry, TypeScriptTool,
+    WriteFileTool,
+};
 pub use types::{
     CommandExecution,
     Complexity,

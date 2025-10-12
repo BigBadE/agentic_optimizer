@@ -9,6 +9,7 @@ merlin-context.workspace = true
 merlin-providers.workspace = true
 merlin-local.workspace = true
 merlin-languages.workspace = true
+merlin-tools.workspace = true
 async-trait.workspace = true
 tokio.workspace = true
 uuid.workspace = true

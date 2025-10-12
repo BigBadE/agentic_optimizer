@@ -388,6 +388,30 @@ impl AgentExecutor {
         }
     }
 
+    /// Build context for conversational queries (no files)
+    async fn build_conversational_context(
+        conversation_history: &Arc<Mutex<ConversationHistory>>,
+    ) -> Context {
+        let conv_history = conversation_history.lock().await;
+        let system_prompt = if conv_history.is_empty() {
+            "You are a helpful AI assistant. Answer the user's question directly and conversationally.".to_owned()
+        } else {
+            let mut prompt = String::from(
+                "You are a helpful AI assistant. Here is the conversation history:\n\n",
+            );
+            for (role, content) in conv_history.iter() {
+                use std::fmt::Write as _;
+                #[allow(clippy::expect_used, reason = "Writing to String never fails")]
+                writeln!(prompt, "{role}: {content}").expect("Writing to String never fails");
+            }
+            prompt.push_str("\nAnswer the user's question based on this conversation.");
+            prompt
+        };
+        drop(conv_history);
+
+        Context::new(system_prompt)
+    }
+
     /// Build context for a task
     ///
     /// # Errors
@@ -398,23 +422,7 @@ impl AgentExecutor {
 
         // For conversational queries, skip file fetching and use minimal context
         if intent == QueryIntent::Conversational {
-            let conv_history = self.conversation_history.lock().await;
-            let system_prompt = if conv_history.is_empty() {
-                "You are a helpful AI assistant. Answer the user's question directly and conversationally.".to_owned()
-            } else {
-                // Include conversation in prompt
-                let mut prompt = String::from(
-                    "You are a helpful AI assistant. Here is the conversation history:\n\n",
-                );
-                for (role, content) in conv_history.iter() {
-                    use std::fmt::Write as _;
-                    let _ = writeln!(prompt, "{role}: {content}");
-                }
-                prompt.push_str("\nAnswer the user's question based on this conversation.");
-                prompt
-            };
-
-            return Ok(Context::new(system_prompt));
+            return Ok(Self::build_conversational_context(&self.conversation_history).await);
         }
 
         // For code queries, fetch file context as normal

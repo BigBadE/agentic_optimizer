@@ -29,6 +29,8 @@ mod list;
 mod show;
 /// Core abstractions shared by all tools.
 mod tool;
+/// TypeScript runtime for natural LLM tool calling.
+mod typescript_runtime;
 
 pub use bash::BashTool;
 pub use delete::DeleteTool;
@@ -36,3 +38,4 @@ pub use edit::EditTool;
 pub use list::ListTool;
 pub use show::ShowTool;
 pub use tool::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};
+pub use typescript_runtime::{TypeScriptRuntime, TypeScriptTool};

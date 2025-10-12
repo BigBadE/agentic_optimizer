@@ -162,17 +162,23 @@ impl Renderer {
             let empty = bar_width.saturating_sub(filled);
             let eta_secs = (total.saturating_sub(progress.current)) / 2;
 
+            // Convert seconds to minutes:seconds format
+            let eta_minutes = eta_secs / 60;
+            let eta_remaining_secs = eta_secs % 60;
+
             text.push('(');
             text.push_str(&percent.to_string());
             text.push_str("% ");
             text.push_str(&"▓".repeat(filled));
             text.push_str(&"░".repeat(empty));
-            text.push_str(" ETA 0:");
-            if eta_secs < 10 {
+            text.push_str(" ETA ");
+            text.push_str(&eta_minutes.to_string());
+            text.push(':');
+            if eta_remaining_secs < 10 {
                 text.push('0');
             }
-            text.push_str(&eta_secs.to_string());
-            text.push_str("s)\n");
+            text.push_str(&eta_remaining_secs.to_string());
+            text.push_str(")\n");
         }
 
         text.push_str(&Self::build_tree_text(

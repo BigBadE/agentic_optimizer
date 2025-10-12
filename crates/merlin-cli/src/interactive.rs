@@ -241,7 +241,7 @@ async fn run_tui_interactive(
     _verbose: bool,
 ) -> Result<()> {
     // Create merlin directory for logs and task storage (respects MERLIN_FOLDER)
-    let merlin_dir = get_merlin_folder(&project);
+    let merlin_dir = get_merlin_folder(&project)?;
     fs::create_dir_all(&merlin_dir)?;
 
     let mut log_file = init_tui_logging(&merlin_dir, &project, local_only)?;

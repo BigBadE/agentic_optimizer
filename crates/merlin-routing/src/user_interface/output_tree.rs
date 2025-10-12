@@ -66,7 +66,7 @@ impl StepType {
 }
 
 /// Tree structure for task output
-#[derive(Default)]
+#[derive(Default, Clone)]
 pub struct OutputTree {
     root: Vec<OutputNode>,
     selected_index: usize,

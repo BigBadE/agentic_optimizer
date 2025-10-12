@@ -56,6 +56,8 @@ pub struct TuiApp<B: Backend> {
     persistence: Option<TaskPersistence>,
     /// Source of input events (abstracted for testing)
     event_source: Box<dyn InputEventSource + Send>,
+    /// Last time the UI was rendered (for forcing periodic updates)
+    last_render_time: Instant,
 }
 
 // Note: all input is sourced from `event_source` to allow test injection without
@@ -113,6 +115,7 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             pending_input: None,
             persistence,
             event_source: Box::new(CrosstermEventSource),
+            last_render_time: Instant::now(),
         };
 
         let channel = super::UiChannel { sender };
@@ -159,6 +162,7 @@ impl<B: Backend> TuiApp<B> {
             pending_input: None,
             persistence: None,
             event_source: Box::new(NoOpEventSource),
+            last_render_time: Instant::now(),
         };
 
         let channel = super::UiChannel { sender };
@@ -202,16 +206,32 @@ impl<B: Backend> TuiApp<B> {
 
         if had_events {
             self.render()?;
+            self.last_render_time = Instant::now();
         }
 
         if self.event_source.poll(Duration::from_millis(50)) {
             let events = self.collect_input_events();
             let should_quit = self.process_input_events(events);
             self.render()?;
+            self.last_render_time = Instant::now();
             return Ok(should_quit);
         }
 
-        self.render()?;
+        // Force periodic renders when there are active tasks with progress
+        // This ensures progress bars and timers update smoothly every tick (50ms)
+        let has_active_progress = self.task_manager.has_tasks_with_progress();
+        let time_since_render = self.last_render_time.elapsed();
+        let should_force_render =
+            has_active_progress && time_since_render >= Duration::from_millis(50);
+
+        if should_force_render {
+            self.render()?;
+            self.last_render_time = Instant::now();
+        } else {
+            self.render()?;
+            self.last_render_time = Instant::now();
+        }
+
         Ok(false)
     }
 
@@ -306,6 +326,11 @@ impl<B: Backend> TuiApp<B> {
     /// Gets a reference to the terminal backend (for testing only)
     pub fn backend(&self) -> &B {
         self.terminal.backend()
+    }
+
+    /// Gets immutable access to task manager (for testing only)
+    pub fn task_manager(&self) -> &TaskManager {
+        &self.task_manager
     }
 
     /// Gets mutable access to task manager for test setup (for testing only)

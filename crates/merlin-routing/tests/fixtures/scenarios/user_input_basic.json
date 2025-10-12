@@ -1,0 +1,40 @@
+{
+  "name": "Basic User Input",
+  "description": "User types input and submits, task is created",
+  "config": {
+    "terminal_size": [80, 30],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "user_input",
+        "data": {
+          "text": "hello world",
+          "submit": true
+        }
+      },
+      "expectations": {
+        "tasks": {
+          "spawned": [
+            {
+              "description": "hello world",
+              "status": "running"
+            }
+          ],
+          "no_unexpected": true
+        },
+        "ui_state": {
+          "snapshot": "user_input_basic_step1.txt",
+          "task_count": 1,
+          "has_progress": false
+        }
+      }
+    }
+  ]
+}

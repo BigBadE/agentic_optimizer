@@ -25,6 +25,9 @@ pub struct InteractiveFlags {
     pub ui: UiMode,
     /// Whether to use local models only
     pub local_only: bool,
+    /// Whether to dump full context to debug.log
+    #[allow(dead_code, reason = "Field used via environment variable")]
+    pub context_dump: bool,
 }
 
 /// Handle interactive agent session with multi-model routing
@@ -182,6 +185,11 @@ async fn execute_user_task(params: TaskExecutionParams) {
         output: format!("Prompt: {user_input}\n"),
     });
 
+    tracing::info!(
+        "execute_user_task: Passing {} conversation messages to orchestrator",
+        conversation_history.len()
+    );
+
     match orchestrator
         .execute_task_streaming_with_history(task, ui_channel.clone(), conversation_history)
         .await
@@ -288,6 +296,10 @@ async fn run_tui_interactive(
 
             let parent_task_id = tui_app.get_selected_task_id();
             let conversation_history = tui_app.get_conversation_history();
+            tracing::info!(
+                "interactive.rs: Extracted {} conversation messages for task execution",
+                conversation_history.len()
+            );
             let log_clone = log_file.try_clone()?;
 
             spawn(execute_user_task(TaskExecutionParams {

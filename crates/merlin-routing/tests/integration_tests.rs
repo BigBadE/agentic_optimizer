@@ -22,6 +22,7 @@ use merlin_routing::{
     TaskGraph, WorkspaceState,
 };
 use std::collections::HashSet;
+use std::fs::canonicalize;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
@@ -119,7 +120,10 @@ async fn test_workspace_state_operations() {
     let temp_dir = TempDir::new().expect("create temp dir");
     let workspace = WorkspaceState::new(temp_dir.path().to_path_buf());
 
-    assert_eq!(workspace.root_path(), &temp_dir.path().to_path_buf());
+    // Canonicalize to avoid Windows short (8.3) vs long path inconsistencies on CI
+    let left = canonicalize(workspace.root_path()).expect("canonicalize left");
+    let right = canonicalize(temp_dir.path()).expect("canonicalize right");
+    assert_eq!(left, right);
 
     let test_file = PathBuf::from("test.txt");
     let content = workspace.read_file(&test_file).await;

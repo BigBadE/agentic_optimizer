@@ -93,7 +93,12 @@ impl ModelProvider for LocalModelProvider {
     async fn generate(&self, query: &Query, context: &Context) -> Result<Response> {
         let start = Instant::now();
 
-        let system_prompt = "You are an expert coding assistant. Provide clear, concise, and correct code solutions.";
+        // Use provided system prompt or default
+        let system_prompt = if context.system_prompt.is_empty() {
+            "You are an expert coding assistant. Provide clear, concise, and correct code solutions."
+        } else {
+            &context.system_prompt
+        };
 
         let mut prompt = query.text.clone();
 

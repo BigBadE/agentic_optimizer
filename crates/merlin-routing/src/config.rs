@@ -156,6 +156,10 @@ impl Default for ValidationConfig {
 
 /// Execution configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Configuration struct with multiple feature flags"
+)]
 pub struct ExecutionConfig {
     /// Maximum number of tasks to execute concurrently
     pub max_concurrent_tasks: usize,
@@ -165,6 +169,8 @@ pub struct ExecutionConfig {
     pub enable_conflict_detection: bool,
     /// Whether file locking is enabled
     pub enable_file_locking: bool,
+    /// Dump full context to debug.log before each model call
+    pub context_dump: bool,
 }
 
 impl Default for ExecutionConfig {
@@ -174,6 +180,7 @@ impl Default for ExecutionConfig {
             enable_parallel: true,
             enable_conflict_detection: true,
             enable_file_locking: true,
+            context_dump: false,
         }
     }
 }

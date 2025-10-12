@@ -222,7 +222,7 @@ impl<B: Backend> TuiApp<B> {
 
     /// Adds an assistant response to conversation history
     pub fn add_assistant_response(&mut self, text: String) {
-        self.state.conversation_history.push(ConversationEntry {
+        self.state.add_conversation_entry(ConversationEntry {
             role: ConversationRole::Assistant,
             text,
             timestamp: Instant::now(),
@@ -231,7 +231,8 @@ impl<B: Backend> TuiApp<B> {
 
     /// Gets conversation history in (role, content) format for context building
     pub fn get_conversation_history(&self) -> Vec<(String, String)> {
-        self.state
+        let history: Vec<(String, String)> = self
+            .state
             .conversation_history
             .iter()
             .map(|entry| {
@@ -242,7 +243,13 @@ impl<B: Backend> TuiApp<B> {
                 };
                 (role.to_owned(), entry.text.clone())
             })
-            .collect()
+            .collect();
+
+        tracing::info!(
+            "TuiApp::get_conversation_history() returning {} messages",
+            history.len()
+        );
+        history
     }
 
     /// Gets the selected task ID
@@ -601,7 +608,7 @@ impl<B: Backend> TuiApp<B> {
             return true;
         }
 
-        self.state.conversation_history.push(ConversationEntry {
+        self.state.add_conversation_entry(ConversationEntry {
             role: ConversationRole::User,
             text: input.clone(),
             timestamp: Instant::now(),

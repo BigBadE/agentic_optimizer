@@ -148,7 +148,7 @@ impl<'handler> EventHandler<'handler> {
             warn!("Failed to save completed task {:?}: {}", task_id, save_err);
         }
 
-        self.state.conversation_history.push(ConversationEntry {
+        self.state.add_conversation_entry(ConversationEntry {
             role: ConversationRole::Assistant,
             text: result.response.text,
             timestamp: Instant::now(),
@@ -189,7 +189,7 @@ impl<'handler> EventHandler<'handler> {
             task.output_tree.add_text(format!("{prefix} {message}"));
         }
 
-        self.state.conversation_history.push(ConversationEntry {
+        self.state.add_conversation_entry(ConversationEntry {
             role: ConversationRole::System,
             text: message,
             timestamp: Instant::now(),

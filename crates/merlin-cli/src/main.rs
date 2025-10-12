@@ -56,7 +56,14 @@ async fn main() -> Result<()> {
         }
         None => {
             // No subcommand - start interactive agent session
-            handlers::handle_interactive(cli.project, cli.validation, cli.ui, cli.local).await?;
+            handlers::handle_interactive(
+                cli.project,
+                cli.validation,
+                cli.ui,
+                cli.local,
+                cli.context_dump,
+            )
+            .await?;
         }
     }
     Ok(())

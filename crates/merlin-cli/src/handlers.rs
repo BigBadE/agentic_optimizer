@@ -245,6 +245,7 @@ pub async fn handle_interactive(
     validation: Validation,
     ui: UiMode,
     local_only: bool,
+    context_dump: bool,
 ) -> Result<()> {
     // Initialize tracing based on UI mode BEFORE creating orchestrator
     if matches!(ui, UiMode::Tui) {
@@ -269,10 +270,9 @@ pub async fn handle_interactive(
             .open(&debug_log)?;
 
         Registry::default()
-            .with(
-                EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| "merlin_context=info,agentic_optimizer=info".into()),
-            )
+            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+                "merlin_context=info,merlin_routing=info,agentic_optimizer=info".into()
+            }))
             .with(
                 fmt::layer()
                     .with_writer(Arc::new(log_file))
@@ -299,6 +299,7 @@ pub async fn handle_interactive(
     let mut config = RoutingConfig::default();
     config.validation.enabled = !matches!(validation, Validation::Disabled);
     config.workspace.root_path.clone_from(&project);
+    config.execution.context_dump = context_dump;
 
     if local_only {
         config.tiers.groq_enabled = false;
@@ -311,6 +312,7 @@ pub async fn handle_interactive(
         validation_enabled: !matches!(validation, Validation::Disabled),
         ui,
         local_only,
+        context_dump,
     };
 
     handle_interactive_agent(orchestrator, project, flags).await

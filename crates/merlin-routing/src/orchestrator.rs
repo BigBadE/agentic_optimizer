@@ -134,8 +134,19 @@ impl RoutingOrchestrator {
             context_fetcher,
         );
 
+        // Enable context dump if configured
+        if self.config.execution.context_dump {
+            executor.enable_context_dump();
+        }
+
         // Set conversation history if provided
-        if !conversation_history.is_empty() {
+        if conversation_history.is_empty() {
+            tracing::info!("No conversation history to set");
+        } else {
+            tracing::info!(
+                "Setting conversation history with {} messages",
+                conversation_history.len()
+            );
             executor
                 .set_conversation_history(conversation_history)
                 .await;

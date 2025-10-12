@@ -34,6 +34,10 @@ pub struct Cli {
     #[arg(long, value_enum, default_value = "tui", global = true)]
     pub ui: UiMode,
 
+    /// Dump full context to debug.log before each model call
+    #[arg(long, global = true)]
+    pub context_dump: bool,
+
     #[command(subcommand)]
     pub command: Option<Commands>,
 }

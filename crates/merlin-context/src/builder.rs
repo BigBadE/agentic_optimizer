@@ -154,9 +154,6 @@ impl ContextBuilder {
             self.max_files
         );
 
-        // Log context usage breakdown
-        Self::log_context_breakdown(&files, &query.text);
-
         Ok(Context::new(load_default_system_prompt()).with_files(files))
     }
 
@@ -759,77 +756,5 @@ impl ContextBuilder {
             .collect();
 
         (search_prioritized, file_scores)
-    }
-
-    /// Log a visual breakdown of context usage
-    fn log_context_breakdown(files: &[FileContext], query_text: &str) {
-        const BAR_WIDTH: usize = 50;
-
-        // Calculate token counts for each component
-        let system_prompt = load_default_system_prompt();
-        let system_prompt_tokens = system_prompt.len() / 4;
-        let user_input_tokens = query_text.len() / 4;
-        let context_tokens: usize = files.iter().map(|f| f.content.len() / 4).sum();
-
-        // For now, we don't track past conversation, so set to 0
-        // This can be updated when conversation history is implemented
-        let conversation_tokens = 0;
-
-        let total_tokens =
-            system_prompt_tokens + user_input_tokens + context_tokens + conversation_tokens;
-
-        // Create visual bar chart
-        let system_bar = (system_prompt_tokens * BAR_WIDTH / total_tokens).max(1);
-        let user_bar = (user_input_tokens * BAR_WIDTH / total_tokens).max(1);
-        let files_bar = (context_tokens * BAR_WIDTH / total_tokens).max(1);
-        let conv_bar = if conversation_tokens > 0 {
-            (conversation_tokens * BAR_WIDTH / total_tokens).max(1)
-        } else {
-            0
-        };
-
-        tracing::info!("=====================================");
-        tracing::info!("CONTEXT USAGE BREAKDOWN");
-        tracing::info!("=====================================");
-        tracing::info!("Total tokens: ~{}", total_tokens);
-        tracing::info!("");
-        tracing::info!(
-            "System Prompt: {:>6} tokens ({:>5.1}%) {}",
-            system_prompt_tokens,
-            (system_prompt_tokens as f64 / total_tokens as f64) * 100.0,
-            "█".repeat(system_bar)
-        );
-        tracing::info!(
-            "User Input:    {:>6} tokens ({:>5.1}%) {}",
-            user_input_tokens,
-            (user_input_tokens as f64 / total_tokens as f64) * 100.0,
-            "█".repeat(user_bar)
-        );
-        tracing::info!(
-            "Files:         {:>6} tokens ({:>5.1}%) {}",
-            context_tokens,
-            (context_tokens as f64 / total_tokens as f64) * 100.0,
-            "█".repeat(files_bar)
-        );
-        if conversation_tokens > 0 {
-            tracing::info!(
-                "Conversation:  {:>6} tokens ({:>5.1}%) {}",
-                conversation_tokens,
-                (conversation_tokens as f64 / total_tokens as f64) * 100.0,
-                "█".repeat(conv_bar)
-            );
-        }
-        tracing::info!("=====================================");
-        tracing::info!("File breakdown: {} files included", files.len());
-        for (index, file) in files.iter().enumerate() {
-            let tokens = file.content.len() / 4;
-            tracing::info!(
-                "  {}. {} - {} tokens",
-                index + 1,
-                file.path.display(),
-                tokens
-            );
-        }
-        tracing::info!("=====================================");
     }
 }

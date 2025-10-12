@@ -121,12 +121,17 @@ impl ModelProvider for GroqProvider {
     async fn generate(&self, query: &Query, context: &Context) -> Result<Response> {
         let start = Instant::now();
 
-        let mut messages = vec![
-            GroqMessage {
-                role: "system".to_owned(),
-                content: "You are an expert coding assistant. Provide clear, concise, and correct code solutions.".to_owned(),
-            }
-        ];
+        // Use provided system prompt or default
+        let system_content = if context.system_prompt.is_empty() {
+            "You are an expert coding assistant. Provide clear, concise, and correct code solutions.".to_owned()
+        } else {
+            context.system_prompt.clone()
+        };
+
+        let mut messages = vec![GroqMessage {
+            role: "system".to_owned(),
+            content: system_content,
+        }];
 
         let mut user_content = query.text.clone();
 

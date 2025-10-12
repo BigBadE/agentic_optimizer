@@ -17,6 +17,7 @@ use merlin_local::LocalModelProvider;
 use merlin_providers::{AnthropicProvider, GroqProvider, OpenRouterProvider};
 use std::env;
 use std::fmt::Write as _;
+use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::{ContextFetcher, SelfAssessor, StepTracker};
 
@@ -35,6 +36,7 @@ pub struct AgentExecutor {
     step_tracker: StepTracker,
     context_fetcher: Arc<Mutex<ContextFetcher>>,
     conversation_history: Arc<Mutex<ConversationHistory>>,
+    context_dump_enabled: Arc<AtomicBool>,
 }
 
 struct ExecInputs<'life> {
@@ -61,7 +63,18 @@ impl AgentExecutor {
             step_tracker: StepTracker::default(),
             context_fetcher: Arc::new(Mutex::new(context_fetcher)),
             conversation_history: Arc::new(Mutex::new(Vec::new())),
+            context_dump_enabled: Arc::new(AtomicBool::new(false)),
         }
+    }
+
+    /// Enable context dumping to debug.log
+    pub fn enable_context_dump(&mut self) {
+        self.context_dump_enabled.store(true, Ordering::Relaxed);
+    }
+
+    /// Disable context dumping
+    pub fn disable_context_dump(&mut self) {
+        self.context_dump_enabled.store(false, Ordering::Relaxed);
     }
 
     /// Set conversation history for context building
@@ -164,6 +177,14 @@ impl AgentExecutor {
         });
 
         let context = self.build_context(&task, &ui_channel).await?;
+
+        // Log context breakdown to debug.log
+        self.log_context_breakdown(&context).await;
+
+        // Dump full context if enabled
+        if self.context_dump_enabled.load(Ordering::Relaxed) {
+            self.dump_context_to_log(&context, &task).await;
+        }
 
         // Step 4: Create query with tool descriptions
         let query = self.create_query_with_tools(&task)?;
@@ -407,23 +428,76 @@ impl AgentExecutor {
         Ok(context)
     }
 
-    /// Check if a request is simple enough to skip assessment
-    fn is_simple_request(description: &str) -> bool {
+    /// Classify the intent of a query to determine context needs
+    fn classify_query_intent(description: &str) -> QueryIntent {
         let desc_lower = description.to_lowercase();
         let word_count = description.split_whitespace().count();
 
-        // Simple greetings
-        let is_greeting = desc_lower == "hi"
+        // Conversational patterns - no file context needed
+        if desc_lower == "hi"
             || desc_lower == "hello"
             || desc_lower == "hey"
+            || desc_lower == "thanks"
+            || desc_lower == "thank you"
             || desc_lower.starts_with("say hi")
-            || desc_lower.starts_with("say hello");
+            || desc_lower.starts_with("say hello")
+        {
+            return QueryIntent::Conversational;
+        }
 
-        // Very short requests
-        let is_very_short = word_count <= 3;
+        // Memory/recall patterns
+        if desc_lower.contains("remember")
+            || desc_lower.contains("what did i")
+            || desc_lower.contains("what was the")
+            || desc_lower.contains("recall")
+            || (desc_lower.contains("what") && desc_lower.contains("told you"))
+            || (desc_lower.contains("what") && desc_lower.contains("said"))
+        {
+            return QueryIntent::Conversational;
+        }
 
-        is_greeting || is_very_short
+        // Very short requests - likely conversational
+        if word_count <= 3 {
+            return QueryIntent::Conversational;
+        }
+
+        // Code modification keywords
+        if desc_lower.contains("add ")
+            || desc_lower.contains("create ")
+            || desc_lower.contains("implement")
+            || desc_lower.contains("write ")
+            || desc_lower.contains("modify")
+            || desc_lower.contains("change ")
+            || desc_lower.contains("fix ")
+            || desc_lower.contains("update ")
+            || desc_lower.contains("refactor")
+        {
+            return QueryIntent::CodeModification;
+        }
+
+        // Default to code query for anything else
+        QueryIntent::CodeQuery
     }
+
+    /// Check if a request is simple enough to skip assessment
+    fn is_simple_request(description: &str) -> bool {
+        matches!(
+            Self::classify_query_intent(description),
+            QueryIntent::Conversational
+        )
+    }
+}
+
+/// Intent classification for queries
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+enum QueryIntent {
+    /// Conversational query - no file context needed
+    Conversational,
+    /// Code query - needs file context but no modification
+    CodeQuery,
+    /// Code modification - needs file context and write capability
+    CodeModification,
+}
 
     /// Execute a task with self-determination (Phase 5.1)
     /// The task assesses itself and decides whether to complete, decompose, or gather context
@@ -650,6 +724,208 @@ impl AgentExecutor {
                     .push(format!("Gathered context for: {need}"));
             }
         }
+    }
+
+    /// Log context breakdown to debug.log
+    async fn log_context_breakdown(&self, context: &Context) {
+        use tracing::info;
+        const BAR_WIDTH: usize = 50;
+
+        info!("=====================================");
+        info!("CONTEXT USAGE BREAKDOWN");
+        info!("=====================================");
+
+        // Calculate token counts
+        let conv_history = self.conversation_history.lock().await;
+        let conversation_tokens = Self::calculate_conversation_tokens(&conv_history);
+        let total_files_tokens = Self::calculate_files_tokens(context);
+        let system_prompt_tokens = context.system_prompt.len() / 4;
+        let total_tokens = context.token_estimate();
+
+        info!("Total tokens: ~{}", total_tokens);
+        info!("");
+
+        // Display bar chart breakdown
+        Self::log_token_bars(
+            conversation_tokens,
+            total_files_tokens,
+            system_prompt_tokens,
+            total_tokens,
+            BAR_WIDTH,
+        );
+
+        info!("=====================================");
+
+        // Conversation preview
+        Self::log_conversation_preview(&conv_history);
+        drop(conv_history);
+
+        // File breakdown
+        Self::log_file_breakdown(context);
+
+        info!("=====================================");
+    }
+
+    /// Calculate conversation token count
+    fn calculate_conversation_tokens(conv_history: &[(String, String)]) -> usize {
+        let char_count: usize = conv_history
+            .iter()
+            .map(|(role, content)| role.len() + content.len() + 10)
+            .sum();
+        char_count / 4
+    }
+
+    /// Calculate files token count
+    fn calculate_files_tokens(context: &Context) -> usize {
+        let char_count: usize = context.files.iter().map(|f| f.content.len()).sum();
+        char_count / 4
+    }
+
+    /// Log token distribution bar charts
+    fn log_token_bars(
+        conversation_tokens: usize,
+        files_tokens: usize,
+        system_tokens: usize,
+        total_tokens: usize,
+        bar_width: usize,
+    ) {
+        use tracing::info;
+
+        if total_tokens == 0 {
+            return;
+        }
+
+        let conv_bar = if conversation_tokens > 0 {
+            (conversation_tokens * bar_width / total_tokens).max(1)
+        } else {
+            0
+        };
+        let files_bar = if files_tokens > 0 {
+            (files_tokens * bar_width / total_tokens).max(1)
+        } else {
+            0
+        };
+        let system_bar = if system_tokens > 0 {
+            (system_tokens * bar_width / total_tokens).max(1)
+        } else {
+            0
+        };
+
+        info!(
+            "Conversation:  {:>6} tokens ({:>5.1}%) {}",
+            conversation_tokens,
+            (conversation_tokens as f64 / total_tokens as f64) * 100.0,
+            "█".repeat(conv_bar)
+        );
+        info!(
+            "Files:         {:>6} tokens ({:>5.1}%) {}",
+            files_tokens,
+            (files_tokens as f64 / total_tokens as f64) * 100.0,
+            "█".repeat(files_bar)
+        );
+        info!(
+            "System Prompt: {:>6} tokens ({:>5.1}%) {}",
+            system_tokens,
+            (system_tokens as f64 / total_tokens as f64) * 100.0,
+            "█".repeat(system_bar)
+        );
+    }
+
+    /// Log conversation preview
+    fn log_conversation_preview(conv_history: &[(String, String)]) {
+        use tracing::info;
+
+        if conv_history.is_empty() {
+            return;
+        }
+
+        info!("💬 Conversation: {} messages", conv_history.len());
+        let preview_count = conv_history.len().min(3);
+        for (idx, (role, content)) in conv_history.iter().rev().take(preview_count).enumerate() {
+            let preview = if content.len() > 60 {
+                format!("{}...", &content[..60])
+            } else {
+                content.clone()
+            };
+            info!("  [{idx}] {role}: {preview}");
+        }
+        if conv_history.len() > preview_count {
+            info!("  ... and {} more", conv_history.len() - preview_count);
+        }
+        info!("");
+    }
+
+    /// Log file breakdown
+    fn log_file_breakdown(context: &Context) {
+        use tracing::info;
+
+        if context.files.is_empty() {
+            return;
+        }
+
+        info!("📁 File breakdown: {} files included", context.files.len());
+        for (index, file) in context.files.iter().enumerate() {
+            let tokens = file.content.len() / 4;
+            info!(
+                "  {}. {} - {} tokens",
+                index + 1,
+                file.path.display(),
+                tokens
+            );
+        }
+    }
+
+    /// Dump full context to debug.log
+    async fn dump_context_to_log(&self, context: &Context, task: &Task) {
+        use tracing::info;
+
+        info!("================== CONTEXT DUMP ==================");
+        info!("Task: {}", task.description);
+        info!("");
+
+        // Conversation history
+        let conv_history = self.conversation_history.lock().await;
+        if !conv_history.is_empty() {
+            info!(
+                "=== CONVERSATION HISTORY ({} messages) ===",
+                conv_history.len()
+            );
+            for (idx, (role, content)) in conv_history.iter().enumerate() {
+                info!("[{idx}] {role}:");
+                info!("{content}");
+                info!("");
+            }
+        }
+        drop(conv_history);
+
+        // System prompt
+        info!("=== SYSTEM PROMPT ===");
+        info!("{}", context.system_prompt);
+        info!("");
+
+        // Files
+        if !context.files.is_empty() {
+            info!("=== FILES ({}) ===", context.files.len());
+            for file in &context.files {
+                info!(
+                    "--- {} ({} bytes) ---",
+                    file.path.display(),
+                    file.content.len()
+                );
+                info!("{}", file.content);
+                info!("");
+            }
+        }
+
+        // Token estimate
+        info!("=== STATISTICS ===");
+        info!("Estimated tokens: {}", context.token_estimate());
+        info!("Files: {}", context.files.len());
+        info!(
+            "System prompt length: {} chars",
+            context.system_prompt.len()
+        );
+        info!("================================================");
     }
 }
 

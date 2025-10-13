@@ -28,20 +28,8 @@
             "total": 2
           }
         },
-        "tasks": {
-          "spawned": [
-            {
-              "description": "Building embedding index",
-              "status": "running",
-              "has_progress": true
-            }
-          ],
-          "no_unexpected": false
-        },
         "ui_state": {
-          "snapshot": "vector_cache_immediate_step1.txt",
-          "task_count": 1,
-          "has_progress": true
+          "snapshot": "vector_cache_immediate_step1.txt"
         }
       }
     }

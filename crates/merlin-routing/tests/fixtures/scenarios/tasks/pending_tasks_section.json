@@ -25,6 +25,18 @@
     {
       "step": 2,
       "action": {
+        "type": "tool_result",
+        "data": {
+          "tool": "test_tool",
+          "success": true,
+          "output": "Active task is running"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
         "type": "agent_response",
         "data": {
           "text": "Pending task 1",
@@ -35,7 +47,7 @@
       "expectations": {}
     },
     {
-      "step": 3,
+      "step": 4,
       "action": {
         "type": "agent_response",
         "data": {

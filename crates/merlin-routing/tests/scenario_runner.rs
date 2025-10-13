@@ -36,7 +36,6 @@ use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskManager, Tas
 use merlin_routing::user_interface::{TuiApp, state::UiState};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
-use ratatui::buffer::Cell;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_str};
 use std::collections::VecDeque;
@@ -211,6 +210,8 @@ enum StepAction {
     ToolResult { data: ToolResultData },
     Wait { data: WaitData },
     BackgroundEvent { data: BackgroundEventData },
+    TaskComplete { data: TaskCompleteData },
+    TaskFailed { data: TaskFailedData },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -275,6 +276,20 @@ struct BackgroundEventData {
     pub progress: u64,
     /// Total units for the event's progress
     pub total: u64,
+}
+
+/// Data describing a task completion action
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TaskCompleteData {
+    /// Description of the task to mark as completed
+    pub description: String,
+}
+
+/// Data describing a task failure action
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct TaskFailedData {
+    /// Description of the task to mark as failed
+    pub description: String,
 }
 
 /// Expected outcomes after a step
@@ -388,6 +403,7 @@ struct EventExpectation {
 /// Scenario runner that executes test scenarios
 pub struct ScenarioRunner {
     scenario: TestScenario,
+    scenario_path: String,
     workspace_dir: Option<PathBuf>,
 }
 
@@ -408,6 +424,7 @@ impl ScenarioRunner {
 
         Ok(Self {
             scenario,
+            scenario_path: name.to_string(),
             workspace_dir: None,
         })
     }
@@ -474,24 +491,9 @@ impl ScenarioRunner {
 
     /// Initializes vector cache progress if enabled.
     fn initialize_vector_cache(&self, app: &mut impl TestApp) {
-        // Create embedding cache task
-        let task_id = TaskId::default();
-        let mut task = create_test_task("Building embedding index");
-        task.status = TaskStatus::Running;
-
-        // Calculate total files to embed
+        // Set embedding progress in UI state instead of creating a task
         let total_files = self.scenario.initial_state.workspace_files.len() as u64;
-
-        task.progress = Some(TaskProgress {
-            stage: "Embedding".to_string(),
-            current: 0,
-            total: Some(total_files),
-            message: String::new(),
-        });
-
-        app.task_manager_mut().add_task(task_id, task);
-        app.state_mut().active_running_tasks.insert(task_id);
-        app.state_mut().active_task_id = Some(task_id);
+        app.state_mut().embedding_progress = Some((0, total_files));
     }
 
     /// Executes a single step in the scenario.
@@ -515,6 +517,12 @@ impl ScenarioRunner {
             }
             StepAction::Wait { data } => {
                 sleep(Duration::from_millis(data.duration_ms)).await;
+            }
+            StepAction::TaskComplete { data } => {
+                Self::execute_task_complete(app, data);
+            }
+            StepAction::TaskFailed { data } => {
+                Self::execute_task_failed(app, data);
             }
         }
 
@@ -602,16 +610,27 @@ impl ScenarioRunner {
         }
     }
 
-    /// Emits a tool result to logs.
+    /// Executes a tool result action, adding output to the most recent running task.
     ///
     /// # Errors
     /// Never returns an error.
-    fn execute_tool_result(_app: &mut impl TestApp, data: &ToolResultData) {
+    fn execute_tool_result(app: &mut impl TestApp, data: &ToolResultData) {
         info!(
             "  Tool {}: {}",
             data.tool,
             if data.success { "SUCCESS" } else { "FAILED" }
         );
+
+        // Find the most recent running task and add output to it
+        let task_ids: Vec<_> = app.task_manager().iter_tasks().map(|(id, _)| id).collect();
+        for task_id in task_ids.iter().rev() {
+            if let Some(task) = app.task_manager_mut().get_task_mut(*task_id)
+                && task.status == TaskStatus::Running
+            {
+                task.output_lines.push(data.output.clone());
+                break;
+            }
+        }
     }
 
     /// Executes a simulated background event such as progress.
@@ -624,13 +643,19 @@ impl ScenarioRunner {
             data.event_type, data.progress, data.total
         );
 
-        if data.event_type == "embedding_progress" || data.event_type == "task_progress" {
-            // Create or update task with progress
+        if data.event_type == "embedding_progress" {
+            // Update embedding progress in UI state instead of creating a task
+            app.state_mut().embedding_progress = Some((data.progress, data.total));
+        } else if data.event_type == "embedding_complete" {
+            // Clear embedding progress when complete
+            app.state_mut().embedding_progress = None;
+        } else if data.event_type == "task_progress" {
+            // Create or update task with progress for non-embedding tasks
             let task_id = TaskId::default();
-            let mut task = create_test_task("Building embedding index");
+            let mut task = create_test_task("Task with progress");
             task.status = TaskStatus::Running;
             task.progress = Some(TaskProgress {
-                stage: "Embedding".to_string(),
+                stage: "Processing".to_string(),
                 current: data.progress,
                 total: Some(data.total),
                 message: String::new(),
@@ -639,6 +664,42 @@ impl ScenarioRunner {
             app.task_manager_mut().add_task(task_id, task);
             app.state_mut().active_running_tasks.insert(task_id);
             app.state_mut().active_task_id = Some(task_id);
+        }
+    }
+
+    /// Marks a task as completed by finding it by description.
+    fn execute_task_complete(app: &mut impl TestApp, data: &TaskCompleteData) {
+        info!("  Completing task: {}", data.description);
+
+        // Find the task by description and mark it as completed
+        let visible_tasks = app.task_manager().get_visible_tasks();
+        for task_id in visible_tasks {
+            if let Some(task) = app.task_manager_mut().get_task_mut(task_id)
+                && task.description.contains(&data.description)
+            {
+                task.status = TaskStatus::Completed;
+                task.end_time = Some(Instant::now());
+                app.state_mut().active_running_tasks.remove(&task_id);
+                break;
+            }
+        }
+    }
+
+    /// Marks a task as failed by finding it by description.
+    fn execute_task_failed(app: &mut impl TestApp, data: &TaskFailedData) {
+        info!("  Failing task: {}", data.description);
+
+        // Find the task by description and mark it as failed
+        let visible_tasks = app.task_manager().get_visible_tasks();
+        for task_id in visible_tasks {
+            if let Some(task) = app.task_manager_mut().get_task_mut(task_id)
+                && task.description.contains(&data.description)
+            {
+                task.status = TaskStatus::Failed;
+                task.end_time = Some(Instant::now());
+                app.state_mut().active_running_tasks.remove(&task_id);
+                break;
+            }
         }
     }
 
@@ -714,9 +775,9 @@ impl ScenarioRunner {
         expectations: &BackgroundTaskExpectations,
     ) -> Result<(), String> {
         if let Some(embedding_exp) = &expectations.embedding_cache {
-            let has_progress = app.task_manager().has_tasks_with_progress();
+            let has_embedding_progress = app.state().embedding_progress.is_some();
 
-            if embedding_exp.status == "running" && !has_progress {
+            if embedding_exp.status == "running" && !has_embedding_progress {
                 return Err("Expected embedding cache to be running".to_string());
             }
 
@@ -745,9 +806,11 @@ impl ScenarioRunner {
             }
         }
 
-        // Verify has_progress
+        // Verify has_progress (check both task progress and embedding progress)
         if let Some(expected_progress) = expectations.has_progress {
-            let actual_progress = app.task_manager().has_tasks_with_progress();
+            let has_task_progress = app.task_manager().has_tasks_with_progress();
+            let has_embedding_progress = app.state().embedding_progress.is_some();
+            let actual_progress = has_task_progress || has_embedding_progress;
             if actual_progress != expected_progress {
                 return Err(format!(
                     "Expected has_progress={expected_progress}, got {actual_progress}"
@@ -771,19 +834,57 @@ impl ScenarioRunner {
     ///
     /// # Errors
     /// Returns an error if the snapshot is missing or cannot be read.
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Snapshot verification requires extensive dimension checking and file I/O"
+    )]
     fn verify_snapshot(&self, app: &impl TestApp, snapshot_name: &str) -> Result<(), String> {
+        use unicode_width::UnicodeWidthStr as _;
+
         // Render UI to string
         let buffer = app.backend().buffer();
         let width = buffer.area().width as usize;
-        let content: String = buffer.content().iter().map(Cell::symbol).collect();
+        let height = buffer.area().height as usize;
 
-        let rendered = content
-            .chars()
-            .collect::<Vec<_>>()
-            .chunks(width)
-            .map(|chunk: &[char]| chunk.iter().collect::<String>())
-            .collect::<Vec<_>>()
-            .join("\n");
+        // Extract content properly handling wide characters
+        let mut rendered_lines = Vec::new();
+        for y in 0..height {
+            let mut line = String::new();
+            let mut x = 0;
+            while x < width {
+                let cell = buffer.cell((x as u16, y as u16)).unwrap();
+                let symbol = cell.symbol();
+                line.push_str(symbol);
+
+                // Skip cells that are part of wide characters
+                let char_width = symbol.width();
+                x += char_width.max(1);
+            }
+            rendered_lines.push(line);
+        }
+        let rendered = rendered_lines.join("\n");
+
+        // Verify dimensions match terminal size
+        let lines: Vec<&str> = rendered.lines().collect();
+        if lines.len() != height {
+            return Err(format!(
+                "Snapshot height mismatch: expected {} lines (terminal height), got {}",
+                height,
+                lines.len()
+            ));
+        }
+
+        for (line_num, line) in lines.iter().enumerate() {
+            let line_width = line.width();
+            if line_width != width {
+                return Err(format!(
+                    "Snapshot width mismatch on line {}: expected {} chars (terminal width), got {}",
+                    line_num + 1,
+                    width,
+                    line_width
+                ));
+            }
+        }
 
         // Determine snapshot path based on scenario structure
         // If snapshot_name contains "_step", it's a multi-step scenario
@@ -858,24 +959,11 @@ impl ScenarioRunner {
     }
 
     fn get_scenario_category(&self) -> String {
-        let name = &self.scenario.name;
-
-        // Determine category based on scenario name
-        if name.starts_with("Render ") {
-            "render".to_string()
-        } else if name.contains("Input") || name.contains("input") {
-            "input".to_string()
-        } else if name.contains("Task") || name.contains("task") {
-            "tasks".to_string()
-        } else if name.contains("Vector") || name.contains("Cache") {
-            "vector_cache".to_string()
-        } else if name.contains("UI ") || name.starts_with("UI") {
-            "ui".to_string()
-        } else if name.contains("Example") || name.contains("Unified") {
-            "examples".to_string()
-        } else {
-            "other".to_string()
-        }
+        // Extract category from scenario path (e.g., "ui/ui_completed_tasks" -> "ui")
+        self.scenario_path.find('/').map_or_else(
+            || "other".to_string(),
+            |slash_pos| self.scenario_path[..slash_pos].to_string(),
+        )
     }
 }
 
@@ -883,6 +971,7 @@ impl ScenarioRunner {
 trait TestApp {
     fn task_manager(&self) -> &TaskManager;
     fn task_manager_mut(&mut self) -> &mut TaskManager;
+    fn state(&self) -> &UiState;
     fn state_mut(&mut self) -> &mut UiState;
     fn set_event_source(&mut self, source: Box<dyn UiInputEventSource + Send>);
     fn tick(&mut self) -> RoutingResult<bool>;
@@ -896,6 +985,10 @@ impl TestApp for TuiApp<TestBackend> {
 
     fn task_manager_mut(&mut self) -> &mut TaskManager {
         self.task_manager_mut()
+    }
+
+    fn state(&self) -> &UiState {
+        self.state()
     }
 
     fn state_mut(&mut self) -> &mut UiState {

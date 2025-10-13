@@ -55,27 +55,21 @@ impl Renderer {
     pub fn render(&self, frame: &mut Frame, ctx: &RenderCtx<'_>) {
         let main_area = frame.area();
 
-        // Check if we have a running task with progress to determine dynamic sizing
-        let has_running_task_with_progress = ctx
-            .ui_ctx
-            .task_manager
-            .iter_tasks()
-            .any(|(_, task)| task.status == TaskStatus::Running && task.progress.is_some());
+        // Calculate actual content heights
+        let task_content_lines = self.calculate_task_tree_height(&ctx.ui_ctx, main_area);
+        let input_content_lines = ctx.input.input_area().lines().len() as u16;
 
-        // Determine task panel height dynamically
-        let task_height = if has_running_task_with_progress {
-            Constraint::Min(5) // Larger for running tasks with progress
-        } else {
-            Constraint::Min(3) // Minimal for completed tasks
-        };
+        // Add borders (2) to content lines
+        let task_height = task_content_lines + 2;
+        let input_height = input_content_lines + 2;
 
-        // If no task is selected, use minimal space for tasks panel
+        // If no task is selected, use minimal space for tasks panel and let input fill the rest
         if ctx.ui_ctx.state.active_task_id.is_none() {
             let primary_split = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    task_height,                // Task tree (dynamic)
-                    Constraint::Percentage(80), // Input area (take most space)
+                    Constraint::Length(task_height),
+                    Constraint::Min(input_height), // Input fills remaining space
                 ])
                 .split(main_area);
 
@@ -86,9 +80,9 @@ impl Renderer {
             let primary_split = Layout::default()
                 .direction(Direction::Vertical)
                 .constraints([
-                    task_height,                // Task tree (dynamic)
-                    Constraint::Percentage(60), // Focused details
-                    Constraint::Percentage(20), // Input area
+                    Constraint::Length(task_height),
+                    Constraint::Min(10), // Focused details gets remaining space
+                    Constraint::Length(input_height),
                 ])
                 .split(main_area);
 
@@ -99,6 +93,12 @@ impl Renderer {
     }
 
     // Rendering methods
+
+    /// Calculates the height needed for the task tree content
+    fn calculate_task_tree_height(&self, ui_ctx: &UiCtx<'_>, area: Rect) -> u16 {
+        let lines = self.build_task_tree_lines(ui_ctx, area);
+        lines.len() as u16
+    }
 
     /// Renders full-width task tree at the top
     fn render_task_tree_full(
@@ -194,12 +194,27 @@ impl Renderer {
         let max_scroll = text_lines.saturating_sub(content_height);
         let clamped_scroll = ui_ctx.state.output_scroll_offset.min(max_scroll);
 
+        // Build title with optional embedding progress indicator
+        let title = if let Some((current, total)) = ui_ctx.state.embedding_progress {
+            let percent = (current as f64 / total as f64 * 100.0) as u16;
+            let base_title = format!(
+                "─── Focused - {}  [Indexing: {}%] ",
+                task.description, percent
+            );
+            // Truncate title to fit in area width
+            Self::truncate_text(&base_title, area.width.saturating_sub(2) as usize)
+        } else {
+            let base_title = format!("─── Focused - {} ", task.description);
+            // Truncate title to fit in area width
+            Self::truncate_text(&base_title, area.width.saturating_sub(2) as usize)
+        };
+
         let paragraph = Paragraph::new(text)
             .style(Style::default().fg(self.theme.text()))
             .block(
                 Block::default()
                     .borders(Borders::ALL)
-                    .title(format!("─── Focused - {} ", task.description))
+                    .title(title)
                     .border_style(Style::default().fg(border_color))
                     .padding(Padding::horizontal(1)),
             )
@@ -234,19 +249,19 @@ impl Renderer {
         );
 
         if let Some((task_id, task)) = task_to_show {
-            let status_icon = Self::get_task_status_icon(task);
+            let is_active = ui_ctx.state.active_running_tasks.contains(task_id);
+            let status_icon = Self::get_task_status_icon(task, is_active);
             let is_selected = ui_ctx.state.active_task_id == Some(*task_id);
 
             // Show status with task description and optional stage
             let task_line = task.progress.as_ref().map_or_else(
-                || format!("└─ [{status_icon}] {}", task.description),
-                |progress| {
-                    format!(
-                        "└─ [{status_icon}] {} [{}]",
-                        task.description, progress.stage
-                    )
-                },
+                || format!("[{status_icon}] {}", task.description),
+                |progress| format!("[{status_icon}] {} [{}]", task.description, progress.stage),
             );
+
+            // Truncate if needed to fit in the area (account for borders and padding)
+            let max_width = area.width.saturating_sub(2) as usize;
+            let truncated_line = Self::truncate_text(&task_line, max_width);
 
             let style = if is_selected {
                 Style::default()
@@ -256,7 +271,7 @@ impl Renderer {
                 Style::default().fg(self.theme.text())
             };
 
-            lines.push(Line::from(vec![Span::styled(task_line, style)]));
+            lines.push(Line::from(vec![Span::styled(truncated_line, style)]));
 
             // Show progress bar for running tasks with progress
             if task.status == TaskStatus::Running
@@ -266,37 +281,94 @@ impl Renderer {
                 lines.push(progress_line);
             }
 
-            // Show task position indicator if there are multiple tasks
+            // Show other tasks if there are multiple tasks
             if all_tasks.len() > 1 {
-                let current_index = all_tasks
-                    .iter()
-                    .position(|(id, _)| *id == *task_id)
-                    .unwrap_or(0);
-                let total = all_tasks.len();
-                lines.push(Line::from(vec![Span::styled(
-                    format!(" ({}/{} tasks)", current_index + 1, total),
-                    Style::default().fg(Color::DarkGray),
-                )]));
+                Self::add_other_task_lines(
+                    area,
+                    &mut lines,
+                    &all_tasks,
+                    ui_ctx.state.active_task_id,
+                    ui_ctx,
+                );
             }
         }
 
         lines
     }
 
-    // Removed unused helper functions to satisfy clippy
+    /// Adds lines for other tasks (not the currently focused one)
+    fn add_other_task_lines(
+        area: Rect,
+        lines: &mut Vec<Line<'static>>,
+        all_tasks: &[(super::TaskId, &super::task_manager::TaskDisplay)],
+        active_task_id: Option<super::TaskId>,
+        ui_ctx: &UiCtx<'_>,
+    ) {
+        let other_tasks: Vec<_> = all_tasks
+            .iter()
+            .filter(|(id, _)| Some(*id) != active_task_id)
+            .collect();
 
-    /// Gets status icon for task
-    fn get_task_status_icon(task: &super::task_manager::TaskDisplay) -> &'static str {
-        // Check if task hasn't started yet (pending/queued)
-        if task.status == TaskStatus::Running
-            && task.output_lines.is_empty()
-            && task.progress.is_none()
-        {
-            return " "; // Pending/queued
+        let max_width = area.width.saturating_sub(2) as usize;
+
+        for (index, (other_id, other_task)) in other_tasks.iter().enumerate() {
+            let is_active = ui_ctx.state.active_running_tasks.contains(other_id);
+            let other_icon = Self::get_task_status_icon(other_task, is_active);
+            let is_last = index == other_tasks.len() - 1;
+            let prefix = if is_last { " └─" } else { " ├─" };
+            let other_line = format!("{prefix} [{other_icon}] {}", other_task.description);
+            let truncated_line = Self::truncate_text(&other_line, max_width);
+
+            lines.push(Line::from(vec![Span::styled(
+                truncated_line,
+                Style::default().fg(Color::DarkGray),
+            )]));
+        }
+    }
+
+    /// Truncates text to fit within `max_width`, adding "..." if truncated
+    fn truncate_text(text: &str, max_width: usize) -> String {
+        use unicode_width::{UnicodeWidthChar as _, UnicodeWidthStr as _};
+
+        let text_width = text.width();
+        if text_width <= max_width {
+            return text.to_string();
         }
 
+        // Need to truncate - reserve space for "..."
+        let target_width = max_width.saturating_sub(3);
+        let mut result = String::new();
+        let mut current_width = 0;
+
+        for character in text.chars() {
+            let char_width = character.width().unwrap_or(0);
+            if current_width + char_width > target_width {
+                break;
+            }
+            result.push(character);
+            current_width += char_width;
+        }
+
+        result.push_str("...");
+        result
+    }
+
+    /// Gets status icon for task
+    fn get_task_status_icon(
+        task: &super::task_manager::TaskDisplay,
+        is_active: bool,
+    ) -> &'static str {
         match task.status {
-            TaskStatus::Running => "▶",
+            TaskStatus::Running => {
+                // Check if task has output or progress
+                if !task.output_lines.is_empty() || task.progress.is_some() {
+                    "▶" // Running with output
+                } else if is_active {
+                    "◉" // Active but no output yet
+                } else {
+                    " " // Pending/queued
+                }
+            }
             TaskStatus::Completed => "✔",
             TaskStatus::Failed => "✗",
         }
@@ -364,16 +436,10 @@ impl Renderer {
             Style::default()
         };
 
-        // Create title with optional status indicator
-        let title = ctx.ui_ctx.state.processing_status.as_ref().map_or_else(
-            || "─── Input ".to_string(),
-            |status| format!("─── Input {status} "),
-        );
-
         input_area.set_block(
             Block::default()
                 .borders(Borders::ALL)
-                .title(title)
+                .title("─── Input ")
                 .border_style(Style::default().fg(border_color))
                 .padding(Padding::horizontal(1)),
         );

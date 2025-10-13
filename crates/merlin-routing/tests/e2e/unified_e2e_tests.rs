@@ -23,8 +23,8 @@
 
 use crate::ScenarioRunner;
 use crate::common::init_tracing;
-use std::fs;
 use std::path::PathBuf;
+use std::{env, fs};
 use tracing::info;
 
 /// Recursively scan a directory for `.json` files and collect scenario names.
@@ -59,6 +59,16 @@ fn discover_scenarios() -> Vec<String> {
         .join("tests")
         .join("fixtures")
         .join("scenarios");
+
+    if env::var("UPDATE_SNAPSHOTS").is_ok() {
+        fs::remove_dir_all(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join("tests")
+                .join("fixtures")
+                .join("snapshots"),
+        )
+        .unwrap();
+    }
 
     let mut scenarios = Vec::new();
     scan_dir(&scenarios_dir, &scenarios_dir, &mut scenarios);

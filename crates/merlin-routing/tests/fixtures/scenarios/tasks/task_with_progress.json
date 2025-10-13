@@ -24,7 +24,7 @@
         "tasks": {
           "spawned": [
             {
-              "description": "Building embedding index",
+              "description": "Task with progress",
               "status": "running",
               "has_progress": true
             }

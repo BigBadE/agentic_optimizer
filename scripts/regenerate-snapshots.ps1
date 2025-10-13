@@ -1,0 +1,2 @@
+$env:UPDATE_SNAPSHOTS=1
+cargo test -p merlin-routing run_all_json_scenarios

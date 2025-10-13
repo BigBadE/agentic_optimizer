@@ -1,1 +1,70 @@
-{"name":"Completed Tasks Display","description":"Tests completed task display when no running tasks","config":{"terminal_size":[100,30],"enable_vector_cache":false},"initial_state":{"workspace_files":[],"vector_cache_state":"complete"},"steps":[{"step":1,"action":{"type":"agent_response","data":{"text":"Completed task","tool_calls":[],"subtasks":[]}},"expectations":{"ui_state":{"snapshot":"ui_completed_tasks.txt"}}}]}
+{
+  "name": "UI Completed Display",
+  "description": "Tests UI display when showing a completed task",
+  "config": {
+    "terminal_size": [100, 30],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "user_input",
+        "data": {
+          "text": "Test completed task",
+          "submit": true
+        }
+      },
+      "expectations": {
+        "tasks": {
+          "spawned": [
+            {
+              "description": "Test completed task",
+              "status": "running"
+            }
+          ]
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "agent_response",
+        "data": {
+          "text": "Task completed successfully",
+          "tool_calls": [],
+          "subtasks": []
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "task_complete",
+        "data": {
+          "description": "Test completed task"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "task_complete",
+        "data": {
+          "description": "Task completed successfully"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "snapshot": "ui_completed_tasks.txt"
+        }
+      }
+    }
+  ]
+}

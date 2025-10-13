@@ -41,20 +41,8 @@
             "total": 3
           }
         },
-        "tasks": {
-          "spawned": [
-            {
-              "description": "Building embedding index",
-              "status": "running",
-              "has_progress": true
-            }
-          ],
-          "no_unexpected": false
-        },
         "ui_state": {
-          "snapshot": "unified_example_step1.txt",
-          "task_count": 1,
-          "has_progress": true
+          "snapshot": "unified_example_step1.txt"
         }
       }
     },
@@ -77,7 +65,7 @@
           ]
         },
         "ui_state": {
-          "task_count": 2
+          "task_count": 1
         }
       }
     },

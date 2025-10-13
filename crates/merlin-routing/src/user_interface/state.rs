@@ -27,6 +27,8 @@ pub struct UiState {
     pub processing_status: Option<String>,
     /// Vertical scroll offset for the output pane
     pub output_scroll_offset: u16,
+    /// Background embedding index progress (current, total)
+    pub embedding_progress: Option<(u64, u64)>,
 }
 
 impl UiState {

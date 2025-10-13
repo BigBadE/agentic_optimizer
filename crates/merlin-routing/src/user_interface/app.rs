@@ -336,6 +336,11 @@ impl<B: Backend> TuiApp<B> {
         &mut self.task_manager
     }
 
+    /// Gets immutable access to UI state (for testing only)
+    pub fn state(&self) -> &UiState {
+        &self.state
+    }
+
     /// Gets mutable access to UI state for test setup (for testing only)
     pub fn state_mut(&mut self) -> &mut UiState {
         &mut self.state

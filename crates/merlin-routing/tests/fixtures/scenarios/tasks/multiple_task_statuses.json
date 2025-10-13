@@ -15,7 +15,7 @@
       "action": {
         "type": "agent_response",
         "data": {
-          "text": "Running task",
+          "text": "Completed task",
           "tool_calls": [],
           "subtasks": []
         }
@@ -25,11 +25,9 @@
     {
       "step": 2,
       "action": {
-        "type": "agent_response",
+        "type": "task_complete",
         "data": {
-          "text": "Completed task",
-          "tool_calls": [],
-          "subtasks": []
+          "description": "Completed task"
         }
       },
       "expectations": {}
@@ -39,9 +37,43 @@
       "action": {
         "type": "agent_response",
         "data": {
+          "text": "Running task",
+          "tool_calls": [],
+          "subtasks": []
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "tool_result",
+        "data": {
+          "tool": "test_tool",
+          "success": true,
+          "output": "Running task output"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "agent_response",
+        "data": {
           "text": "Failed task",
           "tool_calls": [],
           "subtasks": []
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "task_failed",
+        "data": {
+          "description": "Failed task"
         }
       },
       "expectations": {

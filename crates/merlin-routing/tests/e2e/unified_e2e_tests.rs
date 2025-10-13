@@ -5,7 +5,24 @@
 //!
 //! This test automatically discovers and runs all .json files in the scenarios directory.
 
-use super::scenario_runner::ScenarioRunner;
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
+)]
+
+use crate::ScenarioRunner;
+use crate::common::init_tracing;
 use std::fs;
 use std::path::PathBuf;
 use tracing::info;
@@ -49,62 +66,56 @@ fn discover_scenarios() -> Vec<String> {
     scenarios
 }
 
-/// Runs all discovered JSON scenarios.
-///
-/// # Panics
-/// Panics if no scenarios are discovered or if any scenario fails.
-#[cfg(test)]
-mod tests {
-    use super::*;
+#[tokio::test]
+async fn run_all_json_scenarios() {
+    // Ensure tracing is initialized for test logs
+    init_tracing();
 
-    #[tokio::test]
-    async fn run_all_json_scenarios() {
-        let scenarios = discover_scenarios();
+    let scenarios = discover_scenarios();
 
-        assert!(
-            !scenarios.is_empty(),
-            "No JSON scenarios found in tests/fixtures/scenarios/"
-        );
+    assert!(
+        !scenarios.is_empty(),
+        "No JSON scenarios found in tests/fixtures/scenarios/"
+    );
 
-        info!("\nDiscovered {} scenarios:", scenarios.len());
-        for scenario in &scenarios {
-            info!("  - {scenario}");
-        }
-        info!("");
+    info!("Discovered {} scenarios:", scenarios.len());
+    for scenario in &scenarios {
+        info!("  - {scenario}");
+    }
+    info!("");
 
-        let mut passed = 0;
-        let mut failed = Vec::new();
+    let mut passed = 0;
+    let mut failed = Vec::new();
 
-        for scenario_name in &scenarios {
-            info!("\n{}", "=".repeat(60));
-            match ScenarioRunner::load(scenario_name) {
-                Ok(runner) => match runner.run().await {
-                    Ok(()) => {
-                        passed += 1;
-                        info!("✓ {scenario_name} PASSED");
-                    }
-                    Err(error) => {
-                        failed.push((scenario_name.clone(), error.clone()));
-                        info!("✗ {scenario_name} FAILED: {error}");
-                    }
-                },
-                Err(error) => {
-                    failed.push((scenario_name.clone(), format!("Failed to load: {error}")));
-                    info!("✗ {scenario_name} FAILED TO LOAD: {error}");
+    for scenario_name in &scenarios {
+        info!("{}", "=".repeat(60));
+        match ScenarioRunner::load(scenario_name) {
+            Ok(runner) => match runner.run().await {
+                Ok(()) => {
+                    passed += 1;
+                    info!("✓ {scenario_name} PASSED");
                 }
+                Err(error) => {
+                    failed.push((scenario_name.clone(), error.clone()));
+                    info!("✗ {scenario_name} FAILED: {error}");
+                }
+            },
+            Err(error) => {
+                failed.push((scenario_name.clone(), format!("Failed to load: {error}")));
+                info!("✗ {scenario_name} FAILED TO LOAD: {error}");
             }
         }
+    }
 
-        info!("\n{}", "=".repeat(60));
-        let failed_count = failed.len();
-        info!("Results: {passed} passed, {failed_count} failed");
+    info!("{}", "=".repeat(60));
+    let failed_count = failed.len();
+    info!("Results: {passed} passed, {failed_count} failed");
 
-        if !failed.is_empty() {
-            info!("\nFailed scenarios:");
-            for (name, error) in &failed {
-                info!("  ✗ {name}: {error}");
-            }
-            panic!("{} scenario(s) failed", failed.len());
+    if !failed.is_empty() {
+        info!("Failed scenarios:");
+        for (name, error) in &failed {
+            info!("  ✗ {name}: {error}");
         }
+        panic!("{} scenario(s) failed", failed.len());
     }
 }

@@ -29,6 +29,7 @@ tracing.workspace = true
 regex.workspace = true
 
 [dev-dependencies]
+tracing-subscriber.workspace = true
 merlin-agent.workspace = true
 merlin-tools.workspace = true
 

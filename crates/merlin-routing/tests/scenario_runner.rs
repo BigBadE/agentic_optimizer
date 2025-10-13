@@ -48,6 +48,11 @@ use tempfile::TempDir;
 use tokio::time::sleep;
 use tracing::info;
 
+mod common;
+mod e2e;
+mod integration;
+mod unit;
+
 /// Convenience result type for creating a test app
 type CreateAppResult = Result<(TuiApp<TestBackend>, UiChannel), String>;
 
@@ -413,7 +418,7 @@ impl ScenarioRunner {
     /// # Errors
     /// Returns an error if setup or any step execution fails.
     pub async fn run(mut self) -> Result<(), String> {
-        info!("\n=== Running Scenario: {} ===", self.scenario.name);
+        info!("=== Running Scenario: {} ===", self.scenario.name);
         info!("Description: {}", self.scenario.description);
 
         // Set up initial state
@@ -434,11 +439,11 @@ impl ScenarioRunner {
 
         // Execute each step
         for step in &self.scenario.steps {
-            info!("\n--- Step {} ---", step.step);
+            info!("--- Step {} ---", step.step);
             self.execute_step(&mut app, step).await?;
         }
 
-        info!("\n✓ Scenario completed successfully");
+        info!("✓ Scenario completed successfully");
         Ok(())
     }
 

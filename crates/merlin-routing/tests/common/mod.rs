@@ -25,11 +25,37 @@ use merlin_routing::{Result, TaskId, TaskResult, ValidationResult};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use std::collections::VecDeque;
+use std::env;
+use std::sync::Once;
 use std::time::{Duration, Instant};
+use tracing_subscriber::{EnvFilter, fmt};
 
 /// Create a basic test task with sensible defaults
 pub fn create_test_task(desc: &str) -> TaskDisplay {
     create_test_task_with_time(desc, Instant::now())
+}
+
+// ----------------------------------------------------------------------------
+// Tracing initialization for tests
+// ----------------------------------------------------------------------------
+
+static TRACING_INIT: Once = Once::new();
+
+/// Initialize tracing for tests (idempotent).
+/// Honors `RUST_LOG` if set, otherwise defaults to "trace" for rich diagnostics.
+pub fn init_tracing() {
+    TRACING_INIT.call_once(|| {
+        let filter = env::var("RUST_LOG").unwrap_or_else(|_| "trace".to_string());
+        // Consume the result to avoid must_use warnings; if already initialized, ignore error
+        if fmt()
+            .with_env_filter(EnvFilter::new(filter))
+            .with_test_writer()
+            .try_init()
+            .is_err()
+        {
+            // tracing already initialized in this process
+        }
+    });
 }
 
 /// Create a test task with a specific start time

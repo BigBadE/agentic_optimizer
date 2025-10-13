@@ -4,11 +4,13 @@ use merlin_routing::{
     ListFilesTool, ReadFileTool, RunCommandTool, Tool, TypeScriptTool, WriteFileTool,
 };
 use serde_json::json;
+use std::f64::consts::PI;
+use std::path::Path;
 use std::sync::Arc;
 use tempfile::TempDir;
 
 /// Helper to create a TypeScript tool with all basic tools
-fn create_typescript_tool(workspace: &std::path::Path) -> TypeScriptTool {
+fn create_typescript_tool(workspace: &Path) -> TypeScriptTool {
     let tools: Vec<Arc<dyn Tool>> = vec![
         Arc::new(ReadFileTool::new(workspace.to_path_buf())),
         Arc::new(WriteFileTool::new(workspace.to_path_buf())),
@@ -105,14 +107,14 @@ async fn test_typescript_error_handling() {
     let ts_tool = create_typescript_tool(temp_dir.path());
 
     // Syntax error
-    let code = "const x = ;";
-    let result = ts_tool.execute(json!({ "code": code })).await;
-    assert!(result.is_err());
+    let code_bad_syntax = "const x = ;";
+    let result_bad_syntax = ts_tool.execute(json!({ "code": code_bad_syntax })).await;
+    result_bad_syntax.unwrap_err();
 
     // Runtime error (undefined variable)
-    let code = "nonexistent_variable";
-    let result = ts_tool.execute(json!({ "code": code })).await;
-    assert!(result.is_err());
+    let code_undefined = "nonexistent_variable";
+    let result_undefined = ts_tool.execute(json!({ "code": code_undefined })).await;
+    result_undefined.unwrap_err();
 }
 
 #[tokio::test]
@@ -120,14 +122,8 @@ async fn test_typescript_missing_code_parameter() {
     let temp_dir = TempDir::new().unwrap();
     let ts_tool = create_typescript_tool(temp_dir.path());
 
-    let result = ts_tool.execute(json!({})).await;
-    assert!(result.is_err());
-    assert!(
-        result
-            .unwrap_err()
-            .to_string()
-            .contains("Missing 'code' parameter")
-    );
+    let error_message = ts_tool.execute(json!({})).await.unwrap_err().to_string();
+    assert!(error_message.contains("Missing 'code' parameter"));
 }
 
 #[tokio::test]
@@ -272,7 +268,10 @@ async fn test_typescript_complex_workflow() {
     let summary = result["summary"].as_array().unwrap();
     assert_eq!(summary.len(), 3);
 
-    let cat_a = summary.iter().find(|s| s["category"] == "A").unwrap();
+    let cat_a = summary
+        .iter()
+        .find(|entry| entry["category"] == "A")
+        .unwrap();
     assert_eq!(cat_a["count"], 2);
     assert_eq!(cat_a["total"], 250);
 }
@@ -337,7 +336,7 @@ async fn test_typescript_date_and_math() {
     assert_eq!(result["min"], 1);
     assert_eq!(result["sqrt"], 4);
     assert_eq!(result["random"], true);
-    assert!((result["pi"].as_f64().unwrap() - 3.14159).abs() < 0.001);
+    assert!((result["pi"].as_f64().unwrap() - PI).abs() < 0.001);
 }
 
 #[tokio::test]

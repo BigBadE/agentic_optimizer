@@ -14,9 +14,8 @@
         reason = "Test allows"
     )
 )]
-mod common;
 
-use common::*;
+use crate::common::*;
 use merlin_routing::TaskId;
 use merlin_routing::user_interface::task_manager::{TaskManager, TaskStatus};
 use std::time::{Duration, Instant};

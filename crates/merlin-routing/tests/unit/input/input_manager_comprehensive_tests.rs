@@ -1,26 +1,23 @@
 //! Comprehensive tests for TUI input handling
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::print_stdout,
-    clippy::print_stderr,
-    clippy::tests_outside_test_module,
-    clippy::missing_panics_doc,
-    clippy::min_ident_chars,
-    clippy::similar_names,
-    reason = "Tests allow these"
-)]
+    #![allow(
+        clippy::unwrap_used,
+        clippy::expect_used,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        clippy::missing_panics_doc,
+        clippy::min_ident_chars,
+        clippy::similar_names,
+    )]
 
-mod common;
-
-use common::*;
+use crate::common::*;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
-#[test]
-fn test_input_manager_creation() {
-    let app = test_with_events(vec![]);
-    assert_eq!(app.get_input_lines().len(), 1, "Should start with one line");
-}
+    #[test]
+    fn test_input_manager_creation() {
+        let app = test_with_events(vec![]);
+        assert_eq!(app.get_input_lines().len(), 1, "Should start with one line");
+    }
 
 #[test]
 fn test_basic_text_input() {

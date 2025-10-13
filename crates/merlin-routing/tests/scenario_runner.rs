@@ -9,24 +9,47 @@
 //! - User input simulation
 //! - Event verification
 
-#![allow(missing_docs, dead_code)]
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
+)]
 
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
+use merlin_routing::Result as RoutingResult;
 use merlin_routing::TaskId;
-use merlin_routing::user_interface::TuiApp;
-use merlin_routing::user_interface::event_source::InputEventSource;
+use merlin_routing::UiChannel;
+use merlin_routing::user_interface::event_source::InputEventSource as UiInputEventSource;
 use merlin_routing::user_interface::events::TaskProgress;
 use merlin_routing::user_interface::output_tree::OutputTree;
-use merlin_routing::user_interface::task_manager::TaskStatus;
+use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskManager, TaskStatus};
+use merlin_routing::user_interface::{TuiApp, state::UiState};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
 use ratatui::buffer::Cell;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
+use serde_json::{Value, from_str};
 use std::collections::VecDeque;
+use std::env;
 use std::fs;
 use std::path::PathBuf;
 use std::time::{Duration, Instant};
+use tempfile::TempDir;
+use tokio::time::sleep;
+use tracing::info;
+
+/// Convenience result type for creating a test app
+type CreateAppResult = Result<(TuiApp<TestBackend>, UiChannel), String>;
 
 /// Test event source that provides events from a queue
 #[derive(Default)]
@@ -43,7 +66,7 @@ impl TestEventSource {
     }
 }
 
-impl InputEventSource for TestEventSource {
+impl UiInputEventSource for TestEventSource {
     fn poll(&mut self, _timeout: Duration) -> bool {
         !self.queue.is_empty()
     }
@@ -56,10 +79,8 @@ impl InputEventSource for TestEventSource {
 }
 
 /// Creates a test task with default values
-fn create_test_task(
-    description: &str,
-) -> merlin_routing::user_interface::task_manager::TaskDisplay {
-    merlin_routing::user_interface::task_manager::TaskDisplay {
+fn create_test_task(description: &str) -> TaskDisplay {
+    TaskDisplay {
         description: description.to_string(),
         status: TaskStatus::Running,
         start_time: Instant::now(),
@@ -73,19 +94,16 @@ fn create_test_task(
 }
 
 /// Creates a test app with the given terminal size
-fn create_test_app(
-    width: u16,
-    height: u16,
-) -> Result<(TuiApp<TestBackend>, merlin_routing::UiChannel), String> {
+fn create_test_app(width: u16, height: u16) -> CreateAppResult {
     let backend = TestBackend::new(width, height);
     let terminal =
-        Terminal::new(backend).map_err(|e| format!("Failed to create terminal: {}", e))?;
-    TuiApp::new_for_test(terminal).map_err(|e| format!("Failed to create app: {}", e))
+        Terminal::new(backend).map_err(|error| format!("Failed to create terminal: {error}"))?;
+    TuiApp::new_for_test(terminal).map_err(|error| format!("Failed to create app: {error}"))
 }
 
 /// Complete test scenario loaded from JSON
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TestScenario {
+struct TestScenario {
     /// Name of the scenario
     pub name: String,
     /// Description of what this tests
@@ -102,7 +120,7 @@ pub struct TestScenario {
 
 /// Test configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ScenarioConfig {
+struct ScenarioConfig {
     /// Terminal size [width, height]
     #[serde(default = "default_terminal_size")]
     pub terminal_size: (u16, u16),
@@ -134,7 +152,7 @@ impl Default for ScenarioConfig {
 
 /// Initial state of the system
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct InitialState {
+struct InitialState {
     /// Mock workspace files to create
     #[serde(default)]
     pub workspace_files: Vec<WorkspaceFile>,
@@ -147,34 +165,29 @@ pub struct InitialState {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceFile {
+struct WorkspaceFile {
     pub path: String,
     pub content: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExistingTask {
+struct ExistingTask {
     pub description: String,
     pub status: String,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize, Default)]
 #[serde(rename_all = "lowercase")]
-pub enum VectorCacheState {
+enum VectorCacheState {
+    #[default]
     Empty,
     Partial,
     Complete,
 }
 
-impl Default for VectorCacheState {
-    fn default() -> Self {
-        Self::Empty
-    }
-}
-
 /// A single test step
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TestStep {
+struct TestStep {
     /// Step number
     pub step: usize,
     /// Action to perform
@@ -187,7 +200,7 @@ pub struct TestStep {
 /// Action to perform in a step
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(tag = "type", rename_all = "snake_case")]
-pub enum StepAction {
+enum StepAction {
     UserInput { data: UserInputData },
     AgentResponse { data: AgentResponseData },
     ToolResult { data: ToolResultData },
@@ -196,7 +209,7 @@ pub enum StepAction {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UserInputData {
+struct UserInputData {
     pub text: String,
     #[serde(default = "default_true")]
     pub submit: bool,
@@ -207,7 +220,7 @@ fn default_true() -> bool {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct AgentResponseData {
+struct AgentResponseData {
     pub text: String,
     #[serde(default)]
     pub tool_calls: Vec<ToolCallData>,
@@ -216,39 +229,53 @@ pub struct AgentResponseData {
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolCallData {
+struct ToolCallData {
     pub tool: String,
     pub args: Value,
 }
 
+/// Data describing a subtask spawned by an agent response
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubtaskData {
+struct SubtaskData {
+    /// Description of the subtask
     pub description: String,
+    /// Priority of the subtask as a string label
     pub priority: String,
 }
 
+/// Data describing the result of a tool execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ToolResultData {
+struct ToolResultData {
+    /// Tool name
     pub tool: String,
+    /// Whether the tool execution succeeded
     pub success: bool,
+    /// Tool textual output
     pub output: String,
 }
 
+/// Data describing a wait/sleep action
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WaitData {
+struct WaitData {
+    /// Duration to wait in milliseconds
     pub duration_ms: u64,
 }
 
+/// Data describing a simulated background event
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BackgroundEventData {
+struct BackgroundEventData {
+    /// Background event type identifier
     pub event_type: String,
+    /// Current progress value for the event
     pub progress: u64,
+    /// Total units for the event's progress
     pub total: u64,
 }
 
 /// Expected outcomes after a step
+/// Expectations to verify after a single step
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
-pub struct StepExpectations {
+struct StepExpectations {
     /// Task expectations
     #[serde(skip_serializing_if = "Option::is_none")]
     pub tasks: Option<TaskExpectations>,
@@ -263,68 +290,92 @@ pub struct StepExpectations {
     pub events: Option<Vec<EventExpectation>>,
 }
 
+/// Grouped expectations for visible and completed tasks
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskExpectations {
+struct TaskExpectations {
+    /// Expected tasks that should be visible/spawned
     #[serde(default)]
     pub spawned: Vec<TaskExpectation>,
+    /// Expected descriptions of tasks that should be completed
     #[serde(default)]
     pub completed: Vec<String>,
+    /// If true, we expect no extra unexpected tasks to be visible
     #[serde(default)]
     pub no_unexpected: bool,
 }
 
+/// Expectation for a single task
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskExpectation {
+struct TaskExpectation {
+    /// Human-readable description to match against task descriptions
     pub description: String,
+    /// Optional expected status string for the task (e.g., Running, Completed)
     #[serde(skip_serializing_if = "Option::is_none")]
     pub status: Option<String>,
+    /// Whether the task is expected to report progress
     #[serde(skip_serializing_if = "Option::is_none")]
     pub has_progress: Option<bool>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct BackgroundTaskExpectations {
+struct BackgroundTaskExpectations {
+    /// Expectations for the embedding cache background process
     #[serde(skip_serializing_if = "Option::is_none")]
     pub embedding_cache: Option<EmbeddingCacheExpectation>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EmbeddingCacheExpectation {
+struct EmbeddingCacheExpectation {
+    /// Expected status of the embedding cache (e.g., running, complete)
     pub status: String,
+    /// Optional current progress value
     #[serde(skip_serializing_if = "Option::is_none")]
     pub progress: Option<u64>,
+    /// Optional total units for progress
     #[serde(skip_serializing_if = "Option::is_none")]
     pub total: Option<u64>,
+    /// Optional message associated with progress
     #[serde(skip_serializing_if = "Option::is_none")]
     pub message: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct UiStateExpectations {
+struct UiStateExpectations {
+    /// Optional snapshot filename to compare against rendered UI
     #[serde(skip_serializing_if = "Option::is_none")]
     pub snapshot: Option<String>,
+    /// Optional description of the currently active task
     #[serde(skip_serializing_if = "Option::is_none")]
     pub active_task: Option<String>,
+    /// Optional expected count of visible tasks
     #[serde(skip_serializing_if = "Option::is_none")]
     pub task_count: Option<usize>,
+    /// Whether any visible task is expected to report progress
     #[serde(skip_serializing_if = "Option::is_none")]
     pub has_progress: Option<bool>,
+    /// Optional expected focused pane identifier
     #[serde(skip_serializing_if = "Option::is_none")]
     pub focused_pane: Option<String>,
+    /// Optional expectations for visible tasks list
     #[serde(skip_serializing_if = "Option::is_none")]
     pub visible_tasks: Option<Vec<VisibleTaskExpectation>>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct VisibleTaskExpectation {
+struct VisibleTaskExpectation {
+    /// Description text of the task as shown in the UI
     pub description: String,
+    /// Status text of the task as shown in the UI
     pub status: String,
 }
 
+/// Expected event emitted by the system during a step
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct EventExpectation {
+struct EventExpectation {
+    /// Event type identifier
     #[serde(rename = "type")]
     pub event_type: String,
+    /// Arbitrary event payload
     #[serde(flatten)]
     pub data: Value,
 }
@@ -345,10 +396,10 @@ impl ScenarioRunner {
             .join(format!("{name}.json"));
 
         let content = fs::read_to_string(&path)
-            .map_err(|e| format!("Failed to read scenario {}: {}", path.display(), e))?;
+            .map_err(|error| format!("Failed to read scenario {}: {error}", path.display()))?;
 
-        let scenario: TestScenario = serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse scenario: {}", e))?;
+        let scenario: TestScenario =
+            from_str(&content).map_err(|error| format!("Failed to parse scenario: {error}"))?;
 
         Ok(Self {
             scenario,
@@ -357,9 +408,13 @@ impl ScenarioRunner {
     }
 
     /// Run the scenario
+    /// Runs the loaded scenario.
+    ///
+    /// # Errors
+    /// Returns an error if setup or any step execution fails.
     pub async fn run(mut self) -> Result<(), String> {
-        println!("\n=== Running Scenario: {} ===", self.scenario.name);
-        println!("Description: {}", self.scenario.description);
+        info!("\n=== Running Scenario: {} ===", self.scenario.name);
+        info!("Description: {}", self.scenario.description);
 
         // Set up initial state
         self.setup_initial_state()?;
@@ -367,49 +422,53 @@ impl ScenarioRunner {
         // Create UI app
         let (width, height) = self.scenario.config.terminal_size;
         let (mut app, _ui_channel) = create_test_app(width, height)
-            .map_err(|e| format!("Failed to create test app: {}", e))?;
+            .map_err(|error| format!("Failed to create test app: {error}"))?;
 
         // Initialize vector cache if enabled
         if self.scenario.config.enable_vector_cache {
-            self.initialize_vector_cache(&mut app)?;
+            self.initialize_vector_cache(&mut app);
             // Tick to render the initial state
             app.tick()
-                .map_err(|e| format!("Tick failed after vector cache init: {}", e))?;
+                .map_err(|error| format!("Tick failed after vector cache init: {error}"))?;
         }
 
         // Execute each step
         for step in &self.scenario.steps {
-            println!("\n--- Step {} ---", step.step);
+            info!("\n--- Step {} ---", step.step);
             self.execute_step(&mut app, step).await?;
         }
 
-        println!("\n✓ Scenario completed successfully");
+        info!("\n✓ Scenario completed successfully");
         Ok(())
     }
 
+    /// Sets up initial state such as workspace files.
+    ///
+    /// # Errors
+    /// Returns an error if temporary directories or files cannot be created.
     fn setup_initial_state(&mut self) -> Result<(), String> {
         // Create workspace files if needed
         if !self.scenario.initial_state.workspace_files.is_empty() {
-            let temp_dir = tempfile::TempDir::new()
-                .map_err(|e| format!("Failed to create temp dir: {}", e))?;
+            let temp_dir =
+                TempDir::new().map_err(|error| format!("Failed to create temp dir: {error}"))?;
 
             for file in &self.scenario.initial_state.workspace_files {
                 let file_path = temp_dir.path().join(&file.path);
                 if let Some(parent) = file_path.parent() {
                     fs::create_dir_all(parent)
-                        .map_err(|e| format!("Failed to create dir: {}", e))?;
+                        .map_err(|error| format!("Failed to create dir: {error}"))?;
                 }
                 fs::write(&file_path, &file.content)
-                    .map_err(|e| format!("Failed to write file: {}", e))?;
+                    .map_err(|error| format!("Failed to write file: {error}"))?;
             }
 
             self.workspace_dir = Some(temp_dir.path().to_path_buf());
         }
-
         Ok(())
     }
 
-    fn initialize_vector_cache(&self, app: &mut impl TestApp) -> Result<(), String> {
+    /// Initializes vector cache progress if enabled.
+    fn initialize_vector_cache(&self, app: &mut impl TestApp) {
         // Create embedding cache task
         let task_id = TaskId::default();
         let mut task = create_test_task("Building embedding index");
@@ -428,33 +487,35 @@ impl ScenarioRunner {
         app.task_manager_mut().add_task(task_id, task);
         app.state_mut().active_running_tasks.insert(task_id);
         app.state_mut().active_task_id = Some(task_id);
-
-        Ok(())
     }
 
+    /// Executes a single step in the scenario.
+    ///
+    /// # Errors
+    /// Returns an error if the action or expectation verification fails.
     async fn execute_step(&self, app: &mut impl TestApp, step: &TestStep) -> Result<(), String> {
         // Execute action
         match &step.action {
             StepAction::UserInput { data } => {
-                self.execute_user_input(app, data)?;
+                Self::execute_user_input(app, data)?;
             }
             StepAction::AgentResponse { data } => {
-                self.execute_agent_response(app, data)?;
+                Self::execute_agent_response(app, data);
             }
             StepAction::ToolResult { data } => {
-                self.execute_tool_result(app, data)?;
-            }
-            StepAction::Wait { data } => {
-                tokio::time::sleep(Duration::from_millis(data.duration_ms)).await;
+                Self::execute_tool_result(app, data);
             }
             StepAction::BackgroundEvent { data } => {
-                self.execute_background_event(app, data)?;
+                Self::execute_background_event(app, data);
+            }
+            StepAction::Wait { data } => {
+                sleep(Duration::from_millis(data.duration_ms)).await;
             }
         }
 
         // Always tick after an action to render the UI
         app.tick()
-            .map_err(|e| format!("Tick failed after action: {}", e))?;
+            .map_err(|error| format!("Tick failed after action: {error}"))?;
 
         // Verify expectations
         self.verify_expectations(app, &step.expectations)?;
@@ -462,38 +523,34 @@ impl ScenarioRunner {
         Ok(())
     }
 
-    fn execute_user_input(
-        &self,
-        app: &mut impl TestApp,
-        data: &UserInputData,
-    ) -> Result<(), String> {
-        println!("  User input: {}", data.text);
+    /// Executes a user input action.
+    ///
+    /// # Errors
+    /// Returns an error if ticking the app after input fails.
+    fn execute_user_input(app: &mut impl TestApp, data: &UserInputData) -> Result<(), String> {
+        info!("  User input: {}", data.text);
 
         // Create events for typing
-        let mut events: Vec<crossterm::event::Event> = data
+        let mut events: Vec<Event> = data
             .text
             .chars()
-            .map(|ch| {
-                crossterm::event::Event::Key(crossterm::event::KeyEvent::new(
-                    crossterm::event::KeyCode::Char(ch),
-                    crossterm::event::KeyModifiers::NONE,
-                ))
+            .map(|char_value| {
+                Event::Key(KeyEvent::new(KeyCode::Char(char_value), KeyModifiers::NONE))
             })
             .collect();
 
         // Add Enter key if submitting
         if data.submit {
-            events.push(crossterm::event::Event::Key(
-                crossterm::event::KeyEvent::new(
-                    crossterm::event::KeyCode::Enter,
-                    crossterm::event::KeyModifiers::NONE,
-                ),
-            ));
+            events.push(Event::Key(KeyEvent::new(
+                KeyCode::Enter,
+                KeyModifiers::NONE,
+            )));
         }
 
         // Set the event source and tick
         app.set_event_source(Box::new(TestEventSource::with_events(events)));
-        app.tick().map_err(|e| format!("Tick failed: {}", e))?;
+        app.tick()
+            .map_err(|error| format!("Tick failed: {error}"))?;
 
         // If input was submitted, create a task for it
         if data.submit {
@@ -509,12 +566,12 @@ impl ScenarioRunner {
         Ok(())
     }
 
-    fn execute_agent_response(
-        &self,
-        app: &mut impl TestApp,
-        data: &AgentResponseData,
-    ) -> Result<(), String> {
-        println!("  Agent: {}", data.text);
+    /// Executes an agent response and updates tasks.
+    ///
+    /// # Errors
+    /// Returns an error if updating UI state fails.
+    fn execute_agent_response(app: &mut impl TestApp, data: &AgentResponseData) {
+        info!("  Agent: {}", data.text);
         // Create task for agent response
         let task_id = TaskId::default();
         let mut task = create_test_task(&data.text);
@@ -538,29 +595,26 @@ impl ScenarioRunner {
             app.task_manager_mut().add_task(subtask_id, subtask);
             app.state_mut().active_running_tasks.insert(subtask_id);
         }
-
-        Ok(())
     }
 
-    fn execute_tool_result(
-        &self,
-        _app: &mut impl TestApp,
-        data: &ToolResultData,
-    ) -> Result<(), String> {
-        println!(
+    /// Emits a tool result to logs.
+    ///
+    /// # Errors
+    /// Never returns an error.
+    fn execute_tool_result(_app: &mut impl TestApp, data: &ToolResultData) {
+        info!(
             "  Tool {}: {}",
             data.tool,
             if data.success { "SUCCESS" } else { "FAILED" }
         );
-        Ok(())
     }
 
-    fn execute_background_event(
-        &self,
-        app: &mut impl TestApp,
-        data: &BackgroundEventData,
-    ) -> Result<(), String> {
-        println!(
+    /// Executes a simulated background event such as progress.
+    ///
+    /// # Errors
+    /// Returns an error if state updates fail.
+    fn execute_background_event(app: &mut impl TestApp, data: &BackgroundEventData) {
+        info!(
             "  Background event: {} ({}/{})",
             data.event_type, data.progress, data.total
         );
@@ -581,9 +635,12 @@ impl ScenarioRunner {
             app.state_mut().active_running_tasks.insert(task_id);
             app.state_mut().active_task_id = Some(task_id);
         }
-
-        Ok(())
     }
+
+    /// Verifies expectations for a step.
+    ///
+    /// # Errors
+    /// Returns an error if any expectation fails.
     fn verify_expectations(
         &self,
         app: &impl TestApp,
@@ -591,12 +648,12 @@ impl ScenarioRunner {
     ) -> Result<(), String> {
         // Verify tasks
         if let Some(task_exp) = &expectations.tasks {
-            self.verify_tasks(app, task_exp)?;
+            Self::verify_tasks(app, task_exp)?;
         }
 
         // Verify background tasks
         if let Some(bg_exp) = &expectations.background_tasks {
-            self.verify_background_tasks(app, bg_exp)?;
+            Self::verify_background_tasks(app, bg_exp)?;
         }
 
         // Verify UI state
@@ -607,21 +664,19 @@ impl ScenarioRunner {
         Ok(())
     }
 
-    fn verify_tasks(
-        &self,
-        app: &impl TestApp,
-        expectations: &TaskExpectations,
-    ) -> Result<(), String> {
+    /// Verifies expected task presence and unexpected tasks.
+    ///
+    /// # Errors
+    /// Returns an error if verification fails.
+    fn verify_tasks(app: &impl TestApp, expectations: &TaskExpectations) -> Result<(), String> {
         let visible_tasks = app.task_manager().get_visible_tasks();
 
         // Verify spawned tasks
         for expected in &expectations.spawned {
             let found = visible_tasks.iter().any(|task_id| {
-                if let Some(task) = app.task_manager().get_task(*task_id) {
-                    task.description.contains(&expected.description)
-                } else {
-                    false
-                }
+                app.task_manager()
+                    .get_task(*task_id)
+                    .is_some_and(|task| task.description.contains(&expected.description))
             });
 
             if !found {
@@ -641,12 +696,15 @@ impl ScenarioRunner {
             ));
         }
 
-        println!("  ✓ Task expectations met");
+        info!("  ✓ Task expectations met");
         Ok(())
     }
 
+    /// Verifies background task expectations.
+    ///
+    /// # Errors
+    /// Returns an error if expectations are not met.
     fn verify_background_tasks(
-        &self,
         app: &impl TestApp,
         expectations: &BackgroundTaskExpectations,
     ) -> Result<(), String> {
@@ -657,12 +715,16 @@ impl ScenarioRunner {
                 return Err("Expected embedding cache to be running".to_string());
             }
 
-            println!("  ✓ Background task expectations met");
+            info!("  ✓ Background task expectations met");
         }
 
         Ok(())
     }
 
+    /// Verifies UI state expectations and optional snapshot.
+    ///
+    /// # Errors
+    /// Returns an error if verification fails.
     fn verify_ui_state(
         &self,
         app: &impl TestApp,
@@ -673,8 +735,7 @@ impl ScenarioRunner {
             let actual_count = app.task_manager().get_visible_tasks().len();
             if actual_count != expected_count {
                 return Err(format!(
-                    "Expected {} tasks, got {}",
-                    expected_count, actual_count
+                    "Expected {expected_count} tasks, got {actual_count}"
                 ));
             }
         }
@@ -684,8 +745,7 @@ impl ScenarioRunner {
             let actual_progress = app.task_manager().has_tasks_with_progress();
             if actual_progress != expected_progress {
                 return Err(format!(
-                    "Expected has_progress={}, got {}",
-                    expected_progress, actual_progress
+                    "Expected has_progress={expected_progress}, got {actual_progress}"
                 ));
             }
         }
@@ -695,10 +755,17 @@ impl ScenarioRunner {
             self.verify_snapshot(app, snapshot_name)?;
         }
 
-        println!("  ✓ UI state expectations met");
+        info!("  ✓ UI state expectations met");
         Ok(())
     }
 
+    /// Verifies a snapshot of the UI buffer.
+    ///
+    /// # Panics
+    /// Panics in debug logging if snapshot path relativization fails (only in logging).
+    ///
+    /// # Errors
+    /// Returns an error if the snapshot is missing or cannot be read.
     fn verify_snapshot(&self, app: &impl TestApp, snapshot_name: &str) -> Result<(), String> {
         // Render UI to string
         let buffer = app.backend().buffer();
@@ -735,7 +802,7 @@ impl ScenarioRunner {
                     .join("snapshots")
                     .join(scenario_category)
                     .join(scenario_name)
-                    .join(format!("step{}.txt", step_num))
+                    .join(format!("step{step_num}.txt"))
             } else {
                 PathBuf::from(env!("CARGO_MANIFEST_DIR"))
                     .join("tests")
@@ -755,23 +822,21 @@ impl ScenarioRunner {
         };
 
         // Check if UPDATE_SNAPSHOTS env var is set
-        if std::env::var("UPDATE_SNAPSHOTS").is_ok() {
+        if env::var("UPDATE_SNAPSHOTS").is_ok() {
             // Create parent directories if they don't exist
             if let Some(parent) = snapshot_path.parent() {
                 fs::create_dir_all(parent)
-                    .map_err(|e| format!("Failed to create snapshots dir: {}", e))?;
+                    .map_err(|error| format!("Failed to create snapshots dir: {error}"))?;
             }
             fs::write(&snapshot_path, &rendered)
-                .map_err(|e| format!("Failed to write snapshot: {}", e))?;
-            println!(
-                "  ✓ Updated snapshot: {}",
-                snapshot_path
-                    .strip_prefix(
-                        PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/snapshots")
-                    )
-                    .unwrap()
-                    .display()
+                .map_err(|error| format!("Failed to write snapshot: {error}"))?;
+            let base_snap =
+                PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/snapshots");
+            let rel_display = snapshot_path.strip_prefix(base_snap).map_or_else(
+                |_| snapshot_path.display().to_string(),
+                |path_value| path_value.display().to_string(),
             );
+            info!("  ✓ Updated snapshot: {rel_display}");
             return Ok(());
         }
 
@@ -783,7 +848,7 @@ impl ScenarioRunner {
             ));
         }
 
-        println!("  ✓ UI snapshot: {}", snapshot_name);
+        info!("  ✓ UI snapshot: {}", snapshot_name);
         Ok(())
     }
 
@@ -811,46 +876,36 @@ impl ScenarioRunner {
 
 /// Trait for accessing app internals in tests
 trait TestApp {
-    fn task_manager(&self) -> &merlin_routing::user_interface::task_manager::TaskManager;
-    fn task_manager_mut(
-        &mut self,
-    ) -> &mut merlin_routing::user_interface::task_manager::TaskManager;
-    fn state_mut(&mut self) -> &mut merlin_routing::user_interface::state::UiState;
-    fn set_event_source(
-        &mut self,
-        source: Box<dyn merlin_routing::user_interface::event_source::InputEventSource + Send>,
-    );
-    fn tick(&mut self) -> merlin_routing::Result<bool>;
-    fn backend(&self) -> &ratatui::backend::TestBackend;
+    fn task_manager(&self) -> &TaskManager;
+    fn task_manager_mut(&mut self) -> &mut TaskManager;
+    fn state_mut(&mut self) -> &mut UiState;
+    fn set_event_source(&mut self, source: Box<dyn UiInputEventSource + Send>);
+    fn tick(&mut self) -> RoutingResult<bool>;
+    fn backend(&self) -> &TestBackend;
 }
 
-impl TestApp for merlin_routing::user_interface::TuiApp<ratatui::backend::TestBackend> {
-    fn task_manager(&self) -> &merlin_routing::user_interface::task_manager::TaskManager {
+impl TestApp for TuiApp<TestBackend> {
+    fn task_manager(&self) -> &TaskManager {
         self.task_manager()
     }
 
-    fn task_manager_mut(
-        &mut self,
-    ) -> &mut merlin_routing::user_interface::task_manager::TaskManager {
+    fn task_manager_mut(&mut self) -> &mut TaskManager {
         self.task_manager_mut()
     }
 
-    fn state_mut(&mut self) -> &mut merlin_routing::user_interface::state::UiState {
+    fn state_mut(&mut self) -> &mut UiState {
         self.state_mut()
     }
 
-    fn set_event_source(
-        &mut self,
-        source: Box<dyn merlin_routing::user_interface::event_source::InputEventSource + Send>,
-    ) {
-        self.set_event_source(source)
+    fn set_event_source(&mut self, source: Box<dyn UiInputEventSource + Send>) {
+        self.set_event_source(source);
     }
 
-    fn tick(&mut self) -> merlin_routing::Result<bool> {
+    fn tick(&mut self) -> RoutingResult<bool> {
         self.tick()
     }
 
-    fn backend(&self) -> &ratatui::backend::TestBackend {
+    fn backend(&self) -> &TestBackend {
         self.backend()
     }
 }

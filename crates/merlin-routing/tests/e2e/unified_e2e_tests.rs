@@ -5,12 +5,36 @@
 //!
 //! This test automatically discovers and runs all .json files in the scenarios directory.
 
-#[path = "../scenario_runner.rs"]
-mod scenario_runner;
-
-use scenario_runner::ScenarioRunner;
+use super::scenario_runner::ScenarioRunner;
 use std::fs;
 use std::path::PathBuf;
+use tracing::info;
+
+/// Recursively scan a directory for `.json` files and collect scenario names.
+fn scan_dir(dir: &PathBuf, base: &PathBuf, scenarios: &mut Vec<String>) {
+    if let Ok(entries) = fs::read_dir(dir) {
+        for entry in entries.flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                scan_dir(&path, base, scenarios);
+                continue;
+            }
+
+            if path.extension().and_then(|ext| ext.to_str()) == Some("json")
+                && let Ok(relative) = path.strip_prefix(base)
+                && let Some(relative_str) = relative.to_str()
+            {
+                let scenario_name = relative_str
+                    .replace('\\', "/")
+                    .trim_end_matches(".json")
+                    .to_string();
+                if !scenario_name.contains("SCHEMA") {
+                    scenarios.push(scenario_name);
+                }
+            }
+        }
+    }
+}
 
 /// Discovers all JSON scenario files in the fixtures/scenarios directory (including subdirectories)
 fn discover_scenarios() -> Vec<String> {
@@ -20,81 +44,67 @@ fn discover_scenarios() -> Vec<String> {
         .join("scenarios");
 
     let mut scenarios = Vec::new();
-
-    fn scan_dir(dir: &PathBuf, base: &PathBuf, scenarios: &mut Vec<String>) {
-        if let Ok(entries) = fs::read_dir(dir) {
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.is_dir() {
-                    scan_dir(&path, base, scenarios);
-                } else if path.extension().and_then(|s| s.to_str()) == Some("json") {
-                    if let Ok(relative) = path.strip_prefix(base) {
-                        if let Some(relative_str) = relative.to_str() {
-                            // Convert path to forward slashes and remove .json extension
-                            let scenario_name = relative_str
-                                .replace('\\', "/")
-                                .trim_end_matches(".json")
-                                .to_string();
-                            if !scenario_name.contains("SCHEMA") {
-                                scenarios.push(scenario_name);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-
     scan_dir(&scenarios_dir, &scenarios_dir, &mut scenarios);
     scenarios.sort();
     scenarios
 }
 
-#[tokio::test]
-async fn run_all_json_scenarios() {
-    let scenarios = discover_scenarios();
+/// Runs all discovered JSON scenarios.
+///
+/// # Panics
+/// Panics if no scenarios are discovered or if any scenario fails.
+#[cfg(test)]
+mod tests {
+    use super::*;
 
-    if scenarios.is_empty() {
-        panic!("No JSON scenarios found in tests/fixtures/scenarios/");
-    }
+    #[tokio::test]
+    async fn run_all_json_scenarios() {
+        let scenarios = discover_scenarios();
 
-    println!("\nDiscovered {} scenarios:", scenarios.len());
-    for scenario in &scenarios {
-        println!("  - {}", scenario);
-    }
-    println!();
+        assert!(
+            !scenarios.is_empty(),
+            "No JSON scenarios found in tests/fixtures/scenarios/"
+        );
 
-    let mut passed = 0;
-    let mut failed = Vec::new();
+        info!("\nDiscovered {} scenarios:", scenarios.len());
+        for scenario in &scenarios {
+            info!("  - {scenario}");
+        }
+        info!("");
 
-    for scenario_name in &scenarios {
-        println!("\n{}", "=".repeat(60));
-        match ScenarioRunner::load(scenario_name) {
-            Ok(runner) => match runner.run().await {
-                Ok(()) => {
-                    passed += 1;
-                    println!("✓ {} PASSED", scenario_name);
+        let mut passed = 0;
+        let mut failed = Vec::new();
+
+        for scenario_name in &scenarios {
+            info!("\n{}", "=".repeat(60));
+            match ScenarioRunner::load(scenario_name) {
+                Ok(runner) => match runner.run().await {
+                    Ok(()) => {
+                        passed += 1;
+                        info!("✓ {scenario_name} PASSED");
+                    }
+                    Err(error) => {
+                        failed.push((scenario_name.clone(), error.clone()));
+                        info!("✗ {scenario_name} FAILED: {error}");
+                    }
+                },
+                Err(error) => {
+                    failed.push((scenario_name.clone(), format!("Failed to load: {error}")));
+                    info!("✗ {scenario_name} FAILED TO LOAD: {error}");
                 }
-                Err(e) => {
-                    failed.push((scenario_name.clone(), e.clone()));
-                    println!("✗ {} FAILED: {}", scenario_name, e);
-                }
-            },
-            Err(e) => {
-                failed.push((scenario_name.clone(), format!("Failed to load: {}", e)));
-                println!("✗ {} FAILED TO LOAD: {}", scenario_name, e);
             }
         }
-    }
 
-    println!("\n{}", "=".repeat(60));
-    println!("Results: {} passed, {} failed", passed, failed.len());
+        info!("\n{}", "=".repeat(60));
+        let failed_count = failed.len();
+        info!("Results: {passed} passed, {failed_count} failed");
 
-    if !failed.is_empty() {
-        println!("\nFailed scenarios:");
-        for (name, error) in &failed {
-            println!("  ✗ {}: {}", name, error);
+        if !failed.is_empty() {
+            info!("\nFailed scenarios:");
+            for (name, error) in &failed {
+                info!("  ✗ {name}: {error}");
+            }
+            panic!("{} scenario(s) failed", failed.len());
         }
-        panic!("{} scenario(s) failed", failed.len());
     }
 }

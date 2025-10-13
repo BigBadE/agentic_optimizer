@@ -14,9 +14,8 @@
         reason = "Test allows"
     )
 )]
-mod common;
 
-use common::*;
+use crate::common::*;
 use merlin_routing::TaskId;
 use merlin_routing::user_interface::events::{MessageLevel, TaskProgress, UiEvent};
 use merlin_routing::user_interface::output_tree::StepType;

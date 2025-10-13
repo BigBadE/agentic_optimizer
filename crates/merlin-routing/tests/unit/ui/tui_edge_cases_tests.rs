@@ -14,15 +14,12 @@
         reason = "Test allows"
     )
 )]
-mod common;
-
-use common::*;
+use crate::common::*;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use merlin_routing::TaskId;
 use merlin_routing::user_interface::output_tree::{OutputTree, StepType};
 use merlin_routing::user_interface::task_manager::TaskManager;
 use merlin_routing::user_interface::{EmojiMode, calculate_width as ui_calculate_width};
-
 #[test]
 fn test_task_manager_navigation_empty() {
     let manager = TaskManager::default();

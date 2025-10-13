@@ -26,8 +26,6 @@ use std::fs::canonicalize;
 use std::path::PathBuf;
 use tempfile::TempDir;
 
-mod common;
-
 #[tokio::test]
 async fn test_orchestrator_basic() {
     let config = RoutingConfig::default();

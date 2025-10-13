@@ -14,7 +14,6 @@
         reason = "Test allows"
     )
 )]
-mod common;
 
 use async_trait::async_trait;
 use merlin_core::{Response, TokenUsage};

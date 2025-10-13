@@ -15,9 +15,7 @@
     )
 )]
 
-mod common;
-
-use common::*;
+use crate::common::*;
 
 #[test]
 fn test_repeated_autowrap_no_corruption() {

@@ -14,7 +14,6 @@
         reason = "Test allows"
     )
 )]
-mod common;
 
 use merlin_routing::{
     ContextRequirements, FileChange, Task, TaskId,

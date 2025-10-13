@@ -14,7 +14,6 @@
         reason = "Test allows"
     )
 )]
-mod common;
 
 use merlin_routing::user_interface::output_tree::{OutputNode, OutputTree, StepType};
 use serde_json::json;
@@ -22,7 +21,6 @@ use serde_json::json;
 #[test]
 fn test_add_step() {
     let mut tree = OutputTree::default();
-
     tree.add_step(
         "step1".to_owned(),
         StepType::Thinking,

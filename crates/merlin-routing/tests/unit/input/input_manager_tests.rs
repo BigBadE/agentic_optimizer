@@ -14,9 +14,8 @@
         reason = "Test allows"
     )
 )]
-mod common;
 
-use common::*;
+use crate::common::*;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 
 #[test]

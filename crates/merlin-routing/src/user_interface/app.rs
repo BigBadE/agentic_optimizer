@@ -224,13 +224,11 @@ impl<B: Backend> TuiApp<B> {
         let should_force_render =
             has_active_progress && time_since_render >= Duration::from_millis(50);
 
-        if should_force_render {
-            self.render()?;
-            self.last_render_time = Instant::now();
-        } else {
-            self.render()?;
-            self.last_render_time = Instant::now();
-        }
+        // Unconditionally render once at the end of the tick loop to keep UI fresh.
+        // The previous conditional branches were identical.
+        let _ = should_force_render; // document the intent without branching
+        self.render()?;
+        self.last_render_time = Instant::now();
 
         Ok(false)
     }

@@ -1,0 +1,30 @@
+{
+  "name": "TypeScript Control Flow",
+  "description": "Tests TypeScript with loops and conditionals in task display",
+  "config": {
+    "terminal_size": [80, 24],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "agent_response",
+        "data": {
+          "text": "Computing sum with loop: for (let i = 1; i <= 5; i++) sum += i",
+          "tool_calls": [],
+          "subtasks": []
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "snapshot": "typescript_control_flow.txt"
+        }
+      }
+    }
+  ]
+}

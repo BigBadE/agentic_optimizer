@@ -1,14 +1,8 @@
 ┌─── Tasks ────────────────────────────────────────────────────────────────────┐
-│[◉] The config.json file contains:- name: test-app- version: 1.0.0            │
-│ ├─ [▶] Read config.json and tell me what's in it                             │
-│ └─ [◉] I'll read the config.json file for you.                               │
+│[◉] Computing sum with loop: for (let i = 1; i <= 5; i++) sum += i            │
 └──────────────────────────────────────────────────────────────────────────────┘
-┌─── Focused - The config.json file contains:- name: test-app- version: 1.0....┐
+┌─── Focused - Computing sum with loop: for (let i = 1; i <= 5; i++) sum += i ─┐
 │ No output yet...                                                             │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │

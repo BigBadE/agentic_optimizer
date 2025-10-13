@@ -1,14 +1,8 @@
 ┌─── Tasks ────────────────────────────────────────────────────────────────────┐
-│[◉] The config.json file contains:- name: test-app- version: 1.0.0            │
-│ ├─ [▶] Read config.json and tell me what's in it                             │
-│ └─ [◉] I'll read the config.json file for you.                               │
+│[◉] Executing TypeScript: const x = 1 + 1; x * 2                              │
 └──────────────────────────────────────────────────────────────────────────────┘
-┌─── Focused - The config.json file contains:- name: test-app- version: 1.0....┐
+┌─── Focused - Executing TypeScript: const x = 1 + 1; x * 2 ───────────────────┐
 │ No output yet...                                                             │
-│                                                                              │
-│                                                                              │
-│                                                                              │
-│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │

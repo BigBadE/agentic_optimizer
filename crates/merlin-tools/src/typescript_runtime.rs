@@ -14,8 +14,9 @@ use rquickjs::{
 use serde_json::{Map as JsonMap, Number as JsonNumber, Value, json};
 use std::collections::HashMap;
 use std::fmt::Write as _;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Duration;
+use tokio::runtime::{Handle as TokioHandle, Runtime as TokioRuntime};
 
 use crate::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};
 
@@ -106,19 +107,14 @@ impl TypeScriptRuntime {
     ) -> ToolResult<()> {
         let globals = ctx.globals();
 
-        // Create a shared state for tool execution results
-        let tool_results: Arc<Mutex<Vec<ToolOutput>>> = Arc::new(Mutex::new(Vec::new()));
-
         for (tool_name, tool) in tools {
             let tool_clone = Arc::clone(&tool);
-            let results_clone = Arc::clone(&tool_results);
 
-            // Create an async function wrapper for each tool
+            // Create a function wrapper for each tool that executes it synchronously
             let func = Function::new(
                 ctx.clone(),
                 move |ctx: Ctx<'js>, args: Rest<JsValue<'js>>| {
                     let tool_inner = Arc::clone(&tool_clone);
-                    let results_inner = Arc::clone(&results_clone);
 
                     // Convert JS arguments to JSON
                     let json_args: Vec<Value> = args
@@ -138,21 +134,8 @@ impl TypeScriptRuntime {
 
                     let input = ToolInput { params };
 
-                    // Execute tool synchronously (we'll handle async later)
-                    // For now, we'll return a promise-like structure
-                    let result_json = json!({
-                        "pending": true,
-                        "tool": tool_inner.name(),
-                        "input": input.params
-                    });
-
-                    // Store for later execution
-                    results_inner
-                        .lock()
-                        .map_err(|_| QuickJsError::Unknown)?
-                        .push(ToolOutput::success("Pending execution"));
-
-                    json_to_js_value(&ctx, &result_json)
+                    // Execute tool and convert result
+                    Self::execute_tool_and_convert(&ctx, tool_inner, input)
                 },
             )
             .map_err(|err| {
@@ -165,6 +148,51 @@ impl TypeScriptRuntime {
         }
 
         Ok(())
+    }
+
+    /// Execute a tool and convert the result to a JavaScript value
+    ///
+    /// # Errors
+    /// Returns an error if tool execution or conversion fails
+    fn execute_tool_and_convert<'js>(
+        ctx: &Ctx<'js>,
+        tool: Arc<dyn Tool>,
+        input: ToolInput,
+    ) -> Result<JsValue<'js>, QuickJsError> {
+        // Execute tool synchronously
+        // Try to use current runtime, fall back to creating new one if needed
+        let result = if let Ok(handle) = TokioHandle::try_current() {
+            // We're in an async context, use the current runtime
+            handle.block_on(async move { tool.execute(input).await })
+        } else {
+            // No runtime available, create a new one
+            let runtime = TokioRuntime::new().map_err(|_| QuickJsError::Exception)?;
+            runtime.block_on(async move { tool.execute(input).await })
+        };
+
+        // Convert result to JSON
+        Self::convert_tool_result_to_js(ctx, result)
+    }
+
+    /// Convert a tool result to a JavaScript value
+    ///
+    /// # Errors
+    /// Returns an error if conversion fails
+    fn convert_tool_result_to_js<'js>(
+        ctx: &Ctx<'js>,
+        result: ToolResult<ToolOutput>,
+    ) -> Result<JsValue<'js>, QuickJsError> {
+        match result {
+            Ok(output) if output.success => {
+                // Return the data if available, otherwise the message
+                let result_value = output.data.unwrap_or_else(|| Value::String(output.message));
+                json_to_js_value(ctx, &result_value)
+            }
+            Ok(_) | Err(_) => {
+                // Tool failed or execution error, throw in JS
+                Err(QuickJsError::Exception)
+            }
+        }
     }
 
     /// Execute JavaScript code in the given context

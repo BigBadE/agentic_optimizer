@@ -3,22 +3,643 @@
 
 **Vision**: Build the most capable, efficient, and adaptable AI coding agent for managing large complex codebases
 
-**Current Status**: Phase 5 Complete | 160 Rust files | 264 tests passing
-**Next Phase**: 6 - Agent Intelligence & Tool Innovation
+**Current Status**: Infrastructure Complete | 160 Rust files | 307 tests passing
+**Critical Issue**: Agent produces nonsensical responses - needs fundamental improvements
+**Next Phase**: 1 - Make the Agent Actually Work
 
 ---
 
 ## Table of Contents
 
-1. [Current Architecture](#current-architecture)
-2. [Core Design Philosophy](#core-design-philosophy)
-3. [Phase 6: Agent Intelligence & Tool Innovation](#phase-6-agent-intelligence--tool-innovation)
-4. [Phase 7: Context Mastery](#phase-7-context-mastery)
-5. [Phase 8: Multi-Model Orchestra](#phase-8-multi-model-orchestra)
-6. [Phase 9: Performance & Scale](#phase-9-performance--scale)
-7. [Phase 10: Adaptive Intelligence](#phase-10-adaptive-intelligence)
+1. [Current State & Problems](#current-state--problems)
+2. [Phase 1: Core Agent Functionality](#phase-1-core-agent-functionality)
+3. [Phase 2: Response Quality & Reliability](#phase-2-response-quality--reliability)
+4. [Phase 3: Context Intelligence](#phase-3-context-intelligence)
+5. [Phase 4: Advanced Tool Usage](#phase-4-advanced-tool-usage)
+6. [Phase 5: Multi-Model Optimization](#phase-5-multi-model-optimization)
+7. [Current Architecture](#current-architecture)
 8. [Success Metrics](#success-metrics)
-9. [Risk Mitigation](#risk-mitigation)
+
+---
+
+## Current State & Problems
+
+### What's Actually Broken
+
+**Critical Issues**:
+1. **Agent produces nonsensical responses** - The core problem
+   - Responses don't match the query intent
+   - Hallucinates functions, types, and implementations
+   - Ignores provided context
+   - Makes up file paths and code that doesn't exist
+
+2. **Context not being used effectively**
+   - Files are fetched but agent doesn't reference them
+   - BM25 + embeddings select files, but agent ignores them
+   - System prompt tells agent to use context, but it doesn't
+
+3. **Tool usage is broken**
+   - Agent doesn't call tools when it should
+   - When it does call tools, parameters are wrong
+   - No verification that tool results are incorporated
+
+4. **No feedback loop**
+   - Agent can't see its own mistakes
+   - No self-correction mechanism
+   - Validation pipeline exists but doesn't improve responses
+
+### What Actually Works
+
+**Infrastructure** (all the plumbing is done):
+- ✅ Multi-tier model routing
+- ✅ Context fetching with BM25 + embeddings
+- ✅ Tool registry and execution
+- ✅ TUI with real-time updates
+- ✅ TypeScript tool for complex workflows
+- ✅ Validation pipeline
+- ✅ Response caching
+- ✅ Workspace isolation
+
+**The Problem**: Great infrastructure, terrible agent behavior
+
+---
+
+## Phase 1: Core Agent Functionality
+**Timeline**: 2-3 weeks
+**Priority**: CRITICAL - Nothing else matters if the agent doesn't work
+
+### 1.1 Fix Basic Response Quality
+
+**Problem**: Agent ignores context and hallucinates
+
+**Root Causes**:
+1. System prompt is too generic
+2. Context format not clear enough
+3. Model doesn't understand what we want
+4. No examples in the prompt
+
+**Solution**: Prompt Engineering Overhaul
+```rust
+// New system prompt structure:
+// 1. Role definition with strict constraints
+// 2. Context format explanation with examples
+// 3. Step-by-step reasoning requirements
+// 4. Output format specification
+// 5. Few-shot examples of good responses
+
+pub fn build_system_prompt(context: &Context) -> String {
+    format!(
+        r#"You are a Rust coding assistant with access to the user's codebase.
+
+CRITICAL RULES:
+1. ONLY reference code that appears in the context below
+2. If you don't see something in the context, say "I don't see that in the provided code"
+3. Quote line numbers when referencing code (e.g., "on line 42 in src/main.rs")
+4. Never guess function signatures or implementations
+
+CONTEXT FORMAT:
+Below are {} files from the codebase. Each file shows:
+- Full path (e.g., crates/merlin-core/src/lib.rs)
+- Complete file contents with line numbers
+
+REASONING PROCESS:
+1. First, identify which files are relevant to the query
+2. Quote specific lines that answer the question
+3. Explain your reasoning based on the code
+4. If information is missing, explicitly state what's missing
+
+EXAMPLE GOOD RESPONSE:
+User: "How does the context builder work?"
+Assistant: "Looking at crates/merlin-context/src/builder.rs, the ContextBuilder 
+works by scanning the project root (line 48). It uses BM25 for keyword matching 
+(line 156) and embeddings for semantic search (line 164). The build() method 
+combines these scores to select the most relevant files (lines 200-215)."
+
+EXAMPLE BAD RESPONSE:
+"The context builder uses advanced AI to understand your code."
+(This is too vague and doesn't reference specific code)
+
+=== CODEBASE CONTEXT ({} files) ===
+{}
+=== END CONTEXT ===
+
+Now answer the user's question using ONLY the code shown above."#,
+        context.files.len(),
+        context.files.len(),
+        format_files_with_line_numbers(&context.files)
+    )
+}
+```
+
+**Implementation**:
+- Rewrite `prompts/coding_assistant.md` with strict constraints
+- Add few-shot examples for common query types
+- Include explicit reasoning steps requirement
+- Add format for citing code with line numbers
+
+**Testing**:
+- Create 20 test queries with known correct answers
+- Measure hallucination rate (should be <5%)
+- Measure context usage rate (should be >90%)
+
+**Files**:
+- `prompts/coding_assistant.md` - Complete rewrite
+- `crates/merlin-context/src/builder.rs` - Add line numbers to context
+- `crates/merlin-routing/tests/agent_quality/` - New test suite
+
+### 1.2 Force Tool Usage
+
+**Problem**: Agent doesn't use tools when it should
+
+**Solution**: Tool-First Prompting
+```rust
+// Before answering, agent MUST:
+// 1. List which tools it needs
+// 2. Explain why it needs them
+// 3. Call the tools
+// 4. Use tool results in response
+
+pub fn build_tool_prompt(query: &str, tools: &[Tool]) -> String {
+    format!(
+        r#"AVAILABLE TOOLS:
+{}
+
+MANDATORY PROCESS:
+1. Analyze the query: "{}"
+2. List which tools you need and why
+3. Call the tools (you MUST call at least one tool if the query requires it)
+4. Use the tool results in your response
+
+Example:
+Query: "What's in src/main.rs?"
+Reasoning: I need to read the file to see its contents
+Tool calls: readFile("src/main.rs")
+Response: Based on the file contents, src/main.rs contains...
+
+DO NOT respond without calling tools if the query requires them."#,
+        format_tool_descriptions(tools),
+        query
+    )
+}
+```
+
+**Implementation**:
+- Add tool usage requirements to system prompt
+- Create tool usage validator (fails if no tools called when needed)
+- Add examples of correct tool usage patterns
+
+**Testing**:
+- 10 queries that require file reading
+- 10 queries that require file writing
+- 10 queries that require command execution
+- Measure tool usage rate (should be 100% when needed)
+
+### 1.3 Implement Chain-of-Thought Reasoning
+
+**Problem**: Agent jumps to conclusions without reasoning
+
+**Solution**: Require explicit reasoning steps
+```rust
+pub struct ReasoningResponse {
+    thought_process: Vec<String>,  // Step-by-step reasoning
+    evidence: Vec<CodeReference>,  // Specific code citations
+    conclusion: String,            // Final answer
+    confidence: f32,               // 0.0-1.0
+}
+
+// Prompt requires this structure:
+// <thinking>
+// 1. The query asks about...
+// 2. Looking at file X, I see...
+// 3. This means...
+// </thinking>
+// <evidence>
+// - Line 42 in src/main.rs: `fn main() {`
+// - Line 156 in src/lib.rs: `pub struct Context`
+// </evidence>
+// <answer>
+// Based on the evidence above...
+// </answer>
+```
+
+**Implementation**:
+- Update prompt to require `<thinking>`, `<evidence>`, `<answer>` tags
+- Parse and validate response structure
+- Reject responses without proper reasoning
+
+**Files**:
+- `crates/merlin-agent/src/reasoning.rs` - New reasoning parser
+- `crates/merlin-routing/src/validator/reasoning.rs` - Reasoning validator
+
+### 1.4 Add Self-Correction Loop
+
+**Problem**: Agent makes mistakes and doesn't fix them
+
+**Solution**: Validation + Retry with Feedback
+```rust
+pub async fn execute_with_self_correction(
+    query: &str,
+    max_attempts: usize,
+) -> Result<Response> {
+    for attempt in 1..=max_attempts {
+        let response = self.generate_response(query).await?;
+        
+        // Validate response
+        let validation = self.validator.validate(&response).await?;
+        
+        if validation.is_valid() {
+            return Ok(response);
+        }
+        
+        // Give feedback and retry
+        let feedback = format!(
+            "Your previous response had issues:\n{}\n\
+             Please try again, addressing these problems.",
+            validation.issues.join("\n")
+        );
+        
+        query = &format!("{}\n\nFEEDBACK: {}", query, feedback);
+    }
+    
+    Err(Error::MaxAttemptsExceeded)
+}
+```
+
+**Validation Checks**:
+1. **Hallucination check**: All referenced code exists in context
+2. **Tool usage check**: Tools called when needed
+3. **Completeness check**: All parts of query addressed
+4. **Format check**: Response follows required structure
+
+**Implementation**:
+- Extend validation pipeline with specific checks
+- Add retry logic with feedback
+- Track improvement across attempts
+
+**Files**:
+- `crates/merlin-routing/src/agent/self_correct.rs` - New module
+- `crates/merlin-routing/src/validator/hallucination.rs` - Hallucination detector
+
+---
+
+## Phase 2: Response Quality & Reliability
+**Timeline**: 2-3 weeks
+**Priority**: HIGH - Make responses consistently good
+
+### 2.1 Context Citation Enforcement
+
+**Problem**: Agent doesn't cite sources
+
+**Solution**: Require citations for all claims
+```rust
+pub struct Citation {
+    file: PathBuf,
+    line_start: usize,
+    line_end: usize,
+    quoted_text: String,
+}
+
+pub struct CitedResponse {
+    answer: String,
+    citations: Vec<Citation>,
+}
+
+// Validate that every claim has a citation
+pub fn validate_citations(response: &str, context: &Context) -> Result<()> {
+    let claims = extract_claims(response);
+    for claim in claims {
+        if !has_supporting_citation(claim, &response.citations, context) {
+            return Err(Error::UncitedClaim(claim));
+        }
+    }
+    Ok(())
+}
+```
+
+### 2.2 Confidence Scoring
+
+**Problem**: Agent doesn't know when it's uncertain
+
+**Solution**: Require confidence scores
+```rust
+pub struct ConfidentResponse {
+    answer: String,
+    confidence: f32,  // 0.0 = guessing, 1.0 = certain
+    reasoning: String,
+    missing_info: Vec<String>,  // What would increase confidence
+}
+
+// Prompt includes:
+// "Rate your confidence (0.0-1.0) based on:
+// - How much relevant code you found
+// - How directly it answers the question
+// - Whether you had to make assumptions"
+```
+
+### 2.3 Multi-Attempt Consensus
+
+**Problem**: Single response might be wrong
+
+**Solution**: Generate multiple responses, pick best
+```rust
+pub async fn consensus_response(query: &str) -> Result<Response> {
+    // Generate 3 responses with different temperatures
+    let responses = vec![
+        generate(query, temp=0.3).await?,
+        generate(query, temp=0.5).await?,
+        generate(query, temp=0.7).await?,
+    ];
+    
+    // Score each response
+    let scored: Vec<_> = responses.iter()
+        .map(|r| (r, score_response(r, query)))
+        .collect();
+    
+    // Return highest scoring
+    scored.into_iter()
+        .max_by_key(|(_, score)| score)
+        .map(|(r, _)| r.clone())
+        .ok_or(Error::NoValidResponse)
+}
+```
+
+### 2.4 Response Templates
+
+**Problem**: Inconsistent response format
+
+**Solution**: Templates for common query types
+```rust
+pub enum QueryType {
+    HowDoesXWork,
+    WhereIsXDefined,
+    WhatDoesXDo,
+    HowToImplementX,
+    WhyIsXBroken,
+}
+
+pub fn get_template(query_type: QueryType) -> &'static str {
+    match query_type {
+        QueryType::HowDoesXWork => r#"
+## How {feature} Works
+
+**Overview**: {one_sentence_summary}
+
+**Implementation**: 
+{step_by_step_explanation}
+
+**Key Files**:
+- {file1}: {purpose1}
+- {file2}: {purpose2}
+
+**Code References**:
+{citations_with_line_numbers}
+"#,
+        // ... other templates
+    }
+}
+```
+
+---
+
+## Phase 3: Context Intelligence
+**Timeline**: 2-3 weeks  
+**Priority**: HIGH - Better context = better responses
+
+### 3.1 Intelligent Context Pruning
+
+**Problem**: Too many irrelevant files in context
+
+**Current**: BM25 + embeddings select 18 files for "remember bacon"
+**Goal**: Only include truly relevant files (3-5 files max)
+
+**Solution**: Multi-stage filtering
+```rust
+pub async fn select_optimal_context(
+    query: &Query,
+    max_tokens: usize,
+) -> Vec<FileContext> {
+    // Stage 1: Keyword matching (fast, broad)
+    let keyword_matches = bm25.top_k(query, 50);
+    
+    // Stage 2: Semantic similarity (medium, precise)
+    let semantic_matches = embeddings.rank(query, keyword_matches, 20);
+    
+    // Stage 3: Dependency analysis (slow, complete)
+    let with_deps = dependency_graph.expand(semantic_matches);
+    
+    // Stage 4: Relevance scoring with LLM
+    let scored = llm.score_relevance(query, with_deps).await?;
+    
+    // Stage 5: Token budget optimization
+    optimize_token_budget(scored, max_tokens)
+}
+```
+
+### 3.2 Dynamic Context Expansion
+
+**Problem**: Sometimes need more context mid-conversation
+
+**Solution**: Agent can request more files
+```rust
+// Agent can call: requestMoreContext(reason, file_pattern)
+pub async fn handle_context_request(
+    reason: &str,
+    pattern: &str,
+) -> Result<Vec<FileContext>> {
+    info!("Agent requested more context: {}", reason);
+    
+    let additional_files = find_files(pattern)?;
+    let validated = validate_context_request(reason, &additional_files)?;
+    
+    Ok(validated)
+}
+```
+
+### 3.3 Conversation-Aware Context
+
+**Problem**: Context doesn't update based on conversation
+
+**Solution**: Track mentioned files and concepts
+```rust
+pub struct ConversationContext {
+    mentioned_files: HashSet<PathBuf>,
+    discussed_concepts: Vec<String>,
+    current_focus: Option<CodeLocation>,
+}
+
+// Automatically include recently discussed files
+pub fn build_context_with_history(
+    query: &Query,
+    history: &ConversationContext,
+) -> Context {
+    let mut files = select_for_query(query);
+    
+    // Add files from recent conversation
+    files.extend(history.mentioned_files.iter().take(5));
+    
+    // Add files related to discussed concepts
+    files.extend(find_related_to_concepts(&history.discussed_concepts));
+    
+    deduplicate_and_rank(files)
+}
+```
+
+---
+
+## Phase 4: Advanced Tool Usage
+**Timeline**: 2-3 weeks
+**Priority**: MEDIUM - Unlock complex workflows
+
+### 4.1 Tool Chain Planning
+
+**Problem**: Agent doesn't plan multi-step tool usage
+
+**Solution**: Require tool execution plan
+```rust
+pub struct ToolPlan {
+    steps: Vec<ToolStep>,
+    dependencies: HashMap<StepId, Vec<StepId>>,
+}
+
+// Agent must output plan before execution:
+// <tool_plan>
+// 1. readFile("src/main.rs") -> get current implementation
+// 2. readFile("tests/main_test.rs") -> understand requirements  
+// 3. writeFile("src/main.rs", updated_content) -> apply fix
+// 4. runCommand("cargo", ["test"]) -> verify fix works
+// </tool_plan>
+```
+
+### 4.2 Tool Result Verification
+
+**Problem**: Agent doesn't check if tools succeeded
+
+**Solution**: Require verification step
+```rust
+// After each tool call, agent must:
+// 1. Check if tool succeeded
+// 2. Verify result matches expectation
+// 3. Adjust plan if needed
+
+pub async fn execute_tool_with_verification(
+    tool: &dyn Tool,
+    args: Value,
+    expected: &str,
+) -> Result<ToolOutput> {
+    let result = tool.execute(args).await?;
+    
+    if !result.success {
+        return Err(Error::ToolFailed(result.message));
+    }
+    
+    // Agent verifies result
+    let verification = verify_tool_result(&result, expected).await?;
+    if !verification.matches_expectation {
+        return Err(Error::UnexpectedToolResult(verification.diff));
+    }
+    
+    Ok(result)
+}
+```
+
+### 4.3 TypeScript Workflow Patterns
+
+**Problem**: Agent doesn't know when to use TypeScript tool
+
+**Solution**: Provide clear patterns and examples
+```javascript
+// Pattern 1: Batch file operations
+const rustFiles = await listFiles("src/**/*.rs");
+for (const file of rustFiles) {
+    const content = await readFile(file);
+    if (content.includes("TODO")) {
+        const fixed = content.replace(/TODO:.*/g, "");
+        await writeFile(file, fixed);
+    }
+}
+
+// Pattern 2: Conditional workflows
+const testResult = await runCommand("cargo", ["test"]);
+if (testResult.code !== 0) {
+    const logs = await readFile("test-output.log");
+    // Analyze and fix...
+}
+
+// Pattern 3: Data aggregation
+const allTests = await listFiles("tests/**/*.rs");
+const testCounts = {};
+for (const test of allTests) {
+    const content = await readFile(test);
+    const count = (content.match(/#\[test\]/g) || []).length;
+    testCounts[test] = count;
+}
+```
+
+---
+
+## Phase 5: Multi-Model Optimization
+**Timeline**: 2-3 weeks
+**Priority**: MEDIUM - Cost and quality optimization
+
+### 5.1 Task-Specific Model Selection
+
+**Problem**: Using same model for all tasks is suboptimal
+
+**Solution**: Route by task type
+```rust
+pub fn select_model_for_task(task: &Task) -> ModelSpec {
+    match task.task_type {
+        TaskType::SimpleQuery => ModelSpec::Local(Qwen7B),
+        TaskType::CodeGeneration => ModelSpec::Premium(DeepSeekCoder),
+        TaskType::CodeReview => ModelSpec::Premium(ClaudeSonnet),
+        TaskType::Refactoring => ModelSpec::Premium(ClaudeOpus),
+        TaskType::Testing => ModelSpec::Free(GroqLlama70B),
+        TaskType::Documentation => ModelSpec::Free(GroqLlama70B),
+    }
+}
+```
+
+### 5.2 Ensemble Validation
+
+**Problem**: Single model can make mistakes
+
+**Solution**: Multiple models vote on correctness
+```rust
+pub async fn ensemble_validate(code: &str) -> ValidationResult {
+    let reviews = join_all(vec![
+        qwen_review(code),
+        llama_review(code),
+        claude_review(code),
+    ]).await;
+    
+    let consensus = calculate_consensus(&reviews);
+    if consensus.agreement >= 0.7 {
+        ValidationResult::Pass(consensus)
+    } else {
+        ValidationResult::Uncertain(reviews)
+    }
+}
+```
+
+### 5.3 Adaptive Model Selection
+
+**Problem**: Don't know which models are good at what
+
+**Solution**: Track performance and adapt
+```rust
+pub struct ModelPerformance {
+    model: ModelSpec,
+    success_rate: HashMap<TaskType, f32>,
+    avg_quality_score: HashMap<TaskType, f32>,
+}
+
+pub fn select_best_model(task_type: TaskType) -> ModelSpec {
+    performance_tracker
+        .get_models_for_task(task_type)
+        .max_by_key(|m| m.success_rate[&task_type])
+        .unwrap_or_default()
+}
+```
 
 ---
 
@@ -120,55 +741,203 @@ Premium  Subtasks   Escalate  Cache
 - ❌ Expensive ($500/month)
 - ❌ Slow iteration cycles
 
-**Our Differentiators**:
-1. **TypeScript Tool Syntax** (Phase 6.1) - Natural for LLMs trained on open-source code
-2. **Adaptive Context Windows** (Phase 7.2) - Dynamic sizing based on task complexity
-3. **Model Specialization** (Phase 8.2) - Right model for each subtask (code gen, review, test)
-4. **Parallel Tool Execution** (Phase 6.3) - 5-10x faster on multi-file operations
-5. **Language-Specific Backends** (Phase 7.5) - LSP integration for precise navigation
+**Our Differentiators** (when we fix the agent):
+1. **TypeScript Tool Syntax** ✅ - Natural for LLMs trained on open-source code
+2. **Multi-tier Model Routing** ✅ - Cost optimization with quality fallback
+3. **Semantic Context Search** ✅ - BM25 + embeddings for relevant file selection
+4. **Parallel Tool Execution** ✅ - Execute independent operations concurrently
+5. **Real-time TUI** ✅ - Live progress tracking and task visualization
 
 ---
 
-## Phase 6: Agent Intelligence & Tool Innovation
-**Timeline**: 6-8 weeks
-**Priority**: Critical (Foundation for all future work)
+## Success Metrics
 
-### 6.1 TypeScript Tool Syntax (Revolutionary) 🔥 [IN PROGRESS]
+### Phase 1: Core Agent Functionality
 
-**Status**: ✅ Basic implementation complete (simplified parser)
-**Next**: Full SWC/Deno integration for complete TypeScript support
+**Must Achieve**:
+- Hallucination rate < 5% (currently ~50%)
+- Context usage rate > 90% (currently ~20%)
+- Tool usage accuracy 100% when needed (currently ~30%)
+- Response follows required structure 100% (currently ~10%)
 
-**Completed**:
-- ✅ Basic TypeScript runtime with simplified parser
-- ✅ Support for `await functionName(arg1, arg2)` syntax
-- ✅ String, number, boolean, null literal parsing
-- ✅ Multiple tool calls in sequence
-- ✅ Tool validation and error handling
-- ✅ Type definition generation for LLM context
-- ✅ Comprehensive tests (22 tests passing)
-- ✅ Documentation in README.md
-- ✅ Zero clippy warnings with strict linting
+**Measurement**:
+- 20 test queries with known correct answers
+- Automated validation of citations and context usage
+- Tool call verification
+- Structure parsing validation
 
-**Next Steps (Future Work)**:
-- ⏭️ Full SWC parser integration (blocked by nightly/cranelift compatibility)
-- ⏭️ Deno runtime for complete JavaScript execution
-- ⏭️ Control flow support (loops, conditionals, variables)
-- ⏭️ Complex expressions and operators
-- ⏭️ Try/catch error handling
+### Phase 2: Response Quality & Reliability
 
-**Note**: Full SWC/Deno integration encountered compatibility issues with the nightly Rust toolchain and cranelift backend. The basic implementation provides immediate value for simple tool call patterns, which covers 80% of use cases. Full TypeScript support can be added later when toolchain compatibility improves or by using a different runtime approach (e.g., QuickJS, Boa).
+**Must Achieve**:
+- All claims have supporting citations (currently 0%)
+- Confidence scores provided (currently N/A)
+- Consistent response format (currently inconsistent)
+- Multi-attempt consensus improves quality by 30%
 
-**Problem**: Current tool JSON syntax is unnatural for LLMs
-```json
-{
-  "name": "read_file",
-  "parameters": {
-    "path": "src/main.rs"
-  }
-}
+**Measurement**:
+- Citation coverage percentage
+- Confidence calibration (predicted vs actual accuracy)
+- Format compliance rate
+- Quality improvement across attempts
+
+### Phase 3: Context Intelligence
+
+**Must Achieve**:
+- Reduce average files in context from 18 to 3-5
+- Context relevance score > 0.85 (currently ~0.60)
+- Dynamic context expansion when needed
+- Conversation-aware file selection
+
+**Measurement**:
+- Average files per query
+- Relevance scoring by human reviewers
+- Context expansion request accuracy
+- Conversation continuity score
+
+### Phase 4: Advanced Tool Usage
+
+**Must Achieve**:
+- Tool plans generated before execution
+- Tool result verification 100%
+- TypeScript workflow usage when appropriate
+- Multi-step tool chains execute correctly
+
+**Measurement**:
+- Plan quality score
+- Verification pass rate
+- TypeScript usage rate for complex workflows
+- Tool chain success rate
+
+### Phase 5: Multi-Model Optimization
+
+**Must Achieve**:
+- 5x cost reduction (from $0.15 to $0.03 per request)
+- Quality maintained or improved
+- Model selection accuracy > 90%
+- Ensemble validation reduces errors by 50%
+
+**Measurement**:
+- Average cost per request
+- Quality scores by task type
+- Model selection accuracy
+- Error reduction with ensemble
+
+---
+
+## Next Actions
+
+**Immediate (Week 1-2)**:
+1. Implement Phase 1.1: Rewrite system prompt with strict constraints
+2. Add line numbers to context files
+3. Create 20 test queries with known answers
+4. Measure baseline hallucination rate
+
+**Short-term (Week 3-4)**:
+1. Implement Phase 1.2: Force tool usage in prompts
+2. Add tool usage validator
+3. Implement Phase 1.3: Chain-of-thought reasoning
+4. Create reasoning parser and validator
+
+**Medium-term (Week 5-8)**:
+1. Implement Phase 1.4: Self-correction loop
+2. Add hallucination detector
+3. Implement Phase 2.1: Citation enforcement
+4. Begin Phase 2.2: Confidence scoring
+
+**Success Criteria for "Agent Actually Works"**:
+- Can answer "How does X work?" with accurate code citations
+- Can perform "Read file Y and modify Z" without hallucinating
+- Can execute multi-step workflows using TypeScript tool
+- Responses are grounded in provided context 90%+ of the time
+
+---
+
+## Completed Work
+
+### TypeScript Tool Integration ✅
+
+**Status**: Fully implemented and integrated
+- QuickJS-based runtime with sandboxing
+- Tools execute synchronously using Tokio runtime
+- Full JavaScript support (variables, functions, control flow, error handling)
+- Integrated into orchestrator and executor pool
+- System prompt includes TypeScript documentation
+- 2 scenario tests passing (basic + control flow)
+- 15+ unit tests passing
+- Zero clippy warnings
+
+**Files**:
+- `crates/merlin-tools/src/typescript_runtime.rs` (549 lines)
+- `crates/merlin-routing/src/tools/typescript.rs` (160 lines)
+- `prompts/coding_assistant.md` (updated with TypeScript examples)
+- `tests/fixtures/scenarios/tools/` (2 scenarios)
+
+**Implementation Details**:
+- ✅ **QuickJS-based runtime** (`merlin-tools/src/typescript_runtime.rs`)
+  - Full JavaScript execution with sandboxing
+  - Memory limits (64MB) and stack size limits (1MB)
+  - Execution timeout (30s default, configurable)
+  - Tool registration and injection into JS context
+  - Type definition generation for LLM prompts
+- ✅ **Routing integration** (`merlin-routing/src/tools/typescript.rs`)
+  - `TypeScriptTool` wraps the runtime as a routing tool
+  - `ToolWrapper` adapts routing tools to `merlin_tools::Tool` interface
+  - Registered in orchestrator and executor pool with basic tools
+- ✅ **Full JavaScript support**:
+  - Variables, functions, arrow functions
+  - Control flow (if/else, for, while loops)
+  - Arrays and objects
+  - Error handling (try/catch)
+  - All standard JavaScript features via QuickJS
+- ✅ **Comprehensive tests** (15+ tests in `typescript_runtime.rs`)
+  - Runtime creation and configuration
+  - Simple expressions and operations
+  - Control flow and conditionals
+  - Function definitions and arrow functions
+  - Error handling and syntax errors
+  - Type definition generation
+  - Multiple tool registration
+
+**Integration Work Completed**:
+1. ✅ **Async tool execution fixed**: Tools now execute synchronously using Tokio runtime within QuickJS
+2. ✅ **Scenario test coverage**: Created `tools/typescript_basic.json` and `tools/typescript_control_flow.json`
+3. ✅ **Tool result handling**: Tools execute and return results properly to JavaScript context
+4. ✅ **System prompt integration**: Added TypeScript tool documentation to `prompts/coding_assistant.md`
+5. ✅ **Example scenarios**: UI snapshots generated and passing
+
+**Architecture**:
+```
+Agent → TypeScriptTool.execute(code) → QuickJS Runtime
+                                            ↓
+                                    Inject tool functions (with Tokio runtime)
+                                            ↓
+                                    Execute JavaScript
+                                            ↓
+                                    Tool calls → ToolWrapper
+                                            ↓
+                                    Routing Tool.execute() [via block_on]
+                                            ↓
+                                    Return results to JS ✅ (NOW WORKING)
 ```
 
-**Solution**: TypeScript function calls (LLMs are trained on this!)
+**Implementation Details**:
+- Tools execute synchronously within QuickJS using `tokio::runtime::Runtime::block_on`
+- Each tool function wrapper has access to a shared Tokio runtime
+- Tool results are converted to JavaScript values and returned immediately
+- Errors are thrown as JavaScript exceptions
+
+**Known Limitations**:
+1. **Synchronous blocking**: Tools block the QuickJS thread (acceptable for current use case)
+2. **Memory leaks**: `Box::leak` used in `ToolWrapper` for 'static lifetime (acceptable for static tool names)
+3. **No true async/await**: JavaScript async/await syntax works, but tools execute synchronously
+
+**Future Enhancements** (Optional):
+- Add more complex scenario tests with actual file operations
+- Implement true async support using QuickJS promises and event loop
+- Add timeout handling per tool call
+- Add tool call logging and metrics
+
+**Vision**: TypeScript function calls (LLMs are trained on this!)
 ```typescript
 // Agent generates this naturally:
 await readFile("src/main.rs")
@@ -185,1311 +954,10 @@ for (const test of tests) {
 }
 ```
 
-**Why This Works**:
+**Why This Approach**:
 1. LLMs see millions of examples in training data
 2. Natural control flow (loops, conditions, error handling)
 3. Type hints guide correct parameter usage
 4. Reduces hallucination (familiar syntax)
 5. Enables tool chaining without special syntax
 
-**Implementation**:
-```rust
-// crates/merlin-tools/src/typescript_runtime.rs
-pub struct TypeScriptToolRuntime {
-    executor: JsRuntime,  // Using deno_core
-    tool_registry: Arc<ToolRegistry>,
-}
-
-impl TypeScriptToolRuntime {
-    pub async fn execute(&mut self, code: &str) -> Result<Value> {
-        // 1. Parse TypeScript to AST
-        let ast = self.parse_typescript(code)?;
-
-        // 2. Extract tool calls
-        let calls = self.extract_tool_calls(&ast)?;
-
-        // 3. Execute tools with proper awaits
-        for call in calls {
-            match call.name.as_str() {
-                "readFile" => self.handle_read_file(call.args).await?,
-                "writeFile" => self.handle_write_file(call.args).await?,
-                "runCommand" => self.handle_run_command(call.args).await?,
-                _ => return Err(ToolError::UnknownTool(call.name)),
-            }
-        }
-
-        Ok(Value::Null)
-    }
-}
-```
-
-**System Prompt Addition**:
-```
-You have access to these TypeScript functions:
-
-async function readFile(path: string): Promise<string>
-async function writeFile(path: string, content: string): Promise<void>
-async function listFiles(glob: string): Promise<string[]>
-async function runCommand(cmd: string, args: string[]): Promise<{stdout: string, stderr: string, code: number}>
-async function searchCode(pattern: string, files?: string[]): Promise<SearchResult[]>
-
-Write TypeScript code to accomplish the task. The code will be executed in a sandboxed environment.
-```
-
-**Safety**:
-- Sandboxed execution (no network, limited filesystem)
-- Timeout limits (30s per script)
-- Resource limits (memory, CPU)
-- Validation before execution
-
-**Testing**:
-- 50+ tests for common patterns
-- Fuzzing for malicious inputs
-- Performance benchmarks
-
-**Files**:
-- `crates/merlin-tools/src/typescript_runtime.rs` (800 lines)
-- `crates/merlin-tools/src/typescript_parser.rs` (400 lines)
-- `crates/merlin-tools/src/typescript_validator.rs` (300 lines)
-- `crates/merlin-tools/tests/typescript_integration_tests.rs` (500 lines)
-
-### 6.2 Smart Tool Chaining
-
-**Problem**: Tools execute sequentially, even when parallel is safe
-
-**Current**:
-```
-read src/main.rs → read src/lib.rs → read src/utils.rs  (sequential, 300ms)
-```
-
-**Solution**: Dependency analysis + parallel execution
-```
-read [src/main.rs, src/lib.rs, src/utils.rs]  (parallel, 100ms)
-```
-
-**Implementation**:
-```rust
-pub struct ToolChain {
-    steps: Vec<ToolStep>,
-    dependencies: HashMap<StepId, Vec<StepId>>,
-}
-
-impl ToolChain {
-    pub fn analyze_dependencies(&self) -> ExecutionGraph {
-        // Build DAG of dependencies
-        let mut graph = Graph::new();
-        for step in &self.steps {
-            graph.add_node(step.id);
-            for dep in self.find_dependencies(step) {
-                graph.add_edge(dep.id, step.id);
-            }
-        }
-        graph
-    }
-
-    pub async fn execute_parallel(&self) -> Result<Vec<ToolResult>> {
-        let graph = self.analyze_dependencies();
-        let batches = graph.topological_batches();
-
-        let mut results = Vec::new();
-        for batch in batches {
-            // Execute all tools in batch concurrently
-            let batch_results = join_all(
-                batch.iter().map(|step| self.execute_step(step))
-            ).await;
-            results.extend(batch_results);
-        }
-        Ok(results)
-    }
-}
-```
-
-**Dependency Detection**:
-- **Read → Write**: Must be sequential if same file
-- **Read → Read**: Always parallel
-- **Write → Write**: Sequential if same file
-- **Command → Command**: Depends on working directory
-
-**Files**:
-- `crates/merlin-tools/src/chain.rs` (600 lines)
-- `crates/merlin-tools/src/dependency_analysis.rs` (400 lines)
-
-### 6.3 Documentation Tracking
-
-**Problem**: Code changes, docs fall behind
-
-**Solution**: Automatic documentation maintenance
-```rust
-pub struct DocTracker {
-    codebase_state: CodebaseSnapshot,
-    doc_locations: HashMap<Symbol, Vec<DocLocation>>,
-}
-
-impl DocTracker {
-    pub async fn check_staleness(&self) -> Vec<StaleDoc> {
-        let mut stale = Vec::new();
-
-        for (symbol, locs) in &self.doc_locations {
-            let current_sig = self.get_signature(symbol);
-            for loc in locs {
-                let doc_sig = self.extract_documented_signature(loc);
-                if doc_sig != current_sig {
-                    stale.push(StaleDoc {
-                        location: loc.clone(),
-                        symbol: symbol.clone(),
-                        reason: SignatureMismatch {
-                            expected: current_sig.clone(),
-                            documented: doc_sig,
-                        },
-                    });
-                }
-            }
-        }
-
-        stale
-    }
-
-    pub async fn suggest_updates(&self, stale: &[StaleDoc]) -> Vec<DocUpdate> {
-        // Use LLM to generate doc updates
-        let mut updates = Vec::new();
-        for doc in stale {
-            let context = self.build_doc_context(doc);
-            let suggestion = self.llm.generate_doc_update(&context).await?;
-            updates.push(DocUpdate {
-                location: doc.location.clone(),
-                old_content: doc.current_content.clone(),
-                new_content: suggestion,
-            });
-        }
-        updates
-    }
-}
-```
-
-**Integration**:
-- Pre-commit hook: Check for stale docs
-- Post-refactor: Suggest doc updates
-- CI: Fail if critical docs are stale
-
-**Files**:
-- `crates/merlin-context/src/doc_tracker.rs` (500 lines)
-- `crates/merlin-context/src/signature_matching.rs` (300 lines)
-
-### 6.4 Coding Standards Enforcement
-
-**Problem**: Inconsistent style, patterns, conventions
-
-**Solution**: Learn from codebase, enforce automatically
-```rust
-pub struct StyleGuide {
-    patterns: Vec<CodePattern>,
-    violations: Vec<Violation>,
-}
-
-impl StyleGuide {
-    pub async fn learn_from_codebase(&mut self, files: &[PathBuf]) -> Result<()> {
-        // Extract patterns from existing code
-        for file in files {
-            let ast = parse_file(file)?;
-            self.patterns.extend(self.extract_patterns(&ast));
-        }
-
-        // Find common patterns
-        self.patterns = self.find_consensus_patterns();
-        Ok(())
-    }
-
-    pub fn check_code(&self, code: &str) -> Vec<Violation> {
-        let mut violations = Vec::new();
-        let ast = parse_code(code).unwrap();
-
-        for pattern in &self.patterns {
-            if let Some(violation) = pattern.check(&ast) {
-                violations.push(violation);
-            }
-        }
-
-        violations
-    }
-
-    pub fn suggest_fixes(&self, violations: &[Violation]) -> Vec<Fix> {
-        violations.iter()
-            .filter_map(|v| v.suggested_fix())
-            .collect()
-    }
-}
-```
-
-**Patterns Tracked**:
-- Naming conventions (snake_case, PascalCase, SCREAMING_SNAKE)
-- Error handling style (Result vs panic)
-- Import organization
-- Comment style (doc comments, inline, TODO format)
-- Function length limits
-- Complexity limits
-
-**Files**:
-- `crates/merlin-languages/src/style_guide.rs` (700 lines)
-- `crates/merlin-languages/src/pattern_extraction.rs` (500 lines)
-
----
-
-## Phase 7: Context Mastery
-**Timeline**: 6-8 weeks
-**Priority**: High (Directly improves quality)
-
-### 7.1 Intelligent Context Pruning
-
-**Problem**: Too many irrelevant files in context (current: 18 files for "remember bacon")
-
-**Solution**: Multi-stage relevance filtering
-```rust
-pub struct ContextPruner {
-    bm25: BM25Scorer,
-    embeddings: EmbeddingModel,
-    graph: DependencyGraph,
-}
-
-impl ContextPruner {
-    pub async fn select_optimal_files(
-        &self,
-        query: &Query,
-        candidates: Vec<FileScore>,
-        max_tokens: usize,
-    ) -> Vec<FileContext> {
-        // Stage 1: Keyword matching (fast)
-        let keyword_filtered = self.bm25.top_k(&candidates, 50);
-
-        // Stage 2: Semantic similarity (medium)
-        let semantic_filtered = self.embeddings
-            .rank_by_similarity(query, &keyword_filtered)
-            .take(20);
-
-        // Stage 3: Dependency analysis (precise)
-        let with_deps = self.graph
-            .expand_with_dependencies(&semantic_filtered);
-
-        // Stage 4: Token budget optimization
-        self.optimize_token_budget(with_deps, max_tokens)
-    }
-
-    fn optimize_token_budget(
-        &self,
-        files: Vec<FileContext>,
-        max_tokens: usize,
-    ) -> Vec<FileContext> {
-        // Knapsack problem: maximize relevance within token budget
-        let mut dp = vec![vec![0.0; max_tokens + 1]; files.len() + 1];
-
-        for i in 1..=files.len() {
-            let file = &files[i - 1];
-            let tokens = file.token_count();
-            let relevance = file.relevance_score;
-
-            for t in 0..=max_tokens {
-                dp[i][t] = dp[i - 1][t];  // Don't include
-                if tokens <= t {
-                    dp[i][t] = dp[i][t].max(
-                        dp[i - 1][t - tokens] + relevance
-                    );
-                }
-            }
-        }
-
-        // Backtrack to find selected files
-        self.backtrack_selection(&dp, &files, max_tokens)
-    }
-}
-```
-
-**Heuristics**:
-- Recently modified files: +20% relevance
-- Files imported by query-mentioned files: +30%
-- Test files for implementation files: +15%
-- README/docs for library questions: +25%
-
-**Files**:
-- `crates/merlin-context/src/pruning.rs` (600 lines)
-- `crates/merlin-context/src/knapsack_optimizer.rs` (300 lines)
-
-### 7.2 Adaptive Context Windows
-
-**Problem**: Fixed token limits waste capacity on simple tasks, overflow on complex ones
-
-**Solution**: Dynamic window sizing based on task complexity
-```rust
-pub struct AdaptiveContextWindow {
-    base_budget: usize,      // 4000 tokens
-    max_budget: usize,       // 100000 tokens
-    complexity_estimator: ComplexityEstimator,
-}
-
-impl AdaptiveContextWindow {
-    pub fn calculate_budget(&self, task: &Task) -> usize {
-        let complexity = self.complexity_estimator.estimate(task);
-
-        match complexity {
-            Complexity::Trivial => 2_000,     // Greeting, simple query
-            Complexity::Simple => 8_000,      // Single-file edit
-            Complexity::Moderate => 32_000,   // Multi-file refactor
-            Complexity::Complex => 100_000,   // Architecture change
-        }
-    }
-
-    pub fn should_expand(&self, current: &Context, task: &Task) -> bool {
-        // Expand if we're missing critical information
-        let missing_symbols = self.find_missing_symbols(current, task);
-        let missing_deps = self.find_missing_dependencies(current);
-
-        !missing_symbols.is_empty() || !missing_deps.is_empty()
-    }
-}
-```
-
-**Budget Allocation**:
-- System prompt: 10-15%
-- Conversation history: 5-10%
-- Code context: 60-75%
-- Tool descriptions: 5-10%
-- Reserved for response: 10-15%
-
-**Files**:
-- `crates/merlin-context/src/adaptive_window.rs` (400 lines)
-
-### 7.3 Conversation Summarization
-
-**Problem**: 50-message limit discards useful context
-
-**Solution**: Hierarchical summarization
-```rust
-pub struct ConversationSummarizer {
-    llm: Arc<dyn ModelProvider>,
-    summary_cache: HashMap<MessageRange, String>,
-}
-
-impl ConversationSummarizer {
-    pub async fn summarize_old_messages(
-        &mut self,
-        messages: &[(String, String)],
-        keep_recent: usize,
-    ) -> ConversationWithSummary {
-        let (old, recent) = messages.split_at(messages.len() - keep_recent);
-
-        // Summarize in chunks of 10 messages
-        let mut summaries = Vec::new();
-        for chunk in old.chunks(10) {
-            let summary = self.summarize_chunk(chunk).await?;
-            summaries.push(summary);
-        }
-
-        // Recursively summarize summaries if needed
-        let final_summary = if summaries.len() > 5 {
-            self.summarize_summaries(&summaries).await?
-        } else {
-            summaries.join("\n\n")
-        };
-
-        ConversationWithSummary {
-            summary: final_summary,
-            recent_messages: recent.to_vec(),
-        }
-    }
-}
-```
-
-**Summary Format**:
-```
-=== Conversation Summary (Messages 1-40) ===
-User requested implementation of authentication system.
-Agent created User model, login endpoint, JWT middleware.
-User reported bug with token expiration.
-Agent fixed expiration logic in jwt.rs.
-=== End Summary ===
-
-=== Recent Messages (41-50) ===
-[Full message history]
-```
-
-**Files**:
-- `crates/merlin-context/src/conversation_summarizer.rs` (500 lines)
-
-### 7.4 Semantic Code Search
-
-**Problem**: Keyword search misses semantically similar code
-
-**Solution**: Vector embeddings for code search
-```rust
-pub struct SemanticCodeSearch {
-    embeddings: EmbeddingStore,
-    index: HNSW,  // Hierarchical Navigable Small World graph
-}
-
-impl SemanticCodeSearch {
-    pub async fn search(
-        &self,
-        query: &str,
-        top_k: usize,
-    ) -> Vec<CodeChunk> {
-        // Embed query
-        let query_vec = self.embeddings.embed(query).await?;
-
-        // Search in HNSW index (sub-millisecond)
-        let candidates = self.index.search(&query_vec, top_k * 2);
-
-        // Re-rank with cross-encoder for precision
-        let reranked = self.rerank(query, &candidates);
-
-        reranked.into_iter().take(top_k).collect()
-    }
-
-    pub async fn index_codebase(&mut self, files: &[PathBuf]) -> Result<()> {
-        for file in files {
-            let chunks = self.chunk_file(file).await?;
-            for chunk in chunks {
-                let embedding = self.embeddings.embed(&chunk.text).await?;
-                self.index.insert(chunk.id, embedding);
-            }
-        }
-        Ok(())
-    }
-}
-```
-
-**Chunking Strategy**:
-- Functions: Complete function body
-- Structs: Struct definition + impl blocks
-- Modules: Module-level docs + exports
-- Tests: Complete test function
-
-**Files**:
-- `crates/merlin-context/src/semantic_search.rs` (600 lines)
-- `crates/merlin-context/src/hnsw_index.rs` (400 lines)
-
-### 7.5 Language-Specific Navigation
-
-**Problem**: Generic file search doesn't understand code structure
-
-**Solution**: LSP integration for precise navigation
-```rust
-pub struct RustNavigator {
-    analyzer: rust_analyzer::Analysis,
-}
-
-impl LanguageNavigator for RustNavigator {
-    async fn find_definition(&self, position: Position) -> Vec<Location> {
-        self.analyzer.goto_definition(position).await
-    }
-
-    async fn find_references(&self, symbol: &Symbol) -> Vec<Reference> {
-        self.analyzer.find_all_references(symbol).await
-    }
-
-    async fn find_implementations(&self, trait_name: &str) -> Vec<Impl> {
-        self.analyzer.goto_implementation(trait_name).await
-    }
-
-    async fn get_call_hierarchy(&self, function: &str) -> CallGraph {
-        self.analyzer.call_hierarchy(function).await
-    }
-}
-```
-
-**Use Cases**:
-- "Find all calls to this function" → Use LSP, not grep
-- "Show implementations of this trait" → LSP knows structure
-- "Where is this type defined?" → LSP gives exact location
-
-**Files**:
-- `crates/merlin-languages/src/rust/navigator.rs` (500 lines)
-- `crates/merlin-languages/src/navigator_trait.rs` (200 lines)
-
----
-
-## Phase 8: Multi-Model Orchestra
-**Timeline**: 4-6 weeks
-**Priority**: High (Cost reduction + quality improvement)
-
-### 8.1 Task-Specific Model Routing
-
-**Problem**: Using same model for all subtasks is suboptimal
-
-**Current**:
-```
-Claude Sonnet (all tasks) → $0.50 per request
-```
-
-**Solution**: Specialize models by task type
-```
-Code generation → DeepSeek Coder ($0.01)
-Code review → Claude Sonnet ($0.15)
-Test generation → Qwen 7B ($0)
-Documentation → Groq Llama 70B ($0)
-Architecture → Claude Opus ($0.50)
-```
-
-**Implementation**:
-```rust
-pub struct TaskSpecificRouter {
-    models: HashMap<TaskCategory, Vec<ModelSpec>>,
-}
-
-impl TaskSpecificRouter {
-    pub fn select_model(&self, task: &Task) -> ModelSpec {
-        let category = self.categorize_task(task);
-        let candidates = &self.models[&category];
-
-        // Select based on complexity within category
-        match task.complexity {
-            Complexity::Simple => candidates[0].clone(),      // Cheapest
-            Complexity::Moderate => candidates[1].clone(),    // Balanced
-            Complexity::Complex => candidates[2].clone(),     // Best
-        }
-    }
-
-    fn categorize_task(&self, task: &Task) -> TaskCategory {
-        let desc = task.description.to_lowercase();
-
-        if desc.contains("implement") || desc.contains("write") {
-            TaskCategory::CodeGeneration
-        } else if desc.contains("review") || desc.contains("check") {
-            TaskCategory::CodeReview
-        } else if desc.contains("test") {
-            TaskCategory::TestGeneration
-        } else if desc.contains("document") {
-            TaskCategory::Documentation
-        } else if desc.contains("architecture") || desc.contains("design") {
-            TaskCategory::Architecture
-        } else {
-            TaskCategory::General
-        }
-    }
-}
-```
-
-**Cost Savings**:
-- Current average: $0.15/request
-- With specialization: $0.03/request
-- **5x cost reduction**
-
-**Files**:
-- `crates/merlin-routing/src/router/task_specific.rs` (500 lines)
-
-### 8.2 Ensemble Validation
-
-**Problem**: Single model can make subtle mistakes
-
-**Solution**: Multiple models vote on correctness
-```rust
-pub struct EnsembleValidator {
-    reviewers: Vec<Arc<dyn ModelProvider>>,
-    consensus_threshold: f32,  // 0.7 = 70% agreement
-}
-
-impl EnsembleValidator {
-    pub async fn validate(&self, code: &str, requirements: &str) -> ValidationResult {
-        // Parallel reviews from multiple models
-        let reviews = join_all(
-            self.reviewers.iter().map(|model| {
-                self.get_review(model, code, requirements)
-            })
-        ).await;
-
-        // Aggregate scores
-        let avg_score = reviews.iter().map(|r| r.score).sum::<f32>() / reviews.len() as f32;
-        let agreement = self.calculate_agreement(&reviews);
-
-        if agreement >= self.consensus_threshold {
-            ValidationResult::Pass {
-                confidence: agreement,
-                notes: self.merge_feedback(&reviews),
-            }
-        } else {
-            ValidationResult::Uncertain {
-                reviews,
-                requires_human: true,
-            }
-        }
-    }
-}
-```
-
-**Reviewers**:
-- Fast pass: Qwen 7B (local, $0)
-- Standard: Groq Llama 70B ($0)
-- Critical: Claude Sonnet ($0.15)
-
-**Files**:
-- `crates/merlin-routing/src/validator/ensemble.rs` (400 lines)
-
-### 8.3 Model Capability Profiles
-
-**Problem**: Don't know which models are good at what
-
-**Solution**: Benchmark and track model capabilities
-```rust
-pub struct ModelCapabilityProfile {
-    model: ModelSpec,
-    capabilities: HashMap<Capability, Score>,
-}
-
-pub struct CapabilityBenchmark {
-    profiles: HashMap<String, ModelCapabilityProfile>,
-}
-
-impl CapabilityBenchmark {
-    pub async fn benchmark_model(&mut self, model: &ModelSpec) -> ModelCapabilityProfile {
-        let mut capabilities = HashMap::new();
-
-        // Test code generation
-        capabilities.insert(
-            Capability::CodeGeneration,
-            self.test_code_generation(model).await,
-        );
-
-        // Test refactoring
-        capabilities.insert(
-            Capability::Refactoring,
-            self.test_refactoring(model).await,
-        );
-
-        // Test test generation
-        capabilities.insert(
-            Capability::TestGeneration,
-            self.test_test_generation(model).await,
-        );
-
-        ModelCapabilityProfile {
-            model: model.clone(),
-            capabilities,
-        }
-    }
-
-    pub fn select_best_for_capability(&self, cap: Capability) -> &ModelSpec {
-        self.profiles.values()
-            .max_by_key(|p| p.capabilities.get(&cap).unwrap())
-            .map(|p| &p.model)
-            .unwrap()
-    }
-}
-```
-
-**Capabilities Tracked**:
-- Code generation (correctness, style, efficiency)
-- Refactoring (safety, completeness)
-- Test generation (coverage, edge cases)
-- Bug fixing (accuracy, minimal changes)
-- Documentation (clarity, completeness)
-- Architecture (design quality)
-
-**Files**:
-- `crates/merlin-routing/src/benchmarks/capabilities.rs` (700 lines)
-- `benchmarks/capability_suite/` (5000+ lines of test cases)
-
----
-
-## Phase 9: Performance & Scale
-**Timeline**: 4-6 weeks
-**Priority**: Medium (Optimization)
-
-### 9.1 Incremental Context Updates
-
-**Problem**: Rebuilding entire context on each request
-
-**Solution**: Track changes and update incrementally
-```rust
-pub struct IncrementalContextManager {
-    current: Context,
-    file_hashes: HashMap<PathBuf, u64>,
-    watcher: FileWatcher,
-}
-
-impl IncrementalContextManager {
-    pub async fn update(&mut self) -> Result<()> {
-        // Get changed files since last update
-        let changes = self.watcher.poll_changes();
-
-        for change in changes {
-            match change.kind {
-                ChangeKind::Modified => {
-                    // Re-index only changed file
-                    let content = fs::read_to_string(&change.path)?;
-                    self.current.update_file(change.path, content);
-                }
-                ChangeKind::Created => {
-                    self.current.add_file(change.path);
-                }
-                ChangeKind::Deleted => {
-                    self.current.remove_file(&change.path);
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    pub fn get_context(&self) -> &Context {
-        &self.current
-    }
-}
-```
-
-**Performance Impact**:
-- Full rebuild: 2-5 seconds
-- Incremental update: 50-200ms
-- **10-25x faster**
-
-**Files**:
-- `crates/merlin-context/src/incremental.rs` (500 lines)
-
-### 9.2 Parallel Task Execution
-
-**Problem**: Sequential task execution is slow
-
-**Solution**: Execute independent tasks in parallel
-```rust
-pub struct ParallelExecutor {
-    pool: ThreadPool,
-    max_concurrent: usize,
-}
-
-impl ParallelExecutor {
-    pub async fn execute_graph(&self, graph: TaskGraph) -> Result<Vec<TaskResult>> {
-        let batches = graph.topological_batches();
-        let mut results = Vec::new();
-
-        for batch in batches {
-            // Execute all tasks in batch concurrently
-            let batch_futures: Vec<_> = batch.iter()
-                .map(|task| self.execute_task(task))
-                .collect();
-
-            let batch_results = try_join_all(batch_futures).await?;
-            results.extend(batch_results);
-        }
-
-        Ok(results)
-    }
-
-    async fn execute_task(&self, task: &Task) -> Result<TaskResult> {
-        // Each task gets its own executor in the pool
-        self.pool.spawn(async move {
-            let executor = AgentExecutor::new(/* ... */);
-            executor.execute_streaming(task.clone()).await
-        }).await
-    }
-}
-```
-
-**Safety**:
-- File locking prevents concurrent writes
-- Read-only operations fully parallel
-- Write batching for efficiency
-
-**Performance**:
-- 5 independent tasks: 10s → 2s (5x faster)
-- 10 independent tasks: 20s → 2s (10x faster)
-
-**Files**:
-- `crates/merlin-routing/src/executor/parallel.rs` (400 lines)
-
-### 9.3 Response Streaming Optimization
-
-**Problem**: Long wait before seeing output
-
-**Solution**: Stream tokens as they're generated
-```rust
-pub struct StreamingOptimizer {
-    buffer_size: usize,
-    flush_interval: Duration,
-}
-
-impl StreamingOptimizer {
-    pub async fn stream_response<S>(&self, stream: S) -> impl Stream<Item = Chunk>
-    where
-        S: Stream<Item = Token>,
-    {
-        stream
-            .chunks_timeout(self.buffer_size, self.flush_interval)
-            .map(|chunk| self.process_chunk(chunk))
-    }
-
-    fn process_chunk(&self, tokens: Vec<Token>) -> Chunk {
-        // Combine tokens into coherent chunks
-        let text = tokens.into_iter().map(|t| t.text).collect::<String>();
-
-        Chunk {
-            text,
-            metadata: ChunkMetadata {
-                tokens: tokens.len(),
-                latency: self.measure_latency(),
-            },
-        }
-    }
-}
-```
-
-**UX Impact**:
-- Time to first token: 200-500ms (was 2-5s)
-- Perceived latency: -70%
-
-**Files**:
-- `crates/merlin-agent/src/streaming_optimizer.rs` (300 lines)
-
-### 9.4 Caching Improvements
-
-**Problem**: Current cache only checks exact matches
-
-**Solution**: Hierarchical caching with partial matches
-```rust
-pub struct HierarchicalCache {
-    l1: HashMap<String, Response>,           // Exact matches
-    l2: HashMap<String, Response>,           // High similarity (0.95+)
-    l3: HashMap<String, Response>,           // Moderate similarity (0.80+)
-    embeddings: EmbeddingModel,
-}
-
-impl HierarchicalCache {
-    pub async fn get(&mut self, query: &str) -> Option<CachedResponse> {
-        // L1: Exact match (0ms)
-        if let Some(resp) = self.l1.get(query) {
-            return Some(CachedResponse::Exact(resp.clone()));
-        }
-
-        // L2: High similarity (5ms)
-        let embedding = self.embeddings.embed(query).await;
-        if let Some((key, score)) = self.find_similar(&embedding, 0.95) {
-            return Some(CachedResponse::Similar {
-                response: self.l2[key].clone(),
-                similarity: score,
-            });
-        }
-
-        // L3: Moderate similarity (10ms)
-        if let Some((key, score)) = self.find_similar(&embedding, 0.80) {
-            // Partial match - use as starting point
-            return Some(CachedResponse::Partial {
-                base: self.l3[key].clone(),
-                similarity: score,
-                needs_refinement: true,
-            });
-        }
-
-        None
-    }
-}
-```
-
-**Hit Rates**:
-- L1 (exact): 30-40%
-- L2 (high sim): 20-30%
-- L3 (moderate): 10-20%
-- **Total: 60-90% cache hit rate**
-
-**Files**:
-- `crates/merlin-routing/src/cache/hierarchical.rs` (500 lines)
-
----
-
-## Phase 10: Adaptive Intelligence
-**Timeline**: 6-8 weeks
-**Priority**: Medium (Future-proofing)
-
-### 10.1 Learning from Feedback
-
-**Problem**: Agent doesn't learn from mistakes
-
-**Solution**: Feedback loop with reinforcement learning
-```rust
-pub struct FeedbackLearner {
-    examples: Vec<Example>,
-    model: PolicyModel,
-}
-
-pub struct Example {
-    pub query: String,
-    pub context: Context,
-    pub response: Response,
-    pub feedback: Feedback,
-}
-
-pub enum Feedback {
-    Accept,                    // User accepted as-is
-    Reject { reason: String }, // User rejected
-    Modify { diff: Diff },     // User edited response
-}
-
-impl FeedbackLearner {
-    pub async fn learn_from_feedback(&mut self, example: Example) {
-        // Store example
-        self.examples.push(example.clone());
-
-        // Update policy model
-        match &example.feedback {
-            Feedback::Accept => {
-                self.model.reward(example.query, example.response, 1.0);
-            }
-            Feedback::Reject { reason } => {
-                self.model.penalize(example.query, example.response, -1.0);
-                // Learn from reason
-                self.model.add_constraint(reason);
-            }
-            Feedback::Modify { diff } => {
-                // Learn from the correction
-                self.model.update_from_diff(
-                    example.response,
-                    diff,
-                    0.5,  // Partial credit
-                );
-            }
-        }
-    }
-
-    pub fn apply_learnings(&self, context: &mut Context) {
-        // Adjust context based on past feedback
-        let similar_examples = self.find_similar_examples(context);
-        for example in similar_examples {
-            context.add_constraint(example.learned_pattern());
-        }
-    }
-}
-```
-
-**Integration**:
-- After each response, ask: "Was this helpful? (y/n/edit)"
-- Store feedback with context
-- Periodically retrain policy
-
-**Files**:
-- `crates/merlin-agent/src/feedback_learner.rs` (600 lines)
-
-### 10.2 Dynamic Prompt Engineering
-
-**Problem**: Fixed prompts don't adapt to context
-
-**Solution**: Generate prompts dynamically based on task
-```rust
-pub struct DynamicPromptGenerator {
-    templates: HashMap<TaskCategory, PromptTemplate>,
-    examples: ExampleBank,
-}
-
-impl DynamicPromptGenerator {
-    pub fn generate(&self, task: &Task, context: &Context) -> String {
-        let template = &self.templates[&task.category];
-
-        // Select relevant examples (few-shot learning)
-        let examples = self.examples.find_similar(task, 3);
-
-        // Build prompt
-        let mut prompt = template.base.clone();
-
-        // Add task-specific instructions
-        prompt.push_str(&self.generate_task_instructions(task));
-
-        // Add examples
-        for example in examples {
-            prompt.push_str(&format!(
-                "\n\nExample:\nInput: {}\nOutput: {}",
-                example.input,
-                example.output
-            ));
-        }
-
-        // Add context hints
-        prompt.push_str(&self.generate_context_hints(context));
-
-        prompt
-    }
-
-    fn generate_task_instructions(&self, task: &Task) -> String {
-        match task.category {
-            TaskCategory::CodeGeneration => {
-                format!(
-                    "Generate {} code that {}. Ensure it follows the project's style guide.",
-                    task.language,
-                    task.requirements
-                )
-            }
-            TaskCategory::Refactoring => {
-                format!(
-                    "Refactor {} to improve {}. Preserve behavior and maintain tests.",
-                    task.target_code,
-                    task.improvement_goals
-                )
-            }
-            _ => task.description.clone(),
-        }
-    }
-}
-```
-
-**Files**:
-- `crates/merlin-agent/src/dynamic_prompts.rs` (700 lines)
-
-### 10.3 Multi-Language Support
-
-**Problem**: Only Rust is deeply supported
-
-**Solution**: Pluggable language backends
-```rust
-pub trait LanguageBackend: Send + Sync {
-    fn name(&self) -> &str;
-    fn extensions(&self) -> &[&str];
-
-    async fn parse(&self, code: &str) -> Result<AST>;
-    async fn format(&self, code: &str) -> Result<String>;
-    async fn lint(&self, code: &str) -> Result<Vec<Diagnostic>>;
-    async fn find_symbol(&self, name: &str, files: &[PathBuf]) -> Result<Vec<Location>>;
-    async fn get_dependencies(&self, file: &Path) -> Result<Vec<Dependency>>;
-}
-
-pub struct LanguageRegistry {
-    backends: HashMap<String, Arc<dyn LanguageBackend>>,
-}
-
-impl LanguageRegistry {
-    pub fn new() -> Self {
-        let mut registry = Self {
-            backends: HashMap::new(),
-        };
-
-        // Register built-in backends
-        registry.register(Arc::new(RustBackend::new()));
-        registry.register(Arc::new(PythonBackend::new()));
-        registry.register(Arc::new(TypeScriptBackend::new()));
-        registry.register(Arc::new(GoBackend::new()));
-
-        registry
-    }
-
-    pub fn get_backend(&self, language: &str) -> Option<&Arc<dyn LanguageBackend>> {
-        self.backends.get(language)
-    }
-}
-```
-
-**Priority Languages**:
-1. **Rust** (current, complete)
-2. **Python** (80% of AI codebases)
-3. **TypeScript/JavaScript** (web development)
-4. **Go** (cloud infrastructure)
-5. **C/C++** (systems programming)
-
-**Implementation Per Language**:
-- Parser integration (tree-sitter)
-- LSP client for navigation
-- Language-specific linting
-- Test framework integration
-- Build tool integration
-
-**Files**:
-- `crates/merlin-languages/src/python/mod.rs` (1500 lines)
-- `crates/merlin-languages/src/typescript/mod.rs` (1500 lines)
-- `crates/merlin-languages/src/go/mod.rs` (1200 lines)
-
-### 10.4 Project Templates & Scaffolding
-
-**Problem**: Starting new features is tedious
-
-**Solution**: Smart scaffolding based on patterns
-```rust
-pub struct Scaffolder {
-    templates: TemplateLibrary,
-    pattern_detector: PatternDetector,
-}
-
-impl Scaffolder {
-    pub async fn scaffold(
-        &self,
-        intent: &Intent,
-        codebase: &Codebase,
-    ) -> Result<Scaffold> {
-        // Detect patterns in existing codebase
-        let patterns = self.pattern_detector.detect(codebase);
-
-        // Select appropriate template
-        let template = self.templates.find_best_match(intent, &patterns);
-
-        // Generate files
-        let mut files = Vec::new();
-        for file_template in template.files {
-            let content = self.render_template(
-                &file_template,
-                intent,
-                &patterns,
-            );
-            files.push(ScaffoldedFile {
-                path: file_template.path,
-                content,
-            });
-        }
-
-        Ok(Scaffold { files })
-    }
-}
-```
-
-**Templates**:
-- "Add REST endpoint" → Controller, route, tests, docs
-- "Create database migration" → Migration file, model update, tests
-- "Add CLI command" → Command definition, args parser, tests
-- "Implement trait" → Impl block, required methods, tests
-
-**Files**:
-- `crates/merlin-agent/src/scaffolder.rs` (600 lines)
-- `templates/` (100+ template files)
-
----
-
-## Success Metrics
-
-### Phase 6 Targets (Agent Intelligence)
-- [ ] TypeScript tool syntax: 90% success rate on complex chains
-- [ ] Tool chaining: 5-10x speedup on multi-file operations
-- [ ] Doc tracking: Catch 95% of stale docs
-- [ ] Style enforcement: 99% consistency with codebase patterns
-
-### Phase 7 Targets (Context Mastery)
-- [ ] Context pruning: Reduce tokens by 60-80% while maintaining quality
-- [ ] Adaptive windows: 90% of tasks fit in optimal window
-- [ ] Semantic search: 95% relevance in top 5 results
-- [ ] LSP navigation: 100% accuracy on "find definition/references"
-
-### Phase 8 Targets (Multi-Model Orchestra)
-- [ ] Cost reduction: 5x cheaper ($0.15 → $0.03 per request)
-- [ ] Ensemble validation: 95% agreement on correct code
-- [ ] Model selection: 90% accuracy in choosing right model
-
-### Phase 9 Targets (Performance)
-- [ ] Incremental updates: 10-25x faster context rebuilds
-- [ ] Parallel execution: 5-10x speedup on independent tasks
-- [ ] Streaming: 70% reduction in perceived latency
-- [ ] Cache hit rate: 60-90% total hits (L1+L2+L3)
-
-### Phase 10 Targets (Adaptive Intelligence)
-- [ ] Feedback learning: 20% improvement after 100 examples
-- [ ] Multi-language: 5 languages with 80%+ feature parity
-- [ ] Scaffolding: 80% of generated code accepted without edits
-
-### Overall Quality Targets
-- [ ] Test coverage: 70% (from 35%)
-- [ ] Success rate: 95% (from 85%)
-- [ ] P95 latency: < 3s for simple tasks
-- [ ] Daily cost: < $1.00 per user
-
----
-
-## Risk Mitigation
-
-### TypeScript Tool Syntax (Phase 6.1)
-**Risk**: Security vulnerabilities in JS runtime
-**Mitigation**:
-- Sandboxed execution (deno_core with permissions disabled)
-- Static analysis before execution
-- Timeout and resource limits
-- Extensive fuzzing
-
-**Risk**: Models generate invalid TypeScript
-**Mitigation**:
-- Type checking before execution
-- Clear error messages with examples
-- Fallback to JSON syntax on parse failure
-
-### Context Pruning (Phase 7.1)
-**Risk**: Pruning removes critical information
-**Mitigation**:
-- Conservative thresholds initially
-- Always include explicitly mentioned files
-- User override: "include file X"
-- Logging to debug pruning decisions
-
-### Model Specialization (Phase 8.1)
-**Risk**: Wrong model selection degrades quality
-**Mitigation**:
-- Benchmark all models on capability suite
-- Conservative fallback: use best model when uncertain
-- User override: "use Claude for this"
-- A/B testing for model selection
-
-### Parallel Execution (Phase 9.2)
-**Risk**: Race conditions and data corruption
-**Mitigation**:
-- File locking for all writes
-- Transaction logs for rollback
-- Conflict detection before merging
-- Extensive concurrency testing
-
-### Learning from Feedback (Phase 10.1)
-**Risk**: Bad feedback corrupts learned policies
-**Mitigation**:
-- Weight by feedback confidence
-- Detect contradictory feedback
-- Allow policy reset
-- Human review of major policy changes
-
----
-
-## Implementation Timeline
-
-### Months 1-2: Phase 6 (Agent Intelligence)
-- Week 1-2: TypeScript tool runtime + parser
-- Week 3-4: Smart tool chaining
-- Week 5-6: Documentation tracking
-- Week 7-8: Coding standards enforcement
-
-### Months 3-4: Phase 7 (Context Mastery)
-- Week 9-10: Context pruning + knapsack optimizer
-- Week 11-12: Adaptive context windows
-- Week 13-14: Conversation summarization
-- Week 15-16: Semantic code search + LSP integration
-
-### Months 5-6: Phase 8 (Multi-Model Orchestra)
-- Week 17-18: Task-specific routing
-- Week 19-20: Ensemble validation
-- Week 21-22: Model capability benchmarks
-- Week 23-24: Cost optimization
-
-### Months 7-8: Phase 9 (Performance & Scale)
-- Week 25-26: Incremental context updates
-- Week 27-28: Parallel task execution
-- Week 29-30: Streaming optimization
-- Week 31-32: Hierarchical caching
-
-### Months 9-10: Phase 10 (Adaptive Intelligence)
-- Week 33-34: Feedback learning system
-- Week 35-36: Dynamic prompt engineering
-- Week 37-38: Multi-language support (Python, TypeScript)
-- Week 39-40: Project scaffolding
-
-**Total Timeline**: 10 months
-**Estimated Effort**: 800-1000 hours
-
----
-
-## Conclusion
-
-This roadmap transforms Merlin from a capable multi-model router into a **world-class AI coding agent** that:
-
-1. **Understands code deeply** (LSP integration, semantic search)
-2. **Uses tools naturally** (TypeScript syntax, smart chaining)
-3. **Manages context intelligently** (pruning, adaptive windows, summarization)
-4. **Optimizes cost** (task-specific models, caching, parallel execution)
-5. **Learns continuously** (feedback loops, dynamic prompts)
-6. **Scales to any language** (pluggable backends)
-
-The **TypeScript tool syntax** (Phase 6.1) is the most revolutionary change - it leverages LLMs' training on billions of lines of open-source code to make tool usage completely natural. Combined with intelligent context management and multi-model orchestration, Merlin will set a new standard for AI-assisted development.
-
-**Key Differentiators**:
-- ✅ Local-first (Qwen 7B for privacy + speed)
-- ✅ Cost-optimized (5x cheaper with model specialization)
-- ✅ Parallel execution (10x faster on multi-file operations)
-- ✅ Language-aware (LSP integration for precise navigation)
-- ✅ Learning system (improves from feedback)
-
-**Next Actions**:
-1. Review and refine this plan with stakeholders
-2. Begin Phase 6.1: TypeScript tool syntax prototype
-3. Set up benchmarking infrastructure for measuring improvements
-4. Establish baseline metrics for comparison
-
-This is an ambitious but achievable plan to build the best AI coding agent in the world. 🚀

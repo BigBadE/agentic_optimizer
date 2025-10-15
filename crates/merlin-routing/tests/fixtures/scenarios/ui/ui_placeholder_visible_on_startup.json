@@ -1,0 +1,36 @@
+{
+  "name": "Placeholder Visible On Startup",
+  "description": "Tests that 'Start a new conversation...' placeholder is visible on startup even with existing tasks",
+  "config": {
+    "terminal_size": [80, 30],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "existing_tasks": [
+      {"description": "First conversation", "status": "Completed"},
+      {"description": "Second conversation", "status": "Completed"},
+      {"description": "Third conversation", "status": "Completed"},
+      {"description": "Fourth conversation", "status": "Completed"}
+    ],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "description": "Initial state - placeholder should be visible and selected at bottom",
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 10
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "snapshot": "ui_placeholder_visible_on_startup.txt",
+          "focused_pane": "Input"
+        }
+      }
+    }
+  ]
+}

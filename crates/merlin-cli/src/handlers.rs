@@ -295,8 +295,13 @@ pub async fn handle_interactive(
             .init();
     }
 
-    // Create routing configuration
-    let mut config = RoutingConfig::default();
+    // Load or create routing configuration from ~/.merlin/config.toml
+    let mut config = RoutingConfig::load_or_create().unwrap_or_else(|error| {
+        tracing::warn!("Failed to load config from ~/.merlin/config.toml: {error}");
+        tracing::warn!("Using default configuration");
+        RoutingConfig::default()
+    });
+
     config.validation.enabled = !matches!(validation, Validation::Disabled);
     config.workspace.root_path.clone_from(&project);
     config.execution.context_dump = context_dump;

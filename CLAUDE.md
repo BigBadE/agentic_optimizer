@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance when working with code in this repository.
 
 ## Project Overview
 
@@ -14,244 +14,137 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 - Terminal UI for real-time progress monitoring
 - Interactive agent with conversation context
 
-## Testing Guidelines
-
-**IMPORTANT**: When writing or modifying tests, especially for UI components and input handling:
-- **Never directly manipulate** `InputManager` or `TuiApp` internal state
-- **Always use event sources** to inject test input
-- See **[TESTS.md](./TESTS.md)** for detailed testing patterns and examples
-
-## Essential Development Commands
-
-### Building and Running
-
-```bash
-# Build the project (uses cranelift codegen for fast dev builds)
-cargo build
-
-# Release build (thin LTO, codegen-units=1)
-cargo build --release
-
-# CI-optimized build (used in GitHub Actions)
-cargo build --profile ci-release
-
-# Run the interactive agent
-cargo run --bin merlin-cli
-
-# Run with local models only
-cargo run --bin merlin-cli -- --local
-
-# Skip validation for faster iterations
-cargo run --bin merlin-cli -- --no-validate
-```
-
-### Testing
-
-```bash
-# Run all tests across workspace
-cargo test --workspace
-
-# Run tests with coverage (requires cargo-llvm-cov)
-cargo llvm-cov --lcov --output-path coverage.info --workspace --ignore-filename-regex "test_repositories|benchmarks"
-
-# Run specific crate tests
-cargo test -p merlin-routing
-cargo test -p merlin-core
-
-# Run integration tests with output
-cargo test --test integration_tests -- --nocapture
-
-# Run a single test
-cargo test test_name -- --exact --nocapture
-```
-
-### Linting and Formatting
-
-```bash
-# Run clippy (very strict lints - see Cargo.toml workspace.lints)
-cargo clippy --workspace --all-targets --all-features
-
-# Format code
-cargo fmt --all
-
-# Check formatting without modifying
-cargo fmt --all -- --check
-```
-
-### Benchmarking
-
-```bash
-# Run all benchmarks
-cargo bench --workspace
-
-# Run routing benchmarks only
-cargo bench -p merlin-routing
-
-# View results
-open target/criterion/report/index.html
-```
-
 ## Architecture
 
 ### Workspace Structure
 
-This is a **Cargo workspace** with multiple crates organized by functionality:
+Cargo workspace with multiple crates:
 
-**Core Crates:**
+**Core:**
 - `merlin-core` - Fundamental types, traits (`ModelProvider`), error handling
-- `merlin-context` - Context management and file indexing
-- `merlin-languages` - Language-specific backends (currently Rust via rust-analyzer)
+- `merlin-context` - Context management, file indexing
+- `merlin-languages` - Language-specific backends (Rust via rust-analyzer)
 
 **Model Integration:**
 - `merlin-providers` - External API providers (Groq, OpenRouter, Anthropic)
 - `merlin-local` - Local model integration via Ollama
 - `merlin-agent` - Agent execution, self-assessment, step tracking
 
-**Routing System (merlin-routing):**
+**Routing System (`merlin-routing`):**
+- `agent/` - Agent execution (`executor.rs`), context management (`context_manager.rs`, `context_fetcher.rs`), conversation tracking (`conversation.rs`), task coordination (`task_coordinator.rs`), self-assessment (`self_assess.rs`)
 - `analyzer/` - Task complexity analysis and decomposition
 - `router/` - Model tier selection strategies
 - `executor/` - Task execution with workspace isolation and conflict detection
 - `validator/` - Multi-stage validation pipeline
-- `orchestrator.rs` - High-level coordination of all routing components
-- `user_interface/` - Terminal UI with ratatui (TUI) and crossterm
+- `orchestrator.rs` - High-level coordination of all components
+- `user_interface/` - Terminal UI (TUI) with ratatui and crossterm
 
 **CLI:**
 - `merlin-cli` - Command-line interface and interactive agent
 - `merlin-tools` - File operations and command execution tools
 
-### Key Architectural Patterns
+### Key Patterns
 
-**Model Routing Flow:**
-1. **Analyze** - `TaskAnalyzer` determines complexity, intent, scope
-2. **Route** - `RoutingStrategy` selects model tier (Local/Groq/Premium)
-3. **Execute** - `AgentExecutor` runs task with `ToolRegistry`
-4. **Validate** - `ValidationPipeline` runs syntax/build/test/lint checks
-5. **Escalate** - On failure, retry with higher tier (up to 3 retries)
+**Model Routing:**
+1. Analyze - `TaskAnalyzer` determines complexity, intent, scope
+2. Route - `RoutingStrategy` selects model tier
+3. Execute - `AgentExecutor` runs task with `ToolRegistry`
+4. Validate - `ValidationPipeline` runs checks
+5. Escalate - Retry with higher tier on failure (up to 3 retries)
 
 **Task Decomposition:**
-- Single tasks execute directly
 - Complex tasks split into subtasks with dependencies
 - Execution strategies: Sequential, Pipeline, Parallel, Hybrid
-- Conflict detection prevents concurrent modifications to same files
+- Conflict detection prevents concurrent file modifications
 
 **Workspace Isolation:**
-- `TaskWorkspace` provides transactional file operations
-- `WorkspaceSnapshot` enables rollback on validation failure
-- `FileLockManager` prevents concurrent file modifications
+- `TaskWorkspace` - Transactional file operations
+- `WorkspaceSnapshot` - Rollback on validation failure
+- `FileLockManager` - Prevents concurrent modifications
 
 **TUI Architecture:**
-- `TuiApp` manages application state and event loop
-- `TaskManager` displays task progress in tree structure
-- `InputManager` handles user input with `tui-textarea`
-- `UiChannel` receives streaming events from orchestrator
+- `TuiApp` - Application state and event loop
+- `TaskManager` - Task progress tree
+- `InputManager` - User input with `tui-textarea`
+- `UiChannel` - Streaming events from orchestrator
+- All input sourced through `InputEventSource` trait for test injection
 
 ## Critical Constraints
 
 ### Strict Linting
 
-This project has **extremely strict clippy lints** (see `Cargo.toml` lines 111-169):
+Extremely strict clippy lints (Cargo.toml lines 111-172):
 - All clippy categories denied: `all`, `complexity`, `correctness`, `nursery`, `pedantic`, `perf`, `style`, `suspicious`
-- Many restriction lints enabled: `expect_used`, `unwrap_used`, `todo`, `unimplemented`, `print_stdout`, `print_stderr`
-- Missing documentation is denied (`missing_docs`)
-- All code must use `Result<T, E>` with proper error handling
+- Restriction lints: `expect_used`, `unwrap_used`, `todo`, `unimplemented`, `print_stdout`, `print_stderr`, and many more
+- `missing_docs` denied
+- All code uses `Result<T, E>` with proper error handling
 
-**When writing code:**
-- Never use `.unwrap()` or `.expect()` - use proper error propagation
-- Never use `todo!()`, `unimplemented!()`, or `unreachable!()`
-- Never use `println!()` or `eprintln!()` - use `tracing` macros
-- All public items must have documentation comments
-- Avoid wildcards in use statements where possible
-- Do NOT EVER, UNDER ANY CIRCUMSTANCES use allow
+**Requirements:**
+- Never use `.unwrap()`, `.expect()`, `todo!()`, `unimplemented!()`, `unreachable!()`
+- Never use `println!()`/`eprintln!()` - use `tracing` macros
+- All public items need doc comments
+- Never use `#[allow]` outside test modules (test modules use `#[cfg_attr(test, allow(...))]`)
 
-### Edition 2024 Features
+### Rust Edition 2024
 
-The project uses **Rust Edition 2024** (Cargo.toml line 13):
-- Use RPITIT (return position impl trait in traits) instead of `async-trait` where possible
+Uses Rust Edition 2024 (Cargo.toml line 11):
+- Prefer RPITIT over `async-trait` where possible
 - Leverage gen blocks and async generators
-- Use new pattern matching features
 
-### Toolchain Requirements
+### Dependencies
 
-**Required:**
-- Rust nightly (enforced by `rust-toolchain.toml`)
-- Components: `rustfmt`, `clippy`, `rust-src`
-- Cranelift codegen backend for dev profile (fast iteration)
-
-**Optional Development:**
-- `cargo-llvm-cov` for coverage
-- `cargo-chef` for CI caching
-- Ollama running locally for local tier testing
-
-### Dependency Compatibility Notes
-
-**TUI Stack (CRITICAL):**
+**TUI Stack (CRITICAL - DO NOT UPGRADE):**
 ```toml
-ratatui = "0.29"        # NOT 0.30.x - incompatible with tui-textarea
-crossterm = "0.28"       # NOT 0.29 - see above
-tui-textarea = "0.7"     # Latest compatible version
+ratatui = "0.29"        # NOT 0.30+ (incompatible with tui-textarea)
+crossterm = "0.28"      # NOT 0.29+ (incompatible with tui-textarea)
+tui-textarea = "0.7"
 ```
-
-Do not upgrade these dependencies independently - they must stay synchronized.
 
 **Rust Analyzer:**
-All `ra_ap_*` dependencies are pinned to `"0.0"` (latest) to track rust-analyzer releases.
+All `ra_ap_*` dependencies pinned to `"0.0"` (latest).
 
-## Build Optimizations
+### Build Configuration
 
-### Fast Config (.cargo/fast_config.toml)
+**Profiles:**
+- `dev` - Cranelift backend for dependencies (fast iteration)
+- `release` - Thin LTO, codegen-units=1, strip symbols
+- `bench` - Debug symbols enabled
 
-The repository includes optimized linker configuration:
-- **Linux**: Uses LLD linker with `-Zshare-generics=y -Zthreads=0`
-- **macOS**: Uses default ld64 (faster than LLD on macOS)
-- **Windows**: Uses `rust-lld.exe` with `-Zshare-generics=n`
+**Fast Config (`.cargo/fast_config.toml`):**
+- Linux: LLD linker with `-Zshare-generics=y -Zthreads=0`
+- macOS: Default ld64
+- Windows: `rust-lld.exe` with `-Zshare-generics=n`
 
-**To enable locally:**
-```bash
-cp .cargo/fast_config.toml .cargo/config.toml
-```
-
-### Build Profiles
-
-- `dev` - Uses cranelift backend for dependencies (fast iteration)
-- `release` - Thin LTO, codegen-units=1, strip symbols (production)
-- `ci-release` - Inherits release, codegen-units=16 for faster CI builds
-
-## GitHub Actions
-
-**Workflows:**
-- `test.yml` - Multi-platform tests (Ubuntu/Windows/macOS) with coverage
-- `style.yml` - Fast formatting and clippy checks
-- `benchmark.yml` - Criterion benchmarks with historical tracking
-- `quality_benchmarks.yml` - Runs test case benchmarks
-
-**Custom Actions:**
-- `.github/actions/setup-rust` - Installs toolchain, sets up fast config, uses cargo-chef for caching
-
-**All workflows:**
-- Use Rust nightly toolchain
-- Copy `.cargo/fast_config.toml` to `.cargo/config.toml`
-- Have concurrency groups to cancel redundant runs
-- Set `CARGO_INCREMENTAL=0` and `CARGO_TERM_COLOR=always`
+**Toolchain:**
+- Nightly required (`rust-toolchain.toml`)
+- Components: `rustfmt`, `clippy`, `rust-src`
 
 ## Common Gotchas
+
+### TUI Testing
+
+**CRITICAL - Never manipulate internal state directly in tests:**
+- Use `InputEventSource` trait to inject events
+- Create test event sources implementing the trait
+- Example in `tests/scenario_runner.rs:TestEventSource`
+- All UI tests use event injection, not direct state manipulation
 
 ### TUI Event Handling
 
 When modifying `user_interface/app.rs`:
-- Input must be converted to `tui_textarea::Input::from(crossterm::event::Event::Key(key))`
-- Style types must come from `ratatui`, not re-exported from `tui-textarea`
-- `TextArea` is rendered by reference: `frame.render_widget(&input_area, area)`
+- Input converts to `tui_textarea::Input::from(crossterm::event::Event::Key(key))`
+- Style types from `ratatui`, not `tui-textarea`
+- `TextArea` rendered by reference: `frame.render_widget(&input_area, area)`
 
 ### File Operations
 
-All file operations in task execution should use:
+Use in task execution:
 - `TaskWorkspace` for transactional operations
 - `FileLockManager` to prevent conflicts
 - `WriteFileTool`, `ReadFileTool`, `ListFilesTool` from `merlin-tools`
 
 ### Error Handling
 
-Due to strict lints, errors must be handled explicitly:
 ```rust
 // BAD - will not compile
 let value = result.unwrap();
@@ -260,39 +153,56 @@ let value = result.unwrap();
 let value = result.map_err(|err| RoutingError::ExecutionFailed(err.to_string()))?;
 ```
 
-### Async Context
+## Testing
 
-Most agent and provider operations are async:
-- Use `tokio` runtime (workspace default: full features)
-- Provider trait methods are `async fn` (uses `async-trait` currently)
-- Executor methods return `Future`s that must be `.await`ed
+**Structure:**
+- Unit tests: Inline in `src/` with `#[cfg(test)]`
+- Integration tests: `tests/integration/`
+- E2E tests: `tests/e2e/`
+- Scenario-based tests: JSON fixtures in `tests/fixtures/scenarios/`
+- Benchmarks: `benches/` (criterion)
 
-## Testing Strategy
-
-**Unit Tests:** Inline in `src/` files with `#[cfg(test)]`
-**Integration Tests:** In `tests/` directories
-**Benchmarks:** In `benches/` directories (use `criterion` harness)
+**Scenario Testing:**
+- JSON-based test scenarios in `tests/fixtures/scenarios/`
+- Snapshots in `tests/fixtures/snapshots/`
+- Runner in `tests/scenario_runner.rs`
+- Supports UI state verification, event injection, task spawning
 
 **TUI Testing:**
-- Create mock `UiChannel` for event injection
-- Use `TaskManager::new()` with test data
-- Verify state transitions without rendering
+- Mock `UiChannel` for event injection
+- Test event sources implementing `InputEventSource`
+- Verify state without rendering
+- Never manipulate `InputManager` or `TuiApp` internal state
 
-**Provider Testing:**
-- Mock HTTP responses for external APIs
-- Use local Ollama for integration tests
-- Test fallback and retry logic
+## Verification Before Completion
+
+**CRITICAL - Run before marking any task complete:**
+
+```bash
+./scripts/verify.sh
+```
+
+This script:
+1. Formats code (`cargo fmt`)
+2. Runs clippy with warnings as errors
+3. Runs all tests (workspace, lib, bins, tests)
+
+**Optional flags:**
+- `--no-cloud` - Disable cloud provider tests
+- `--ollama` - Run Ollama-specific tests
+
+**Must pass with zero errors.** Never use `#[allow]` to silence warnings.
 
 ## Documentation Standards
 
-All public items require doc comments:
+All public items need doc comments:
 ```rust
 /// Brief one-line summary.
 ///
 /// Detailed explanation with examples if complex.
 ///
 /// # Errors
-/// When applicable, describe error conditions.
+/// Describe error conditions when returning `Result`.
 ///
 /// # Examples
 /// ```
@@ -301,52 +211,3 @@ All public items require doc comments:
 /// ```
 pub fn function() -> Result<()> { ... }
 ```
-
-## Critical Task Completion Requirements
-
-**BEFORE marking any task as complete, you MUST:**
-
-1. **Run clippy and fix ALL warnings/errors**:
-   ```bash
-   cargo clippy --workspace --all-targets --all-features
-   ```
-   - Fix every warning - this project has ZERO tolerance for clippy warnings
-   - Never use `#[allow]` attributes outside of test modules
-   - All code must pass the strict linting rules defined in Cargo.toml
-
-2. **Run all tests and ensure they pass**:
-   ```bash
-   cargo test --workspace
-   ```
-   - All tests must pass
-   - No ignored tests should be introduced without justification
-   - Test coverage should increase, not decrease
-
-3. **Verify the build succeeds**:
-   ```bash
-   cargo build --workspace
-   ```
-   - All crates must compile
-   - No build warnings
-
-**This is CRITICALLY important** - incomplete or untested code creates technical debt and breaks CI/CD.
-
-## Verification Before Task Completion
-
-**CRITICAL**: Before marking any task as complete, you MUST run the verification script:
-
-```bash
-./scripts/verify.sh
-```
-
-This script will:
-1. Format all code with `cargo fmt`
-2. Run `cargo clippy` with all warnings treated as errors
-3. Run all tests across the workspace
-
-**The verification script MUST pass with no errors.** If it fails:
-- Fix all clippy warnings (never use `#[allow]` outside test modules)
-- Fix all test failures
-- Ensure code is properly formatted
-
-This is the single source of truth for code quality - if `verify.sh` passes, the code is ready.

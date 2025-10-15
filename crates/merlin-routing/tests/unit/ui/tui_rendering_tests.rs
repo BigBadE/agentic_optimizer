@@ -82,7 +82,6 @@ fn test_render_with_tasks() {
 
     let state = UiState {
         active_task_id: Some(task_id),
-        selected_task_index: 0,
         ..Default::default()
     };
 

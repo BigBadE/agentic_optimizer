@@ -1,19 +1,18 @@
 use std::collections::HashSet;
 use std::sync::Arc;
 
-use tokio::sync::Semaphore;
-use tokio::sync::mpsc;
-use tokio::task::JoinSet;
-
 use super::graph::TaskGraph;
 use super::scheduler::ConflictAwareTaskGraph;
 use super::state::WorkspaceState;
 use crate::user_interface::UiChannel;
 use crate::{
-    AgentExecutor, ContextFetcher, ListFilesTool, ModelRouter, ReadFileTool, Result, RoutingError,
-    RunCommandTool, SubagentTool, Task, TaskResult, Tool, ToolRegistry, TypeScriptTool, Validator,
-    WriteFileTool,
+    AgentExecutor, ContextFetcher, ListFilesTool, ModelRouter, ReadFileTool, Result, RoutingConfig,
+    RoutingError, RunCommandTool, SubagentTool, Task, TaskResult, Tool, ToolRegistry,
+    TypeScriptTool, Validator, WriteFileTool,
 };
+use tokio::sync::Semaphore;
+use tokio::sync::mpsc;
+use tokio::task::JoinSet;
 
 /// Parallel task executor with concurrency limits
 pub struct ExecutorPool {
@@ -179,6 +178,7 @@ impl ExecutorPool {
     ) -> Result<TaskResult> {
         // Build tool registry based on workspace root
         let workspace_root = workspace.root_path().clone();
+        let default_config = RoutingConfig::default();
 
         // First, create the basic tools
         let basic_tools: Vec<Arc<dyn Tool>> = vec![
@@ -190,7 +190,8 @@ impl ExecutorPool {
 
         // Create advanced tools
         let ts_tool = Arc::new(TypeScriptTool::new(basic_tools.clone()));
-        let subagent_tool = Arc::new(SubagentTool::new());
+        let config_arc = Arc::new(default_config.clone());
+        let subagent_tool = Arc::new(SubagentTool::new(config_arc));
 
         // Build the complete registry
         let mut tool_registry = ToolRegistry::default();
@@ -203,7 +204,13 @@ impl ExecutorPool {
 
         // Create context fetcher and AgentExecutor
         let context_fetcher = ContextFetcher::new(workspace_root);
-        let mut executor = AgentExecutor::new(router, validator, tool_registry, context_fetcher);
+        let mut executor = AgentExecutor::new(
+            router,
+            validator,
+            tool_registry,
+            context_fetcher,
+            default_config,
+        );
         let (sender, _receiver) = mpsc::unbounded_channel();
         let ui_channel = UiChannel::from_sender(sender);
 

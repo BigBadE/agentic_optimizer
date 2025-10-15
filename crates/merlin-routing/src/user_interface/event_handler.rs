@@ -111,12 +111,21 @@ impl<'handler> EventHandler<'handler> {
         // Clear processing status since task has started
         self.state.processing_status = None;
 
-        // Ensure parent is not collapsed
+        // Ensure parent conversation is expanded to show the new child task
         if let Some(parent_id) = parent_id {
-            self.task_manager.expand_task(parent_id);
+            // Find the root conversation (parent might be a child itself)
+            let mut root_id = parent_id;
+            while let Some(task) = self.task_manager.get_task(root_id) {
+                if let Some(grandparent_id) = task.parent_id {
+                    root_id = grandparent_id;
+                } else {
+                    break;
+                }
+            }
+            self.state.expanded_conversations.insert(root_id);
         }
 
-        // Select the newly spawned task
+        // Auto-select newly spawned task
         self.select_task(task_id);
     }
 
@@ -139,6 +148,8 @@ impl<'handler> EventHandler<'handler> {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             task.status = TaskStatus::Completed;
             task.end_time = Some(Instant::now());
+            // Clear progress indicator when task completes
+            task.progress = None;
         }
 
         if let Some(persistence) = self.persistence
@@ -231,14 +242,6 @@ impl<'handler> EventHandler<'handler> {
     }
 
     fn select_task(&mut self, task_id: TaskId) {
-        if let Some(pos) = self
-            .task_manager
-            .task_order()
-            .iter()
-            .position(|&id| id == task_id)
-        {
-            self.state.selected_task_index = pos;
-        }
         self.state.active_task_id = Some(task_id);
         // Reset scroll offset when switching tasks
         self.state.output_scroll_offset = 0;

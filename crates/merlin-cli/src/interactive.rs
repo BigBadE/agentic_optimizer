@@ -294,11 +294,22 @@ async fn run_tui_interactive(
         if let Some(user_input) = tui_app.take_pending_input() {
             writeln!(log_file, "User: {user_input}")?;
 
-            let parent_task_id = tui_app.get_selected_task_id();
+            // Get conversation history BEFORE taking continuing_from (which clears the state)
             let conversation_history = tui_app.get_conversation_history();
+
+            // Check if we're continuing a conversation
+            let continuing_from = tui_app.take_continuing_conversation_from();
+
+            // Get parent task ID - use continuing_from if set, otherwise use selected task
+            let parent_task_id = continuing_from.or_else(|| tui_app.get_selected_task_id());
             tracing::info!(
-                "interactive.rs: Extracted {} conversation messages for task execution",
-                conversation_history.len()
+                "interactive.rs: Extracted {} conversation messages for task execution{}",
+                conversation_history.len(),
+                if continuing_from.is_some() {
+                    " (continuing conversation)"
+                } else {
+                    ""
+                }
             );
             let log_clone = log_file.try_clone()?;
 

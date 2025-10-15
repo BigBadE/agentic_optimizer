@@ -1,0 +1,41 @@
+{
+  "name": "Task List Respects Screen Size",
+  "description": "Tests that task list with many children doesn't exceed screen height",
+  "config": {
+    "terminal_size": [80, 25],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "agent_response",
+        "data": {
+          "text": "Processing large batch",
+          "tool_calls": [],
+          "subtasks": [
+            {"description": "Task 1", "priority": "high"},
+            {"description": "Task 2", "priority": "high"},
+            {"description": "Task 3", "priority": "high"},
+            {"description": "Task 4", "priority": "high"},
+            {"description": "Task 5", "priority": "high"},
+            {"description": "Task 6", "priority": "high"},
+            {"description": "Task 7", "priority": "high"},
+            {"description": "Task 8", "priority": "high"},
+            {"description": "Task 9", "priority": "high"},
+            {"description": "Task 10", "priority": "high"}
+          ]
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "snapshot": "ui_task_list_screen_size.txt"
+        }
+      }
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "name": "Conversation Scroll - Initial State",
+  "description": "Tests that on fresh open, the latest conversation is shown",
+  "config": {
+    "terminal_size": [80, 30],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "existing_tasks": [
+      {"description": "First conversation", "status": "Completed"},
+      {"description": "Second conversation", "status": "Completed"},
+      {"description": "Third conversation", "status": "Completed"}
+    ],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 10
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "snapshot": "ui_conversation_scroll_initial.txt"
+        }
+      }
+    }
+  ]
+}

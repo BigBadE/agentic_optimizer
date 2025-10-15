@@ -1,3 +1,6 @@
+mod conversation_continuation_tests;
+mod expansion_tests;
+mod task_list_tests;
 mod test_autowrap_fix;
 mod tui_edge_cases_tests;
 mod tui_rendering_tests;

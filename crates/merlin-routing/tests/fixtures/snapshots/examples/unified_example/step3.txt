@@ -1,9 +1,9 @@
 ┌─── Tasks ────────────────────────────────────────────────────────────────────┐
 │[◉] I'll read the config.json file for you.                                   │
-│ └─ [◉] Read config.json and tell me what's in it                             │
 └──────────────────────────────────────────────────────────────────────────────┘
 ┌─── Focused - I'll read the config.json file for you.  [Indexing: 0%] ────────┐
 │ No output yet...                                                             │
+│                                                                              │
 │                                                                              │
 │                                                                              │
 │                                                                              │

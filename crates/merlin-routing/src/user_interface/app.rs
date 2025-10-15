@@ -104,7 +104,7 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             .as_ref()
             .map(|dir| TaskPersistence::new(dir.clone()));
 
-        let app = Self {
+        let mut app = Self {
             terminal,
             event_receiver: receiver,
             task_manager: TaskManager::default(),
@@ -117,6 +117,9 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             event_source: Box::new(CrosstermEventSource),
             last_render_time: Instant::now(),
         };
+
+        // Initialize scroll to show placeholder at bottom (selected by default)
+        app.adjust_task_list_scroll();
 
         let channel = super::UiChannel { sender };
 
@@ -238,6 +241,11 @@ impl<B: Backend> TuiApp<B> {
         self.pending_input.take()
     }
 
+    /// Takes the task ID to continue conversation from (clears it after taking)
+    pub fn take_continuing_conversation_from(&mut self) -> Option<TaskId> {
+        self.state.continuing_conversation_from.take()
+    }
+
     /// Adds an assistant response to conversation history
     pub fn add_assistant_response(&mut self, text: String) {
         self.state.add_conversation_entry(ConversationEntry {
@@ -249,10 +257,21 @@ impl<B: Backend> TuiApp<B> {
 
     /// Gets conversation history in (role, content) format for context building
     pub fn get_conversation_history(&self) -> Vec<(String, String)> {
+        // If continuing a conversation, load history from that task
+        if let Some(task_id) = self.state.continuing_conversation_from {
+            tracing::info!(
+                "TuiApp::get_conversation_history() - continuing from task {:?}",
+                task_id
+            );
+            return self.get_conversation_history_from_task(task_id);
+        }
+
+        // Otherwise, use current conversation history, filtering out system messages
         let history: Vec<(String, String)> = self
             .state
             .conversation_history
             .iter()
+            .filter(|entry| entry.role != ConversationRole::System)
             .map(|entry| {
                 let role = match entry.role {
                     ConversationRole::User => "user",
@@ -270,16 +289,77 @@ impl<B: Backend> TuiApp<B> {
         history
     }
 
+    /// Gets conversation history from a specific task and its ancestors
+    fn get_conversation_history_from_task(&self, task_id: TaskId) -> Vec<(String, String)> {
+        let mut history = Vec::new();
+
+        // Find the root task
+        let mut current_id = task_id;
+        let root_id = loop {
+            if let Some(task) = self.task_manager.get_task(current_id) {
+                if let Some(parent_id) = task.parent_id {
+                    current_id = parent_id;
+                } else {
+                    break current_id;
+                }
+            } else {
+                break task_id;
+            }
+        };
+
+        // Collect all tasks in the conversation chain (root and its children)
+        let mut conversation_tasks = vec![root_id];
+        for (id, task) in self.task_manager.iter_tasks() {
+            if task.parent_id == Some(root_id) {
+                conversation_tasks.push(id);
+            }
+        }
+
+        // Sort by start time to maintain chronological order
+        conversation_tasks.sort_by(|task_a, task_b| {
+            let time_a = self
+                .task_manager
+                .get_task(*task_a)
+                .map_or_else(Instant::now, |task| task.start_time);
+            let time_b = self
+                .task_manager
+                .get_task(*task_b)
+                .map_or_else(Instant::now, |task| task.start_time);
+            time_a.cmp(&time_b)
+        });
+
+        // Extract conversation from each task's description and output
+        for id in conversation_tasks {
+            if let Some(task) = self.task_manager.get_task(id) {
+                // Add user message (task description)
+                if !task.description.is_empty()
+                    && !task.description.starts_with("Saving task")
+                    && !task.description.starts_with("Loading task")
+                {
+                    history.push(("user".to_string(), task.description.clone()));
+                }
+
+                // Add assistant response from output tree
+                let output_text = task.output_tree.to_text();
+                if !output_text.is_empty()
+                    && !output_text.contains("Saving task")
+                    && !output_text.contains("Loading task")
+                {
+                    history.push(("assistant".to_string(), output_text));
+                }
+            }
+        }
+
+        tracing::info!(
+            "TuiApp::get_conversation_history_from_task() returning {} messages from task chain",
+            history.len()
+        );
+        history
+    }
+
     /// Gets the selected task ID
     pub fn get_selected_task_id(&self) -> Option<TaskId> {
-        if self.state.active_task_id.is_some() {
-            self.task_manager
-                .task_order()
-                .get(self.state.selected_task_index)
-                .copied()
-        } else {
-            None
-        }
+        self.state.active_task_id
     }
 
     /// Gets the parent of the selected task
@@ -500,7 +580,15 @@ impl<B: Backend> TuiApp<B> {
                 }
             }
             FocusedPane::Tasks => {
-                self.toggle_selected_task_collapse();
+                // Toggle expand/collapse for the selected conversation
+                if let Some(selected_id) = self.state.active_task_id {
+                    let root_id = self.find_root_conversation(selected_id);
+                    if self.state.expanded_conversations.contains(&root_id) {
+                        self.state.expanded_conversations.remove(&root_id);
+                    } else {
+                        self.state.expanded_conversations.insert(root_id);
+                    }
+                }
                 false
             }
             FocusedPane::Output => false,
@@ -586,17 +674,13 @@ impl<B: Backend> TuiApp<B> {
     /// Handles key events when the tasks pane is focused
     fn handle_task_key(&mut self, key: &KeyEvent) {
         match key.code {
-            KeyCode::Up => {
-                self.state.pending_delete_task_id = None;
-                self.navigate_tasks_up();
-            }
-            KeyCode::Down => {
-                self.state.pending_delete_task_id = None;
-                self.navigate_tasks_down();
+            KeyCode::Up => self.navigate_tasks_up(),
+            KeyCode::Down => self.navigate_tasks_down(),
+            KeyCode::Right => {
+                self.toggle_selected_task_collapse();
             }
             KeyCode::Left => {
                 self.state.active_task_id = None;
-                self.state.selected_task_index = usize::MAX;
                 self.state.pending_delete_task_id = None;
             }
             KeyCode::Backspace => self.handle_backspace_in_tasks(),
@@ -604,13 +688,22 @@ impl<B: Backend> TuiApp<B> {
         }
     }
 
+    /// Finds the root conversation for a given task ID
+    fn find_root_conversation(&self, task_id: TaskId) -> TaskId {
+        let mut current_id = task_id;
+        while let Some(task) = self.task_manager.get_task(current_id) {
+            if let Some(parent_id) = task.parent_id {
+                current_id = parent_id;
+            } else {
+                return current_id;
+            }
+        }
+        task_id
+    }
+
     /// Handles backspace behavior in the tasks pane (two-step delete)
     fn handle_backspace_in_tasks(&mut self) {
-        let Some(&selected_task_id) = self
-            .task_manager
-            .task_order()
-            .get(self.state.selected_task_index)
-        else {
+        let Some(selected_task_id) = self.state.active_task_id else {
             return;
         };
 
@@ -636,6 +729,15 @@ impl<B: Backend> TuiApp<B> {
             return true;
         }
 
+        // If a task is selected, we're continuing that conversation
+        // Clear the selection so the new message starts a fresh conversation context
+        if self.state.active_task_id.is_some() {
+            // Keep the conversation history from the selected task's root
+            // The orchestrator will use this to continue the conversation
+            self.state.continuing_conversation_from = self.state.active_task_id;
+            self.state.active_task_id = None;
+        }
+
         self.state.add_conversation_entry(ConversationEntry {
             role: ConversationRole::User,
             text: input.clone(),
@@ -651,141 +753,176 @@ impl<B: Backend> TuiApp<B> {
         false
     }
 
-    /// Collapses or expands the currently selected task in the tasks pane
+    /// Toggles collapse state of the selected task
     fn toggle_selected_task_collapse(&mut self) {
-        let Some(&task_id) = self
-            .task_manager
-            .task_order()
-            .get(self.state.selected_task_index)
-        else {
+        let Some(task_id) = self.state.active_task_id else {
             return;
         };
 
         self.task_manager.toggle_collapse(task_id);
     }
 
+    /// Builds a flat list of all visible tasks in display order
+    /// Includes root conversations and their children if expanded
+    /// Returns Vec of (`task_id`, `is_child`) tuples in chronological order
+    fn build_visible_task_list(&self) -> Vec<(TaskId, bool)> {
+        // Get all root conversations sorted by start time (oldest first)
+        let mut root_conversations: Vec<_> = self
+            .task_manager
+            .iter_tasks()
+            .filter(|(_, task)| task.parent_id.is_none())
+            .collect();
+        root_conversations
+            .sort_by(|(_, task_a), (_, task_b)| task_a.start_time.cmp(&task_b.start_time));
+
+        let mut visible_tasks = Vec::new();
+
+        for (root_id, _) in &root_conversations {
+            // Add the root conversation
+            visible_tasks.push((*root_id, false));
+
+            // If expanded, add its children
+            if self.state.expanded_conversations.contains(root_id) {
+                let mut children: Vec<_> = self
+                    .task_manager
+                    .iter_tasks()
+                    .filter(|(_, task)| task.parent_id == Some(*root_id))
+                    .collect();
+                children
+                    .sort_by(|(_, task_a), (_, task_b)| task_a.start_time.cmp(&task_b.start_time));
+
+                for (child_id, _) in children {
+                    visible_tasks.push((child_id, true));
+                }
+            }
+        }
+
+        visible_tasks
+    }
+
     /// Moves selection up within the visible tasks, updating active selection
+    /// Navigates through both root conversations and expanded children
+    /// Up moves to older tasks (up the screen)
     fn navigate_tasks_up(&mut self) {
-        let visible_tasks = self.task_manager.get_visible_tasks();
+        let visible_tasks = self.build_visible_task_list();
+
         if visible_tasks.is_empty() {
+            // No tasks, stay on placeholder
             return;
         }
 
+        // If nothing selected (placeholder at bottom), select the newest visible task (last in list)
         if self.state.active_task_id.is_none() {
-            self.select_last_visible_task(&visible_tasks);
+            if let Some((last_id, _)) = visible_tasks.last() {
+                self.state.active_task_id = Some(*last_id);
+                self.adjust_task_list_scroll();
+            }
             return;
         }
 
-        if self.state.selected_task_index >= self.task_manager.task_order().len() {
-            self.select_last_visible_task(&visible_tasks);
+        // Find current task in the visible list
+        let Some(current_id) = self.state.active_task_id else {
             return;
-        }
+        };
 
-        self.select_previous_visible_task(&visible_tasks);
+        // Find the previous task in the visible list (older, up the screen)
+        if let Some(current_pos) = visible_tasks.iter().position(|(id, _)| *id == current_id)
+            && current_pos > 0
+        {
+            let (prev_id, _) = visible_tasks[current_pos - 1];
+            self.state.active_task_id = Some(prev_id);
+            self.adjust_task_list_scroll();
+        }
     }
 
     /// Moves selection down within the visible tasks, updating active selection
+    /// Navigates through both root conversations and expanded children
+    /// Down moves to newer tasks (down the screen) or to placeholder
     fn navigate_tasks_down(&mut self) {
-        let visible_tasks = self.task_manager.get_visible_tasks();
+        let visible_tasks = self.build_visible_task_list();
+
         if visible_tasks.is_empty() {
+            // No tasks, stay on placeholder
             return;
         }
 
+        // If nothing selected (placeholder at bottom), don't move (stop at boundary)
         if self.state.active_task_id.is_none() {
-            self.select_last_visible_task(&visible_tasks);
             return;
         }
 
-        if self.state.selected_task_index >= self.task_manager.task_order().len() {
-            self.select_first_visible_task(&visible_tasks);
-            return;
-        }
-
-        self.select_next_visible_task(&visible_tasks);
-    }
-
-    /// Selects the last task from the provided `visible_tasks` if available
-    fn select_last_visible_task(&mut self, visible_tasks: &[TaskId]) {
-        let Some(&last_task_id) = visible_tasks.last() else {
-            return;
-        };
-        if let Some(new_index) = self
-            .task_manager
-            .task_order()
-            .iter()
-            .position(|&id| id == last_task_id)
-        {
-            self.state.selected_task_index = new_index;
-            self.state.active_task_id = Some(last_task_id);
-        }
-    }
-
-    /// Selects the first task from the provided `visible_tasks` if available
-    fn select_first_visible_task(&mut self, visible_tasks: &[TaskId]) {
-        let Some(&first_task_id) = visible_tasks.first() else {
-            return;
-        };
-        if let Some(new_index) = self
-            .task_manager
-            .task_order()
-            .iter()
-            .position(|&id| id == first_task_id)
-        {
-            self.state.selected_task_index = new_index;
-            self.state.active_task_id = Some(first_task_id);
-        }
-    }
-
-    /// Moves selection to the previous task within the `visible_tasks` list if possible
-    fn select_previous_visible_task(&mut self, visible_tasks: &[TaskId]) {
-        let current_task_id = self.task_manager.task_order()[self.state.selected_task_index];
-        let Some(current_pos) = visible_tasks.iter().position(|&id| id == current_task_id) else {
+        // Find current task in the visible list
+        let Some(current_id) = self.state.active_task_id else {
             return;
         };
 
-        if current_pos > 0 {
-            let new_task_id = visible_tasks[current_pos - 1];
-            if let Some(new_index) = self
-                .task_manager
-                .task_order()
-                .iter()
-                .position(|&id| id == new_task_id)
-            {
-                self.state.selected_task_index = new_index;
-                self.state.active_task_id = Some(new_task_id);
+        // Find the next task in the visible list (newer, down the screen)
+        if let Some(current_pos) = visible_tasks.iter().position(|(id, _)| *id == current_id) {
+            if current_pos + 1 < visible_tasks.len() {
+                let (next_id, _) = visible_tasks[current_pos + 1];
+                self.state.active_task_id = Some(next_id);
+            } else {
+                // At the newest visible task, move to placeholder
+                self.state.active_task_id = None;
             }
+            self.adjust_task_list_scroll();
         }
     }
 
-    /// Moves selection to the next task within the `visible_tasks` list if possible
-    fn select_next_visible_task(&mut self, visible_tasks: &[TaskId]) {
-        let current_task_id = self.task_manager.task_order()[self.state.selected_task_index];
-        let Some(current_pos) = visible_tasks.iter().position(|&id| id == current_task_id) else {
+    /// Adjusts task list scroll to keep the selected task visible
+    fn adjust_task_list_scroll(&mut self) {
+        // Get all visible tasks in display order (includes expanded children)
+        let visible_tasks = self.build_visible_task_list();
+
+        let total_visible = visible_tasks.len();
+        let max_visible = 3; // Can show up to 3 items (tasks + placeholder)
+
+        // If nothing selected (placeholder is selected)
+        if self.state.active_task_id.is_none() {
+            // Scroll to show placeholder at bottom
+            // Placeholder is conceptually at index total_visible (after all visible tasks)
+            let placeholder_index = total_visible;
+            if placeholder_index >= max_visible {
+                self.state.task_list_scroll_offset =
+                    placeholder_index.saturating_sub(max_visible - 1);
+            } else {
+                self.state.task_list_scroll_offset = 0;
+            }
+            return;
+        }
+
+        // Find the selected task in the visible list
+        let Some(selected_id) = self.state.active_task_id else {
             return;
         };
 
-        if current_pos < visible_tasks.len() - 1 {
-            let new_task_id = visible_tasks[current_pos + 1];
-            if let Some(new_index) = self
-                .task_manager
-                .task_order()
-                .iter()
-                .position(|&id| id == new_task_id)
-            {
-                self.state.selected_task_index = new_index;
-                self.state.active_task_id = Some(new_task_id);
-            }
+        // Find the index of the selected task in the visible list
+        let Some(selected_index) = visible_tasks.iter().position(|(id, _)| *id == selected_id)
+        else {
+            return;
+        };
+
+        // Display shows oldest at top (chronological order)
+        // scroll_offset = 0 means show the oldest visible tasks (start of list)
+        // scroll_offset = N means skip the first N oldest visible tasks
+
+        // Calculate which tasks are currently visible
+        let visible_start = self.state.task_list_scroll_offset;
+        let visible_end = (visible_start + max_visible).min(total_visible + 1); // +1 for placeholder
+
+        // Adjust scroll if selected task is outside visible window
+        if selected_index < visible_start {
+            // Selected task is older than visible window start, scroll up to show it
+            self.state.task_list_scroll_offset = selected_index;
+        } else if selected_index >= visible_end {
+            // Selected task is newer than visible window end, scroll down to show it
+            self.state.task_list_scroll_offset = selected_index.saturating_sub(max_visible - 1);
         }
     }
 
     /// Deletes a task and updates UI state accordingly
     fn delete_task(&mut self, task_id: TaskId) {
         let was_active = self.state.active_task_id == Some(task_id);
-        let deleted_pos = self
-            .task_manager
-            .task_order()
-            .iter()
-            .position(|&id| id == task_id);
 
         let to_delete = self.task_manager.remove_task(task_id);
 
@@ -801,44 +938,24 @@ impl<B: Backend> TuiApp<B> {
             self.state.active_running_tasks.remove(id);
         }
 
-        if was_active && !self.task_manager.is_empty() {
-            self.select_task_after_deletion(deleted_pos);
-        } else if to_delete.contains(&self.state.active_task_id.unwrap_or_default()) {
-            self.state.active_task_id = None;
-        }
-
-        self.adjust_selected_index();
-    }
-
-    /// Selects the appropriate task after a deletion, preserving a valid selection
-    fn select_task_after_deletion(&mut self, deleted_pos: Option<usize>) {
-        let Some(pos) = deleted_pos else {
+        if !was_active {
             return;
-        };
-
-        if pos < self.task_manager.task_order().len() {
-            self.state.selected_task_index = pos;
-        } else {
-            self.state.selected_task_index = self.task_manager.task_order().len() - 1;
         }
 
-        if let Some(&new_task_id) = self
+        // After deleting active task, select the next newest conversation
+        let mut root_conversations: Vec<_> = self
             .task_manager
-            .task_order()
-            .get(self.state.selected_task_index)
-        {
-            self.state.active_task_id = Some(new_task_id);
+            .iter_tasks()
+            .filter(|(_, task)| task.parent_id.is_none())
+            .collect();
+        root_conversations
+            .sort_by(|(_, task_a), (_, task_b)| task_a.start_time.cmp(&task_b.start_time));
+
+        // Select the newest conversation (last in chronological order) if any exist
+        if let Some((new_id, _)) = root_conversations.last() {
+            self.state.active_task_id = Some(*new_id);
         } else {
             self.state.active_task_id = None;
-        }
-    }
-
-    /// Adjusts the selected index to stay within bounds of the current task order
-    fn adjust_selected_index(&mut self) {
-        if self.state.selected_task_index >= self.task_manager.task_order().len()
-            && !self.task_manager.is_empty()
-        {
-            self.state.selected_task_index = self.task_manager.task_order().len() - 1;
         }
     }
 

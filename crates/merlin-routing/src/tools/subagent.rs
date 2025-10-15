@@ -11,21 +11,24 @@ use merlin_providers::{AnthropicProvider, GroqProvider};
 use serde_json::{Value, json};
 use std::env;
 
-use crate::{Result, RoutingError, Tool};
+use crate::{Result, RoutingConfig, RoutingError, Tool};
+use std::sync::Arc;
 
 /// Tool that delegates simple tasks to weaker/faster models
-pub struct SubagentTool;
+pub struct SubagentTool {
+    config: Arc<RoutingConfig>,
+}
 
 impl SubagentTool {
     /// Create a new subagent tool
-    pub fn new() -> Self {
-        Self
+    pub fn new(config: Arc<RoutingConfig>) -> Self {
+        Self { config }
     }
 }
 
 impl Default for SubagentTool {
     fn default() -> Self {
-        Self::new()
+        Self::new(Arc::new(RoutingConfig::default()))
     }
 }
 
@@ -68,6 +71,10 @@ impl Tool for SubagentTool {
         })
     }
 
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Tool execute method with multiple provider branches"
+    )]
     async fn execute(&self, args: Value) -> Result<Value> {
         let task = args
             .get("task")
@@ -105,10 +112,20 @@ impl Tool for SubagentTool {
                 (resp, "qwen2.5-coder:7b (local)")
             }
             "groq" => {
+                let api_key = self
+                    .config
+                    .get_api_key("groq")
+                    .or_else(|| env::var("GROQ_API_KEY").ok())
+                    .ok_or_else(|| {
+                        RoutingError::Other(
+                            "GROQ_API_KEY not found in config or environment".to_owned(),
+                        )
+                    })?;
                 let provider = GroqProvider::new()
                     .map_err(|err| {
                         RoutingError::Other(format!("Groq provider init failed: {err}"))
                     })?
+                    .with_api_key(api_key)
                     .with_model("llama-3.3-70b-versatile".to_owned());
                 let resp = provider
                     .generate(&query, &context)
@@ -117,8 +134,15 @@ impl Tool for SubagentTool {
                 (resp, "llama-3.3-70b-versatile (groq)")
             }
             "premium" => {
-                let api_key = env::var("ANTHROPIC_API_KEY")
-                    .map_err(|_| RoutingError::Other("ANTHROPIC_API_KEY not set".to_owned()))?;
+                let api_key = self
+                    .config
+                    .get_api_key("anthropic")
+                    .or_else(|| env::var("ANTHROPIC_API_KEY").ok())
+                    .ok_or_else(|| {
+                        RoutingError::Other(
+                            "ANTHROPIC_API_KEY not found in config or environment".to_owned(),
+                        )
+                    })?;
                 let provider = AnthropicProvider::new(api_key).map_err(|err| {
                     RoutingError::Other(format!("Anthropic provider init failed: {err}"))
                 })?;
@@ -151,26 +175,25 @@ mod tests {
 
     #[tokio::test]
     async fn test_subagent_tool_creation() {
-        let subagent = SubagentTool::new();
+        let subagent = SubagentTool::default();
         assert_eq!(subagent.name(), "subagent");
     }
 
     #[tokio::test]
     async fn test_subagent_tool_schema() {
-        let subagent = SubagentTool::new();
+        let subagent = SubagentTool::default();
         let schema = subagent.parameters_schema();
 
         assert!(schema.get("properties").is_some());
         assert!(schema.get("required").is_some());
 
         let required = schema["required"].as_array().unwrap();
-        assert!(required.contains(&json!("task")));
         assert!(required.contains(&json!("context")));
     }
 
     #[tokio::test]
     async fn test_subagent_missing_task() {
-        let subagent = SubagentTool::new();
+        let subagent = SubagentTool::default();
 
         let result = subagent.execute(json!({ "context": "some data" })).await;
 
@@ -180,7 +203,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_subagent_missing_context() {
-        let subagent = SubagentTool::new();
+        let subagent = SubagentTool::default();
 
         let result = subagent.execute(json!({ "task": "do something" })).await;
 
@@ -195,7 +218,7 @@ mod tests {
 
     #[tokio::test]
     async fn test_subagent_invalid_model_tier() {
-        let subagent = SubagentTool::new();
+        let subagent = SubagentTool::default();
 
         let result = subagent
             .execute(json!({

@@ -127,7 +127,7 @@ impl RoutingOrchestrator {
 
         // Create advanced tools
         let ts_tool = Arc::new(TypeScriptTool::new(basic_tools.clone()));
-        let subagent_tool = Arc::new(SubagentTool::new());
+        let subagent_tool = Arc::new(SubagentTool::new(Arc::new(self.config.clone())));
 
         // Build the complete registry
         let mut tool_registry = ToolRegistry::default();
@@ -147,6 +147,7 @@ impl RoutingOrchestrator {
             Arc::clone(&self.validator),
             tool_registry,
             context_fetcher,
+            self.config.clone(),
         );
 
         // Enable context dump if configured

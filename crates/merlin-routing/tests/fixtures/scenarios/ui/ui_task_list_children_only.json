@@ -1,0 +1,45 @@
+{
+  "name": "Task List Shows Only Children of Current Task",
+  "description": "Tests that only children of the currently running root task are shown, not other root tasks",
+  "config": {
+    "terminal_size": [100, 30],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "agent_response",
+        "data": {
+          "text": "Analyzing project structure",
+          "tool_calls": [],
+          "subtasks": [
+            {"description": "Scan source files", "priority": "high"},
+            {"description": "Check dependencies", "priority": "medium"}
+          ]
+        }
+      },
+      "expectations": {
+        "tasks": {
+          "spawned": [
+            {"description": "Analyzing project structure", "status": "Running"},
+            {"description": "Scan source files", "status": "Running"},
+            {"description": "Check dependencies", "status": "Running"}
+          ]
+        },
+        "ui_state": {
+          "snapshot": "ui_task_list_children_only.txt",
+          "visible_tasks": [
+            {"description": "Analyzing project structure", "status": "Running"},
+            {"description": "Scan source files", "status": "Running"},
+            {"description": "Check dependencies", "status": "Running"}
+          ]
+        }
+      }
+    }
+  ]
+}

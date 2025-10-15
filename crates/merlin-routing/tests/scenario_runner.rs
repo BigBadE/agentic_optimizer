@@ -36,6 +36,7 @@ use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskManager, Tas
 use merlin_routing::user_interface::{TuiApp, state::UiState};
 use ratatui::Terminal;
 use ratatui::backend::TestBackend;
+use ratatui::buffer::Buffer;
 use serde::{Deserialize, Serialize};
 use serde_json::{Value, from_str};
 use std::collections::VecDeque;
@@ -178,6 +179,8 @@ struct WorkspaceFile {
 struct ExistingTask {
     pub description: String,
     pub status: String,
+    #[serde(default)]
+    pub children: Vec<ExistingTask>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
@@ -212,6 +215,7 @@ enum StepAction {
     BackgroundEvent { data: BackgroundEventData },
     TaskComplete { data: TaskCompleteData },
     TaskFailed { data: TaskFailedData },
+    KeyPress { data: KeyPressData },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -223,6 +227,11 @@ struct UserInputData {
 
 fn default_true() -> bool {
     true
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct KeyPressData {
+    pub key: String,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -379,6 +388,15 @@ struct UiStateExpectations {
     /// Optional expectations for visible tasks list
     #[serde(skip_serializing_if = "Option::is_none")]
     pub visible_tasks: Option<Vec<VisibleTaskExpectation>>,
+    /// Expected `active_task_id` (by description)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub active_task_id: Option<String>,
+    /// Expected expanded conversations (by description)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub expanded_conversations: Option<Vec<String>>,
+    /// Expected scroll offset
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_list_scroll_offset: Option<usize>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -446,6 +464,28 @@ impl ScenarioRunner {
         let (mut app, _ui_channel) = create_test_app(width, height)
             .map_err(|error| format!("Failed to create test app: {error}"))?;
 
+        // Load existing tasks if any
+        self.load_existing_tasks(&mut app);
+
+        // Adjust scroll to show placeholder when tasks are loaded
+        // This mimics what happens in production when tasks arrive via events
+        // Position scroll so placeholder is at the bottom of the visible window
+        if !self.scenario.initial_state.existing_tasks.is_empty() {
+            let visible_task_count = app
+                .task_manager()
+                .iter_tasks()
+                .filter(|(_, task)| task.parent_id.is_none())
+                .count();
+            // Placeholder is at index visible_task_count (after all tasks)
+            // We want it in the last position of a 3-item window
+            let max_visible = 3;
+            let placeholder_index = visible_task_count;
+            // Show placeholder at bottom: skip (placeholder_index - (max_visible - 1)) tasks
+            // This ensures placeholder is in the last slot of the visible window
+            app.state_mut().task_list_scroll_offset =
+                placeholder_index.saturating_sub(max_visible - 1);
+        }
+
         // Initialize vector cache if enabled
         if self.scenario.config.enable_vector_cache {
             self.initialize_vector_cache(&mut app);
@@ -489,6 +529,65 @@ impl ScenarioRunner {
         Ok(())
     }
 
+    /// Loads existing tasks from initial state
+    fn load_existing_tasks(&self, app: &mut impl TestApp) {
+        use std::time::Duration;
+
+        let now = Instant::now();
+        for (index, existing_task) in self
+            .scenario
+            .initial_state
+            .existing_tasks
+            .iter()
+            .enumerate()
+        {
+            let start_time = now
+                .checked_sub(Duration::from_secs(
+                    (self.scenario.initial_state.existing_tasks.len() - index) as u64 * 100,
+                ))
+                .unwrap();
+            self.load_task_recursive(app, existing_task, None, start_time);
+        }
+    }
+
+    /// Recursively loads a task and its children
+    fn load_task_recursive(
+        &self,
+        app: &mut impl TestApp,
+        existing_task: &ExistingTask,
+        parent_id: Option<TaskId>,
+        start_time: Instant,
+    ) {
+        use std::time::Duration;
+
+        let task_id = TaskId::default();
+
+        let task = TaskDisplay {
+            description: existing_task.description.clone(),
+            status: match existing_task.status.as_str() {
+                "Completed" => TaskStatus::Completed,
+                "Failed" => TaskStatus::Failed,
+                _ => TaskStatus::Running,
+            },
+            start_time,
+            end_time: (existing_task.status == "Completed" || existing_task.status == "Failed")
+                .then(|| start_time + Duration::from_secs(50)),
+            parent_id,
+            progress: None,
+            output_lines: vec![],
+            output_tree: OutputTree::default(),
+            steps: vec![],
+        };
+
+        app.task_manager_mut().add_task(task_id, task);
+
+        // Load children with slightly later start times
+        for (child_index, child) in existing_task.children.iter().enumerate() {
+            let child_start_time = start_time + Duration::from_secs((child_index + 1) as u64 * 10);
+            self.load_task_recursive(app, child, Some(task_id), child_start_time);
+        }
+    }
+
     /// Initializes vector cache progress if enabled.
     fn initialize_vector_cache(&self, app: &mut impl TestApp) {
         // Set embedding progress in UI state instead of creating a task
@@ -523,6 +622,9 @@ impl ScenarioRunner {
             }
             StepAction::TaskFailed { data } => {
                 Self::execute_task_failed(app, data);
+            }
+            StepAction::KeyPress { data } => {
+                Self::execute_key_press(app, data)?;
             }
         }
 
@@ -679,6 +781,8 @@ impl ScenarioRunner {
             {
                 task.status = TaskStatus::Completed;
                 task.end_time = Some(Instant::now());
+                // Clear progress indicator when task completes
+                task.progress = None;
                 app.state_mut().active_running_tasks.remove(&task_id);
                 break;
             }
@@ -698,18 +802,45 @@ impl ScenarioRunner {
                 task.status = TaskStatus::Failed;
                 task.end_time = Some(Instant::now());
                 app.state_mut().active_running_tasks.remove(&task_id);
-                break;
             }
         }
     }
 
-    /// Verifies expectations for a step.
+    /// Executes a key press action.
+    ///
+    /// # Errors
+    /// Returns an error if ticking the app after key press fails.
+    fn execute_key_press(app: &mut impl TestApp, data: &KeyPressData) -> Result<(), String> {
+        use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+
+        info!("  Key press: {}", data.key);
+
+        let key_code = match data.key.as_str() {
+            "Up" => KeyCode::Up,
+            "Down" => KeyCode::Down,
+            "Left" => KeyCode::Left,
+            "Right" => KeyCode::Right,
+            "Enter" => KeyCode::Enter,
+            "Tab" => KeyCode::Tab,
+            "Esc" => KeyCode::Esc,
+            _ => return Err(format!("Unsupported key: {}", data.key)),
+        };
+
+        let event = Event::Key(KeyEvent::new(key_code, KeyModifiers::NONE));
+        app.set_event_source(Box::new(TestEventSource::with_events(vec![event])));
+        app.tick()
+            .map_err(|error| format!("Tick failed after key press: {error}"))?;
+
+        Ok(())
+    }
+
+    /// Verifies all expectations after a step.
     ///
     /// # Errors
     /// Returns an error if any expectation fails.
     fn verify_expectations(
         &self,
-        app: &impl TestApp,
+        app: &mut impl TestApp,
         expectations: &StepExpectations,
     ) -> Result<(), String> {
         // Verify tasks
@@ -793,9 +924,17 @@ impl ScenarioRunner {
     /// Returns an error if verification fails.
     fn verify_ui_state(
         &self,
-        app: &impl TestApp,
+        app: &mut impl TestApp,
         expectations: &UiStateExpectations,
     ) -> Result<(), String> {
+        // Set focused pane if specified
+        if let Some(focused_pane) = &expectations.focused_pane {
+            app.set_focused_pane(focused_pane);
+            // Tick to re-render with new focus
+            app.tick()
+                .map_err(|error| format!("Tick failed after setting focus: {error}"))?;
+        }
+
         // Verify task count
         if let Some(expected_count) = expectations.task_count {
             let actual_count = app.task_manager().get_visible_tasks().len();
@@ -818,12 +957,80 @@ impl ScenarioRunner {
             }
         }
 
+        // Verify active_task_id
+        if let Some(expected_desc) = &expectations.active_task_id {
+            Self::verify_active_task_description(app, expected_desc)?;
+        }
+
+        // Verify expanded_conversations
+        if let Some(expected_expanded) = &expectations.expanded_conversations {
+            let actual_expanded = &app.state().expanded_conversations;
+            let mut actual_descriptions: Vec<String> = actual_expanded
+                .iter()
+                .filter_map(|id| {
+                    app.task_manager()
+                        .get_task(*id)
+                        .map(|task| task.description.clone())
+                })
+                .collect();
+            actual_descriptions.sort();
+
+            let mut expected_sorted = expected_expanded.clone();
+            expected_sorted.sort();
+
+            if actual_descriptions != expected_sorted {
+                return Err(format!(
+                    "Expected expanded conversations {expected_sorted:?}, got {actual_descriptions:?}"
+                ));
+            }
+        }
+
+        // Verify task_list_scroll_offset
+        if let Some(expected_offset) = expectations.task_list_scroll_offset {
+            let actual_offset = app.state().task_list_scroll_offset;
+            if actual_offset != expected_offset {
+                return Err(format!(
+                    "Expected task_list_scroll_offset {expected_offset}, got {actual_offset}"
+                ));
+            }
+        }
+
         // Verify snapshot if specified
         if let Some(snapshot_name) = &expectations.snapshot {
             self.verify_snapshot(app, snapshot_name)?;
         }
 
         info!("  ✓ UI state expectations met");
+        Ok(())
+    }
+
+    /// Verifies that the active task matches the expected description.
+    ///
+    /// # Errors
+    /// Returns an error if the active task ID doesn't match the expected description.
+    fn verify_active_task_description(
+        app: &impl TestApp,
+        expected_desc: &str,
+    ) -> Result<(), String> {
+        let actual_id = app.state().active_task_id;
+        if let Some(task_id) = actual_id {
+            if let Some(task) = app.task_manager().get_task(task_id) {
+                if task.description != *expected_desc {
+                    return Err(format!(
+                        "Expected active_task_id to be '{}', got '{}'",
+                        expected_desc, task.description
+                    ));
+                }
+            } else {
+                return Err(format!(
+                    "Active task ID {task_id:?} not found in task manager"
+                ));
+            }
+        } else {
+            return Err(format!(
+                "Expected active_task_id '{expected_desc}', but no task is active"
+            ));
+        }
         Ok(())
     }
 
@@ -834,57 +1041,22 @@ impl ScenarioRunner {
     ///
     /// # Errors
     /// Returns an error if the snapshot is missing or cannot be read.
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Snapshot verification requires extensive dimension checking and file I/O"
+    #[cfg_attr(
+        test,
+        allow(
+            clippy::too_many_lines,
+            reason = "Snapshot verification requires extensive dimension checking and file I/O"
+        )
     )]
     fn verify_snapshot(&self, app: &impl TestApp, snapshot_name: &str) -> Result<(), String> {
-        use unicode_width::UnicodeWidthStr as _;
-
         // Render UI to string
         let buffer = app.backend().buffer();
         let width = buffer.area().width as usize;
         let height = buffer.area().height as usize;
 
-        // Extract content properly handling wide characters
-        let mut rendered_lines = Vec::new();
-        for y in 0..height {
-            let mut line = String::new();
-            let mut x = 0;
-            while x < width {
-                let cell = buffer.cell((x as u16, y as u16)).unwrap();
-                let symbol = cell.symbol();
-                line.push_str(symbol);
-
-                // Skip cells that are part of wide characters
-                let char_width = symbol.width();
-                x += char_width.max(1);
-            }
-            rendered_lines.push(line);
-        }
-        let rendered = rendered_lines.join("\n");
-
-        // Verify dimensions match terminal size
-        let lines: Vec<&str> = rendered.lines().collect();
-        if lines.len() != height {
-            return Err(format!(
-                "Snapshot height mismatch: expected {} lines (terminal height), got {}",
-                height,
-                lines.len()
-            ));
-        }
-
-        for (line_num, line) in lines.iter().enumerate() {
-            let line_width = line.width();
-            if line_width != width {
-                return Err(format!(
-                    "Snapshot width mismatch on line {}: expected {} chars (terminal width), got {}",
-                    line_num + 1,
-                    width,
-                    line_width
-                ));
-            }
-        }
+        // Extract and validate rendered content
+        let rendered = Self::extract_rendered_content(buffer, width, height)?;
+        Self::validate_ui_sections(&rendered, app.state().active_task_id.is_some())?;
 
         // Determine snapshot path based on scenario structure
         // If snapshot_name contains "_step", it's a multi-step scenario
@@ -965,6 +1137,84 @@ impl ScenarioRunner {
             |slash_pos| self.scenario_path[..slash_pos].to_string(),
         )
     }
+
+    /// Extracts rendered content from buffer
+    fn extract_rendered_content(
+        buffer: &Buffer,
+        width: usize,
+        height: usize,
+    ) -> Result<String, String> {
+        use unicode_width::UnicodeWidthStr as _;
+
+        // Extract content properly handling wide characters
+        let mut rendered_lines = Vec::new();
+        for y in 0..height {
+            let mut line = String::new();
+            let mut x = 0;
+            while x < width {
+                let cell = buffer.cell((x as u16, y as u16)).unwrap();
+                let symbol = cell.symbol();
+                line.push_str(symbol);
+
+                // Skip cells that are part of wide characters
+                let char_width = symbol.width();
+                x += char_width.max(1);
+            }
+            rendered_lines.push(line);
+        }
+        let rendered = rendered_lines.join("\n");
+
+        // Verify dimensions match terminal size
+        let lines: Vec<&str> = rendered.lines().collect();
+        if lines.len() != height {
+            return Err(format!(
+                "Snapshot height mismatch: expected {} lines (terminal height), got {}",
+                height,
+                lines.len()
+            ));
+        }
+
+        for (line_num, line) in lines.iter().enumerate() {
+            let line_width = line.width();
+            if line_width != width {
+                return Err(format!(
+                    "Snapshot width mismatch on line {}: expected {} chars (terminal width), got {}",
+                    line_num + 1,
+                    width,
+                    line_width
+                ));
+            }
+        }
+
+        Ok(rendered)
+    }
+
+    /// Validates that all essential UI sections are present
+    fn validate_ui_sections(rendered: &str, has_active_task: bool) -> Result<(), String> {
+        // Verify all essential UI sections are present
+        let has_tasks_section = rendered.contains("─── Tasks ");
+        let has_input_section = rendered.contains("─── Input ");
+
+        if !has_tasks_section {
+            return Err(
+                "UI validation failed: Tasks section not found in rendered output".to_string(),
+            );
+        }
+
+        if !has_input_section {
+            return Err("UI validation failed: Input section not found in rendered output - UI may be too large for screen".to_string());
+        }
+
+        // If there's an active task, verify the Focused section is present
+        if has_active_task {
+            let has_focused_section = rendered.contains("─── Focused ");
+            if !has_focused_section {
+                return Err("UI validation failed: Focused section not found despite active task - UI may be too large for screen".to_string());
+            }
+        }
+
+        Ok(())
+    }
 }
 
 /// Trait for accessing app internals in tests
@@ -976,6 +1226,7 @@ trait TestApp {
     fn set_event_source(&mut self, source: Box<dyn UiInputEventSource + Send>);
     fn tick(&mut self) -> RoutingResult<bool>;
     fn backend(&self) -> &TestBackend;
+    fn set_focused_pane(&mut self, pane: &str);
 }
 
 impl TestApp for TuiApp<TestBackend> {
@@ -1005,5 +1256,16 @@ impl TestApp for TuiApp<TestBackend> {
 
     fn backend(&self) -> &TestBackend {
         self.backend()
+    }
+
+    fn set_focused_pane(&mut self, pane: &str) {
+        use merlin_routing::user_interface::renderer::FocusedPane;
+
+        let focused = match pane {
+            "Tasks" => FocusedPane::Tasks,
+            "Output" => FocusedPane::Output,
+            _ => FocusedPane::Input,
+        };
+        self.set_focused_pane(focused);
     }
 }

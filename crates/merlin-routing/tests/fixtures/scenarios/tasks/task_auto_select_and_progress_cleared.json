@@ -1,0 +1,80 @@
+{
+  "name": "Task Auto-Select and Progress Cleared",
+  "description": "Tests that new tasks are auto-selected and progress indicator is cleared on completion",
+  "config": {
+    "terminal_size": [80, 30],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "description": "Start a new task - should auto-select it",
+      "action": {
+        "type": "agent_response",
+        "data": {
+          "text": "Test task",
+          "tool_calls": [],
+          "subtasks": []
+        }
+      },
+      "expectations": {
+        "tasks": {
+          "spawned": [
+            {
+              "description": "Test task",
+              "status": "running"
+            }
+          ]
+        },
+        "ui_state": {
+          "task_count": 1,
+          "snapshot": "task_auto_select_and_progress_cleared_step1.txt"
+        }
+      }
+    },
+    {
+      "step": 2,
+      "description": "Add progress - should show progress bar",
+      "action": {
+        "type": "background_event",
+        "data": {
+          "event_type": "task_progress",
+          "progress": 1,
+          "total": 100
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "snapshot": "task_auto_select_and_progress_cleared_step2.txt"
+        }
+      }
+    },
+    {
+      "step": 3,
+      "description": "Complete task - progress should be cleared",
+      "action": {
+        "type": "task_complete",
+        "data": {
+          "description": "Task with progress"
+        }
+      },
+      "expectations": {
+        "tasks": {
+          "spawned": [
+            {
+              "description": "Task with progress",
+              "status": "completed"
+            }
+          ]
+        },
+        "ui_state": {
+          "snapshot": "task_auto_select_and_progress_cleared_step3.txt"
+        }
+      }
+    }
+  ]
+}

@@ -1,1 +1,30 @@
-{"name":"Render Small Terminal","description":"Tests small terminal 40x10","config":{"terminal_size":[40,10],"enable_vector_cache":false},"initial_state":{"workspace_files":[],"vector_cache_state":"complete"},"steps":[{"step":1,"action":{"type":"agent_response","data":{"text":"Task","tool_calls":[],"subtasks":[]}},"expectations":{"ui_state":{"snapshot":"render_small_terminal.txt"}}}]}
+{
+  "name": "Render Small Terminal",
+  "description": "Tests small terminal 40x15",
+  "config": {
+    "terminal_size": [40, 15],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "agent_response",
+        "data": {
+          "text": "Task",
+          "tool_calls": [],
+          "subtasks": []
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "snapshot": "render_small_terminal.txt"
+        }
+      }
+    }
+  ]
+}

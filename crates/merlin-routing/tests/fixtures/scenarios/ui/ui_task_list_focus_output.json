@@ -1,0 +1,40 @@
+{
+  "name": "Task List Shrinks When Output Pane Focused",
+  "description": "Tests that task list shrinks to max 3 lines when Output pane is focused",
+  "config": {
+    "terminal_size": [80, 30],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "agent_response",
+        "data": {
+          "text": "Processing batch",
+          "tool_calls": [],
+          "subtasks": [
+            {"description": "Task 1", "priority": "high"},
+            {"description": "Task 2", "priority": "high"},
+            {"description": "Task 3", "priority": "high"},
+            {"description": "Task 4", "priority": "high"},
+            {"description": "Task 5", "priority": "high"},
+            {"description": "Task 6", "priority": "high"},
+            {"description": "Task 7", "priority": "high"},
+            {"description": "Task 8", "priority": "high"}
+          ]
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "snapshot": "ui_task_list_focus_output.txt",
+          "focused_pane": "Output"
+        }
+      }
+    }
+  ]
+}

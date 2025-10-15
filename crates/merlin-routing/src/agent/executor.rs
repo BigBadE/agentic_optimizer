@@ -7,9 +7,9 @@ use std::time::Instant;
 use tokio::sync::Mutex;
 
 use crate::{
-    ExecutionContext, ExecutionMode, ModelRouter, ModelTier, Result, RoutingError, SubtaskSpec,
-    Task, TaskAction, TaskDecision, TaskId, TaskResult, TaskState, ToolRegistry, UiChannel,
-    UiEvent, ValidationResult, Validator, streaming::StepType,
+    ExecutionContext, ExecutionMode, ModelRouter, ModelTier, Result, RoutingConfig, RoutingError,
+    SubtaskSpec, Task, TaskAction, TaskDecision, TaskId, TaskResult, TaskState, ToolRegistry,
+    UiChannel, UiEvent, ValidationResult, Validator, streaming::StepType,
     user_interface::events::TaskProgress,
 };
 use merlin_core::{Context, ModelProvider, Query, Response, TokenUsage};
@@ -37,6 +37,7 @@ pub struct AgentExecutor {
     context_fetcher: Arc<Mutex<ContextFetcher>>,
     conversation_history: Arc<Mutex<ConversationHistory>>,
     context_dump_enabled: Arc<AtomicBool>,
+    config: Arc<RoutingConfig>,
 }
 
 struct ExecInputs<'life> {
@@ -58,14 +59,13 @@ enum QueryIntent {
 }
 
 impl AgentExecutor {
-    const ENV_OPENROUTER_API_KEY: &'static str = "OPENROUTER_API_KEY";
-    const ENV_ANTHROPIC_API_KEY: &'static str = "ANTHROPIC_API_KEY";
     /// Create a new agent executor
     pub fn new(
         router: Arc<dyn ModelRouter>,
         validator: Arc<dyn Validator>,
         tool_registry: Arc<ToolRegistry>,
         context_fetcher: ContextFetcher,
+        config: RoutingConfig,
     ) -> Self {
         Self {
             router,
@@ -75,6 +75,7 @@ impl AgentExecutor {
             context_fetcher: Arc::new(Mutex::new(context_fetcher)),
             conversation_history: Arc::new(Mutex::new(Vec::new())),
             context_dump_enabled: Arc::new(AtomicBool::new(false)),
+            config: Arc::new(config),
         }
     }
 
@@ -174,7 +175,7 @@ impl AgentExecutor {
         let decision = self.router.route(&task).await?;
 
         // Step 2: Create provider
-        let provider = Self::create_provider(&decision.tier)?;
+        let provider = self.create_provider(&decision.tier)?;
 
         // Step 3: Build context
         ui_channel.send(UiEvent::TaskProgress {
@@ -352,14 +353,24 @@ impl AgentExecutor {
     ///
     /// # Errors
     /// Returns an error if required API keys are missing or provider initialization fails.
-    fn create_provider(tier: &ModelTier) -> Result<Arc<dyn ModelProvider>> {
+    fn create_provider(&self, tier: &ModelTier) -> Result<Arc<dyn ModelProvider>> {
         match tier {
             ModelTier::Local { model_name } => {
                 Ok(Arc::new(LocalModelProvider::new(model_name.clone())))
             }
             ModelTier::Groq { model_name } => {
+                let api_key = self
+                    .config
+                    .get_api_key("groq")
+                    .or_else(|| env::var("GROQ_API_KEY").ok())
+                    .ok_or_else(|| {
+                        RoutingError::Other(
+                            "GROQ_API_KEY not found in config or environment".to_owned(),
+                        )
+                    })?;
                 let provider = GroqProvider::new()
                     .map_err(|error| RoutingError::Other(error.to_string()))?
+                    .with_api_key(api_key)
                     .with_model(model_name.clone());
                 Ok(Arc::new(provider))
             }
@@ -368,16 +379,28 @@ impl AgentExecutor {
                 model_name,
             } => match provider_name.as_str() {
                 "openrouter" => {
-                    let api_key = env::var(Self::ENV_OPENROUTER_API_KEY).map_err(|_| {
-                        RoutingError::Other(format!("{} not set", Self::ENV_OPENROUTER_API_KEY))
-                    })?;
+                    let api_key = self
+                        .config
+                        .get_api_key("openrouter")
+                        .or_else(|| env::var("OPENROUTER_API_KEY").ok())
+                        .ok_or_else(|| {
+                            RoutingError::Other(
+                                "OPENROUTER_API_KEY not found in config or environment".to_owned(),
+                            )
+                        })?;
                     let provider = OpenRouterProvider::new(api_key)?.with_model(model_name.clone());
                     Ok(Arc::new(provider))
                 }
                 "anthropic" => {
-                    let api_key = env::var(Self::ENV_ANTHROPIC_API_KEY).map_err(|_| {
-                        RoutingError::Other(format!("{} not set", Self::ENV_ANTHROPIC_API_KEY))
-                    })?;
+                    let api_key = self
+                        .config
+                        .get_api_key("anthropic")
+                        .or_else(|| env::var("ANTHROPIC_API_KEY").ok())
+                        .ok_or_else(|| {
+                            RoutingError::Other(
+                                "ANTHROPIC_API_KEY not found in config or environment".to_owned(),
+                            )
+                        })?;
                     let provider = AnthropicProvider::new(api_key)?;
                     Ok(Arc::new(provider))
                 }
@@ -562,7 +585,7 @@ impl AgentExecutor {
 
                 // Route and create provider
                 let decision_result = self.router.route(&task).await?;
-                let provider = Self::create_provider(&decision_result.tier)?;
+                let provider = self.create_provider(&decision_result.tier)?;
 
                 // Assess the task
                 let Ok(decision) = self
@@ -975,8 +998,10 @@ mod tests {
         let validator = Arc::new(ValidationPipeline::with_default_stages());
         let tool_registry = Arc::new(ToolRegistry::default());
         let context_fetcher = ContextFetcher::new(PathBuf::from("."));
+        let config = RoutingConfig::default();
 
-        let executor = AgentExecutor::new(router, validator, tool_registry, context_fetcher);
+        let executor =
+            AgentExecutor::new(router, validator, tool_registry, context_fetcher, config);
 
         // Just verify it was created successfully
         assert!(

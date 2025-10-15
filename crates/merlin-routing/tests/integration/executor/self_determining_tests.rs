@@ -14,8 +14,8 @@
 )]
 
 use merlin_routing::{
-    AgentExecutor, Complexity, ContextFetcher, ExecutionMode, StrategyRouter, SubtaskSpec, Task,
-    TaskAction, TaskDecision, ToolRegistry, UiChannel, ValidationPipeline,
+    AgentExecutor, Complexity, ContextFetcher, ExecutionMode, RoutingConfig, StrategyRouter,
+    SubtaskSpec, Task, TaskAction, TaskDecision, ToolRegistry, UiChannel, ValidationPipeline,
 };
 use std::path::PathBuf;
 use std::sync::Arc;
@@ -26,8 +26,10 @@ async fn test_simple_task_skips_assessment() {
     let validator = Arc::new(ValidationPipeline::with_default_stages());
     let tool_registry = Arc::new(ToolRegistry::default());
     let context_fetcher = ContextFetcher::new(PathBuf::from("."));
+    let config = RoutingConfig::default();
 
-    let mut executor = AgentExecutor::new(router, validator, tool_registry, context_fetcher);
+    let mut executor =
+        AgentExecutor::new(router, validator, tool_registry, context_fetcher, config);
 
     let task = Task::new("hi".to_owned());
 

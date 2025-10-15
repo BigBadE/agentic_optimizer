@@ -1,0 +1,34 @@
+{
+  "name": "Task List Shows Three Conversations When Focused",
+  "description": "Tests that focusing the task list shows up to 3 recent conversations",
+  "config": {
+    "terminal_size": [80, 30],
+    "enable_vector_cache": false
+  },
+  "initial_state": {
+    "workspace_files": [],
+    "existing_tasks": [
+      {"description": "First conversation", "status": "Completed"},
+      {"description": "Second conversation", "status": "Completed"},
+      {"description": "Third conversation", "status": "Completed"}
+    ],
+    "vector_cache_state": "complete"
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "Up"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "snapshot": "ui_task_list_three_conversations.txt",
+          "focused_pane": "Tasks"
+        }
+      }
+    }
+  ]
+}

@@ -9,8 +9,6 @@ const MAX_CONVERSATION_HISTORY: usize = 50;
 /// Main UI state
 #[derive(Default)]
 pub struct UiState {
-    /// Currently selected task index
-    pub selected_task_index: usize,
     /// Active task identifier
     pub active_task_id: Option<TaskId>,
     /// Set of currently running tasks
@@ -29,6 +27,12 @@ pub struct UiState {
     pub output_scroll_offset: u16,
     /// Background embedding index progress (current, total)
     pub embedding_progress: Option<(u64, u64)>,
+    /// Task ID to continue conversation from (when submitting with a task selected)
+    pub continuing_conversation_from: Option<TaskId>,
+    /// Scroll offset for the task list (0 = bottom/newest, higher = scroll up to older)
+    pub task_list_scroll_offset: usize,
+    /// Set of expanded conversation IDs (showing child messages)
+    pub expanded_conversations: HashSet<TaskId>,
 }
 
 impl UiState {

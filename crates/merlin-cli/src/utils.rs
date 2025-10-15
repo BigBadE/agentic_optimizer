@@ -21,13 +21,16 @@ const MAX_TASKS: usize = 50;
 pub fn get_merlin_folder(project_root: &Path) -> Result<PathBuf> {
     let path =
         env::var("MERLIN_FOLDER").map_or_else(|_| project_root.join(".merlin"), PathBuf::from);
-    canonicalize(path.clone()).with_context(|| {
-        format!(
-            "Couldn't create .merlin folder in project or provided MERLIN_FOLDER path \"{}\".\n\
+    if let Some(parent) = path.parent() {
+        canonicalize(parent).with_context(|| {
+            format!(
+                "Couldn't create .merlin folder in project or provided MERLIN_FOLDER path \"{}\".\n\
         Make sure you don't have accidental quotes around it",
-            path.display()
-        )
-    })
+                path.display()
+            )
+        })?;
+    }
+    Ok(path)
 }
 
 /// Calculate estimated cost based on token usage.

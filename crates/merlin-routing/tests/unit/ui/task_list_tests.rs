@@ -702,7 +702,8 @@ fn test_task_list_starts_at_top() {
     let buffer = terminal.backend().buffer();
     let content: String = buffer.content().iter().map(Cell::symbol).collect();
 
-    // Should show first 3 conversations (oldest at top, max_visible = 3)
+    // With terminal height 24 and task area of 14 lines, max_visible = 12
+    // So all 5 conversations should be visible
     assert!(
         content.contains("Conversation 0"),
         "Should show oldest conversation"
@@ -716,12 +717,16 @@ fn test_task_list_starts_at_top() {
         "Should show third oldest"
     );
     assert!(
-        !content.contains("Conversation 3"),
-        "Should not show newer conversations without scrolling"
+        content.contains("Conversation 3"),
+        "Should show fourth conversation"
     );
     assert!(
-        !content.contains("Conversation 4"),
-        "Should not show newest conversation"
+        content.contains("Conversation 4"),
+        "Should show newest conversation"
+    );
+    assert!(
+        content.contains("Start a new conversation..."),
+        "Should show placeholder"
     );
 }
 

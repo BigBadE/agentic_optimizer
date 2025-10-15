@@ -55,21 +55,36 @@ impl Renderer {
     pub fn render(&self, frame: &mut Frame, ctx: &RenderCtx<'_>) {
         let main_area = frame.area();
 
-        // Calculate actual content heights
-        let task_content_lines =
-            self.calculate_task_tree_height(&ctx.ui_ctx, main_area, ctx.focused);
-        let input_content_lines = ctx.input.input_area().lines().len() as u16;
-
-        // Determine task height based on focus
-        let task_height = if ctx.focused == FocusedPane::Tasks {
-            // When Tasks pane is focused, expand to show all running tasks
-            (task_content_lines + 2).min(main_area.height.saturating_sub(10))
+        // Determine maximum task area height based on focus (BEFORE calculating content)
+        let max_task_area_height = if ctx.focused == FocusedPane::Tasks {
+            // When Tasks pane is focused, limit to leave room for input
+            main_area.height.saturating_sub(10)
         } else if ctx.focused == FocusedPane::Output && ctx.ui_ctx.state.active_task_id.is_some() {
             // When Output pane is focused, limit task list to max 3 lines + borders
-            (task_content_lines + 2).min(5)
+            5
         } else {
-            // Default: use actual content height
-            task_content_lines + 2
+            // Default: use full height
+            main_area.height
+        };
+
+        // Create constrained area for calculating task content
+        let constrained_task_area = Rect {
+            height: max_task_area_height,
+            ..main_area
+        };
+
+        // Calculate actual content heights using constrained area
+        let task_content_lines =
+            self.calculate_task_tree_height(&ctx.ui_ctx, constrained_task_area, ctx.focused);
+        let input_content_lines = ctx.input.input_area().lines().len() as u16;
+
+        // Determine final task height
+        let task_height = if ctx.focused == FocusedPane::Tasks {
+            // When focused, use the full constrained height (not content-based)
+            max_task_area_height
+        } else {
+            // Otherwise, size to content (+ borders, but not exceeding max)
+            (task_content_lines + 2).min(max_task_area_height)
         };
 
         let input_height = input_content_lines + 2;
@@ -248,10 +263,18 @@ impl Renderer {
     ) -> super::TaskId {
         ui_ctx.state.active_task_id.map_or_else(
             || {
-                // No selection - show the newest root task
+                // No selection - show the first running root, or just the first
                 root_tasks
-                    .last()
-                    .map_or_else(super::TaskId::default, |(id, _)| *id)
+                    .iter()
+                    .find(|(id, _)| ui_ctx.state.active_running_tasks.contains(id))
+                    .map_or_else(
+                        || {
+                            root_tasks
+                                .first()
+                                .map_or_else(super::TaskId::default, |(id, _)| *id)
+                        },
+                        |(id, _)| *id,
+                    )
             },
             |active_id| {
                 // If a task is selected, find its root
@@ -267,10 +290,10 @@ impl Renderer {
                             task.parent_id
                         }
                     })
-                    // If selected task not found, default to newest root
+                    // If selected task not found, default to first root
                     .unwrap_or_else(|| {
                         root_tasks
-                            .last()
+                            .first()
                             .map_or_else(super::TaskId::default, |(id, _)| *id)
                     })
             },
@@ -525,9 +548,8 @@ impl Renderer {
         root_tasks: &[&(super::TaskId, &super::task_manager::TaskDisplay)],
         lines: &mut Vec<Line<'static>>,
     ) {
-        // When not focused on Tasks
-        if root_tasks.is_empty() || ui_ctx.state.active_task_id.is_none() {
-            // Show placeholder when no tasks exist OR when no task is selected
+        // Show placeholder only when no tasks exist at all
+        if root_tasks.is_empty() {
             lines.push(Line::from(vec![Span::styled(
                 "  Start a new conversation...",
                 Style::default().fg(Color::DarkGray),
@@ -549,17 +571,45 @@ impl Renderer {
             .state
             .active_running_tasks
             .contains(&primary_root_task_id);
-        let status_icon = Self::get_task_status_icon(root_task, is_active);
         let is_selected = ui_ctx.state.active_task_id == Some(primary_root_task_id);
+        let is_primary_expanded = ui_ctx
+            .state
+            .expanded_conversations
+            .contains(&primary_root_task_id);
+
+        self.render_unfocused_root_and_children(
+            root_task,
+            all_tasks,
+            primary_root_task_id,
+            is_active,
+            is_selected,
+            is_primary_expanded,
+            area,
+            ui_ctx,
+            lines,
+        );
+    }
+
+    /// Renders the root task and its children in unfocused view
+    #[allow(clippy::too_many_arguments, reason = "Helper method needs all context")]
+    fn render_unfocused_root_and_children(
+        &self,
+        root_task: &super::task_manager::TaskDisplay,
+        all_tasks: &[(super::TaskId, &super::task_manager::TaskDisplay)],
+        primary_root_task_id: super::TaskId,
+        is_active: bool,
+        is_selected: bool,
+        is_primary_expanded: bool,
+        area: Rect,
+        ui_ctx: &UiCtx<'_>,
+        lines: &mut Vec<Line<'static>>,
+    ) {
+        let status_icon = Self::get_task_status_icon(root_task, is_active);
 
         // Check if this conversation has children
         let has_children = all_tasks
             .iter()
             .any(|(_, task)| task.parent_id == Some(primary_root_task_id));
-        let is_primary_expanded = ui_ctx
-            .state
-            .expanded_conversations
-            .contains(&primary_root_task_id);
 
         // Add expand indicator if conversation has children
         let expand_indicator = match (has_children, is_primary_expanded) {

@@ -603,9 +603,6 @@ impl AgentExecutor {
                 // Execute based on decision
                 match decision.action {
                     TaskAction::Complete { result } => {
-                        // Task can be completed immediately
-                        task.state = TaskState::Completed;
-
                         let duration_ms = start.elapsed().as_millis() as u64;
 
                         return Ok(TaskResult {

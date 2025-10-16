@@ -546,13 +546,12 @@ impl ScenarioRunner {
                     (self.scenario.initial_state.existing_tasks.len() - index) as u64 * 100,
                 ))
                 .unwrap();
-            self.load_task_recursive(app, existing_task, None, start_time);
+            Self::load_task_recursive(app, existing_task, None, start_time);
         }
     }
 
     /// Recursively loads a task and its children
     fn load_task_recursive(
-        &self,
         app: &mut impl TestApp,
         existing_task: &ExistingTask,
         parent_id: Option<TaskId>,
@@ -584,7 +583,7 @@ impl ScenarioRunner {
         // Load children with slightly later start times
         for (child_index, child) in existing_task.children.iter().enumerate() {
             let child_start_time = start_time + Duration::from_secs((child_index + 1) as u64 * 10);
-            self.load_task_recursive(app, child, Some(task_id), child_start_time);
+            Self::load_task_recursive(app, child, Some(task_id), child_start_time);
         }
     }
 

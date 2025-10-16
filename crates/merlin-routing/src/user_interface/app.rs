@@ -193,6 +193,8 @@ impl<B: Backend> TuiApp<B> {
                 self.task_manager.rebuild_order();
 
                 // Don't auto-select any task on load - user should manually select
+                // Adjust scroll to show placeholder at bottom (selected by default)
+                self.adjust_task_list_scroll();
             }
 
             tracing::info!("Loaded {} tasks from persistence", loaded_count);
@@ -873,50 +875,42 @@ impl<B: Backend> TuiApp<B> {
     fn adjust_task_list_scroll(&mut self) {
         // Get all visible tasks in display order (includes expanded children)
         let visible_tasks = self.build_visible_task_list();
-
         let total_visible = visible_tasks.len();
-        let max_visible = 3; // Can show up to 3 items (tasks + placeholder)
 
-        // If nothing selected (placeholder is selected)
-        if self.state.active_task_id.is_none() {
-            // Scroll to show placeholder at bottom
-            // Placeholder is conceptually at index total_visible (after all visible tasks)
-            let placeholder_index = total_visible;
-            if placeholder_index >= max_visible {
-                self.state.task_list_scroll_offset =
-                    placeholder_index.saturating_sub(max_visible - 1);
-            } else {
-                self.state.task_list_scroll_offset = 0;
-            }
-            return;
-        }
+        // Calculate how many items can be shown based on current terminal size and focus
+        let terminal_height = self.terminal.size().map(|size| size.height).unwrap_or(30);
 
-        // Find the selected task in the visible list
-        let Some(selected_id) = self.state.active_task_id else {
-            return;
+        let task_area_height = if self.focused_pane == FocusedPane::Tasks {
+            let max_height = (terminal_height * 60) / 100;
+            max_height.min(terminal_height.saturating_sub(10))
+        } else if self.focused_pane == FocusedPane::Output && self.state.active_task_id.is_some() {
+            5
+        } else {
+            terminal_height
         };
 
-        // Find the index of the selected task in the visible list
-        let Some(selected_index) = visible_tasks.iter().position(|(id, _)| *id == selected_id)
-        else {
-            return;
-        };
+        let max_visible = (task_area_height.saturating_sub(2) as usize).max(1);
 
-        // Display shows oldest at top (chronological order)
-        // scroll_offset = 0 means show the oldest visible tasks (start of list)
-        // scroll_offset = N means skip the first N oldest visible tasks
+        // Determine which item should be shown at the bottom of the visible window
+        let target_bottom_index = self.state.active_task_id.map_or(
+            total_visible, // Placeholder is selected - it's at index total_visible (after all tasks)
+            |selected_id| {
+                // A task is selected - find its position
+                visible_tasks
+                    .iter()
+                    .position(|(id, _)| *id == selected_id)
+                    .unwrap_or(total_visible) // If not found, treat like placeholder
+            },
+        );
 
-        // Calculate which tasks are currently visible
-        let visible_start = self.state.task_list_scroll_offset;
-        let visible_end = (visible_start + max_visible).min(total_visible + 1); // +1 for placeholder
-
-        // Adjust scroll if selected task is outside visible window
-        if selected_index < visible_start {
-            // Selected task is older than visible window start, scroll up to show it
-            self.state.task_list_scroll_offset = selected_index;
-        } else if selected_index >= visible_end {
-            // Selected task is newer than visible window end, scroll down to show it
-            self.state.task_list_scroll_offset = selected_index.saturating_sub(max_visible - 1);
+        // Calculate scroll offset to position target at bottom of window
+        // If target is at index N, we want to show items [N - (max_visible-1), N]
+        // So scroll_offset = N - (max_visible - 1)
+        if target_bottom_index + 1 >= max_visible {
+            self.state.task_list_scroll_offset = target_bottom_index + 1 - max_visible;
+        } else {
+            // Not enough items to fill window, start from beginning
+            self.state.task_list_scroll_offset = 0;
         }
     }
 

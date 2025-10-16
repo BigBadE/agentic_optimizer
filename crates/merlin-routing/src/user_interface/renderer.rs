@@ -57,8 +57,10 @@ impl Renderer {
 
         // Determine maximum task area height based on focus (BEFORE calculating content)
         let max_task_area_height = if ctx.focused == FocusedPane::Tasks {
-            // When Tasks pane is focused, limit to leave room for input
-            main_area.height.saturating_sub(10)
+            // When Tasks pane is focused, allow up to 60% of screen height with minimum input space
+            let max_height = (main_area.height * 60) / 100;
+            // Ensure at least 10 lines remain for input
+            max_height.min(main_area.height.saturating_sub(10))
         } else if ctx.focused == FocusedPane::Output && ctx.ui_ctx.state.active_task_id.is_some() {
             // When Output pane is focused, limit task list to max 3 lines + borders
             5
@@ -78,14 +80,9 @@ impl Renderer {
             self.calculate_task_tree_height(&ctx.ui_ctx, constrained_task_area, ctx.focused);
         let input_content_lines = ctx.input.input_area().lines().len() as u16;
 
-        // Determine final task height
-        let task_height = if ctx.focused == FocusedPane::Tasks {
-            // When focused, use the full constrained height (not content-based)
-            max_task_area_height
-        } else {
-            // Otherwise, size to content (+ borders, but not exceeding max)
-            (task_content_lines + 2).min(max_task_area_height)
-        };
+        // Determine final task height - always size to content but don't exceed max
+        // +2 for borders
+        let task_height = (task_content_lines + 2).min(max_task_area_height);
 
         let input_height = input_content_lines + 2;
 
@@ -548,8 +545,8 @@ impl Renderer {
         root_tasks: &[&(super::TaskId, &super::task_manager::TaskDisplay)],
         lines: &mut Vec<Line<'static>>,
     ) {
-        // Show placeholder only when no tasks exist at all
-        if root_tasks.is_empty() {
+        // Show placeholder when no tasks exist OR when placeholder is explicitly selected
+        if root_tasks.is_empty() || ui_ctx.state.active_task_id.is_none() {
             lines.push(Line::from(vec![Span::styled(
                 "  Start a new conversation...",
                 Style::default().fg(Color::DarkGray),

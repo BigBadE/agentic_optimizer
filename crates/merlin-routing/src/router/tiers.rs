@@ -132,12 +132,21 @@ impl ModelRouter for StrategyRouter {
             };
 
             if tier_enabled && self.is_available(&tier).await {
-                return Ok(RoutingDecision {
+                let decision = RoutingDecision {
                     tier: tier.clone(),
                     estimated_cost: Self::estimate_cost(&tier, task),
                     estimated_latency_ms: Self::estimate_latency(&tier),
                     reasoning: format!("Selected by {} strategy", strategy.name()),
-                });
+                };
+                tracing::info!(
+                    "🎯 Routing decision: {} | Strategy: {} | Complexity: {:?} | Cost: ${:.6} | Latency: {}ms",
+                    decision.tier,
+                    strategy.name(),
+                    task.complexity,
+                    decision.estimated_cost,
+                    decision.estimated_latency_ms
+                );
+                return Ok(decision);
             }
         }
 

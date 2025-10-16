@@ -82,6 +82,10 @@ impl<'handler> EventHandler<'handler> {
                 // These events are kept for backward compatibility with existing tests
                 // and will be removed in a future phase when hierarchical task support is added
             }
+
+            UiEvent::EmbeddingProgress { current, total, .. } => {
+                self.state.embedding_progress = Some((current, total));
+            }
         }
     }
 
@@ -93,6 +97,22 @@ impl<'handler> EventHandler<'handler> {
         description: String,
         parent_id: Option<TaskId>,
     ) {
+        // Normalize parent_id to always point to root conversation (max 1 level deep)
+        let normalized_parent_id = if let Some(parent_id) = parent_id {
+            // Find the root conversation (parent might be a child itself)
+            let mut root_id = parent_id;
+            while let Some(task) = self.task_manager.get_task(root_id) {
+                if let Some(grandparent_id) = task.parent_id {
+                    root_id = grandparent_id;
+                } else {
+                    break;
+                }
+            }
+            Some(root_id)
+        } else {
+            None
+        };
+
         let task_display = TaskDisplay {
             description,
             status: TaskStatus::Running,
@@ -100,7 +120,7 @@ impl<'handler> EventHandler<'handler> {
             output_lines: Vec::default(),
             start_time: Instant::now(),
             end_time: None,
-            parent_id,
+            parent_id: normalized_parent_id,
             output_tree: super::output_tree::OutputTree::default(),
             steps: Vec::default(),
         };
@@ -112,16 +132,7 @@ impl<'handler> EventHandler<'handler> {
         self.state.processing_status = None;
 
         // Ensure parent conversation is expanded to show the new child task
-        if let Some(parent_id) = parent_id {
-            // Find the root conversation (parent might be a child itself)
-            let mut root_id = parent_id;
-            while let Some(task) = self.task_manager.get_task(root_id) {
-                if let Some(grandparent_id) = task.parent_id {
-                    root_id = grandparent_id;
-                } else {
-                    break;
-                }
-            }
+        if let Some(root_id) = normalized_parent_id {
             self.state.expanded_conversations.insert(root_id);
         }
 

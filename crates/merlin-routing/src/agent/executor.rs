@@ -957,14 +957,14 @@ impl AgentExecutor {
         // Files
         if !context.files.is_empty() {
             info!("=== FILES ({}) ===", context.files.len());
-            for file in &context.files {
+            for (index, file) in context.files.iter().enumerate() {
                 info!(
-                    "--- {} ({} bytes) ---",
+                    "  {}. {} ({} bytes, ~{} tokens)",
+                    index + 1,
                     file.path.display(),
-                    file.content.len()
+                    file.content.len(),
+                    file.content.len() / 4
                 );
-                info!("{}", file.content);
-                info!("");
             }
         }
 

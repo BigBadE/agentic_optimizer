@@ -203,6 +203,54 @@ impl VectorSearchManager {
         Ok(())
     }
 
+    /// Initialize vector store using only existing cache, without blocking for full rebuild
+    ///
+    /// This allows immediate use of partial/incomplete embeddings while full indexing
+    /// continues in the background. Returns immediately after loading cache.
+    ///
+    /// # Errors
+    /// Returns an error if cache loading fails or embedding model is unavailable
+    pub async fn initialize_partial(&mut self) -> Result<()> {
+        // Check if embedding model is available (fast check)
+        tracing::info!("Checking embedding model availability for partial init...");
+        if let Err(error) = self.client.ensure_model_available().await {
+            tracing::warn!("Embedding model unavailable for partial init: {error}");
+            return Err(error);
+        }
+
+        tracing::info!(
+            "Loading embedding cache for partial init (path: {})...",
+            self.cache_path.display()
+        );
+
+        // Try to load from cache - if it exists and is valid, use it immediately
+        if let Ok(cache) = self.load_cache()
+            && cache.is_valid()
+            && !cache.embeddings.is_empty()
+        {
+            info!(
+                "  Loading {} cached embeddings for immediate use",
+                cache.embeddings.len()
+            );
+
+            let (valid, _invalid) = self.validate_cache_entries(&cache.embeddings);
+            self.load_valid_entries(&valid);
+            self.bm25.finalize();
+
+            info!(
+                "  Partial index ready: {} embeddings, {} BM25 docs",
+                self.store.len(),
+                self.bm25.len()
+            );
+            return Ok(());
+        }
+
+        // No cache available - return error but don't block
+        Err(Error::Other(
+            "No valid cache available for partial initialization".into(),
+        ))
+    }
+
     /// Try to initialize from cached embeddings
     ///
     /// # Errors

@@ -323,14 +323,14 @@ async fn test_conversation_context_preserves_order() {
         .await
         .unwrap();
 
-    // Check order is preserved
+    // Check order is reversed (newest first for better LLM context)
     let system_prompt = &context.system_prompt;
     let first_pos = system_prompt.find("First message").unwrap();
     let second_pos = system_prompt.find("Second message").unwrap();
     let third_pos = system_prompt.find("Third message").unwrap();
 
-    assert!(first_pos < second_pos);
-    assert!(second_pos < third_pos);
+    assert!(third_pos < second_pos);
+    assert!(second_pos < first_pos);
 }
 
 #[tokio::test]

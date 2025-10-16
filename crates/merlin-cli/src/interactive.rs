@@ -213,11 +213,6 @@ async fn execute_user_task(params: TaskExecutionParams) {
             );
             // Extra debug confirmations
             try_write_log(&ui_channel, &mut log_file, "Task completed successfully.");
-            try_write_log(
-                &ui_channel,
-                &mut log_file,
-                "Attempted to save task snapshot to .merlin/tasks.",
-            );
         }
         Err(error) => {
             try_write_log(&ui_channel, &mut log_file, &format!("Error: {error}"));
@@ -226,6 +221,45 @@ async fn execute_user_task(params: TaskExecutionParams) {
                 message: format!("Error: {error}"),
             });
             ui_channel.failed(task_id, error.to_string());
+        }
+    }
+}
+
+/// Initialize vector embeddings in background
+async fn initialize_embeddings_background(ui_channel: UiChannel, project: PathBuf) {
+    use merlin_context::VectorSearchManager;
+    use std::sync::Arc;
+
+    tracing::info!("Starting background embedding initialization...");
+
+    let ui_channel_progress = ui_channel.clone();
+    let progress_callback = Arc::new(move |stage: &str, current: u64, total: Option<u64>| {
+        if let Some(total_count) = total {
+            tracing::debug!("Embedding progress: {stage} {current}/{total_count}");
+            ui_channel_progress.send(UiEvent::EmbeddingProgress {
+                current,
+                total: total_count,
+                stage: stage.to_owned(),
+            });
+        }
+    });
+
+    let mut manager = VectorSearchManager::new(project).with_progress_callback(progress_callback);
+
+    match manager.initialize().await {
+        Ok(()) => {
+            tracing::info!("Embedding initialization completed successfully");
+            ui_channel.send(UiEvent::SystemMessage {
+                level: MessageLevel::Success,
+                message: "Vector index ready".to_owned(),
+            });
+        }
+        Err(error) => {
+            tracing::warn!("Embedding initialization failed: {error}");
+            ui_channel.send(UiEvent::SystemMessage {
+                level: MessageLevel::Warning,
+                message: format!("Vector index unavailable: {error}"),
+            });
         }
     }
 }
@@ -259,6 +293,12 @@ async fn run_tui_interactive(
 
     // Load tasks in background
     tui_app.load_tasks_async().await;
+
+    // Start embedding initialization in background
+    spawn(initialize_embeddings_background(
+        ui_channel.clone(),
+        project.clone(),
+    ));
 
     // Log how many task files exist on disk and how many were parsed
     let disk_task_files = fs::read_dir(&tasks_dir).map_or(0, |read_dir| {

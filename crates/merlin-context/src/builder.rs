@@ -545,8 +545,9 @@ impl ContextBuilder {
         });
 
         // Vector search initialization (I/O-bound, async)
+        // Use partial initialization to avoid blocking on full rebuild
         let vector_handle = needs_vector_init.then(|| {
-            tracing::info!("Building embedding index...");
+            tracing::info!("Loading embedding cache (non-blocking)...");
             let mut manager = VectorSearchManager::new(self.project_root.clone());
 
             if let Some(callback) = self.progress_callback.clone() {
@@ -554,7 +555,19 @@ impl ContextBuilder {
             }
 
             spawn(async move {
-                let result = manager.initialize().await;
+                // Try partial init first (fast, uses cache only)
+                let result = match manager.initialize_partial().await {
+                    Ok(()) => {
+                        tracing::info!("Using cached embeddings immediately");
+                        Ok(())
+                    }
+                    Err(error) => {
+                        tracing::warn!(
+                            "No cache available, will proceed without embeddings: {error}"
+                        );
+                        Err(error)
+                    }
+                };
                 (manager, result)
             })
         });

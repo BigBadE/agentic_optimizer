@@ -37,7 +37,19 @@ impl TaskAnalyzer for LocalTaskAnalyzer {
     async fn analyze(&self, request: &str) -> Result<TaskAnalysis> {
         let intent = self.intent_extractor.extract(request);
 
-        let _complexity = self.complexity_estimator.estimate(&intent, request);
+        let complexity = self.complexity_estimator.estimate(&intent, request);
+        tracing::info!(
+            "📊 Task complexity analysis: {:?} | Action: {:?} | Scope: {}",
+            complexity,
+            intent.action,
+            match &intent.scope {
+                super::Scope::Function(name) => format!("Function({name})"),
+                super::Scope::File(path) => format!("File({path})"),
+                super::Scope::Module(name) => format!("Module({name})"),
+                super::Scope::Multiple(files) => format!("Multiple({} files)", files.len()),
+                super::Scope::Project => "Project".to_owned(),
+            }
+        );
 
         let mut tasks = self.task_decomposer.decompose(&intent, request);
 

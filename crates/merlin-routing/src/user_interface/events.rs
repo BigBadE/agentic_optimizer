@@ -101,6 +101,15 @@ pub enum UiEvent {
         /// Description of the subtask
         description: String,
     },
+    /// Embedding indexing progress update
+    EmbeddingProgress {
+        /// Current progress
+        current: u64,
+        /// Total items
+        total: u64,
+        /// Stage description
+        stage: String,
+    },
 }
 
 /// Progress information for a task.

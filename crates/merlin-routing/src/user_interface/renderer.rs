@@ -84,7 +84,8 @@ impl Renderer {
         // +2 for borders
         let task_height = (task_content_lines + 2).min(max_task_area_height);
 
-        let input_height = input_content_lines + 2;
+        // Input height: content lines + 2 for borders, minimum 4 (2 for borders + 2 for content)
+        let input_height = (input_content_lines + 2).max(4);
 
         // If no task is selected, use minimal space for tasks panel and let input fill the rest
         if ctx.ui_ctx.state.active_task_id.is_none() {
@@ -222,20 +223,9 @@ impl Renderer {
         let max_scroll = text_lines.saturating_sub(content_height);
         let clamped_scroll = ui_ctx.state.output_scroll_offset.min(max_scroll);
 
-        // Build title with optional embedding progress indicator
-        let title = if let Some((current, total)) = ui_ctx.state.embedding_progress {
-            let percent = (current as f64 / total as f64 * 100.0) as u16;
-            let base_title = format!(
-                "─── Focused - {}  [Indexing: {}%] ",
-                task.description, percent
-            );
-            // Truncate title to fit in area width
-            Self::truncate_text(&base_title, area.width.saturating_sub(2) as usize)
-        } else {
-            let base_title = format!("─── Focused - {} ", task.description);
-            // Truncate title to fit in area width
-            Self::truncate_text(&base_title, area.width.saturating_sub(2) as usize)
-        };
+        // Build title without embedding progress (moved to input box)
+        let base_title = format!("─── Focused - {} ", task.description);
+        let title = Self::truncate_text(&base_title, area.width.saturating_sub(2) as usize);
 
         let paragraph = Paragraph::new(text)
             .style(Style::default().fg(self.theme.text()))
@@ -820,10 +810,18 @@ impl Renderer {
             Style::default()
         };
 
+        // Build title with optional embedding progress indicator
+        let title = if let Some((current, total)) = ctx.ui_ctx.state.embedding_progress {
+            let percent = (current as f64 / total as f64 * 100.0) as u16;
+            format!("─── Input  [Indexing: {percent}%]")
+        } else {
+            "─── Input ".to_owned()
+        };
+
         input_area.set_block(
             Block::default()
                 .borders(Borders::ALL)
-                .title("─── Input ")
+                .title(title)
                 .border_style(Style::default().fg(border_color))
                 .padding(Padding::horizontal(1)),
         );

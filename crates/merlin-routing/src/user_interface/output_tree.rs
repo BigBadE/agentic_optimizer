@@ -198,6 +198,89 @@ impl OutputTree {
         Self::get_node_id(node).is_some_and(|id| self.collapsed_nodes.contains(id))
     }
 
+    /// Render the output tree as formatted text
+    pub fn render(&self) -> Vec<String> {
+        let mut lines = Vec::new();
+        for node in &self.root {
+            Self::render_node(&mut lines, node, 0, &self.collapsed_nodes);
+        }
+        if lines.is_empty() {
+            lines.push("No output yet...".to_owned());
+        }
+        lines
+    }
+
+    fn render_node(
+        lines: &mut Vec<String>,
+        node: &OutputNode,
+        indent: usize,
+        collapsed: &HashSet<String>,
+    ) {
+        let prefix = "  ".repeat(indent);
+
+        match node {
+            OutputNode::Step {
+                id,
+                step_type,
+                content,
+                children,
+            } => {
+                let status_icon = if Self::is_completed(node, collapsed) {
+                    "✓"
+                } else {
+                    "●"
+                };
+
+                let type_label = match step_type {
+                    StepType::Thinking => "[Think]",
+                    StepType::ToolCall => "[Tool]",
+                    StepType::Subtask => "[Task]",
+                    StepType::Output => "[Step]",
+                };
+
+                lines.push(format!("{prefix}{status_icon} {type_label} {content}"));
+
+                if !collapsed.contains(id) {
+                    for child in children {
+                        Self::render_node(lines, child, indent + 1, collapsed);
+                    }
+                }
+            }
+            OutputNode::ToolCall {
+                tool_name, result, ..
+            } => {
+                let status = result
+                    .as_ref()
+                    .map_or("●", |res| if res.success { "✓" } else { "✗" });
+                lines.push(format!("{prefix}{status} [Tool] {tool_name}"));
+
+                if let Some(res) = result {
+                    for line in res.content.lines() {
+                        lines.push(format!("{prefix}  {line}"));
+                    }
+                }
+            }
+            OutputNode::Text { content } => {
+                for line in content.lines() {
+                    lines.push(format!("{prefix}{line}"));
+                }
+            }
+        }
+    }
+
+    fn is_completed(node: &OutputNode, collapsed: &HashSet<String>) -> bool {
+        match node {
+            OutputNode::Step { id, children, .. } => {
+                collapsed.contains(id)
+                    || children
+                        .iter()
+                        .all(|child| Self::is_completed(child, collapsed))
+            }
+            OutputNode::ToolCall { result, .. } => result.is_some(),
+            OutputNode::Text { .. } => true,
+        }
+    }
+
     fn get_children(node: &OutputNode) -> Option<&Vec<OutputNode>> {
         match node {
             OutputNode::Step { children, .. } => Some(children),

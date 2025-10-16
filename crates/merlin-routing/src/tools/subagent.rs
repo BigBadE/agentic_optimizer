@@ -121,11 +121,10 @@ impl Tool for SubagentTool {
                             "GROQ_API_KEY not found in config or environment".to_owned(),
                         )
                     })?;
-                let provider = GroqProvider::new()
+                let provider = GroqProvider::with_api_key_direct(api_key)
                     .map_err(|err| {
                         RoutingError::Other(format!("Groq provider init failed: {err}"))
                     })?
-                    .with_api_key(api_key)
                     .with_model("llama-3.3-70b-versatile".to_owned());
                 let resp = provider
                     .generate(&query, &context)

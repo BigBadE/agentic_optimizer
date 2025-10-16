@@ -245,16 +245,18 @@ impl ContextFetcher {
         // Build context using the context builder
         let mut context = self.build_context_for_query(current_query).await?;
 
-        // Add conversation history to system prompt (newest first)
-        let mut conversation_text =
-            String::from("\n\n=== Previous Conversation (newest first) ===\n");
-        for (role, content) in messages.iter().rev() {
-            #[allow(clippy::expect_used, reason = "Writing to string never fails")]
-            write!(conversation_text, "{role}: {content}\n\n")
-                .expect("Writing to string never fails");
+        // Add conversation history to system prompt (newest last) only if not empty
+        if !messages.is_empty() {
+            let mut conversation_text =
+                String::from("\n\n=== Previous Conversation (newest at bottom) ===\n");
+            for (role, content) in messages {
+                #[allow(clippy::expect_used, reason = "Writing to string never fails")]
+                write!(conversation_text, "{role}: {content}\n\n")
+                    .expect("Writing to string never fails");
+            }
+            conversation_text.push_str("=== End Previous Conversation ===\n\n");
+            context.system_prompt.push_str(&conversation_text);
         }
-        conversation_text.push_str("=== End Previous Conversation ===\n\n");
-        context.system_prompt.push_str(&conversation_text);
 
         Ok(context)
     }

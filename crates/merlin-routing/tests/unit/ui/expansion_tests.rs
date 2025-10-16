@@ -27,6 +27,7 @@ fn test_enter_toggles_expansion() {
         output_lines: vec![],
         output_tree: OutputTree::default(),
         steps: vec![],
+        current_step: None,
     };
 
     let child_task = TaskDisplay {
@@ -39,6 +40,7 @@ fn test_enter_toggles_expansion() {
         output_lines: vec![],
         output_tree: OutputTree::default(),
         steps: vec![],
+        current_step: None,
     };
 
     app.task_manager_mut().add_task(parent_id, parent_task);

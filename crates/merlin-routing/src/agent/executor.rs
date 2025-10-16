@@ -119,15 +119,12 @@ impl AgentExecutor {
         ui_channel: &UiChannel,
         task_id: TaskId,
     ) -> Result<TaskDecision> {
-        // Report assessment stage
-        ui_channel.send(UiEvent::TaskProgress {
+        // Start analysis step
+        ui_channel.send(UiEvent::TaskStepStarted {
             task_id,
-            progress: super::super::user_interface::events::TaskProgress {
-                stage: "Assessing".to_owned(),
-                current: 0,
-                total: None,
-                message: "Analyzing task complexity".to_owned(),
-            },
+            step_id: "analysis".to_owned(),
+            step_type: "Analysis".to_owned(),
+            content: "Analyzing task complexity and determining execution strategy".to_owned(),
         });
 
         let assessor = SelfAssessor::new(Arc::clone(provider));
@@ -178,17 +175,19 @@ impl AgentExecutor {
         let provider = self.create_provider(&decision.tier)?;
 
         // Step 3: Build context
-        ui_channel.send(UiEvent::TaskProgress {
+        ui_channel.send(UiEvent::TaskStepStarted {
             task_id,
-            progress: TaskProgress {
-                stage: "Building Context".to_owned(),
-                current: 0,
-                total: None,
-                message: "Analyzing query and gathering relevant files...".to_owned(),
-            },
+            step_id: "context_analysis".to_owned(),
+            step_type: "Context".to_owned(),
+            content: "Analyzing query intent".to_owned(),
         });
 
         let context = self.build_context(&task, &ui_channel).await?;
+
+        ui_channel.send(UiEvent::TaskStepCompleted {
+            task_id,
+            step_id: "context_analysis".to_owned(),
+        });
 
         // Log context breakdown to debug.log
         self.log_context_breakdown(&context).await;
@@ -202,6 +201,13 @@ impl AgentExecutor {
         let query = self.create_query_with_tools(&task)?;
 
         // Step 5: Execute with streaming
+        ui_channel.send(UiEvent::TaskStepStarted {
+            task_id,
+            step_id: "model_execution".to_owned(),
+            step_type: "Execution".to_owned(),
+            content: format!("Executing with {}", decision.tier),
+        });
+
         let response = self
             .execute_with_streaming(
                 task_id,
@@ -213,6 +219,11 @@ impl AgentExecutor {
                 },
             )
             .await?;
+
+        ui_channel.send(UiEvent::TaskStepCompleted {
+            task_id,
+            step_id: "model_execution".to_owned(),
+        });
 
         // Step 6: Validate
         let validation = self.validator.validate(&response, &task).await?;
@@ -336,12 +347,13 @@ impl AgentExecutor {
     /// # Errors
     /// Returns an error if formatting the prompt fails.
     fn create_query_with_tools(&self, task: &Task) -> Result<Query> {
-        let mut prompt = task.description.clone();
+        // Start with clear user request label
+        let mut prompt = format!("# User Request\n\n{}", task.description);
 
         // Add tool descriptions to the prompt
         let tools = self.tool_registry.list_tools();
         if !tools.is_empty() {
-            prompt.push_str("\n\nAvailable tools:\n");
+            prompt.push_str("\n\n# Available Tools\n");
             for tool in tools {
                 writeln!(prompt, "- {}: {}", tool.name(), tool.description())?;
             }
@@ -359,18 +371,28 @@ impl AgentExecutor {
                 Ok(Arc::new(LocalModelProvider::new(model_name.clone())))
             }
             ModelTier::Groq { model_name } => {
-                let api_key = self
-                    .config
-                    .get_api_key("groq")
+                // Get Groq API key from config first, then environment
+                let api_key_from_config = self.config.get_api_key("groq");
+
+                tracing::debug!(
+                    "Groq API key from config: {}",
+                    if api_key_from_config.is_some() {
+                        "present"
+                    } else {
+                        "missing"
+                    }
+                );
+
+                let api_key = api_key_from_config
                     .or_else(|| env::var("GROQ_API_KEY").ok())
                     .ok_or_else(|| {
                         RoutingError::Other(
                             "GROQ_API_KEY not found in config or environment".to_owned(),
                         )
                     })?;
-                let provider = GroqProvider::new()
+
+                let provider = GroqProvider::with_api_key_direct(api_key)
                     .map_err(|error| RoutingError::Other(error.to_string()))?
-                    .with_api_key(api_key)
                     .with_model(model_name.clone());
                 Ok(Arc::new(provider))
             }
@@ -415,19 +437,27 @@ impl AgentExecutor {
     async fn build_conversational_context(
         conversation_history: &Arc<Mutex<ConversationHistory>>,
     ) -> Context {
+        use merlin_core::prompts::load_prompt;
+
+        // Always load the proper coding assistant prompt
+        let base_prompt = load_prompt("coding_assistant")
+            .unwrap_or_else(|_| {
+                "You are a helpful AI coding assistant. Answer the user's question directly and conversationally.".to_owned()
+            });
+
         let conv_history = conversation_history.lock().await;
         let system_prompt = if conv_history.is_empty() {
-            "You are a helpful AI assistant. Answer the user's question directly and conversationally.".to_owned()
+            base_prompt
         } else {
-            let mut prompt = String::from(
-                "You are a helpful AI assistant. Here is the conversation history:\n\n",
-            );
+            // Append conversation history to the coding assistant prompt
+            let mut prompt = base_prompt;
+            prompt.push_str("\n\n## Conversation History\n\n");
             for (role, content) in conv_history.iter() {
                 use std::fmt::Write as _;
                 #[allow(clippy::expect_used, reason = "Writing to String never fails")]
                 writeln!(prompt, "{role}: {content}").expect("Writing to String never fails");
             }
-            prompt.push_str("\nAnswer the user's question based on this conversation.");
+            prompt.push_str("\nAnswer the user's question based on this conversation and your role as a coding assistant.");
             prompt
         };
         drop(conv_history);
@@ -442,6 +472,7 @@ impl AgentExecutor {
     async fn build_context(&self, task: &Task, ui_channel: &UiChannel) -> Result<Context> {
         let intent = Self::classify_query_intent(&task.description);
         let query = Query::new(task.description.clone());
+        let task_id = task.id;
 
         // For conversational queries, skip file fetching and use minimal context
         if intent == QueryIntent::Conversational {
@@ -449,7 +480,6 @@ impl AgentExecutor {
         }
 
         // For code queries, fetch file context as normal
-        let task_id = task.id;
         let ui_clone = ui_channel.clone();
 
         let progress_callback = Arc::new(move |stage: &str, current: u64, total: Option<u64>| {
@@ -474,6 +504,14 @@ impl AgentExecutor {
         *fetcher = replace(&mut *fetcher, ContextFetcher::new(project_root))
             .with_progress_callback(progress_callback);
 
+        // Send substep for file gathering
+        ui_channel.send(UiEvent::TaskStepStarted {
+            task_id,
+            step_id: "file_gathering".to_owned(),
+            step_type: "Search".to_owned(),
+            content: "Searching for relevant files".to_owned(),
+        });
+
         // Check if we have conversation history
         let context = {
             let conv_history = self.conversation_history.lock().await;
@@ -490,6 +528,11 @@ impl AgentExecutor {
                     .map_err(|err| RoutingError::Other(format!("Failed to build context: {err}")))?
             }
         };
+
+        ui_channel.send(UiEvent::TaskStepCompleted {
+            task_id,
+            step_id: "file_gathering".to_owned(),
+        });
 
         Ok(context)
     }

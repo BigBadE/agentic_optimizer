@@ -70,6 +70,7 @@ pub fn create_test_task_with_time(desc: &str, start: Instant) -> TaskDisplay {
         output_lines: vec![],
         output_tree: OutputTree::default(),
         steps: vec![],
+        current_step: None,
     }
 }
 
@@ -85,6 +86,7 @@ pub fn create_child_task(desc: &str, parent_id: TaskId) -> TaskDisplay {
         output_lines: vec![],
         output_tree: OutputTree::default(),
         steps: vec![],
+        current_step: None,
     }
 }
 
@@ -101,6 +103,7 @@ pub fn create_completed_task(desc: &str) -> TaskDisplay {
         output_lines: vec![],
         output_tree: OutputTree::default(),
         steps: vec![],
+        current_step: None,
     }
 }
 
@@ -117,6 +120,7 @@ pub fn create_failed_task(desc: &str) -> TaskDisplay {
         output_lines: vec![],
         output_tree: OutputTree::default(),
         steps: vec![],
+        current_step: None,
     }
 }
 

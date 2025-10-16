@@ -191,7 +191,7 @@ impl VectorSearchManager {
         );
 
         // Try to load from cache first
-        if let Ok(cache) = self.load_cache()
+        if let Ok(cache) = self.load_cache().await
             && self.try_initialize_from_cache(cache).await?
         {
             return Ok(());
@@ -208,33 +208,32 @@ impl VectorSearchManager {
     /// This allows immediate use of partial/incomplete embeddings while full indexing
     /// continues in the background. Returns immediately after loading cache.
     ///
+    /// Note: Skips model availability check for non-blocking operation.
+    ///
     /// # Errors
-    /// Returns an error if cache loading fails or embedding model is unavailable
+    /// Returns an error if cache loading fails or cache is invalid/empty
     pub async fn initialize_partial(&mut self) -> Result<()> {
-        // Check if embedding model is available (fast check)
-        tracing::info!("Checking embedding model availability for partial init...");
-        if let Err(error) = self.client.ensure_model_available().await {
-            tracing::warn!("Embedding model unavailable for partial init: {error}");
-            return Err(error);
-        }
-
+        // Skip model availability check - we're just loading from cache
+        // Model check will happen in background task if needed
         tracing::info!(
             "Loading embedding cache for partial init (path: {})...",
             self.cache_path.display()
         );
 
         // Try to load from cache - if it exists and is valid, use it immediately
-        if let Ok(cache) = self.load_cache()
+        // IMPORTANT: Skip validation to avoid blocking on file I/O
+        // Trust the cache and let background task handle updates
+        if let Ok(cache) = self.load_cache().await
             && cache.is_valid()
             && !cache.embeddings.is_empty()
         {
             info!(
-                "  Loading {} cached embeddings for immediate use",
+                "  Loading {} cached embeddings for immediate use (no validation)",
                 cache.embeddings.len()
             );
 
-            let (valid, _invalid) = self.validate_cache_entries(&cache.embeddings);
-            self.load_valid_entries(&valid);
+            // Load all entries without validation (trust the cache)
+            self.load_valid_entries(&cache.embeddings);
             self.bm25.finalize();
 
             info!(
@@ -1299,13 +1298,23 @@ impl VectorSearchManager {
     ///
     /// # Errors
     /// Returns an error if the cache file cannot be read or deserialized
-    fn load_cache(&self) -> Result<VectorCache> {
-        let data = fs::read(&self.cache_path)
+    async fn load_cache(&self) -> Result<VectorCache> {
+        use tokio::fs as async_fs;
+
+        // Read cache file asynchronously to avoid blocking
+        let data = async_fs::read(&self.cache_path)
+            .await
             .map_err(|error| Error::Other(format!("Failed to read cache: {error}")))?;
 
-        let cache: VectorCache = decode_from_slice(&data, bincode_config())
-            .map_err(|error| Error::Other(format!("Failed to deserialize cache: {error}")))?
-            .0;
+        // Deserialize in blocking task (CPU-bound operation)
+        let cache = spawn_blocking(move || {
+            decode_from_slice(&data, bincode_config())
+                .map_err(|error| Error::Other(format!("Failed to deserialize cache: {error}")))
+                .map(|(cache, _)| cache)
+        })
+        .await
+        .map_err(|error| Error::Other(format!("Task join error: {error}")))??;
+
         Ok(cache)
     }
 

@@ -15,16 +15,25 @@ impl RoutingStrategy for ComplexityBasedStrategy {
     }
 
     async fn select_tier(&self, task: &Task) -> Result<ModelTier> {
+        // Complexity-based routing with multi-tier model selection:
+        // Trivial: Local qwen2.5-coder:7b
+        // Simple: Groq llama-3.1-8b-instant
+        // Medium: Groq qwen2.5-32b-coder-preview
+        // Complex: Premium claude-3-5-sonnet
+
         Ok(match task.complexity {
-            Complexity::Trivial | Complexity::Simple => ModelTier::Local {
+            Complexity::Trivial => ModelTier::Local {
                 model_name: "qwen2.5-coder:7b".to_owned(),
             },
+            Complexity::Simple => ModelTier::Groq {
+                model_name: "llama-3.1-8b-instant".to_owned(),
+            },
             Complexity::Medium => ModelTier::Groq {
-                model_name: "llama-3.1-70b-versatile".to_owned(),
+                model_name: "qwen2.5-32b-coder-preview".to_owned(),
             },
             Complexity::Complex => ModelTier::Premium {
-                provider: "openrouter".to_owned(),
-                model_name: "deepseek/deepseek-coder".to_owned(),
+                provider: "anthropic".to_owned(),
+                model_name: "claude-3-5-sonnet-20241022".to_owned(),
             },
         })
     }
@@ -51,7 +60,7 @@ mod tests {
             Ok(tier) => tier,
             Err(error) => panic!("failed to select tier for simple task: {error}"),
         };
-        assert!(matches!(tier_simple, ModelTier::Local { .. }));
+        assert!(matches!(tier_simple, ModelTier::Groq { .. }));
 
         let medium_task = Task::new("Medium task".to_owned()).with_complexity(Complexity::Medium);
         let tier_medium = match strategy.select_tier(&medium_task).await {

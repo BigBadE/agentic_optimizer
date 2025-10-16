@@ -15,15 +15,20 @@ impl RoutingStrategy for QualityCriticalStrategy {
     }
 
     async fn select_tier(&self, task: &Task) -> Result<ModelTier> {
+        // Quality-critical routing - always use premium models
+        // Critical: Claude 3.5 Sonnet (best reasoning)
+        // High: Claude 3.5 Haiku (fast premium)
+
         if task.priority == Priority::Critical {
             Ok(ModelTier::Premium {
                 provider: "anthropic".to_owned(),
-                model_name: "claude-3.5-sonnet".to_owned(),
+                model_name: "claude-3-5-sonnet-20241022".to_owned(),
             })
         } else {
+            // High priority
             Ok(ModelTier::Premium {
-                provider: "openrouter".to_owned(),
-                model_name: "anthropic/claude-3-haiku".to_owned(),
+                provider: "anthropic".to_owned(),
+                model_name: "claude-3-5-haiku-20241022".to_owned(),
             })
         }
     }

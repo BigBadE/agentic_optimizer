@@ -211,6 +211,7 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
         parent_id: serializable.parent_id,
         output_tree,
         steps: Vec::default(),
+        current_step: None,
     };
 
     (serializable.id, task_display)

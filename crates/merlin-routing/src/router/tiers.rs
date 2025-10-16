@@ -151,10 +151,11 @@ impl ModelRouter for StrategyRouter {
         }
 
         // Fallback: Try any enabled tier
+        // Prefer Groq over local for better quality
         if self.groq_enabled {
             return Ok(RoutingDecision {
                 tier: ModelTier::Groq {
-                    model_name: "llama-3.1-70b-versatile".to_owned(),
+                    model_name: "qwen2.5-32b-coder-preview".to_owned(),
                 },
                 estimated_cost: 0.0,
                 estimated_latency_ms: 500,

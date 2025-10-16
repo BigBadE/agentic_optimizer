@@ -1,7 +1,7 @@
 use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use tokio::spawn;
-use tokio::task::{JoinError, spawn_blocking};
+use tokio::task::spawn_blocking;
 use walkdir::{DirEntry, WalkDir};
 
 use core::result::Result as CoreResult;
@@ -16,8 +16,6 @@ use crate::embedding::{ProgressCallback, SearchResult, VectorSearchManager};
 use crate::fs_utils::is_source_file;
 use crate::query::{QueryAnalyzer, QueryIntent};
 
-type BackendJoinResult = CoreResult<(Option<Box<dyn LanguageProvider>>, Result<()>), JoinError>;
-type VectorJoinResult = CoreResult<(VectorSearchManager, Result<()>), JoinError>;
 type FileScoreInfo = (PathBuf, f32, Option<f32>, Option<f32>);
 type ProcessSearchResultsReturn = (Vec<PrioritizedFile>, Vec<FileScoreInfo>);
 type FileChunksMap = HashMap<PathBuf, Vec<(usize, usize, f32)>>;
@@ -458,31 +456,21 @@ impl ContextBuilder {
         false
     }
 
-    /// Handle backend initialization result
-    fn handle_backend_result(&mut self, backend_result: BackendJoinResult) {
-        if let Ok((backend, Ok(()))) = backend_result {
-            self.language_backend = backend;
-            self.language_backend_initialized = true;
-            tracing::info!("Rust-analyzer initialized");
-        } else if let Ok((backend, Err(backend_error))) = backend_result {
-            self.language_backend = backend;
-            tracing::warn!("Failed to initialize rust-analyzer: {backend_error}");
-            tracing::warn!("Falling back to basic file scanning");
-        } else if let Err(join_error) = backend_result {
-            tracing::error!("Backend task join error: {join_error}");
-        }
-    }
+    /// Spawn background task for full embedding initialization
+    ///
+    /// Note: Does not use progress callback to avoid UI blocking
+    fn spawn_background_embedding(project_root: PathBuf) {
+        spawn(async move {
+            let mut bg_manager = VectorSearchManager::new(project_root);
+            // Don't set progress callback - background task shouldn't update UI
 
-    /// Handle vector search initialization result
-    fn handle_vector_result(&mut self, vector_result: VectorJoinResult) {
-        if let Ok((manager, Ok(()))) = vector_result {
-            self.vector_manager = Some(manager);
-            tracing::info!("Embedding index ready");
-        } else if let Ok((_, Err(vector_error))) = vector_result {
-            tracing::warn!("Failed to initialize vector search: {vector_error}");
-        } else if let Err(join_error) = vector_result {
-            tracing::error!("Vector search task join error: {join_error}");
-        }
+            tracing::info!("Background: Starting full embedding initialization...");
+            if let Err(bg_error) = bg_manager.initialize().await {
+                tracing::warn!("Background embedding generation failed: {bg_error}");
+            } else {
+                tracing::info!("Background: Embedding generation completed successfully");
+            }
+        });
     }
 
     /// Initialize backend with timeout
@@ -536,17 +524,30 @@ impl ContextBuilder {
 
         tracing::info!("Initializing systems in parallel...");
 
-        // Rust-analyzer initialization (CPU-bound, blocking) with timeout
-        let backend_handle = needs_backend_init.then(|| {
+        // Rust-analyzer initialization (CPU-bound, blocking) - spawn in background
+        if needs_backend_init {
             let backend = self.language_backend.take();
             let project_root = self.project_root.clone();
 
-            spawn(async move { Self::initialize_backend_with_timeout(backend, project_root).await })
-        });
+            spawn(async move {
+                tracing::info!("Background: Starting rust-analyzer initialization...");
+                let (_backend, result) =
+                    Self::initialize_backend_with_timeout(backend, project_root).await;
+                match result {
+                    Ok(()) => tracing::info!("Background: rust-analyzer initialized successfully"),
+                    Err(error) => {
+                        tracing::warn!("Background: rust-analyzer initialization failed: {error}");
+                    }
+                }
+            });
+
+            // Mark as initialized to prevent re-initialization
+            self.language_backend_initialized = true;
+        }
 
         // Vector search initialization (I/O-bound, async)
-        // Use partial initialization to avoid blocking on full rebuild
-        let vector_handle = needs_vector_init.then(|| {
+        // Truly non-blocking: loads cache if available, spawns background task otherwise
+        if needs_vector_init {
             tracing::info!("Loading embedding cache (non-blocking)...");
             let mut manager = VectorSearchManager::new(self.project_root.clone());
 
@@ -554,45 +555,27 @@ impl ContextBuilder {
                 manager = manager.with_progress_callback(callback);
             }
 
-            spawn(async move {
-                // Try partial init first (fast, uses cache only)
-                let result = match manager.initialize_partial().await {
-                    Ok(()) => {
-                        tracing::info!("Using cached embeddings immediately");
-                        Ok(())
-                    }
-                    Err(error) => {
-                        tracing::warn!(
-                            "No cache available, will proceed without embeddings: {error}"
-                        );
-                        Err(error)
-                    }
-                };
-                (manager, result)
-            })
-        });
+            // Try partial init first (fast, uses cache only)
+            match manager.initialize_partial().await {
+                Ok(()) => {
+                    tracing::info!("Using cached embeddings immediately");
+                    self.vector_manager = Some(manager);
+                }
+                Err(error) => {
+                    tracing::warn!(
+                        "No cache available, spawning background embedding generation: {error}"
+                    );
+                    Self::spawn_background_embedding(self.project_root.clone());
 
-        // Wait for BOTH tasks to complete simultaneously
-        match (backend_handle, vector_handle) {
-            (Some(backend_hdl), Some(vector_hdl)) => {
-                let (backend_result, vector_result) = tokio::join!(backend_hdl, vector_hdl);
-                self.handle_backend_result(backend_result);
-                self.handle_vector_result(vector_result);
-            }
-            (Some(backend_hdl), None) => {
-                let backend_result = backend_hdl.await;
-                self.handle_backend_result(backend_result);
-            }
-            (None, Some(vector_hdl)) => {
-                let vector_result = vector_hdl.await;
-                self.handle_vector_result(vector_result);
-            }
-            (None, None) => {
-                // Nothing to initialize
+                    // Store the manager anyway (empty but ready for BM25 fallback)
+                    self.vector_manager = Some(manager);
+                }
             }
         }
 
-        tracing::info!("All systems initialized");
+        tracing::info!(
+            "Core systems initialized (backend and embeddings may continue in background)"
+        );
         Ok(())
     }
 

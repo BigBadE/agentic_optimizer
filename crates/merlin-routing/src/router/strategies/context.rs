@@ -30,19 +30,31 @@ impl RoutingStrategy for LongContextStrategy {
     }
 
     async fn select_tier(&self, task: &Task) -> Result<ModelTier> {
-        if task.context_needs.estimated_tokens > 100_000 {
+        // Long-context routing - select models based on context size
+        // 16k-32k: Groq qwen2.5-32b (32k window)
+        // 32k-100k: Premium haiku (200k window)
+        // 100k-200k: Premium glm-4.6 (long context specialist)
+        // 200k+: Premium sonnet (200k window, best reasoning)
+
+        if task.context_needs.estimated_tokens > 200_000 {
             Ok(ModelTier::Premium {
                 provider: "anthropic".to_owned(),
-                model_name: "claude-3.5-sonnet".to_owned(),
+                model_name: "claude-3-5-sonnet-20241022".to_owned(),
+            })
+        } else if task.context_needs.estimated_tokens > 100_000 {
+            Ok(ModelTier::Premium {
+                provider: "openrouter".to_owned(),
+                model_name: "01-ai/yi-lightning".to_owned(),
             })
         } else if task.context_needs.estimated_tokens > 32000 {
             Ok(ModelTier::Premium {
-                provider: "openrouter".to_owned(),
-                model_name: "anthropic/claude-3-haiku".to_owned(),
+                provider: "anthropic".to_owned(),
+                model_name: "claude-3-5-haiku-20241022".to_owned(),
             })
         } else {
+            // 16k-32k range
             Ok(ModelTier::Groq {
-                model_name: "llama-3.1-70b-versatile".to_owned(),
+                model_name: "qwen2.5-32b-coder-preview".to_owned(),
             })
         }
     }
@@ -74,8 +86,9 @@ mod tests {
             Err(error) => panic!("failed to select tier for huge context: {error}"),
         };
 
+        // 150k tokens should route to yi-lightning (100k-200k range)
         if let ModelTier::Premium { model_name, .. } = tier {
-            assert!(model_name.contains("sonnet"));
+            assert!(model_name.contains("yi-lightning"));
         } else {
             panic!("Expected Premium tier for huge context");
         }

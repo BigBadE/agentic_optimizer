@@ -267,8 +267,30 @@ impl RoutingConfig {
         use toml::from_str;
         let contents = fs::read_to_string(path)
             .map_err(|error| RoutingError::Other(format!("Failed to read config: {error}")))?;
-        from_str(&contents)
-            .map_err(|error| RoutingError::Other(format!("Failed to parse config: {error}")))
+        let config: Self = from_str(&contents)
+            .map_err(|error| RoutingError::Other(format!("Failed to parse config: {error}")))?;
+
+        tracing::debug!(
+            "Loaded config from {:?}: groq_api_key={}, openrouter_api_key={}, anthropic_api_key={}",
+            path,
+            if config.api_keys.groq_api_key.is_some() {
+                "present"
+            } else {
+                "missing"
+            },
+            if config.api_keys.openrouter_api_key.is_some() {
+                "present"
+            } else {
+                "missing"
+            },
+            if config.api_keys.anthropic_api_key.is_some() {
+                "present"
+            } else {
+                "missing"
+            }
+        );
+
+        Ok(config)
     }
 
     /// Save config to a specific file
@@ -344,5 +366,127 @@ mod tests {
             Err(error) => panic!("deserialize failed: {error}"),
         };
         assert_eq!(config.tiers.local_model, deserialized.tiers.local_model);
+    }
+
+    #[test]
+    fn test_api_key_loading_from_toml() {
+        use std::io::Write as _;
+        use tempfile::NamedTempFile;
+
+        // Create a temporary config file with API keys
+        let toml_content = r#"
+[tiers]
+local_enabled = true
+local_model = "qwen2.5-coder:7b"
+groq_enabled = true
+groq_model = "llama-3.1-70b-versatile"
+premium_enabled = true
+max_retries = 3
+timeout_seconds = 300
+
+[api_keys]
+groq_api_key = "test_groq_key_123"
+openrouter_api_key = "test_openrouter_key_456"
+anthropic_api_key = "test_anthropic_key_789"
+
+[validation]
+enabled = true
+early_exit = true
+build_timeout_seconds = 60
+test_timeout_seconds = 300
+
+[validation.checks]
+enabled_checks = ["Syntax", "Build", "Test", "Lint"]
+
+[execution]
+max_concurrent_tasks = 4
+enable_parallel = true
+enable_conflict_detection = true
+enable_file_locking = true
+context_dump = false
+
+[workspace]
+root_path = "."
+enable_snapshots = true
+enable_transactions = true
+
+[cache]
+enabled = true
+ttl_hours = 24
+max_size_mb = 100
+similarity_threshold = 0.95
+"#;
+
+        let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
+        temp_file
+            .write_all(toml_content.as_bytes())
+            .expect("Failed to write to temp file");
+
+        // Load config from the temp file
+        let config = RoutingConfig::load_from_file(temp_file.path())
+            .expect("Failed to load config from temp file");
+
+        // Verify API keys were loaded
+        assert_eq!(
+            config.api_keys.groq_api_key,
+            Some("test_groq_key_123".to_owned())
+        );
+        assert_eq!(
+            config.api_keys.openrouter_api_key,
+            Some("test_openrouter_key_456".to_owned())
+        );
+        assert_eq!(
+            config.api_keys.anthropic_api_key,
+            Some("test_anthropic_key_789".to_owned())
+        );
+
+        // Verify get_api_key method works
+        assert_eq!(
+            config.get_api_key("groq"),
+            Some("test_groq_key_123".to_owned())
+        );
+        assert_eq!(
+            config.get_api_key("openrouter"),
+            Some("test_openrouter_key_456".to_owned())
+        );
+        assert_eq!(
+            config.get_api_key("anthropic"),
+            Some("test_anthropic_key_789".to_owned())
+        );
+    }
+
+    #[test]
+    fn test_load_actual_config_if_exists() {
+        // This test checks if the actual ~/.merlin/config.toml can be loaded
+        // It's optional - passes if the file doesn't exist
+        if let Ok(config_path) = RoutingConfig::config_path()
+            && config_path.exists()
+        {
+            let config = RoutingConfig::load_from_file(&config_path)
+                .expect("Failed to load actual config file");
+
+            // Just verify it loaded without crashing
+            println!("Loaded config from {config_path:?}");
+            println!(
+                "  groq_api_key present: {}",
+                config.api_keys.groq_api_key.is_some()
+            );
+            println!(
+                "  openrouter_api_key present: {}",
+                config.api_keys.openrouter_api_key.is_some()
+            );
+            println!(
+                "  anthropic_api_key present: {}",
+                config.api_keys.anthropic_api_key.is_some()
+            );
+
+            // Verify get_api_key returns the keys
+            if config.api_keys.groq_api_key.is_some() {
+                assert!(
+                    config.get_api_key("groq").is_some(),
+                    "groq_api_key is set in file but get_api_key returns None"
+                );
+            }
+        }
     }
 }

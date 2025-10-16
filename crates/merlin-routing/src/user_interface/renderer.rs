@@ -84,8 +84,8 @@ impl Renderer {
         // +2 for borders
         let task_height = (task_content_lines + 2).min(max_task_area_height);
 
-        // Input height: content lines + 2 for borders, minimum 4 (2 for borders + 2 for content)
-        let input_height = (input_content_lines + 2).max(4);
+        // Input height: content lines + 2 for borders, minimum 3 (2 for borders + 1 for content)
+        let input_height = (input_content_lines + 2).max(3);
 
         // If no task is selected, use minimal space for tasks panel and let input fill the rest
         if ctx.ui_ctx.state.active_task_id.is_none() {
@@ -349,6 +349,14 @@ impl Renderer {
         };
 
         lines.push(Line::from(vec![Span::styled(truncated_line, style)]));
+
+        // Render current step as a sub-child if present
+        if let Some(step) = &task.current_step {
+            let step_line = format!("  │  └─ ● {}", step.content);
+            let truncated_step = Self::truncate_text(&step_line, max_width);
+            let step_style = Style::default().fg(Color::DarkGray);
+            lines.push(Line::from(vec![Span::styled(truncated_step, step_style)]));
+        }
     }
 
     /// Renders a root task conversation
@@ -399,6 +407,15 @@ impl Renderer {
         };
 
         lines.push(Line::from(vec![Span::styled(truncated_line, style)]));
+
+        // Render current step as a child if present and not expanded
+        // (if expanded, step will show under the actual task children)
+        if !is_expanded && let Some(step) = &task.current_step {
+            let step_line = format!(" └─ ● {}", step.content);
+            let truncated_step = Self::truncate_text(&step_line, max_width);
+            let step_style = Style::default().fg(Color::DarkGray);
+            lines.push(Line::from(vec![Span::styled(truncated_step, step_style)]));
+        }
     }
 
     /// Builds task list lines for rendering (top tasks panel)
@@ -651,6 +668,14 @@ impl Renderer {
             lines.push(progress_line);
         }
 
+        // Render current step as a child if present and not expanded
+        if !is_primary_expanded && let Some(step) = &root_task.current_step {
+            let step_line = format!(" └─ ● {}", step.content);
+            let truncated_step = Self::truncate_text(&step_line, max_width);
+            let step_style = Style::default().fg(Color::DarkGray);
+            lines.push(Line::from(vec![Span::styled(truncated_step, step_style)]));
+        }
+
         // Show children only if conversation is expanded OR if they're currently running
         let children: Vec<_> = all_tasks
             .iter()
@@ -696,6 +721,15 @@ impl Renderer {
             };
 
             lines.push(Line::from(vec![Span::styled(truncated_line, style)]));
+
+            // Render current step for this child if present
+            if let Some(step) = &child_task.current_step {
+                let connector = if is_last { "    " } else { " │  " };
+                let step_line = format!("{connector}└─ ● {}", step.content);
+                let truncated_step = Self::truncate_text(&step_line, max_width);
+                let step_style = Style::default().fg(Color::DarkGray);
+                lines.push(Line::from(vec![Span::styled(truncated_step, step_style)]));
+            }
         }
     }
 
@@ -813,7 +847,7 @@ impl Renderer {
         // Build title with optional embedding progress indicator
         let title = if let Some((current, total)) = ctx.ui_ctx.state.embedding_progress {
             let percent = (current as f64 / total as f64 * 100.0) as u16;
-            format!("─── Input  [Indexing: {percent}%]")
+            format!("─── Input  [Indexing: {percent}%] ")
         } else {
             "─── Input ".to_owned()
         };
@@ -839,11 +873,11 @@ impl Renderer {
         _focused_pane: FocusedPane,
     ) -> String {
         let available_width = width.saturating_sub(4) as usize;
-        if task.output_lines.is_empty() {
-            return "No output yet...".to_owned();
-        }
 
-        task.output_lines
+        // Render the hierarchical output tree with steps
+        let tree_lines = task.output_tree.render();
+
+        tree_lines
             .iter()
             .filter(|line| !line.trim_start().starts_with("Prompt:"))
             .flat_map(|line| {

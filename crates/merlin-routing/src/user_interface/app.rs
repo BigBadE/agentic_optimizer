@@ -104,7 +104,7 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             .as_ref()
             .map(|dir| TaskPersistence::new(dir.clone()));
 
-        let mut app = Self {
+        let app = Self {
             terminal,
             event_receiver: receiver,
             task_manager: TaskManager::default(),
@@ -117,9 +117,6 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             event_source: Box::new(CrosstermEventSource),
             last_render_time: Instant::now(),
         };
-
-        // Initialize scroll to show placeholder at bottom (selected by default)
-        app.adjust_task_list_scroll();
 
         let channel = super::UiChannel { sender };
 
@@ -460,6 +457,11 @@ impl<B: Backend> TuiApp<B> {
                 EventHandler::new(&mut self.task_manager, &mut self.state, persistence);
             handler.handle_event(event);
             had_events = true;
+        }
+
+        // Adjust scroll after processing events (in case tasks were added/removed)
+        if had_events {
+            self.adjust_task_list_scroll();
         }
 
         had_events
@@ -891,8 +893,8 @@ impl<B: Backend> TuiApp<B> {
 
         let max_visible = (task_area_height.saturating_sub(2) as usize).max(1);
 
-        // Determine which item should be shown at the bottom of the visible window
-        let target_bottom_index = self.state.active_task_id.map_or(
+        // Find the current position of the selected item
+        let selected_index = self.state.active_task_id.map_or(
             total_visible, // Placeholder is selected - it's at index total_visible (after all tasks)
             |selected_id| {
                 // A task is selected - find its position
@@ -903,15 +905,26 @@ impl<B: Backend> TuiApp<B> {
             },
         );
 
-        // Calculate scroll offset to position target at bottom of window
-        // If target is at index N, we want to show items [N - (max_visible-1), N]
-        // So scroll_offset = N - (max_visible - 1)
-        if target_bottom_index + 1 >= max_visible {
-            self.state.task_list_scroll_offset = target_bottom_index + 1 - max_visible;
-        } else {
-            // Not enough items to fill window, start from beginning
-            self.state.task_list_scroll_offset = 0;
+        // Special case: if placeholder is selected (active_task_id is None), always scroll to show it at the bottom
+        if self.state.active_task_id.is_none() && total_visible >= max_visible {
+            self.state.task_list_scroll_offset = total_visible.saturating_sub(max_visible - 1);
+            return;
         }
+
+        // Only adjust scroll if the selected item is outside the current visible window
+        let current_scroll = self.state.task_list_scroll_offset;
+        let window_start = current_scroll;
+        let window_end = current_scroll + max_visible;
+
+        // If selected item is above the visible window, scroll up to show it at the top
+        if selected_index < window_start {
+            self.state.task_list_scroll_offset = selected_index;
+        }
+        // If selected item is below the visible window, scroll down to show it at the bottom
+        else if selected_index >= window_end {
+            self.state.task_list_scroll_offset = selected_index.saturating_sub(max_visible - 1);
+        }
+        // Otherwise, the item is already visible - don't change scroll
     }
 
     /// Deletes a task and updates UI state accordingly
@@ -958,6 +971,9 @@ impl<B: Backend> TuiApp<B> {
     /// # Errors
     /// Returns an error if drawing to the terminal fails.
     fn render(&mut self) -> Result<()> {
+        // Ensure scroll is correct before rendering (handles initial state)
+        self.adjust_task_list_scroll();
+
         self.terminal
             .draw(|frame| {
                 let ctx = RenderCtx {

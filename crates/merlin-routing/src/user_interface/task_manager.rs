@@ -37,6 +37,8 @@ pub struct TaskDisplay {
     pub output_tree: OutputTree,
     /// List of task steps
     pub steps: Vec<TaskStepInfo>,
+    /// Currently active step (shown as visual subtask in UI)
+    pub current_step: Option<TaskStepInfo>,
 }
 
 /// Task step information

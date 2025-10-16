@@ -1,5 +1,4 @@
 use super::events::{MessageLevel, UiEvent};
-use super::output_tree::StepType;
 use super::persistence::TaskPersistence;
 use super::state::{ConversationEntry, ConversationRole, UiState};
 use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo};
@@ -84,7 +83,12 @@ impl<'handler> EventHandler<'handler> {
             }
 
             UiEvent::EmbeddingProgress { current, total, .. } => {
-                self.state.embedding_progress = Some((current, total));
+                // Clear progress when complete (current == total)
+                if current >= total {
+                    self.state.embedding_progress = None;
+                } else {
+                    self.state.embedding_progress = Some((current, total));
+                }
             }
         }
     }
@@ -123,6 +127,7 @@ impl<'handler> EventHandler<'handler> {
             parent_id: normalized_parent_id,
             output_tree: super::output_tree::OutputTree::default(),
             steps: Vec::default(),
+            current_step: None,
         };
 
         self.task_manager.add_task(task_id, task_display);
@@ -226,20 +231,31 @@ impl<'handler> EventHandler<'handler> {
         content: String,
     ) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
-            task.steps.push(TaskStepInfo {
-                step_id: step_id.clone(),
+            let step_info = TaskStepInfo {
+                step_id,
                 step_type: step_type.to_string(),
-                content: content.clone(),
+                content,
                 timestamp: Instant::now(),
-            });
+            };
 
-            let step_type_enum = StepType::from_string(step_type);
-            task.output_tree.add_step(step_id, step_type_enum, content);
+            // Set as current step (replaces previous step)
+            task.current_step = Some(step_info.clone());
+
+            // Also keep in history
+            task.steps.push(step_info);
         }
     }
 
     fn handle_task_step_completed(&mut self, task_id: TaskId, step_id: &str) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
+            // Clear current step if it matches
+            if task
+                .current_step
+                .as_ref()
+                .is_some_and(|step| step.step_id == step_id)
+            {
+                task.current_step = None;
+            }
             task.output_tree.complete_step(step_id);
         }
     }

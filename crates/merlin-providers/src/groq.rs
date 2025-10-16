@@ -39,6 +39,23 @@ impl GroqProvider {
         })
     }
 
+    /// Creates a new `GroqProvider` with the given API key.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the provided API key is empty.
+    pub fn with_api_key_direct(api_key: String) -> Result<Self> {
+        if api_key.is_empty() {
+            return Err(Error::MissingApiKey(ENV_GROQ_API_KEY.to_owned()));
+        }
+
+        Ok(Self {
+            client: Client::default(),
+            api_key,
+            model: DEFAULT_MODEL.to_owned(),
+        })
+    }
+
     /// Sets the model to use for generation.
     #[must_use]
     pub fn with_model(mut self, model: String) -> Self {

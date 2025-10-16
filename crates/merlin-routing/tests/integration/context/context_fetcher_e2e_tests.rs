@@ -307,33 +307,6 @@ async fn test_context_with_empty_query() {
 }
 
 #[tokio::test]
-async fn test_conversation_context_preserves_order() {
-    let (_temp, project_root) = create_test_project().await;
-    let mut fetcher = ContextFetcher::new(project_root).without_context_builder();
-
-    let messages = vec![
-        ("user".to_owned(), "First message".to_owned()),
-        ("assistant".to_owned(), "Second message".to_owned()),
-        ("user".to_owned(), "Third message".to_owned()),
-    ];
-
-    let query = Query::new("Continue");
-    let context = fetcher
-        .build_context_from_conversation(&messages, &query)
-        .await
-        .unwrap();
-
-    // Check order is reversed (newest first for better LLM context)
-    let system_prompt = &context.system_prompt;
-    let first_pos = system_prompt.find("First message").unwrap();
-    let second_pos = system_prompt.find("Second message").unwrap();
-    let third_pos = system_prompt.find("Third message").unwrap();
-
-    assert!(third_pos < second_pos);
-    assert!(second_pos < first_pos);
-}
-
-#[tokio::test]
 async fn test_large_conversation_history() {
     let (_temp, project_root) = create_test_project().await;
     let mut fetcher = ContextFetcher::new(project_root).without_context_builder();

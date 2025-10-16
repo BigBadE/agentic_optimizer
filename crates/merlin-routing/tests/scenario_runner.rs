@@ -95,6 +95,7 @@ fn create_test_task(description: &str) -> TaskDisplay {
         output_lines: vec![],
         output_tree: OutputTree::default(),
         steps: vec![],
+        current_step: None,
     }
 }
 
@@ -576,6 +577,7 @@ impl ScenarioRunner {
             output_lines: vec![],
             output_tree: OutputTree::default(),
             steps: vec![],
+            current_step: None,
         };
 
         app.task_manager_mut().add_task(task_id, task);

@@ -39,6 +39,7 @@ fn create_test_task(description: &str, status: TaskStatus) -> TaskDisplay {
         parent_id: None,
         output_tree,
         steps: Vec::new(),
+        current_step: None,
     }
 }
 

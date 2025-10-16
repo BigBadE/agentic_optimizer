@@ -545,8 +545,18 @@ impl Renderer {
         root_tasks: &[&(super::TaskId, &super::task_manager::TaskDisplay)],
         lines: &mut Vec<Line<'static>>,
     ) {
-        // Show placeholder when no tasks exist OR when placeholder is explicitly selected
-        if root_tasks.is_empty() || ui_ctx.state.active_task_id.is_none() {
+        // Show placeholder when no tasks exist
+        if root_tasks.is_empty() {
+            lines.push(Line::from(vec![Span::styled(
+                "  Start a new conversation...",
+                Style::default().fg(Color::DarkGray),
+            )]));
+            return;
+        }
+
+        // Show placeholder when it's selected AND there are no running tasks
+        // (if there are running tasks, show them instead)
+        if ui_ctx.state.active_task_id.is_none() && ui_ctx.state.active_running_tasks.is_empty() {
             lines.push(Line::from(vec![Span::styled(
                 "  Start a new conversation...",
                 Style::default().fg(Color::DarkGray),

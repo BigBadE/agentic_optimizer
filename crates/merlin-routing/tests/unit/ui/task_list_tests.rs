@@ -606,9 +606,14 @@ fn test_task_list_scrolling_through_conversations() {
     let buffer = terminal.backend().buffer();
     let content: String = buffer.content().iter().map(Cell::symbol).collect();
 
+    // When no task is selected, placeholder should be shown
     assert!(
-        content.contains("First conversation"),
-        "Should show oldest conversation by default"
+        content.contains("Start a new conversation"),
+        "Should show placeholder when nothing selected"
+    );
+    assert!(
+        !content.contains("First conversation"),
+        "Should not show first conversation when placeholder selected"
     );
     assert!(
         !content.contains("Second conversation"),

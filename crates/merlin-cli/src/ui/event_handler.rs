@@ -1,8 +1,7 @@
-use super::events::{MessageLevel, UiEvent};
 use super::persistence::TaskPersistence;
 use super::state::{ConversationEntry, ConversationRole, UiState};
 use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo};
-use crate::{TaskId, TaskResult};
+use merlin_routing::{MessageLevel, TaskId, TaskProgress, TaskResult, UiEvent};
 use serde_json::Value;
 use std::time::{Instant, SystemTime};
 use tracing::warn;
@@ -145,7 +144,7 @@ impl<'handler> EventHandler<'handler> {
         self.select_task(task_id);
     }
 
-    fn handle_task_progress(&mut self, task_id: TaskId, progress: super::events::TaskProgress) {
+    fn handle_task_progress(&mut self, task_id: TaskId, progress: TaskProgress) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             task.progress = Some(progress);
         }
@@ -195,7 +194,6 @@ impl<'handler> EventHandler<'handler> {
         self.state.add_conversation_entry(ConversationEntry {
             role: ConversationRole::Assistant,
             text: result.response.text,
-            timestamp: Instant::now(),
         });
     }
 
@@ -243,7 +241,6 @@ impl<'handler> EventHandler<'handler> {
         self.state.add_conversation_entry(ConversationEntry {
             role: ConversationRole::System,
             text: message,
-            timestamp: Instant::now(),
         });
     }
 
@@ -259,7 +256,6 @@ impl<'handler> EventHandler<'handler> {
                 step_id,
                 step_type: step_type.to_string(),
                 content,
-                timestamp: Instant::now(),
             };
 
             // Set as current step (replaces previous step)

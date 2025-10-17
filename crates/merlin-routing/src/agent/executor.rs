@@ -123,7 +123,7 @@ impl AgentExecutor {
         ui_channel.send(UiEvent::TaskStepStarted {
             task_id,
             step_id: "analysis".to_owned(),
-            step_type: "Analysis".to_owned(),
+            step_type: "thinking".to_owned(),
             content: "Analyzing task complexity and determining execution strategy".to_owned(),
         });
 
@@ -178,7 +178,7 @@ impl AgentExecutor {
         ui_channel.send(UiEvent::TaskStepStarted {
             task_id,
             step_id: "context_analysis".to_owned(),
-            step_type: "Context".to_owned(),
+            step_type: "thinking".to_owned(),
             content: "Analyzing query intent".to_owned(),
         });
 
@@ -204,7 +204,7 @@ impl AgentExecutor {
         ui_channel.send(UiEvent::TaskStepStarted {
             task_id,
             step_id: "model_execution".to_owned(),
-            step_type: "Execution".to_owned(),
+            step_type: "tool_call".to_owned(),
             content: format!("Executing with {}", decision.tier),
         });
 
@@ -317,7 +317,7 @@ impl AgentExecutor {
             ui_channel.send(UiEvent::TaskStepStarted {
                 task_id,
                 step_id: format!("{:?}", tool_step.id),
-                step_type: "ToolCall".to_owned(),
+                step_type: "tool_call".to_owned(),
                 content: tool_step.content.clone(),
             });
 
@@ -593,7 +593,7 @@ impl AgentExecutor {
         ui_channel.send(UiEvent::TaskStepStarted {
             task_id,
             step_id: "file_gathering".to_owned(),
-            step_type: "Search".to_owned(),
+            step_type: "thinking".to_owned(),
             content: "Searching for relevant files".to_owned(),
         });
 

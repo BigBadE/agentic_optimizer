@@ -7,13 +7,6 @@ pub enum Validation {
     Disabled,
 }
 
-#[derive(ValueEnum, Clone, Copy, Debug)]
-pub enum UiMode {
-    Tui,
-    Plain,
-    PlainVerbose,
-}
-
 #[derive(Parser)]
 #[command(name = "merlin")]
 #[command(about = "Intelligent AI coding assistant with multi-model routing", long_about = None)]
@@ -29,10 +22,6 @@ pub struct Cli {
     /// Validation mode (enabled/disabled)
     #[arg(long, value_enum, default_value = "enabled", global = true)]
     pub validation: Validation,
-
-    /// UI mode (tui/plain/plain-verbose)
-    #[arg(long, value_enum, default_value = "tui", global = true)]
-    pub ui: UiMode,
 
     /// Dump full context to debug.log before each model call
     #[arg(long, global = true)]

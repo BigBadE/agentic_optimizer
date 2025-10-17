@@ -255,20 +255,6 @@ async fn test_interactive_mode_with_validation_disabled() {
 }
 
 #[tokio::test]
-async fn test_interactive_mode_with_plain_ui() {
-    let temp = TempDir::new().expect("Failed to create temp dir");
-    create_test_project(&temp);
-
-    let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
-    cmd.current_dir(temp.path())
-        .arg("--ui")
-        .arg("plain")
-        .arg("--help")
-        .assert()
-        .success();
-}
-
-#[tokio::test]
 async fn test_prompt_command_with_nonexistent_file() {
     let temp = TempDir::new().expect("Failed to create temp dir");
     create_test_project(&temp);

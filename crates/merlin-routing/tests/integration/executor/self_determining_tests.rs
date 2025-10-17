@@ -16,8 +16,10 @@ use merlin_routing::{
     AgentExecutor, Complexity, ContextFetcher, ExecutionMode, RoutingConfig, StrategyRouter,
     SubtaskSpec, Task, TaskAction, TaskDecision, ToolRegistry, UiChannel, ValidationPipeline,
 };
+use serde_json::{from_str, to_string};
 use std::path::PathBuf;
 use std::sync::Arc;
+use tokio::sync::mpsc::unbounded_channel;
 #[tokio::test]
 #[ignore = "Requires Ollama running locally"]
 async fn test_simple_task_skips_assessment() {
@@ -33,7 +35,7 @@ async fn test_simple_task_skips_assessment() {
     let task = Task::new("hi".to_owned());
 
     // Create a channel for UI events (we'll ignore the receiver)
-    let (tx, _rx) = tokio::sync::mpsc::unbounded_channel();
+    let (tx, _rx) = unbounded_channel();
     let ui_channel = UiChannel::from_sender(tx);
 
     // Simple tasks should execute without assessment
@@ -194,8 +196,8 @@ fn test_task_decision_serialization() {
         confidence: 0.95,
     };
 
-    let json = serde_json::to_string(&decision).expect("Serialization failed");
-    let deserialized: TaskDecision = serde_json::from_str(&json).expect("Deserialization failed");
+    let json = to_string(&decision).expect("Serialization failed");
+    let deserialized: TaskDecision = from_str(&json).expect("Deserialization failed");
 
     assert_eq!(deserialized.reasoning, "Test");
     assert!((deserialized.confidence - 0.95).abs() < f32::EPSILON);
@@ -208,8 +210,8 @@ fn test_subtask_spec_serialization() {
         complexity: Complexity::Medium,
     };
 
-    let json = serde_json::to_string(&spec).expect("Serialization failed");
-    let deserialized: SubtaskSpec = serde_json::from_str(&json).expect("Deserialization failed");
+    let json = to_string(&spec).expect("Serialization failed");
+    let deserialized: SubtaskSpec = from_str(&json).expect("Deserialization failed");
 
     assert_eq!(deserialized.description, "Test");
     assert_eq!(deserialized.complexity, Complexity::Medium);
@@ -220,11 +222,11 @@ fn test_execution_mode_serialization() {
     let sequential = ExecutionMode::Sequential;
     let parallel = ExecutionMode::Parallel;
 
-    let json_seq = serde_json::to_string(&sequential).expect("Serialization failed");
-    let json_par = serde_json::to_string(&parallel).expect("Serialization failed");
+    let json_seq = to_string(&sequential).expect("Serialization failed");
+    let json_par = to_string(&parallel).expect("Serialization failed");
 
-    let deser_seq: ExecutionMode = serde_json::from_str(&json_seq).expect("Deserialization failed");
-    let deser_par: ExecutionMode = serde_json::from_str(&json_par).expect("Deserialization failed");
+    let deser_seq: ExecutionMode = from_str(&json_seq).expect("Deserialization failed");
+    let deser_par: ExecutionMode = from_str(&json_par).expect("Deserialization failed");
 
     assert_eq!(deser_seq, ExecutionMode::Sequential);
     assert_eq!(deser_par, ExecutionMode::Parallel);

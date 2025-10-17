@@ -1,7 +1,5 @@
-use super::text_width::EmojiMode;
-use crate::TaskId;
+use merlin_routing::TaskId;
 use std::collections::HashSet;
-use std::time::Instant;
 
 /// Maximum number of conversation entries to retain
 const MAX_CONVERSATION_HISTORY: usize = 50;
@@ -19,8 +17,6 @@ pub struct UiState {
     pub loading_tasks: bool,
     /// History of conversation entries (limited to `MAX_CONVERSATION_HISTORY`)
     pub conversation_history: Vec<ConversationEntry>,
-    /// Emoji display mode
-    pub emoji_mode: EmojiMode,
     /// Status message to display when processing input
     pub processing_status: Option<String>,
     /// Vertical scroll offset for the output pane
@@ -38,11 +34,6 @@ pub struct UiState {
 }
 
 impl UiState {
-    /// Access `emoji_mode`
-    pub fn emoji_mode(&self) -> &EmojiMode {
-        &self.emoji_mode
-    }
-
     /// Add a conversation entry and trim history if needed
     pub fn add_conversation_entry(&mut self, entry: ConversationEntry) {
         tracing::info!(
@@ -63,11 +54,6 @@ impl UiState {
             self.conversation_history.len()
         );
     }
-
-    /// Clear all conversation history
-    pub fn clear_conversation_history(&mut self) {
-        self.conversation_history.clear();
-    }
 }
 
 /// Conversation entry
@@ -77,25 +63,6 @@ pub struct ConversationEntry {
     pub role: ConversationRole,
     /// Text content of the message
     pub text: String,
-    /// Timestamp when the entry was created
-    pub timestamp: Instant,
-}
-
-impl ConversationEntry {
-    /// Access role
-    pub fn role(&self) -> ConversationRole {
-        self.role
-    }
-
-    /// Access text
-    pub fn text(&self) -> &str {
-        &self.text
-    }
-
-    /// Access timestamp
-    pub fn timestamp(&self) -> Instant {
-        self.timestamp
-    }
 }
 
 /// Conversation role
@@ -110,10 +77,6 @@ pub enum ConversationRole {
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::min_ident_chars,
-    reason = "Test code uses short variable names for clarity"
-)]
 mod tests {
     use super::*;
 
@@ -124,7 +87,6 @@ mod tests {
         let entry = ConversationEntry {
             role: ConversationRole::User,
             text: "Hello".to_owned(),
-            timestamp: Instant::now(),
         };
 
         state.add_conversation_entry(entry);
@@ -137,11 +99,10 @@ mod tests {
         let mut state = UiState::default();
 
         // Add more than MAX_CONVERSATION_HISTORY entries
-        for i in 0..(MAX_CONVERSATION_HISTORY + 20) {
+        for index in 0..(MAX_CONVERSATION_HISTORY + 20) {
             let entry = ConversationEntry {
                 role: ConversationRole::User,
-                text: format!("Message {i}"),
-                timestamp: Instant::now(),
+                text: format!("Message {index}"),
             };
             state.add_conversation_entry(entry);
         }
@@ -165,18 +126,17 @@ mod tests {
         let mut state = UiState::default();
 
         // Add some entries
-        for i in 0..5 {
+        for index in 0..5 {
             state.add_conversation_entry(ConversationEntry {
                 role: ConversationRole::User,
-                text: format!("Message {i}"),
-                timestamp: Instant::now(),
+                text: format!("Message {index}"),
             });
         }
 
         assert_eq!(state.conversation_history.len(), 5);
 
-        // Clear
-        state.clear_conversation_history();
+        // Clear by directly accessing the field
+        state.conversation_history.clear();
         assert_eq!(state.conversation_history.len(), 0);
     }
 
@@ -185,10 +145,10 @@ mod tests {
         let entry = ConversationEntry {
             role: ConversationRole::Assistant,
             text: "Test".to_owned(),
-            timestamp: Instant::now(),
         };
 
-        assert_eq!(entry.role(), ConversationRole::Assistant);
-        assert_eq!(entry.text(), "Test");
+        // Access fields directly, not as methods
+        assert_eq!(entry.role, ConversationRole::Assistant);
+        assert_eq!(entry.text, "Test");
     }
 }

@@ -37,18 +37,6 @@ impl Theme {
         }
     }
 
-    /// Gets the theme name
-    pub fn name(self) -> &'static str {
-        match self {
-            Self::Nord => "Nord",
-            Self::Dracula => "Dracula",
-            Self::Gruvbox => "Gruvbox",
-            Self::TokyoNight => "Tokyo Night",
-            Self::Catppuccin => "Catppuccin",
-            Self::Monochrome => "Monochrome",
-        }
-    }
-
     /// Gets the focused border color
     pub fn focused_border(self) -> Color {
         match self {
@@ -82,42 +70,6 @@ impl Theme {
             Self::TokyoNight => Color::Rgb(192, 202, 245),
             Self::Catppuccin => Color::Rgb(205, 214, 244),
             Self::Monochrome => Color::Rgb(255, 255, 255),
-        }
-    }
-
-    /// Gets the success color
-    pub fn success(self) -> Color {
-        match self {
-            Self::Nord => Color::Rgb(163, 190, 140),
-            Self::Dracula => Color::Rgb(80, 250, 123),
-            Self::Gruvbox => Color::Rgb(184, 187, 38),
-            Self::TokyoNight => Color::Rgb(158, 206, 106),
-            Self::Catppuccin => Color::Rgb(166, 227, 161),
-            Self::Monochrome => Color::Rgb(100, 255, 100),
-        }
-    }
-
-    /// Gets the error color
-    pub fn error(self) -> Color {
-        match self {
-            Self::Nord => Color::Rgb(191, 97, 106),
-            Self::Dracula => Color::Rgb(255, 85, 85),
-            Self::Gruvbox => Color::Rgb(251, 73, 52),
-            Self::TokyoNight => Color::Rgb(247, 118, 142),
-            Self::Catppuccin => Color::Rgb(243, 139, 168),
-            Self::Monochrome => Color::Rgb(255, 100, 100),
-        }
-    }
-
-    /// Gets the warning color
-    pub fn warning(self) -> Color {
-        match self {
-            Self::Nord => Color::Rgb(235, 203, 139),
-            Self::Dracula => Color::Rgb(241, 250, 140),
-            Self::Gruvbox => Color::Rgb(250, 189, 47),
-            Self::TokyoNight => Color::Rgb(224, 175, 104),
-            Self::Catppuccin => Color::Rgb(249, 226, 175),
-            Self::Monochrome => Color::Rgb(255, 200, 100),
         }
     }
 

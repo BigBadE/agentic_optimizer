@@ -84,6 +84,7 @@ Extremely strict clippy lints (Cargo.toml lines 111-172):
 - Never use `println!()`/`eprintln!()` - use `tracing` macros
 - All public items need doc comments
 - Never use `#[allow]` outside test modules (test modules use `#[cfg_attr(test, allow(...))]`)
+- Do NOT use cargo clean, ever. Instead, delete specific profile folders, like target/debug, on ICE.
 
 ### Rust Edition 2024
 

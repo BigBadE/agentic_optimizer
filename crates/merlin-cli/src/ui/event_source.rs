@@ -1,4 +1,5 @@
 use crossterm::event::{self, Event};
+use std::io;
 use std::time::Duration;
 
 /// Abstraction over the input event source used by the TUI.
@@ -8,22 +9,27 @@ use std::time::Duration;
 /// - `read()` blocks until an event is available and returns it.
 pub trait InputEventSource {
     /// Wait up to `timeout` for an event to become available.
-    /// Returns `true` if an event is ready to be read.
-    fn poll(&mut self, timeout: Duration) -> bool;
+    ///
+    /// # Errors
+    /// Returns an error if the event polling operation fails.
+    fn poll(&mut self, timeout: Duration) -> io::Result<bool>;
 
     /// Block until an input `Event` is available and return it.
-    fn read(&mut self) -> Event;
+    ///
+    /// # Errors
+    /// Returns an error if reading the event fails.
+    fn read(&mut self) -> io::Result<Event>;
 }
 
 /// Default event source backed by crossterm.
 pub struct CrosstermEventSource;
 
 impl InputEventSource for CrosstermEventSource {
-    fn poll(&mut self, timeout: Duration) -> bool {
-        event::poll(timeout).unwrap_or(false)
+    fn poll(&mut self, timeout: Duration) -> io::Result<bool> {
+        event::poll(timeout)
     }
 
-    fn read(&mut self) -> Event {
-        event::read().unwrap_or(Event::Resize(0, 0))
+    fn read(&mut self) -> io::Result<Event> {
+        event::read()
     }
 }

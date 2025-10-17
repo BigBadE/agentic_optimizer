@@ -60,12 +60,11 @@ impl Tool for ReadFileTool {
 
             let canonical_path = path_buf
                 .canonicalize()
-                .map_err(|err| RoutingError::Other(format!("Invalid path '{}': {err}", path)))?;
+                .map_err(|err| RoutingError::Other(format!("Invalid path '{path}': {err}")))?;
 
             if !canonical_path.starts_with(&canonical_root) {
                 return Err(RoutingError::Other(format!(
-                    "Path '{}' is outside workspace",
-                    path
+                    "Path '{path}' is outside workspace"
                 )));
             }
 
@@ -83,7 +82,7 @@ impl Tool for ReadFileTool {
             let full = self.workspace_root.join(path);
             let canonical_path = full
                 .canonicalize()
-                .map_err(|err| RoutingError::Other(format!("Invalid path '{}': {err}", path)))?;
+                .map_err(|err| RoutingError::Other(format!("Invalid path '{path}': {err}")))?;
 
             let canonical_root = self
                 .workspace_root
@@ -92,8 +91,7 @@ impl Tool for ReadFileTool {
 
             if !canonical_path.starts_with(&canonical_root) {
                 return Err(RoutingError::Other(format!(
-                    "Path '{}' is outside workspace",
-                    path
+                    "Path '{path}' is outside workspace"
                 )));
             }
 
@@ -185,23 +183,21 @@ impl Tool for WriteFileTool {
 
                 if !canonical_parent.starts_with(&canonical_root) {
                     return Err(RoutingError::Other(format!(
-                        "Path '{}' is outside workspace",
-                        path
+                        "Path '{path}' is outside workspace"
                     )));
                 }
             } else {
                 // Parent doesn't exist - check if it would be within workspace
                 // This is tricky, so we require the parent to exist for absolute paths
                 return Err(RoutingError::Other(format!(
-                    "Parent directory of '{}' does not exist",
-                    path
+                    "Parent directory of '{path}' does not exist"
                 )));
             }
 
             // Get relative path by stripping workspace root
             let rel_path = path_buf
                 .strip_prefix(&canonical_root)
-                .map_err(|_| RoutingError::Other(format!("Path '{}' is outside workspace", path)))?
+                .map_err(|_| RoutingError::Other(format!("Path '{path}' is outside workspace")))?
                 .to_path_buf();
 
             (path_buf, rel_path)
@@ -228,8 +224,7 @@ impl Tool for WriteFileTool {
 
         if !canonical_parent.starts_with(&canonical_root) {
             return Err(RoutingError::Other(format!(
-                "Path '{}' is outside workspace",
-                path
+                "Path '{path}' is outside workspace"
             )));
         }
 
@@ -297,14 +292,13 @@ impl Tool for ListFilesTool {
                 .canonicalize()
                 .map_err(|error| RoutingError::Other(format!("Invalid workspace root: {error}")))?;
 
-            let canonical_path = path_buf.canonicalize().map_err(|error| {
-                RoutingError::Other(format!("Invalid path '{}': {error}", path))
-            })?;
+            let canonical_path = path_buf
+                .canonicalize()
+                .map_err(|error| RoutingError::Other(format!("Invalid path '{path}': {error}")))?;
 
             if !canonical_path.starts_with(&canonical_root) {
                 return Err(RoutingError::Other(format!(
-                    "Path '{}' is outside workspace",
-                    path
+                    "Path '{path}' is outside workspace"
                 )));
             }
 
@@ -316,7 +310,7 @@ impl Tool for ListFilesTool {
         // Security check: ensure path is within workspace
         let canonical_path = full_path
             .canonicalize()
-            .map_err(|error| RoutingError::Other(format!("Invalid path '{}': {error}", path)))?;
+            .map_err(|error| RoutingError::Other(format!("Invalid path '{path}': {error}")))?;
         let canonical_root = self
             .workspace_root
             .canonicalize()
@@ -324,8 +318,7 @@ impl Tool for ListFilesTool {
 
         if !canonical_path.starts_with(&canonical_root) {
             return Err(RoutingError::Other(format!(
-                "Path '{}' is outside workspace",
-                path
+                "Path '{path}' is outside workspace"
             )));
         }
 

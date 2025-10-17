@@ -1,6 +1,6 @@
-use super::events::TaskProgress;
-use crate::TaskId;
-use std::collections::{HashMap, HashSet};
+use merlin_routing::TaskId;
+use merlin_routing::TaskProgress;
+use std::collections::HashMap;
 use std::time::{Instant, SystemTime};
 
 /// Status of a task
@@ -44,34 +44,12 @@ pub struct TaskDisplay {
 pub struct TaskStepInfo {
     /// Unique identifier for this step
     pub step_id: String,
-    /// Type of step (e.g., `thinking`, `tool_call`)
+    /// Type of step (e.g., `thinking`, `tool_call`, `validation`)
+    ///
+    /// Used for differentiated UI rendering of step types.
     pub step_type: String,
     /// Content of the step
     pub content: String,
-    /// When this step occurred
-    pub timestamp: Instant,
-}
-
-impl TaskStepInfo {
-    /// Access `step_id`
-    pub fn step_id(&self) -> &str {
-        &self.step_id
-    }
-
-    /// Access `step_type`
-    pub fn step_type(&self) -> &str {
-        &self.step_type
-    }
-
-    /// Access `content`
-    pub fn content(&self) -> &str {
-        &self.content
-    }
-
-    /// Access `timestamp`
-    pub fn timestamp(&self) -> Instant {
-        self.timestamp
-    }
 }
 
 /// Manages task storage, ordering, and hierarchy
@@ -79,7 +57,6 @@ impl TaskStepInfo {
 pub struct TaskManager {
     tasks: HashMap<TaskId, TaskDisplay>,
     task_order: Vec<TaskId>,
-    collapsed_tasks: HashSet<TaskId>,
 }
 
 impl TaskManager {
@@ -109,7 +86,6 @@ impl TaskManager {
 
         for id in &to_delete {
             self.tasks.remove(id);
-            self.collapsed_tasks.remove(id);
         }
 
         self.task_order.retain(|id| !to_delete.contains(id));
@@ -174,32 +150,14 @@ impl TaskManager {
         false
     }
 
-    /// Collapses a task
-    pub fn collapse_task(&mut self, task_id: TaskId) {
-        self.collapsed_tasks.insert(task_id);
-    }
-
-    /// Expands a task
-    pub fn expand_task(&mut self, task_id: TaskId) {
-        self.collapsed_tasks.remove(&task_id);
-    }
-
-    /// Toggles collapse state of a task
-    pub fn toggle_collapse(&mut self, task_id: TaskId) {
-        if self.collapsed_tasks.contains(&task_id) {
-            self.expand_task(task_id);
-        } else {
-            self.collapse_task(task_id);
-        }
-    }
-
-    /// Checks if a task is collapsed
-    pub fn is_collapsed(&self, task_id: TaskId) -> bool {
-        self.collapsed_tasks.contains(&task_id)
-    }
-
     /// Checks if a task has children
-    pub fn has_children(&self, task_id: TaskId) -> bool {
+    ///
+    /// TODO: Use this for task hierarchy features (e.g., showing parent tasks differently).
+    #[cfg_attr(
+        not(test),
+        allow(dead_code, reason = "Utility for future task hierarchy UI")
+    )]
+    pub(crate) fn has_children(&self, task_id: TaskId) -> bool {
         self.task_order.iter().any(|id| {
             self.tasks
                 .get(id)
@@ -218,7 +176,13 @@ impl TaskManager {
     }
 
     /// Checks if task manager is empty
-    pub fn is_empty(&self) -> bool {
+    ///
+    /// Useful for conditional rendering and test assertions.
+    #[cfg_attr(
+        not(test),
+        allow(dead_code, reason = "Utility for conditional UI rendering")
+    )]
+    pub(crate) fn is_empty(&self) -> bool {
         self.tasks.is_empty()
     }
 
@@ -300,28 +264,10 @@ impl TaskManager {
         task.parent_id
     }
 
-    /// Checks if a task is hidden because one of its ancestors is collapsed
-    pub fn is_hidden_by_collapse(&self, task_id: TaskId) -> bool {
-        let mut current_parent = self.get_parent_id(task_id);
-
-        while let Some(parent_id) = current_parent {
-            if self.collapsed_tasks.contains(&parent_id) {
-                return true;
-            }
-            current_parent = self.get_parent_id(parent_id);
-        }
-        false
-    }
-
     /// Checks if there are any tasks with active progress indicators
     /// Used to determine if UI should force periodic updates
     pub fn has_tasks_with_progress(&self) -> bool {
         self.tasks.values().any(|task| task.progress.is_some())
-    }
-
-    /// Updates an existing task with new data
-    pub fn update_task(&mut self, task_id: TaskId, task: TaskDisplay) {
-        self.tasks.insert(task_id, task);
     }
 }
 

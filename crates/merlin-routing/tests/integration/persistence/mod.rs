@@ -1,1 +1,0 @@
-mod persistence_tests;

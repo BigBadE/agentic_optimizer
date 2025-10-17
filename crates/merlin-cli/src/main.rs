@@ -22,6 +22,7 @@ mod cli;
 mod config;
 mod handlers;
 mod interactive;
+mod ui;
 mod utils;
 
 #[tokio::main]
@@ -30,7 +31,7 @@ async fn main() -> Result<()> {
 
     match cli.command {
         Some(Commands::Chat { project, model }) => {
-            handlers::handle_chat(project, model).await?;
+            handlers::handle_chat(project, model)?;
         }
         Some(Commands::Query {
             query,
@@ -56,14 +57,8 @@ async fn main() -> Result<()> {
         }
         None => {
             // No subcommand - start interactive agent session
-            handlers::handle_interactive(
-                cli.project,
-                cli.validation,
-                cli.ui,
-                cli.local,
-                cli.context_dump,
-            )
-            .await?;
+            handlers::handle_interactive(cli.project, cli.validation, cli.local, cli.context_dump)
+                .await?;
         }
     }
     Ok(())
@@ -71,8 +66,6 @@ async fn main() -> Result<()> {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use console::Term;
     use merlin_core::TokenUsage;
     use std::fs;
     use tempfile::TempDir;
@@ -84,15 +77,6 @@ mod tests {
         assert_eq!(usage.output, 0, "Default output should be 0");
         assert_eq!(usage.cache_read, 0, "Default cache_read should be 0");
         assert_eq!(usage.cache_write, 0, "Default cache_write should be 0");
-    }
-
-    #[test]
-    fn test_print_chat_header() {
-        let temp = TempDir::new().expect("Failed to create temp dir");
-        let term = Term::stdout();
-
-        let result = interactive::print_chat_header(&term, temp.path());
-        assert!(result.is_ok(), "print_chat_header should succeed");
     }
 
     #[test]

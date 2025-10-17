@@ -16,6 +16,7 @@ use merlin_core::{Response, TokenUsage};
 use merlin_routing::{
     CacheConfig, MetricsCollector, MetricsReport, RequestMetrics, ResponseCache, RoutingConfig,
 };
+use serde_json::{from_str, to_string};
 use std::thread;
 use std::time::Duration;
 
@@ -238,8 +239,8 @@ fn test_config_integration() {
 fn test_config_serialization_integration() {
     let config = RoutingConfig::default();
 
-    let json = serde_json::to_string(&config).expect("Serialization failed");
-    let deserialized: RoutingConfig = serde_json::from_str(&json).expect("Deserialization failed");
+    let json = to_string(&config).expect("Serialization failed");
+    let deserialized: RoutingConfig = from_str(&json).expect("Deserialization failed");
 
     assert_eq!(deserialized.cache.enabled, config.cache.enabled);
     assert_eq!(deserialized.cache.ttl_hours, config.cache.ttl_hours);

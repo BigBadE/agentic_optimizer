@@ -190,36 +190,6 @@ fn test_cli_with_validation_enabled() {
 }
 
 #[test]
-fn test_cli_with_ui_plain() {
-    cargo_bin()
-        .arg("--ui")
-        .arg("plain")
-        .arg("--help")
-        .assert()
-        .success();
-}
-
-#[test]
-fn test_cli_with_ui_plain_verbose() {
-    cargo_bin()
-        .arg("--ui")
-        .arg("plain-verbose")
-        .arg("--help")
-        .assert()
-        .success();
-}
-
-#[test]
-fn test_cli_with_ui_tui() {
-    cargo_bin()
-        .arg("--ui")
-        .arg("tui")
-        .arg("--help")
-        .assert()
-        .success();
-}
-
-#[test]
 fn test_cli_with_project_flag() {
     let temp = temp_dir();
 
@@ -302,8 +272,6 @@ fn test_cli_multiple_flags_combined() {
         .arg("--local")
         .arg("--validation")
         .arg("disabled")
-        .arg("--ui")
-        .arg("plain")
         .arg("--help")
         .assert()
         .success();
@@ -313,17 +281,6 @@ fn test_cli_multiple_flags_combined() {
 fn test_cli_invalid_validation_value() {
     cargo_bin()
         .arg("--validation")
-        .arg("invalid")
-        .arg("--help")
-        .assert()
-        .failure()
-        .stderr(predicate::str::contains("invalid value"));
-}
-
-#[test]
-fn test_cli_invalid_ui_value() {
-    cargo_bin()
-        .arg("--ui")
         .arg("invalid")
         .arg("--help")
         .assert()

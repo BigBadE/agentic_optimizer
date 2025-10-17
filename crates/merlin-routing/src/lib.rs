@@ -136,7 +136,7 @@ pub use types::{
     ValidationResult,
     ValidationStage as ValidationStageType,
 };
-pub use user_interface::{MessageLevel, TaskProgress, TuiApp, UiChannel, UiEvent};
+pub use user_interface::{MessageLevel, TaskProgress, UiChannel, UiEvent};
 pub use validator::{
     BuildValidationStage, LintValidationStage, SyntaxValidationStage, TestValidationStage,
     ValidationPipeline, ValidationStage as ValidationStageTrait, Validator,

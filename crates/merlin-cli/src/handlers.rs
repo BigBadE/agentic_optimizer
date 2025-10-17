@@ -2,68 +2,27 @@
 
 use anyhow::Result;
 use console::{Term, style};
-use merlin_agent::{Agent, AgentConfig};
 use merlin_context::ContextBuilder;
-use merlin_core::{Context, ModelProvider, Query};
+use merlin_core::{Context, ModelProvider as _, Query};
 use merlin_languages::{Language, create_backend};
 use merlin_providers::OpenRouterProvider;
 use merlin_routing::{RoutingConfig, RoutingOrchestrator};
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
 use toml::to_string_pretty;
 
-use crate::cli::{UiMode, Validation};
+use crate::cli::Validation;
 use crate::config::Config;
-use crate::interactive::{
-    InteractiveFlags, chat_loop, handle_interactive_agent, print_chat_header,
-};
+use crate::interactive::{InteractiveFlags, handle_interactive_agent};
 use crate::utils::{display_response_metrics, get_merlin_folder};
 
-/// Run interactive chat session with a single provider-backed agent.
+/// Run interactive chat session - now deprecated in favor of main interactive TUI
 ///
 /// # Errors
-/// Returns an error if configuration loading, provider initialization, IO, or agent execution fails.
-pub async fn handle_chat(project: PathBuf, model: Option<String>) -> Result<()> {
-    let term = Term::stdout();
-
-    print_chat_header(&term, &project)?;
-
-    let cli_config = Config::load_from_project(&project);
-
-    term.write_line(&format!("{}", style("Initializing agent...").cyan()))?;
-
-    let mut provider = OpenRouterProvider::from_config_or_env(cli_config.providers.openrouter_key)?;
-    let model_to_use = model.or_else(|| cli_config.providers.high_model.clone());
-    if let Some(model_name) = model_to_use {
-        provider = provider.with_model(model_name);
-    }
-    let provider: Arc<dyn ModelProvider> = Arc::new(provider);
-
-    let backend = create_backend(Language::Rust)?;
-
-    let agent_config = AgentConfig::default()
-        .with_system_prompt(
-            "You are a helpful AI coding assistant. Analyze the provided code context and help the user with their requests. \
-             Be concise but thorough. When making code changes, provide complete, working code."
-        )
-        .with_max_context_tokens(100_000)
-        .with_top_k_context_files(15);
-
-    let agent = Agent::with_config(provider, agent_config);
-    let mut executor = agent.executor().with_language_backend(backend);
-
-    term.write_line(&format!(
-        "{}",
-        style("\u{2713} Agent ready!").green().bold()
-    ))?;
-    term.write_line("")?;
-    term.write_line(&format!(
-        "{}",
-        style("Type your message (or 'exit' to quit):").cyan()
-    ))?;
-    term.write_line("")?;
-
-    chat_loop(&term, &mut executor, &project).await
+/// Returns an error to indicate the command is deprecated
+pub fn handle_chat(_project: PathBuf, _model: Option<String>) -> Result<()> {
+    anyhow::bail!(
+        "The 'chat' command has been removed. Use the main interactive TUI mode instead (just run 'merlin' without arguments)."
+    )
 }
 
 /// Setup provider from configuration
@@ -243,57 +202,41 @@ pub fn handle_metrics(_daily: bool) {
 pub async fn handle_interactive(
     project: PathBuf,
     validation: Validation,
-    ui: UiMode,
     local_only: bool,
     context_dump: bool,
 ) -> Result<()> {
-    // Initialize tracing based on UI mode BEFORE creating orchestrator
-    if matches!(ui, UiMode::Tui) {
-        // TUI mode - log to file
-        use std::fs;
-        use std::sync::Arc;
-        use tracing_subscriber::{
-            EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
-        };
+    // Initialize tracing - TUI mode logs to file
+    use std::fs;
+    use std::sync::Arc;
+    use tracing_subscriber::{
+        EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
+    };
 
-        let merlin_dir = get_merlin_folder(&project)?;
-        fs::create_dir_all(&merlin_dir)?;
+    let merlin_dir = get_merlin_folder(&project)?;
+    fs::create_dir_all(&merlin_dir)?;
 
-        let debug_log = merlin_dir.join("debug.log");
-        if debug_log.exists() {
-            fs::remove_file(&debug_log)?;
-        }
-
-        let log_file = fs::OpenOptions::new()
-            .create(true)
-            .append(true)
-            .open(&debug_log)?;
-
-        Registry::default()
-            .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
-                "merlin_context=info,merlin_routing=info,agentic_optimizer=info".into()
-            }))
-            .with(
-                fmt::layer()
-                    .with_writer(Arc::new(log_file))
-                    .with_ansi(false)
-                    .with_target(true)
-                    .with_level(true),
-            )
-            .init();
-    } else {
-        // Plain modes - log to stdout
-        use tracing_subscriber::{
-            EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
-        };
-        Registry::default()
-            .with(
-                EnvFilter::try_from_default_env()
-                    .unwrap_or_else(|_| "agentic_optimizer=info".into()),
-            )
-            .with(fmt::layer())
-            .init();
+    let debug_log = merlin_dir.join("debug.log");
+    if debug_log.exists() {
+        fs::remove_file(&debug_log)?;
     }
+
+    let log_file = fs::OpenOptions::new()
+        .create(true)
+        .append(true)
+        .open(&debug_log)?;
+
+    Registry::default()
+        .with(EnvFilter::try_from_default_env().unwrap_or_else(|_| {
+            "merlin_context=info,merlin_routing=info,agentic_optimizer=info".into()
+        }))
+        .with(
+            fmt::layer()
+                .with_writer(Arc::new(log_file))
+                .with_ansi(false)
+                .with_target(true)
+                .with_level(true),
+        )
+        .init();
 
     // Load or create routing configuration from ~/.merlin/config.toml
     let mut config = RoutingConfig::load_or_create().unwrap_or_else(|error| {
@@ -315,7 +258,6 @@ pub async fn handle_interactive(
 
     let flags = InteractiveFlags {
         validation_enabled: !matches!(validation, Validation::Disabled),
-        ui,
         local_only,
         context_dump,
     };

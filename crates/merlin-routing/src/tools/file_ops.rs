@@ -36,7 +36,7 @@ impl Tool for ReadFileTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Path to the file relative to workspace root"
+                    "description": "Path to the file (relative to workspace root, or absolute path within workspace)"
                 }
             },
             "required": ["path"]
@@ -49,28 +49,64 @@ impl Tool for ReadFileTool {
             .and_then(|value| value.as_str())
             .ok_or_else(|| RoutingError::Other("Missing 'path' argument".to_owned()))?;
 
-        let full_path = self.workspace_root.join(path);
+        // Handle both absolute and relative paths
+        let path_buf = PathBuf::from(path);
+        let (full_path, relative_path) = if path_buf.is_absolute() {
+            // If absolute path provided, verify it's within workspace and get relative path
+            let canonical_root = self
+                .workspace_root
+                .canonicalize()
+                .map_err(|err| RoutingError::Other(format!("Invalid workspace root: {err}")))?;
 
-        // Security check: ensure path is within workspace
-        let canonical_path = full_path
-            .canonicalize()
-            .map_err(|err| RoutingError::Other(format!("Invalid path: {err}")))?;
-        let canonical_root = self
-            .workspace_root
-            .canonicalize()
-            .map_err(|err| RoutingError::Other(format!("Invalid workspace root: {err}")))?;
+            let canonical_path = path_buf
+                .canonicalize()
+                .map_err(|err| RoutingError::Other(format!("Invalid path '{}': {err}", path)))?;
 
-        if !canonical_path.starts_with(&canonical_root) {
-            return Err(RoutingError::Other("Path outside workspace".to_owned()));
-        }
+            if !canonical_path.starts_with(&canonical_root) {
+                return Err(RoutingError::Other(format!(
+                    "Path '{}' is outside workspace",
+                    path
+                )));
+            }
 
-        let content = tokio_read_to_string_async(&canonical_path)
+            // Get relative path by stripping workspace root
+            let rel_path = canonical_path
+                .strip_prefix(&canonical_root)
+                .map_err(|err| {
+                    RoutingError::Other(format!("Failed to create relative path: {err}"))
+                })?
+                .to_path_buf();
+
+            (canonical_path, rel_path)
+        } else {
+            // Relative path - proceed as before
+            let full = self.workspace_root.join(path);
+            let canonical_path = full
+                .canonicalize()
+                .map_err(|err| RoutingError::Other(format!("Invalid path '{}': {err}", path)))?;
+
+            let canonical_root = self
+                .workspace_root
+                .canonicalize()
+                .map_err(|err| RoutingError::Other(format!("Invalid workspace root: {err}")))?;
+
+            if !canonical_path.starts_with(&canonical_root) {
+                return Err(RoutingError::Other(format!(
+                    "Path '{}' is outside workspace",
+                    path
+                )));
+            }
+
+            (canonical_path, PathBuf::from(path))
+        };
+
+        let content = tokio_read_to_string_async(&full_path)
             .await
             .map_err(|err| RoutingError::Other(format!("Failed to read file: {err}")))?;
 
         Ok(json!({
             "content": content,
-            "path": path,
+            "path": relative_path.to_string_lossy().to_string(),
             "size": content.len()
         }))
     }
@@ -104,7 +140,7 @@ impl Tool for WriteFileTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Path to the file relative to workspace root"
+                    "description": "Path to the file (relative to workspace root, or absolute path within workspace)"
                 },
                 "content": {
                     "type": "string",
@@ -126,7 +162,54 @@ impl Tool for WriteFileTool {
             .and_then(|value| value.as_str())
             .ok_or_else(|| RoutingError::Other("Missing 'content' argument".to_owned()))?;
 
-        let full_path = self.workspace_root.join(path);
+        // Handle both absolute and relative paths
+        let path_buf = PathBuf::from(path);
+        let canonical_root = self
+            .workspace_root
+            .canonicalize()
+            .map_err(|err| RoutingError::Other(format!("Invalid workspace root: {err}")))?;
+
+        let (full_path, relative_path) = if path_buf.is_absolute() {
+            // Verify absolute path is within workspace
+            // For write operations, we can't canonicalize a non-existent path,
+            // so we check the parent directory
+            let parent = path_buf
+                .parent()
+                .ok_or_else(|| RoutingError::Other("Invalid path".to_owned()))?;
+
+            // Parent must exist or be within workspace
+            if parent.exists() {
+                let canonical_parent = parent
+                    .canonicalize()
+                    .map_err(|err| RoutingError::Other(format!("Invalid parent path: {err}")))?;
+
+                if !canonical_parent.starts_with(&canonical_root) {
+                    return Err(RoutingError::Other(format!(
+                        "Path '{}' is outside workspace",
+                        path
+                    )));
+                }
+            } else {
+                // Parent doesn't exist - check if it would be within workspace
+                // This is tricky, so we require the parent to exist for absolute paths
+                return Err(RoutingError::Other(format!(
+                    "Parent directory of '{}' does not exist",
+                    path
+                )));
+            }
+
+            // Get relative path by stripping workspace root
+            let rel_path = path_buf
+                .strip_prefix(&canonical_root)
+                .map_err(|_| RoutingError::Other(format!("Path '{}' is outside workspace", path)))?
+                .to_path_buf();
+
+            (path_buf, rel_path)
+        } else {
+            // Relative path - proceed as before
+            let full = self.workspace_root.join(path);
+            (full, PathBuf::from(path))
+        };
 
         // Security check: ensure path is within workspace
         let parent = full_path
@@ -139,16 +222,15 @@ impl Tool for WriteFileTool {
             .map_err(|err| RoutingError::Other(format!("Failed to create directories: {err}")))?;
 
         // Check if path would be within workspace after creation
-        let canonical_root = self
-            .workspace_root
-            .canonicalize()
-            .map_err(|err| RoutingError::Other(format!("Invalid workspace root: {err}")))?;
         let canonical_parent = parent
             .canonicalize()
             .map_err(|err| RoutingError::Other(format!("Invalid parent path: {err}")))?;
 
         if !canonical_parent.starts_with(&canonical_root) {
-            return Err(RoutingError::Other("Path outside workspace".to_owned()));
+            return Err(RoutingError::Other(format!(
+                "Path '{}' is outside workspace",
+                path
+            )));
         }
 
         tokio_write_async(&full_path, content)
@@ -156,7 +238,7 @@ impl Tool for WriteFileTool {
             .map_err(|err| RoutingError::Other(format!("Failed to write file: {err}")))?;
 
         Ok(json!({
-            "path": path,
+            "path": relative_path.to_string_lossy().to_string(),
             "size": content.len(),
             "created": !full_path.exists()
         }))
@@ -191,7 +273,7 @@ impl Tool for ListFilesTool {
             "properties": {
                 "path": {
                     "type": "string",
-                    "description": "Path to the directory relative to workspace root (empty string for root)"
+                    "description": "Path to the directory (relative to workspace root or absolute within workspace, empty string for root)"
                 }
             },
             "required": ["path"]
@@ -204,8 +286,29 @@ impl Tool for ListFilesTool {
             .and_then(|value| value.as_str())
             .ok_or_else(|| RoutingError::Other("Missing 'path' argument".to_owned()))?;
 
+        // Handle both absolute and relative paths
+        let path_buf = PathBuf::from(path);
         let full_path = if path.is_empty() {
             self.workspace_root.clone()
+        } else if path_buf.is_absolute() {
+            // Verify absolute path is within workspace
+            let canonical_root = self
+                .workspace_root
+                .canonicalize()
+                .map_err(|error| RoutingError::Other(format!("Invalid workspace root: {error}")))?;
+
+            let canonical_path = path_buf.canonicalize().map_err(|error| {
+                RoutingError::Other(format!("Invalid path '{}': {error}", path))
+            })?;
+
+            if !canonical_path.starts_with(&canonical_root) {
+                return Err(RoutingError::Other(format!(
+                    "Path '{}' is outside workspace",
+                    path
+                )));
+            }
+
+            canonical_path
         } else {
             self.workspace_root.join(path)
         };
@@ -213,14 +316,17 @@ impl Tool for ListFilesTool {
         // Security check: ensure path is within workspace
         let canonical_path = full_path
             .canonicalize()
-            .map_err(|error| RoutingError::Other(format!("Invalid path: {error}")))?;
+            .map_err(|error| RoutingError::Other(format!("Invalid path '{}': {error}", path)))?;
         let canonical_root = self
             .workspace_root
             .canonicalize()
             .map_err(|error| RoutingError::Other(format!("Invalid workspace root: {error}")))?;
 
         if !canonical_path.starts_with(&canonical_root) {
-            return Err(RoutingError::Other("Path outside workspace".to_owned()));
+            return Err(RoutingError::Other(format!(
+                "Path '{}' is outside workspace",
+                path
+            )));
         }
 
         let mut entries = Vec::default();

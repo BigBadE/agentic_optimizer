@@ -5,7 +5,6 @@
     clippy::tests_outside_test_module,
     clippy::missing_panics_doc,
     clippy::expect_used,
-    clippy::absolute_paths,
     clippy::redundant_clone,
     clippy::assertions_on_result_states,
     clippy::unwrap_used,

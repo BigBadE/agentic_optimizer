@@ -4,7 +4,7 @@ use super::state::{ConversationEntry, ConversationRole, UiState};
 use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo};
 use crate::{TaskId, TaskResult};
 use serde_json::Value;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 use tracing::warn;
 
 /// Handles UI events and updates task manager and state
@@ -122,8 +122,8 @@ impl<'handler> EventHandler<'handler> {
             status: TaskStatus::Running,
             progress: None,
             output_lines: Vec::default(),
-            start_time: Instant::now(),
-            end_time: None,
+            created_at: SystemTime::now(),
+            timestamp: Instant::now(),
             parent_id: normalized_parent_id,
             output: String::new(),
             steps: Vec::default(),
@@ -181,7 +181,6 @@ impl<'handler> EventHandler<'handler> {
 
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             task.status = TaskStatus::Completed;
-            task.end_time = Some(Instant::now());
             // Clear progress indicator when task completes
             task.progress = None;
         }
@@ -205,7 +204,6 @@ impl<'handler> EventHandler<'handler> {
 
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             task.status = TaskStatus::Failed;
-            task.end_time = Some(Instant::now());
 
             let error_msg = format!("Error: {error}");
             if !task.output.is_empty() {

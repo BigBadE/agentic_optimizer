@@ -19,8 +19,8 @@ struct SerializableTask {
     status: String,
     output_text: String,
     output_lines: Vec<String>,
-    start_time: SystemTime,
-    end_time: Option<SystemTime>,
+    created_at: SystemTime,
+    timestamp: SystemTime,
     parent_id: Option<TaskId>,
 }
 
@@ -67,13 +67,8 @@ impl TaskPersistence {
         // Convert Instant to SystemTime by calculating elapsed time from task start
         let now_instant = Instant::now();
         let now_system = SystemTime::now();
-        let elapsed = now_instant.duration_since(task.start_time);
-        let start_time = now_system - elapsed;
-
-        let end_time = task.end_time.map(|end_instant| {
-            let end_elapsed = now_instant.duration_since(end_instant);
-            now_system - end_elapsed
-        });
+        let elapsed = now_instant.duration_since(task.timestamp);
+        let timestamp = now_system - elapsed;
 
         let serializable = SerializableTask {
             id: task_id,
@@ -81,8 +76,8 @@ impl TaskPersistence {
             status: status_str.to_string(),
             output_text: task.output.clone(),
             output_lines: task.output_lines.clone(),
-            start_time,
-            end_time,
+            created_at: task.created_at,
+            timestamp,
             parent_id: task.parent_id,
         };
 
@@ -181,24 +176,19 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
     let now_instant = Instant::now();
     let now_system = SystemTime::now();
 
-    let start_time = now_system
-        .duration_since(serializable.start_time)
+    let timestamp = now_system
+        .duration_since(serializable.timestamp)
         .map_or(now_instant, |elapsed| {
             now_instant.checked_sub(elapsed).unwrap_or(now_instant)
         });
-
-    let end_time = serializable.end_time.and_then(|end_sys| {
-        let elapsed = now_system.duration_since(end_sys).ok()?;
-        now_instant.checked_sub(elapsed)
-    });
 
     let task_display = TaskDisplay {
         description: serializable.description,
         status,
         progress: None,
         output_lines: serializable.output_lines,
-        start_time,
-        end_time,
+        created_at: serializable.created_at,
+        timestamp,
         parent_id: serializable.parent_id,
         output: serializable.output_text,
         steps: Vec::default(),

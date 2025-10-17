@@ -18,22 +18,21 @@ use std::collections::HashMap;
 use std::fmt::Write as _;
 use std::fs;
 use std::io::Result as IoResult;
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 use tempfile::TempDir;
 
 type LoadResult = IoResult<HashMap<TaskId, TaskDisplay>>;
 
 fn create_test_task(description: &str, status: TaskStatus) -> TaskDisplay {
     let output = format!("Test output for {description}");
-    let end_time = (status == TaskStatus::Completed).then(Instant::now);
 
     TaskDisplay {
         description: description.to_string(),
         status,
         progress: None,
         output_lines: Vec::new(),
-        start_time: Instant::now(),
-        end_time,
+        created_at: SystemTime::now(),
+        timestamp: Instant::now(),
         parent_id: None,
         output,
         steps: Vec::new(),
@@ -395,16 +394,18 @@ async fn test_end_time_persistence() {
 
     persistence.save_task(task_id, &task_completed).unwrap();
     let loaded = persistence.load_all_tasks().await.unwrap();
-    assert!(
-        loaded[&task_id].end_time.is_some(),
-        "Completed task should have end time"
+    assert_eq!(
+        loaded[&task_id].status,
+        TaskStatus::Completed,
+        "Task status should be preserved"
     );
 
     let task2_id = TaskId::default();
     persistence.save_task(task2_id, &task_running).unwrap();
     let loaded2 = persistence.load_all_tasks().await.unwrap();
-    assert!(
-        loaded2[&task2_id].end_time.is_none(),
-        "Running task should not have end time"
+    assert_eq!(
+        loaded2[&task2_id].status,
+        TaskStatus::Running,
+        "Task status should be preserved"
     );
 }

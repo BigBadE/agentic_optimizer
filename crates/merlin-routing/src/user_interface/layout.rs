@@ -90,10 +90,10 @@ mod tests {
         assert_eq!(cache.output_viewport_height(), 0); // No area set yet
 
         cache.set_output_area(80, 20);
-        assert_eq!(cache.output_viewport_height(), 16); // 20 - 4 (borders/padding)
+        assert_eq!(cache.output_viewport_height(), 18); // 20 - 2 (borders)
 
         cache.set_output_area(80, 10);
-        assert_eq!(cache.output_viewport_height(), 6); // 10 - 4
+        assert_eq!(cache.output_viewport_height(), 8); // 10 - 2 (borders)
     }
 
     #[test]

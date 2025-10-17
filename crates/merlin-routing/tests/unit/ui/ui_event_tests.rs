@@ -19,7 +19,6 @@ use crate::common::*;
 use merlin_routing::TaskId;
 use merlin_routing::user_interface::events::{MessageLevel, TaskProgress, UiEvent};
 use merlin_routing::user_interface::task_manager::{TaskManager, TaskStatus};
-use std::time::Instant;
 
 /// Handle task lifecycle events
 fn handle_task_lifecycle(manager: &mut TaskManager, event: UiEvent) {
@@ -36,13 +35,11 @@ fn handle_task_lifecycle(manager: &mut TaskManager, event: UiEvent) {
         UiEvent::TaskCompleted { task_id, .. } => {
             if let Some(task) = manager.get_task_mut(task_id) {
                 task.status = TaskStatus::Completed;
-                task.end_time = Some(Instant::now());
             }
         }
         UiEvent::TaskFailed { task_id, .. } => {
             if let Some(task) = manager.get_task_mut(task_id) {
                 task.status = TaskStatus::Failed;
-                task.end_time = Some(Instant::now());
             }
         }
         _ => {}
@@ -273,7 +270,6 @@ fn test_task_completed_event() {
         panic!("Task should exist");
     };
     assert_eq!(task.status, TaskStatus::Completed);
-    assert!(task.end_time.is_some());
 }
 
 #[test]
@@ -295,7 +291,6 @@ fn test_task_failed_event() {
         panic!("Task should exist");
     };
     assert_eq!(task.status, TaskStatus::Failed);
-    assert!(task.end_time.is_some());
 }
 
 #[test]

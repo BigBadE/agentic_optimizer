@@ -3,7 +3,7 @@ use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use merlin_routing::TaskId;
 use merlin_routing::user_interface::renderer::FocusedPane;
 use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskStatus};
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 #[test]
 fn test_enter_toggles_expansion() {
@@ -19,8 +19,8 @@ fn test_enter_toggles_expansion() {
     let parent_task = TaskDisplay {
         description: "Parent conversation".to_string(),
         status: TaskStatus::Completed,
-        start_time: Instant::now(),
-        end_time: Some(Instant::now()),
+        created_at: SystemTime::now(),
+        timestamp: Instant::now(),
         parent_id: None,
         progress: None,
         output_lines: vec![],
@@ -32,8 +32,8 @@ fn test_enter_toggles_expansion() {
     let child_task = TaskDisplay {
         description: "Child message".to_string(),
         status: TaskStatus::Completed,
-        start_time: Instant::now(),
-        end_time: Some(Instant::now()),
+        created_at: SystemTime::now(),
+        timestamp: Instant::now(),
         parent_id: Some(parent_id),
         progress: None,
         output_lines: vec![],

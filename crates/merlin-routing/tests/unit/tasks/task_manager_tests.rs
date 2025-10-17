@@ -74,17 +74,38 @@ fn test_collapse_expand() {
     manager.add_task(child_id, create_child_task("Child", parent_id));
 
     // Initially both visible
-    assert_eq!(manager.get_visible_tasks().len(), 2);
+    {
+        let visible_count = manager
+            .task_order()
+            .iter()
+            .filter(|&&id| !manager.is_hidden_by_collapse(id))
+            .count();
+        assert_eq!(visible_count, 2);
+    }
 
     // Collapse parent
     manager.collapse_task(parent_id);
     assert!(manager.is_collapsed(parent_id));
-    assert_eq!(manager.get_visible_tasks().len(), 1);
+    {
+        let visible_count = manager
+            .task_order()
+            .iter()
+            .filter(|&&id| !manager.is_hidden_by_collapse(id))
+            .count();
+        assert_eq!(visible_count, 1);
+    }
 
     // Expand parent
     manager.expand_task(parent_id);
     assert!(!manager.is_collapsed(parent_id));
-    assert_eq!(manager.get_visible_tasks().len(), 2);
+    {
+        let visible_count = manager
+            .task_order()
+            .iter()
+            .filter(|&&id| !manager.is_hidden_by_collapse(id))
+            .count();
+        assert_eq!(visible_count, 2);
+    }
 }
 
 #[test]
@@ -135,9 +156,9 @@ fn test_task_order_preserved_after_rebuild() {
     // Rebuild order
     manager.rebuild_order();
 
-    // Newer tasks should appear first (reverse chronological)
-    assert_eq!(manager.task_order()[0], task2_id);
-    assert_eq!(manager.task_order()[1], task1_id);
+    // Older tasks should appear first (chronological order)
+    assert_eq!(manager.task_order()[0], task1_id);
+    assert_eq!(manager.task_order()[1], task2_id);
 }
 
 #[test]
@@ -180,17 +201,38 @@ fn test_get_visible_tasks_with_nested_collapse() {
     manager.add_task(grandchild_id, create_child_task("Grandchild", child1_id));
 
     // All visible initially
-    assert_eq!(manager.get_visible_tasks().len(), 4);
+    {
+        let visible_count = manager
+            .task_order()
+            .iter()
+            .filter(|&&id| !manager.is_hidden_by_collapse(id))
+            .count();
+        assert_eq!(visible_count, 4);
+    }
 
     // Collapse child1
     manager.collapse_task(child1_id);
     // Root, Child1, Child2 visible (grandchild hidden)
-    assert_eq!(manager.get_visible_tasks().len(), 3);
+    {
+        let visible_count = manager
+            .task_order()
+            .iter()
+            .filter(|&&id| !manager.is_hidden_by_collapse(id))
+            .count();
+        assert_eq!(visible_count, 3);
+    }
 
     // Collapse root
     manager.collapse_task(root_id);
     // Only root visible
-    assert_eq!(manager.get_visible_tasks().len(), 1);
+    {
+        let visible_count = manager
+            .task_order()
+            .iter()
+            .filter(|&&id| !manager.is_hidden_by_collapse(id))
+            .count();
+        assert_eq!(visible_count, 1);
+    }
 }
 
 #[test]

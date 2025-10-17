@@ -261,64 +261,21 @@ impl AgentExecutor {
             .await
             .map_err(|err| RoutingError::Other(format!("Provider error: {err}")))?;
 
-        // Check if response contains tool calls (simulated for now)
-        // In a real implementation, this would parse the LLM response for tool calls
-        let tool_calls: Vec<(String, Value)> = vec![];
+        // Log agent response to debug.log BEFORE processing
+        tracing::debug!("Agent response text: {}", response.text);
+
+        // Parse tool calls from response
+        let tool_calls = Self::extract_tool_calls(&response.text);
+
+        if tool_calls.is_empty() {
+            tracing::debug!("No tool calls found in response");
+        } else {
+            tracing::debug!("Found {} tool call(s)", tool_calls.len());
+        }
 
         if !tool_calls.is_empty() {
-            // Execute tool calls
-            for (tool_name, args) in tool_calls {
-                // Send tool call started event
-                ui_channel.send(UiEvent::ToolCallStarted {
-                    task_id,
-                    tool: tool_name.clone(),
-                    args: args.clone(),
-                });
-
-                let tool_step = self.step_tracker.create_step(
-                    task_id,
-                    StepType::ToolCall {
-                        tool: tool_name.clone(),
-                        args: args.clone(),
-                    },
-                    format!("Calling tool: {tool_name}"),
-                );
-
-                ui_channel.send(UiEvent::TaskStepStarted {
-                    task_id,
-                    step_id: format!("{:?}", tool_step.id),
-                    step_type: "ToolCall".to_owned(),
-                    content: tool_step.content.clone(),
-                });
-
-                // Execute the tool
-                let result = self.execute_tool(&tool_name, args).await?;
-
-                // Send tool call completed event
-                ui_channel.send(UiEvent::ToolCallCompleted {
-                    task_id,
-                    tool: tool_name.clone(),
-                    result: result.clone(),
-                });
-
-                let result_step = self.step_tracker.create_step(
-                    task_id,
-                    StepType::ToolResult {
-                        tool: tool_name.clone(),
-                        result: result.clone(),
-                    },
-                    format!("Tool result: {result}"),
-                );
-
-                ui_channel.send(UiEvent::TaskStepCompleted {
-                    task_id,
-                    step_id: format!("{:?}", result_step.id),
-                });
-
-                // Tool results are shown in the output tree via ToolCallCompleted events,
-                // no need to append them to response.text (which would create trailing newlines)
-                // In a real implementation, would re-query LLM with tool results to get final response
-            }
+            self.execute_tool_calls(task_id, tool_calls, ui_channel)
+                .await?;
         }
 
         // Send output directly as text (no wrapper step)
@@ -328,6 +285,82 @@ impl AgentExecutor {
         });
 
         Ok(response)
+    }
+
+    /// Execute all tool calls from the LLM response
+    ///
+    /// # Errors
+    /// Returns an error if any tool execution fails
+    async fn execute_tool_calls(
+        &mut self,
+        task_id: TaskId,
+        tool_calls: Vec<(String, Value)>,
+        ui_channel: &UiChannel,
+    ) -> Result<()> {
+        for (tool_name, args) in tool_calls {
+            // Send tool call started event
+            ui_channel.send(UiEvent::ToolCallStarted {
+                task_id,
+                tool: tool_name.clone(),
+                args: args.clone(),
+            });
+
+            let tool_step = self.step_tracker.create_step(
+                task_id,
+                StepType::ToolCall {
+                    tool: tool_name.clone(),
+                    args: args.clone(),
+                },
+                format!("Calling tool: {tool_name}"),
+            );
+
+            ui_channel.send(UiEvent::TaskStepStarted {
+                task_id,
+                step_id: format!("{:?}", tool_step.id),
+                step_type: "ToolCall".to_owned(),
+                content: tool_step.content.clone(),
+            });
+
+            // Execute the tool
+            tracing::debug!("Executing tool: {} with args: {:?}", tool_name, args);
+            let result = match self.execute_tool(&tool_name, args.clone()).await {
+                Ok(val) => {
+                    tracing::debug!("Tool {} succeeded with result: {:?}", tool_name, val);
+                    val
+                }
+                Err(err) => {
+                    tracing::error!("Tool {} failed with error: {}", tool_name, err);
+                    tracing::error!("Tool args were: {:?}", args);
+                    return Err(err);
+                }
+            };
+
+            // Send tool call completed event
+            ui_channel.send(UiEvent::ToolCallCompleted {
+                task_id,
+                tool: tool_name.clone(),
+                result: result.clone(),
+            });
+
+            let result_step = self.step_tracker.create_step(
+                task_id,
+                StepType::ToolResult {
+                    tool: tool_name.clone(),
+                    result: result.clone(),
+                },
+                format!("Tool result: {result}"),
+            );
+
+            ui_channel.send(UiEvent::TaskStepCompleted {
+                task_id,
+                step_id: format!("{:?}", result_step.id),
+            });
+
+            // Tool results are shown in the output tree via ToolCallCompleted events,
+            // no need to append them to response.text (which would create trailing newlines)
+            // In a real implementation, would re-query LLM with tool results to get final response
+        }
+        Ok(())
     }
 
     /// Execute a tool by name
@@ -341,6 +374,57 @@ impl AgentExecutor {
             .ok_or_else(|| RoutingError::Other(format!("Tool not found: {tool_name}")))?;
 
         tool.execute(args).await
+    }
+
+    /// Extract tool calls from LLM response
+    ///
+    /// Looks for JSON objects in the format: `{"tool": "tool_name", "params": {...}}`
+    fn extract_tool_calls(text: &str) -> Vec<(String, Value)> {
+        use serde_json::from_str;
+
+        // Try to find JSON in markdown code blocks first
+        let json_str = if let Some(start) = text.find("```json") {
+            let Some(after_start) = text.get(start + 7..) else {
+                return vec![];
+            };
+            let Some(end) = after_start.find("```") else {
+                return vec![];
+            };
+            let Some(content) = after_start.get(..end) else {
+                return vec![];
+            };
+            content.trim()
+        } else if let Some(start) = text.find('{') {
+            // Try to find raw JSON
+            let Some(end) = text.rfind('}') else {
+                return vec![];
+            };
+            let Some(content) = text.get(start..=end) else {
+                return vec![];
+            };
+            content
+        } else {
+            return vec![];
+        };
+
+        // Parse the JSON
+        let Ok(value) = from_str::<Value>(json_str) else {
+            tracing::warn!("Failed to parse tool call JSON");
+            return vec![];
+        };
+
+        // Extract tool name and params
+        let Some(tool_name) = value.get("tool").and_then(|val| val.as_str()) else {
+            tracing::warn!("Tool call JSON missing 'tool' field");
+            return vec![];
+        };
+
+        let Some(params) = value.get("params") else {
+            tracing::warn!("Tool call JSON missing 'params' field");
+            return vec![];
+        };
+
+        vec![(tool_name.to_owned(), params.clone())]
     }
 
     /// Create query with tool descriptions

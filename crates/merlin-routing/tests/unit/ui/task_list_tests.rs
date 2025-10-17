@@ -50,7 +50,6 @@ fn test_task_list_shows_only_most_recent_conversation_on_launch() {
         now.checked_sub(Duration::from_secs(300)).unwrap(),
     );
     task1.status = UiTaskStatus::Completed;
-    task1.end_time = Some(now.checked_sub(Duration::from_secs(250)).unwrap());
     manager.add_task(task1_id, task1);
 
     // Middle conversation
@@ -59,7 +58,6 @@ fn test_task_list_shows_only_most_recent_conversation_on_launch() {
         now.checked_sub(Duration::from_secs(200)).unwrap(),
     );
     task2.status = UiTaskStatus::Completed;
-    task2.end_time = Some(now.checked_sub(Duration::from_secs(150)).unwrap());
     manager.add_task(task2_id, task2);
 
     // Most recent conversation (should be shown)
@@ -68,7 +66,6 @@ fn test_task_list_shows_only_most_recent_conversation_on_launch() {
         now.checked_sub(Duration::from_secs(100)).unwrap(),
     );
     task3.status = UiTaskStatus::Completed;
-    task3.end_time = Some(now.checked_sub(Duration::from_secs(50)).unwrap());
     manager.add_task(task3_id, task3);
 
     let state = UiState::default();
@@ -115,7 +112,6 @@ fn test_new_conversation_does_not_branch_from_previous() {
         now.checked_sub(Duration::from_secs(100)).unwrap(),
     );
     prev_task.status = UiTaskStatus::Completed;
-    prev_task.end_time = Some(now.checked_sub(Duration::from_secs(50)).unwrap());
     manager.add_task(prev_task_id, prev_task);
 
     // Create a new running conversation (should NOT be a child of previous)
@@ -571,31 +567,16 @@ fn test_task_list_scrolling_through_conversations() {
     let conv1_id = TaskId::default();
     let mut conv1 = create_test_task("First conversation");
     conv1.status = UiTaskStatus::Completed;
-    conv1.end_time = Some(
-        Instant::now()
-            .checked_sub(Duration::from_secs(300))
-            .unwrap(),
-    );
     manager.add_task(conv1_id, conv1);
 
     let conv2_id = TaskId::default();
     let mut conv2 = create_test_task("Second conversation");
     conv2.status = UiTaskStatus::Completed;
-    conv2.end_time = Some(
-        Instant::now()
-            .checked_sub(Duration::from_secs(200))
-            .unwrap(),
-    );
     manager.add_task(conv2_id, conv2);
 
     let conv3_id = TaskId::default();
     let mut conv3 = create_test_task("Third conversation");
     conv3.status = UiTaskStatus::Completed;
-    conv3.end_time = Some(
-        Instant::now()
-            .checked_sub(Duration::from_secs(100))
-            .unwrap(),
-    );
     manager.add_task(conv3_id, conv3);
 
     // Initially, no selection - should show oldest (First)

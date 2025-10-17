@@ -319,16 +319,16 @@ impl<B: Backend> TuiApp<B> {
             }
         }
 
-        // Sort by start time to maintain chronological order
+        // Sort by timestamp to maintain chronological order
         conversation_tasks.sort_by(|task_a, task_b| {
             let time_a = self
                 .task_manager
                 .get_task(*task_a)
-                .map_or_else(Instant::now, |task| task.start_time);
+                .map_or_else(Instant::now, |task| task.timestamp);
             let time_b = self
                 .task_manager
                 .get_task(*task_b)
-                .map_or_else(Instant::now, |task| task.start_time);
+                .map_or_else(Instant::now, |task| task.timestamp);
             time_a.cmp(&time_b)
         });
 
@@ -765,35 +765,28 @@ impl<B: Backend> TuiApp<B> {
 
     /// Builds a flat list of all visible tasks in display order
     /// Includes root conversations and their children if expanded
-    /// Returns Vec of (`task_id`, `is_child`) tuples in chronological order
+    /// Returns Vec of (`task_id`, `is_child`) tuples in chronological order (oldest first, newest last)
     fn build_visible_task_list(&self) -> Vec<(TaskId, bool)> {
-        // Get all root conversations sorted by start time (oldest first)
-        let mut root_conversations: Vec<_> = self
-            .task_manager
-            .iter_tasks()
-            .filter(|(_, task)| task.parent_id.is_none())
-            .collect();
-        root_conversations
-            .sort_by(|(_, task_a), (_, task_b)| task_a.start_time.cmp(&task_b.start_time));
-
+        // Use task_order which is already sorted correctly (oldest first, newest last)
         let mut visible_tasks = Vec::new();
 
-        for (root_id, _) in &root_conversations {
-            // Add the root conversation
-            visible_tasks.push((*root_id, false));
+        for &task_id in self.task_manager.task_order() {
+            let Some(task) = self.task_manager.get_task(task_id) else {
+                continue;
+            };
 
-            // If expanded, add its children
-            if self.state.expanded_conversations.contains(root_id) {
-                let mut children: Vec<_> = self
-                    .task_manager
-                    .iter_tasks()
-                    .filter(|(_, task)| task.parent_id == Some(*root_id))
-                    .collect();
-                children
-                    .sort_by(|(_, task_a), (_, task_b)| task_a.start_time.cmp(&task_b.start_time));
+            if task.parent_id.is_none() {
+                // Root conversation - always visible
+                visible_tasks.push((task_id, false));
 
-                for (child_id, _) in children {
-                    visible_tasks.push((child_id, true));
+                // If expanded, children will follow in task_order
+            } else {
+                // Child task - only visible if parent is expanded
+                let Some(parent_id) = task.parent_id else {
+                    continue;
+                };
+                if self.state.expanded_conversations.contains(&parent_id) {
+                    visible_tasks.push((task_id, true));
                 }
             }
         }
@@ -947,17 +940,22 @@ impl<B: Backend> TuiApp<B> {
         }
 
         // After deleting active task, select the next newest conversation
-        let mut root_conversations: Vec<_> = self
+        // task_order is already sorted (oldest first, newest last)
+        let root_conversations: Vec<TaskId> = self
             .task_manager
-            .iter_tasks()
-            .filter(|(_, task)| task.parent_id.is_none())
+            .task_order()
+            .iter()
+            .filter(|&&id| {
+                self.task_manager
+                    .get_task(id)
+                    .is_some_and(|task| task.parent_id.is_none())
+            })
+            .copied()
             .collect();
-        root_conversations
-            .sort_by(|(_, task_a), (_, task_b)| task_a.start_time.cmp(&task_b.start_time));
 
         // Select the newest conversation (last in chronological order) if any exist
-        if let Some((new_id, _)) = root_conversations.last() {
-            self.state.active_task_id = Some(*new_id);
+        if let Some(&new_id) = root_conversations.last() {
+            self.state.active_task_id = Some(new_id);
         } else {
             self.state.active_task_id = None;
         }

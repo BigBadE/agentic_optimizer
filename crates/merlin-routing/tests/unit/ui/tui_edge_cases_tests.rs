@@ -23,8 +23,12 @@ use merlin_routing::user_interface::{EmojiMode, calculate_width as ui_calculate_
 fn test_task_manager_navigation_empty() {
     let manager = TaskManager::default();
 
-    let visible = manager.get_visible_tasks();
-    assert!(visible.is_empty());
+    let visible_count = manager
+        .task_order()
+        .iter()
+        .filter(|&&id| !manager.is_hidden_by_collapse(id))
+        .count();
+    assert_eq!(visible_count, 0);
 }
 
 #[test]
@@ -34,9 +38,14 @@ fn test_task_manager_navigation_single_task() {
 
     manager.add_task(task_id, create_test_task("Task"));
 
-    let visible = manager.get_visible_tasks();
-    assert_eq!(visible.len(), 1);
-    assert_eq!(visible[0], task_id);
+    let visible_tasks: Vec<_> = manager
+        .task_order()
+        .iter()
+        .copied()
+        .filter(|&id| !manager.is_hidden_by_collapse(id))
+        .collect();
+    assert_eq!(visible_tasks.len(), 1);
+    assert_eq!(visible_tasks[0], task_id);
 }
 
 #[test]
@@ -52,13 +61,27 @@ fn test_task_collapse_with_multiple_levels() {
     manager.add_task(grandchild, create_child_task("Grandchild", child));
 
     // All visible
-    assert_eq!(manager.get_visible_tasks().len(), 3);
+    {
+        let visible_count = manager
+            .task_order()
+            .iter()
+            .filter(|&&id| !manager.is_hidden_by_collapse(id))
+            .count();
+        assert_eq!(visible_count, 3);
+    }
 
     // Collapse root
     manager.collapse_task(root);
 
     // Only root visible
-    assert_eq!(manager.get_visible_tasks().len(), 1);
+    {
+        let visible_count = manager
+            .task_order()
+            .iter()
+            .filter(|&&id| !manager.is_hidden_by_collapse(id))
+            .count();
+        assert_eq!(visible_count, 1);
+    }
 }
 
 #[test]
@@ -76,13 +99,27 @@ fn test_task_partial_collapse() {
     manager.add_task(child2, create_child_task("Child 2", root));
 
     // All visible
-    assert_eq!(manager.get_visible_tasks().len(), 4);
+    {
+        let visible_count = manager
+            .task_order()
+            .iter()
+            .filter(|&&id| !manager.is_hidden_by_collapse(id))
+            .count();
+        assert_eq!(visible_count, 4);
+    }
 
     // Collapse child1
     manager.collapse_task(child1);
 
     // Root, child1, and child2 visible (grandchild hidden)
-    assert_eq!(manager.get_visible_tasks().len(), 3);
+    {
+        let visible_count = manager
+            .task_order()
+            .iter()
+            .filter(|&&id| !manager.is_hidden_by_collapse(id))
+            .count();
+        assert_eq!(visible_count, 3);
+    }
 }
 
 #[test]
@@ -132,7 +169,12 @@ fn test_task_manager_many_tasks() {
     }
 
     assert_eq!(manager.task_order().len(), 1000);
-    assert_eq!(manager.get_visible_tasks().len(), 1000);
+    let visible_count = manager
+        .task_order()
+        .iter()
+        .filter(|&&id| !manager.is_hidden_by_collapse(id))
+        .count();
+    assert_eq!(visible_count, 1000);
 }
 
 #[test]

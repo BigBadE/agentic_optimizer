@@ -42,7 +42,7 @@ use std::collections::VecDeque;
 use std::env;
 use std::fs;
 use std::path::PathBuf;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use tempfile::TempDir;
 use tokio::time::sleep;
 use tracing::info;
@@ -87,8 +87,8 @@ fn create_test_task(description: &str) -> TaskDisplay {
     TaskDisplay {
         description: description.to_string(),
         status: TaskStatus::Running,
-        start_time: Instant::now(),
-        end_time: None,
+        created_at: SystemTime::now(),
+        timestamp: Instant::now(),
         parent_id: None,
         progress: None,
         output_lines: vec![],
@@ -568,9 +568,8 @@ impl ScenarioRunner {
                 "Failed" => TaskStatus::Failed,
                 _ => TaskStatus::Running,
             },
-            start_time,
-            end_time: (existing_task.status == "Completed" || existing_task.status == "Failed")
-                .then(|| start_time + Duration::from_secs(50)),
+            created_at: SystemTime::now(),
+            timestamp: start_time,
             parent_id,
             progress: None,
             output_lines: vec![],
@@ -772,13 +771,18 @@ impl ScenarioRunner {
         info!("  Completing task: {}", data.description);
 
         // Find the task by description and mark it as completed
-        let visible_tasks = app.task_manager().get_visible_tasks();
+        let visible_tasks: Vec<_> = app
+            .task_manager()
+            .task_order()
+            .iter()
+            .copied()
+            .filter(|&id| !app.task_manager().is_hidden_by_collapse(id))
+            .collect();
         for task_id in visible_tasks {
             if let Some(task) = app.task_manager_mut().get_task_mut(task_id)
                 && task.description.contains(&data.description)
             {
                 task.status = TaskStatus::Completed;
-                task.end_time = Some(Instant::now());
                 // Clear progress indicator when task completes
                 task.progress = None;
                 app.state_mut().active_running_tasks.remove(&task_id);
@@ -792,13 +796,18 @@ impl ScenarioRunner {
         info!("  Failing task: {}", data.description);
 
         // Find the task by description and mark it as failed
-        let visible_tasks = app.task_manager().get_visible_tasks();
+        let visible_tasks: Vec<_> = app
+            .task_manager()
+            .task_order()
+            .iter()
+            .copied()
+            .filter(|&id| !app.task_manager().is_hidden_by_collapse(id))
+            .collect();
         for task_id in visible_tasks {
             if let Some(task) = app.task_manager_mut().get_task_mut(task_id)
                 && task.description.contains(&data.description)
             {
                 task.status = TaskStatus::Failed;
-                task.end_time = Some(Instant::now());
                 app.state_mut().active_running_tasks.remove(&task_id);
             }
         }
@@ -864,7 +873,13 @@ impl ScenarioRunner {
     /// # Errors
     /// Returns an error if verification fails.
     fn verify_tasks(app: &impl TestApp, expectations: &TaskExpectations) -> Result<(), String> {
-        let visible_tasks = app.task_manager().get_visible_tasks();
+        let visible_tasks: Vec<_> = app
+            .task_manager()
+            .task_order()
+            .iter()
+            .copied()
+            .filter(|&id| !app.task_manager().is_hidden_by_collapse(id))
+            .collect();
 
         // Verify spawned tasks
         for expected in &expectations.spawned {
@@ -935,7 +950,12 @@ impl ScenarioRunner {
 
         // Verify task count
         if let Some(expected_count) = expectations.task_count {
-            let actual_count = app.task_manager().get_visible_tasks().len();
+            let actual_count = app
+                .task_manager()
+                .task_order()
+                .iter()
+                .filter(|&&id| !app.task_manager().is_hidden_by_collapse(id))
+                .count();
             if actual_count != expected_count {
                 return Err(format!(
                     "Expected {expected_count} tasks, got {actual_count}"

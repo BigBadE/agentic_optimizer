@@ -1,8 +1,7 @@
 use super::events::TaskProgress;
 use crate::TaskId;
-use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
-use std::time::Instant;
+use std::time::{Instant, SystemTime};
 
 /// Status of a task
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -26,10 +25,10 @@ pub struct TaskDisplay {
     pub progress: Option<TaskProgress>,
     /// Output lines from the task
     pub output_lines: Vec<String>,
-    /// When the task started
-    pub start_time: Instant,
-    /// When the task ended (if completed)
-    pub end_time: Option<Instant>,
+    /// When the task was created (persists across program runs)
+    pub created_at: SystemTime,
+    /// When the task was created/started (monotonic clock, used for sorting within a program run)
+    pub timestamp: Instant,
     /// ID of the parent task (if this is a subtask)
     pub parent_id: Option<TaskId>,
     /// Plain text output
@@ -128,15 +127,21 @@ impl TaskManager {
     }
 
     /// Rebuilds task order from parent relationships
+    ///
+    /// Orders tasks by timestamp (oldest first). Uses Instant for sorting within
+    /// a single program run for consistent ordering.
     pub fn rebuild_order(&mut self) {
         self.task_order.clear();
 
+        // Collect all task IDs with their timestamps
         let mut all_tasks: Vec<(TaskId, Instant)> = self
             .tasks
             .iter()
-            .map(|(&id, task)| (id, task.start_time))
+            .map(|(&id, task)| (id, task.timestamp))
             .collect();
-        all_tasks.sort_by_key(|(_, time)| Reverse(*time));
+
+        // Sort by timestamp ascending (oldest first)
+        all_tasks.sort_by_key(|(_, timestamp)| *timestamp);
 
         // Add root tasks first, then recursively add their children
         for (task_id, _) in &all_tasks {
@@ -153,15 +158,6 @@ impl TaskManager {
                 self.task_order.push(task_id);
             }
         }
-    }
-
-    /// Gets all visible tasks (not hidden by collapsed parents)
-    pub fn get_visible_tasks(&self) -> Vec<TaskId> {
-        self.task_order
-            .iter()
-            .copied()
-            .filter(|&task_id| !self.is_hidden_by_collapse(task_id))
-            .collect()
     }
 
     /// Checks if a task is a descendant of another
@@ -275,13 +271,16 @@ impl TaskManager {
     fn add_task_and_descendants(&mut self, task_id: TaskId) {
         self.task_order.push(task_id);
 
+        // Collect children with their timestamps
         let mut children: Vec<(TaskId, Instant)> = self
             .tasks
             .iter()
             .filter(|(_, task)| task.parent_id == Some(task_id))
-            .map(|(&id, task)| (id, task.start_time))
+            .map(|(&id, task)| (id, task.timestamp))
             .collect();
-        children.sort_by_key(|(_, time)| Reverse(*time));
+
+        // Sort children by timestamp ascending (oldest first)
+        children.sort_by_key(|(_, timestamp)| *timestamp);
 
         for (child_id, _) in children {
             if !self.task_order.contains(&child_id) {
@@ -301,7 +300,8 @@ impl TaskManager {
         task.parent_id
     }
 
-    fn is_hidden_by_collapse(&self, task_id: TaskId) -> bool {
+    /// Checks if a task is hidden because one of its ancestors is collapsed
+    pub fn is_hidden_by_collapse(&self, task_id: TaskId) -> bool {
         let mut current_parent = self.get_parent_id(task_id);
 
         while let Some(parent_id) = current_parent {
@@ -322,5 +322,116 @@ impl TaskManager {
     /// Updates an existing task with new data
     pub fn update_task(&mut self, task_id: TaskId, task: TaskDisplay) {
         self.tasks.insert(task_id, task);
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::time::Duration;
+
+    fn create_task(description: &str, time_offset_secs: u64) -> TaskDisplay {
+        let created_at = SystemTime::now()
+            .checked_sub(Duration::from_secs(time_offset_secs))
+            .unwrap_or_else(SystemTime::now);
+
+        TaskDisplay {
+            description: description.to_owned(),
+            status: TaskStatus::Running,
+            progress: None,
+            output_lines: vec![],
+            created_at,
+            timestamp: Instant::now()
+                .checked_sub(Duration::from_secs(time_offset_secs))
+                .unwrap_or_else(Instant::now),
+            parent_id: None,
+            output: String::default(),
+            steps: vec![],
+            current_step: None,
+        }
+    }
+
+    #[test]
+    fn test_task_order_after_loading_simulates_insert_for_load() {
+        let mut manager = TaskManager::default();
+
+        // Simulate loading tasks from disk
+        // This is the ACTUAL flow used in app.rs:
+        // 1. Call insert_task_for_load for each task (doesn't update order)
+        // 2. Call rebuild_order once at the end
+        //
+        // Tasks are ordered by timestamp (oldest first).
+        // Higher time_offset_secs = older task (created further in the past).
+
+        let task1 = create_task("Oldest task", 300); // Created 5 minutes ago
+        let task2 = create_task("Middle task", 180); // Created 3 minutes ago
+        let task3 = create_task("Recent task", 60); // Created 1 minute ago
+        let task4 = create_task("Newest task", 10); // Created 10 seconds ago
+
+        let id1 = TaskId::default();
+        let id2 = TaskId::default();
+        let id3 = TaskId::default();
+        let id4 = TaskId::default();
+
+        // Use insert_task_for_load in any order - rebuild_order will sort by timestamp
+        manager.insert_task_for_load(id3, task3);
+        manager.insert_task_for_load(id1, task1);
+        manager.insert_task_for_load(id4, task4);
+        manager.insert_task_for_load(id2, task2);
+
+        // Rebuild order (this is what app.rs does after loading)
+        manager.rebuild_order();
+
+        // Verify tasks are ordered by timestamp (oldest first)
+        let order = manager.task_order();
+        assert_eq!(order.len(), 4, "Should have 4 tasks");
+
+        // Oldest task should be first
+        assert_eq!(order[0], id1, "Oldest task should be first");
+        assert_eq!(order[1], id2, "Middle task should be second");
+        assert_eq!(order[2], id3, "Recent task should be third");
+        assert_eq!(order[3], id4, "Newest task should be fourth");
+    }
+
+    #[test]
+    fn test_task_order_with_children() {
+        let mut manager = TaskManager::default();
+
+        let id1 = TaskId::default();
+        let id2 = TaskId::default();
+        let id3 = TaskId::default();
+        let id4 = TaskId::default();
+
+        // Parent task
+        let parent = create_task("Parent task", 300);
+        manager.add_task(id1, parent);
+
+        // Child tasks of parent (added in order)
+        let mut child1 = create_task("First child", 200);
+        child1.parent_id = Some(id1);
+        let mut child2 = create_task("Second child", 100);
+        child2.parent_id = Some(id1);
+
+        manager.add_task(id2, child1);
+        manager.add_task(id3, child2);
+
+        // Another root task
+        let task2 = create_task("Second root", 150);
+        manager.add_task(id4, task2);
+
+        manager.rebuild_order();
+
+        let order = manager.task_order();
+        assert_eq!(order.len(), 4);
+
+        // Parent should come first
+        assert_eq!(order[0], id1, "Parent should be first");
+
+        // Children should follow parent in insertion order
+        assert_eq!(order[1], id2, "First child should come first");
+        assert_eq!(order[2], id3, "Second child should come second");
+
+        // Second root task should come last
+        assert_eq!(order[3], id4, "Second root task should be last");
     }
 }

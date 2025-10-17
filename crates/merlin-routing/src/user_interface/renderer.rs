@@ -427,18 +427,25 @@ impl Renderer {
     ) -> Vec<Line<'static>> {
         let mut lines = Vec::default();
 
-        // Get all tasks sorted by start time (oldest first - newest at bottom)
-        let mut all_tasks: Vec<_> = ui_ctx.task_manager.iter_tasks().collect();
-        all_tasks.sort_by(|(_, task_a), (_, task_b)| {
-            task_a.start_time.cmp(&task_b.start_time) // Chronological order
-        });
+        // Get all tasks in the order maintained by TaskManager (oldest first - newest at bottom)
+        // TaskManager maintains task_order which is properly sorted by timestamp
+        let all_tasks: Vec<_> = ui_ctx
+            .task_manager
+            .task_order()
+            .iter()
+            .filter_map(|&task_id| {
+                ui_ctx
+                    .task_manager
+                    .get_task(task_id)
+                    .map(|task| (task_id, task))
+            })
+            .collect();
 
-        // Get all root tasks (conversations) sorted by start time (oldest first, newest at bottom)
-        let mut root_tasks: Vec<_> = all_tasks
+        // Get all root tasks (conversations) - already in correct order from task_order
+        let root_tasks: Vec<_> = all_tasks
             .iter()
             .filter(|(_, task)| task.parent_id.is_none())
             .collect();
-        root_tasks.sort_by(|(_, task_a), (_, task_b)| task_a.start_time.cmp(&task_b.start_time));
 
         if focused == FocusedPane::Tasks {
             self.build_focused_task_lines(ui_ctx, area, &all_tasks, &root_tasks, &mut lines);
@@ -480,7 +487,7 @@ impl Renderer {
                     .filter(|(_, task)| task.parent_id == Some(*root_id))
                     .collect();
                 children
-                    .sort_by(|(_, task_a), (_, task_b)| task_a.start_time.cmp(&task_b.start_time));
+                    .sort_by(|(_, task_a), (_, task_b)| task_a.timestamp.cmp(&task_b.timestamp));
 
                 for (child_id, _) in children {
                     visible_items.push((*child_id, true)); // true = is_child

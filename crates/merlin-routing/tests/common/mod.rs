@@ -26,7 +26,7 @@ use ratatui::backend::TestBackend;
 use std::collections::VecDeque;
 use std::env;
 use std::sync::Once;
-use std::time::{Duration, Instant};
+use std::time::{Duration, Instant, SystemTime};
 use tracing_subscriber::{EnvFilter, fmt};
 
 /// Create a basic test task with sensible defaults
@@ -62,8 +62,8 @@ pub fn create_test_task_with_time(desc: &str, start: Instant) -> TaskDisplay {
     TaskDisplay {
         description: desc.to_string(),
         status: TaskStatus::Running,
-        start_time: start,
-        end_time: None,
+        created_at: SystemTime::now(),
+        timestamp: start,
         parent_id: None,
         progress: None,
         output_lines: vec![],
@@ -78,8 +78,8 @@ pub fn create_child_task(desc: &str, parent_id: TaskId) -> TaskDisplay {
     TaskDisplay {
         description: desc.to_string(),
         status: TaskStatus::Running,
-        start_time: Instant::now(),
-        end_time: None,
+        created_at: SystemTime::now(),
+        timestamp: Instant::now(),
         parent_id: Some(parent_id),
         progress: None,
         output_lines: vec![],
@@ -95,8 +95,8 @@ pub fn create_completed_task(desc: &str) -> TaskDisplay {
     TaskDisplay {
         description: desc.to_string(),
         status: TaskStatus::Completed,
-        start_time: start,
-        end_time: Some(start),
+        created_at: SystemTime::now(),
+        timestamp: start,
         parent_id: None,
         progress: None,
         output_lines: vec![],
@@ -112,8 +112,8 @@ pub fn create_failed_task(desc: &str) -> TaskDisplay {
     TaskDisplay {
         description: desc.to_string(),
         status: TaskStatus::Failed,
-        start_time: start,
-        end_time: Some(start),
+        created_at: SystemTime::now(),
+        timestamp: start,
         parent_id: None,
         progress: None,
         output_lines: vec![],

@@ -33,6 +33,8 @@ pub struct UiState {
     pub task_list_scroll_offset: usize,
     /// Set of expanded conversation IDs (showing child messages)
     pub expanded_conversations: HashSet<TaskId>,
+    /// Flag to auto-scroll output to bottom on next render
+    pub auto_scroll_output_to_bottom: bool,
 }
 
 impl UiState {

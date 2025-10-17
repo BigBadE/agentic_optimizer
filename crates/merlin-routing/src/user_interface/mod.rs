@@ -29,8 +29,12 @@ pub mod theme;
 /// TUI application and main event loop
 mod app;
 mod event_handler;
+/// Layout calculation utilities
+mod layout;
 /// Task persistence (public for testing)
 pub mod persistence;
+/// Scrolling utilities
+pub mod scroll;
 
 // Re-exports
 pub use app::TuiApp;

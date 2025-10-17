@@ -256,7 +256,7 @@ impl AgentExecutor {
             ui_channel,
         } = inputs;
         // Execute the query directly without extra steps
-        let mut response = provider
+        let response = provider
             .generate(query, context)
             .await
             .map_err(|err| RoutingError::Other(format!("Provider error: {err}")))?;
@@ -315,8 +315,9 @@ impl AgentExecutor {
                     step_id: format!("{:?}", result_step.id),
                 });
 
-                // Add tool result to response (in real implementation, would re-query LLM with results)
-                write!(response.text, "\n\nTool '{tool_name}' result: {result}")?;
+                // Tool results are shown in the output tree via ToolCallCompleted events,
+                // no need to append them to response.text (which would create trailing newlines)
+                // In a real implementation, would re-query LLM with tool results to get final response
             }
         }
 

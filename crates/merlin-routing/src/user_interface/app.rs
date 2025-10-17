@@ -12,6 +12,7 @@ use super::event_handler::EventHandler;
 use super::event_source::{CrosstermEventSource, InputEventSource};
 use super::events::UiEvent;
 use super::input::InputManager;
+use super::layout;
 use super::persistence::TaskPersistence;
 use super::renderer::{FocusedPane, RenderCtx, Renderer, UiCtx};
 use super::state::{ConversationEntry, ConversationRole, UiState};
@@ -58,6 +59,8 @@ pub struct TuiApp<B: Backend> {
     event_source: Box<dyn InputEventSource + Send>,
     /// Last time the UI was rendered (for forcing periodic updates)
     last_render_time: Instant,
+    /// Cache of actual rendered layout dimensions
+    layout_cache: layout::LayoutCache,
 }
 
 // Note: all input is sourced from `event_source` to allow test injection without
@@ -116,6 +119,7 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             persistence,
             event_source: Box::new(CrosstermEventSource),
             last_render_time: Instant::now(),
+            layout_cache: layout::LayoutCache::new(),
         };
 
         let channel = super::UiChannel { sender };
@@ -163,6 +167,7 @@ impl<B: Backend> TuiApp<B> {
             persistence: None,
             event_source: Box::new(NoOpEventSource),
             last_render_time: Instant::now(),
+            layout_cache: layout::LayoutCache::new(),
         };
 
         let channel = super::UiChannel { sender };
@@ -628,18 +633,8 @@ impl<B: Backend> TuiApp<B> {
             return;
         };
 
-        let Some(task) = self.task_manager.get_task_mut(task_id) else {
-            return;
-        };
-
-        // Calculate max scroll based on task output (approximate)
-        let text_lines = task
-            .output_lines
-            .iter()
-            .map(|line| line.lines().count())
-            .sum::<usize>() as u16;
-        let viewport_height = 10u16; // Approximate viewport height
-        let max_scroll = text_lines.saturating_sub(viewport_height);
+        // Calculate max scroll based on actual rendered output (needs immutable borrow)
+        let max_scroll = self.calculate_output_max_scroll(task_id);
 
         match key.code {
             // Arrow keys and vim-style navigation scroll the text output
@@ -647,14 +642,29 @@ impl<B: Backend> TuiApp<B> {
                 self.state.output_scroll_offset = self.state.output_scroll_offset.saturating_sub(1);
             }
             KeyCode::Down | KeyCode::Char('j') => {
-                let new_offset = self.state.output_scroll_offset.saturating_add(1);
-                self.state.output_scroll_offset = new_offset.min(max_scroll);
+                self.state.output_scroll_offset = self
+                    .state
+                    .output_scroll_offset
+                    .saturating_add(1)
+                    .min(max_scroll);
             }
             // Right/Left expand/collapse output tree
-            KeyCode::Right | KeyCode::Char('l') => task.output_tree.expand_selected(),
-            KeyCode::Left | KeyCode::Char('h') => task.output_tree.collapse_selected(),
+            KeyCode::Right | KeyCode::Char('l') => {
+                if let Some(task) = self.task_manager.get_task_mut(task_id) {
+                    task.output_tree.expand_selected();
+                }
+            }
+            KeyCode::Left | KeyCode::Char('h') => {
+                if let Some(task) = self.task_manager.get_task_mut(task_id) {
+                    task.output_tree.collapse_selected();
+                }
+            }
             // Space toggles output tree node
-            KeyCode::Char(' ') => task.output_tree.toggle_selected(),
+            KeyCode::Char(' ') => {
+                if let Some(task) = self.task_manager.get_task_mut(task_id) {
+                    task.output_tree.toggle_selected();
+                }
+            }
             // Home/End scroll to top/bottom of output
             KeyCode::Home => {
                 self.state.output_scroll_offset = 0;
@@ -668,8 +678,11 @@ impl<B: Backend> TuiApp<B> {
                     self.state.output_scroll_offset.saturating_sub(10);
             }
             KeyCode::PageDown => {
-                let new_offset = self.state.output_scroll_offset.saturating_add(10);
-                self.state.output_scroll_offset = new_offset.min(max_scroll);
+                self.state.output_scroll_offset = self
+                    .state
+                    .output_scroll_offset
+                    .saturating_add(10)
+                    .min(max_scroll);
             }
             _ => {}
         }
@@ -966,6 +979,32 @@ impl<B: Backend> TuiApp<B> {
         }
     }
 
+    /// Calculates the maximum scroll offset for the output pane
+    fn calculate_output_max_scroll(&self, task_id: TaskId) -> u16 {
+        let Some(task) = self.task_manager.get_task(task_id) else {
+            return 0;
+        };
+
+        // Use cached viewport height from actual rendering
+        let viewport_height = self.layout_cache.output_viewport_height();
+        if viewport_height == 0 {
+            // Layout not yet cached (first render), return 0
+            return 0;
+        }
+
+        let terminal_width = self.terminal.size().map(|size| size.width).unwrap_or(80);
+        let text_lines = Renderer::calculate_output_line_count(task, terminal_width);
+        text_lines.saturating_sub(viewport_height)
+    }
+
+    /// Auto-scrolls the output pane to the bottom if already at or near bottom
+    fn auto_scroll_output_to_bottom(&mut self) {
+        if let Some(task_id) = self.state.active_task_id {
+            let max_scroll = self.calculate_output_max_scroll(task_id);
+            self.state.output_scroll_offset = max_scroll;
+        }
+    }
+
     /// Renders the UI to the terminal
     ///
     /// # Errors
@@ -974,17 +1013,31 @@ impl<B: Backend> TuiApp<B> {
         // Ensure scroll is correct before rendering (handles initial state)
         self.adjust_task_list_scroll();
 
+        // Auto-scroll output to bottom if flag is set
+        if self.state.auto_scroll_output_to_bottom {
+            self.auto_scroll_output_to_bottom();
+            self.state.auto_scroll_output_to_bottom = false;
+        }
+
+        let layout_cache = &mut self.layout_cache;
+        let renderer = &self.renderer;
+        let task_manager = &self.task_manager;
+        let state = &self.state;
+        let input_manager = &self.input_manager;
+        let focused_pane = self.focused_pane;
+
         self.terminal
             .draw(|frame| {
-                let ctx = RenderCtx {
+                let mut ctx = RenderCtx {
                     ui_ctx: UiCtx {
-                        task_manager: &self.task_manager,
-                        state: &self.state,
+                        task_manager,
+                        state,
                     },
-                    input: &self.input_manager,
-                    focused: self.focused_pane,
+                    input: input_manager,
+                    focused: focused_pane,
+                    layout_cache,
                 };
-                self.renderer.render(frame, &ctx);
+                renderer.render(frame, &mut ctx);
             })
             .map_err(|err| RoutingError::Other(err.to_string()))?;
 

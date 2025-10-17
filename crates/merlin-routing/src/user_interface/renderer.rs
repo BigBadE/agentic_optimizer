@@ -7,6 +7,8 @@ use ratatui::{
 };
 // Formatting helpers are implemented via push methods to avoid extra allocations
 use super::input::InputManager;
+use super::layout;
+use super::scroll;
 use super::state::UiState;
 use super::task_manager::{TaskManager, TaskStatus};
 use super::theme::Theme;
@@ -34,6 +36,8 @@ pub struct RenderCtx<'ctx> {
     pub input: &'ctx InputManager,
     /// Currently focused pane
     pub focused: FocusedPane,
+    /// Layout cache to populate with actual rendered dimensions
+    pub layout_cache: &'ctx mut layout::LayoutCache,
 }
 
 impl Renderer {
@@ -52,40 +56,31 @@ impl Renderer {
         self.theme = theme;
     }
     /// Renders the entire UI
-    pub fn render(&self, frame: &mut Frame, ctx: &RenderCtx<'_>) {
+    pub fn render(&self, frame: &mut Frame, ctx: &mut RenderCtx<'_>) {
         let main_area = frame.area();
 
-        // Determine maximum task area height based on focus (BEFORE calculating content)
+        // Calculate task content lines
         let max_task_area_height = if ctx.focused == FocusedPane::Tasks {
-            // When Tasks pane is focused, allow up to 60% of screen height with minimum input space
             let max_height = (main_area.height * 60) / 100;
-            // Ensure at least 10 lines remain for input
             max_height.min(main_area.height.saturating_sub(10))
         } else if ctx.focused == FocusedPane::Output && ctx.ui_ctx.state.active_task_id.is_some() {
-            // When Output pane is focused, limit task list to max 3 lines + borders
             5
         } else {
-            // Default: use full height
             main_area.height
         };
 
-        // Create constrained area for calculating task content
         let constrained_task_area = Rect {
             height: max_task_area_height,
             ..main_area
         };
-
-        // Calculate actual content heights using constrained area
         let task_content_lines =
             self.calculate_task_tree_height(&ctx.ui_ctx, constrained_task_area, ctx.focused);
         let input_content_lines = ctx.input.input_area().lines().len() as u16;
 
-        // Determine final task height - always size to content but don't exceed max
-        // +2 for borders
-        let task_height = (task_content_lines + 2).min(max_task_area_height);
-
-        // Input height: content lines + 2 for borders, minimum 3 (2 for borders + 1 for content)
-        let input_height = (input_content_lines + 2).max(3);
+        // Use centralized layout calculations
+        let task_height =
+            layout::calculate_task_area_height(main_area.height, task_content_lines, ctx.focused);
+        let input_height = layout::calculate_input_area_height(input_content_lines);
 
         // If no task is selected, use minimal space for tasks panel and let input fill the rest
         if ctx.ui_ctx.state.active_task_id.is_none() {
@@ -111,6 +106,11 @@ impl Renderer {
                 .split(main_area);
 
             self.render_task_tree_full(frame, primary_split[0], &ctx.ui_ctx, ctx.focused);
+
+            // Cache the actual output area dimensions from ratatui's layout
+            ctx.layout_cache
+                .set_output_area(primary_split[1].width, primary_split[1].height);
+
             self.render_focused_detail_section(frame, primary_split[1], &ctx.ui_ctx, ctx.focused);
             self.render_input_area(frame, primary_split[2], ctx.input, ctx);
         }
@@ -217,10 +217,10 @@ impl Renderer {
         ));
 
         // Calculate content height and clamp scroll offset
-        // Account for borders (2) and padding (2)
-        let content_height = area.height.saturating_sub(4);
-        let text_lines = text.lines().count() as u16;
-        let max_scroll = text_lines.saturating_sub(content_height);
+        // Account for borders (2)
+        let viewport_height = area.height.saturating_sub(2);
+        let text_lines = scroll::count_text_lines(&text);
+        let max_scroll = text_lines.saturating_sub(viewport_height);
         let clamped_scroll = ui_ctx.state.output_scroll_offset.min(max_scroll);
 
         // Build title without embedding progress (moved to input box)
@@ -233,8 +233,7 @@ impl Renderer {
                 Block::default()
                     .borders(Borders::ALL)
                     .title(title)
-                    .border_style(Style::default().fg(border_color))
-                    .padding(Padding::horizontal(1)),
+                    .border_style(Style::default().fg(border_color)),
             )
             .wrap(Wrap { trim: false })
             .scroll((clamped_scroll, 0));
@@ -309,7 +308,15 @@ impl Renderer {
             let is_primary = task_id == primary_root_task_id;
 
             if is_child {
-                self.render_child_task(task, status_icon, is_selected, max_width, lines);
+                self.render_child_task(
+                    task,
+                    task_id,
+                    status_icon,
+                    is_selected,
+                    ui_ctx,
+                    max_width,
+                    lines,
+                );
             } else {
                 self.render_root_task(
                     task,
@@ -331,8 +338,10 @@ impl Renderer {
     fn render_child_task(
         &self,
         task: &super::task_manager::TaskDisplay,
+        task_id: super::TaskId,
         status_icon: &str,
         is_selected: bool,
+        ui_ctx: &UiCtx<'_>,
         max_width: usize,
         lines: &mut Vec<Line<'static>>,
     ) {
@@ -350,8 +359,20 @@ impl Renderer {
 
         lines.push(Line::from(vec![Span::styled(truncated_line, style)]));
 
+        // Show delete confirmation if this task is pending deletion
+        if is_selected && ui_ctx.state.pending_delete_task_id == Some(task_id) {
+            let confirm_line = "  │  └─ ⚠ Press Backspace again to confirm deletion";
+            let truncated_confirm = Self::truncate_text(confirm_line, max_width);
+            let confirm_style = Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD);
+            lines.push(Line::from(vec![Span::styled(
+                truncated_confirm,
+                confirm_style,
+            )]));
+        }
         // Render current step as a sub-child if present
-        if let Some(step) = &task.current_step {
+        else if let Some(step) = &task.current_step {
             let step_line = format!("  │  └─ ● {}", step.content);
             let truncated_step = Self::truncate_text(&step_line, max_width);
             let step_style = Style::default().fg(Color::DarkGray);
@@ -408,9 +429,21 @@ impl Renderer {
 
         lines.push(Line::from(vec![Span::styled(truncated_line, style)]));
 
+        // Show delete confirmation if this task is pending deletion
+        if is_selected && ui_ctx.state.pending_delete_task_id == Some(task_id) {
+            let confirm_line = " └─ ⚠ Press Backspace again to confirm deletion";
+            let truncated_confirm = Self::truncate_text(confirm_line, max_width);
+            let confirm_style = Style::default()
+                .fg(Color::Yellow)
+                .add_modifier(Modifier::BOLD);
+            lines.push(Line::from(vec![Span::styled(
+                truncated_confirm,
+                confirm_style,
+            )]));
+        }
         // Render current step as a child if present and not expanded
         // (if expanded, step will show under the actual task children)
-        if !is_expanded && let Some(step) = &task.current_step {
+        else if !is_expanded && let Some(step) = &task.current_step {
             let step_line = format!(" └─ ● {}", step.content);
             let truncated_step = Self::truncate_text(&step_line, max_width);
             let step_style = Style::default().fg(Color::DarkGray);
@@ -867,6 +900,12 @@ impl Renderer {
 
     // Helper methods
 
+    /// Calculate the number of lines that will be rendered for a task's output
+    pub fn calculate_output_line_count(task: &super::task_manager::TaskDisplay, width: u16) -> u16 {
+        let text = Self::build_tree_text(task, width, FocusedPane::Output);
+        text.lines().count() as u16
+    }
+
     fn build_tree_text(
         task: &super::task_manager::TaskDisplay,
         width: u16,
@@ -901,7 +940,3 @@ pub enum FocusedPane {
     /// Tasks list pane on the right
     Tasks,
 }
-
-// Helper functions
-
-// removed old wrap_tree_content and node formatting; focused output prints raw text

@@ -249,17 +249,11 @@ async fn initialize_embeddings_background(ui_channel: UiChannel, project: PathBu
     match manager.initialize().await {
         Ok(()) => {
             tracing::info!("Embedding initialization completed successfully");
-            ui_channel.send(UiEvent::SystemMessage {
-                level: MessageLevel::Success,
-                message: "Vector index ready".to_owned(),
-            });
+            // Don't send UI message - keeps output clean
         }
         Err(error) => {
             tracing::warn!("Embedding initialization failed: {error}");
-            ui_channel.send(UiEvent::SystemMessage {
-                level: MessageLevel::Warning,
-                message: format!("Vector index unavailable: {error}"),
-            });
+            // Don't send UI message - keeps output clean, logged to debug.log
         }
     }
 }

@@ -156,6 +156,11 @@ impl<'handler> EventHandler<'handler> {
             task.output_lines.push(output.clone());
             task.output_tree.add_text(output);
         }
+
+        // Auto-scroll to bottom if this is the active task and we were already at bottom
+        if self.state.active_task_id == Some(task_id) {
+            self.state.auto_scroll_output_to_bottom = true;
+        }
     }
 
     fn handle_task_completed(&mut self, task_id: TaskId, result: TaskResult) {

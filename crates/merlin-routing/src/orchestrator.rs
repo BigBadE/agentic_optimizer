@@ -1,14 +1,5 @@
-use std::env;
-use std::path::{Path, PathBuf};
-use std::slice::from_ref;
 use std::sync::Arc;
-use std::time::{SystemTime, UNIX_EPOCH};
 
-use serde_json::to_string_pretty;
-use tokio::fs;
-use tracing::{info, warn};
-
-use crate::user_interface::events::{MessageLevel, UiEvent};
 use crate::{
     AgentExecutor, ConflictAwareTaskGraph, ContextFetcher, ExecutorPool, ListFilesTool,
     LocalTaskAnalyzer, ModelRouter, ReadFileTool, Result, RoutingConfig, RoutingError,
@@ -28,11 +19,6 @@ pub struct RoutingOrchestrator {
 }
 
 impl RoutingOrchestrator {
-    /// Get the Merlin folder path, respecting `MERLIN_FOLDER` environment variable
-    fn get_merlin_folder(project_root: &Path) -> PathBuf {
-        env::var("MERLIN_FOLDER").map_or_else(|_| project_root.join(".merlin"), PathBuf::from)
-    }
-
     /// Creates a new routing orchestrator with the given configuration.
     ///
     /// Initializes analyzer, router, validator, and workspace with default implementations.
@@ -169,24 +155,7 @@ impl RoutingOrchestrator {
         }
 
         // Execute with streaming
-        let task_clone = task.clone();
-        let result = executor.execute_streaming(task, ui_channel.clone()).await?;
-
-        // Best-effort: snapshot the submitted task on completion (non-fatal)
-        match self.write_single_task_snapshot(&task_clone).await {
-            Ok(path) => {
-                info!("Saved task snapshot: {}", path.display());
-                ui_channel.send(UiEvent::SystemMessage {
-                    level: MessageLevel::Info,
-                    message: format!("Saved task snapshot: {}", path.display()),
-                });
-            }
-            Err(error) => {
-                warn!("Failed to write task snapshot: {}", error);
-            }
-        }
-
-        Ok(result)
+        executor.execute_streaming(task, ui_channel.clone()).await
     }
 
     /// Execute multiple tasks with dependency management
@@ -229,51 +198,8 @@ impl RoutingOrchestrator {
     /// Returns an error if analysis or execution fails.
     pub async fn process_request(&self, request: &str) -> Result<Vec<TaskResult>> {
         let analysis = self.analyze_request(request).await?;
-
-        // Persist analyzed tasks to .merlin/tasks for recovery across restarts (non-fatal)
-        if self.write_tasks_snapshot(&analysis.tasks).await.is_err() {
-            // Ignore snapshot persistence failures to avoid breaking request processing
-        }
-
         let results = self.execute_tasks(analysis.tasks.clone()).await?;
-
-        // After successful completion, persist the tasks snapshot again (non-fatal)
-        if self.write_tasks_snapshot(&analysis.tasks).await.is_err() {
-            // Ignore snapshot persistence failures
-        }
-
         Ok(results)
-    }
-
-    /// Write the current analyzed tasks to `<workspace>/.merlin/tasks/<timestamp>.json`.
-    ///
-    /// # Errors
-    /// Returns an error if directory creation or file write fails.
-    async fn write_tasks_snapshot(&self, tasks: &[Task]) -> Result<PathBuf> {
-        let root = self.workspace.root_path().clone();
-        let merlin_dir = Self::get_merlin_folder(&root);
-        let dir = merlin_dir.join("tasks");
-        fs::create_dir_all(&dir).await?;
-
-        let now = SystemTime::now()
-            .duration_since(UNIX_EPOCH)
-            .map_err(|err| RoutingError::Other(err.to_string()))?;
-        let filename = format!("{}-tasks.json", now.as_millis());
-        let path = dir.join(filename);
-
-        let json = to_string_pretty(tasks)?;
-        fs::write(&path, json).await?;
-        Ok(path)
-    }
-
-    /// Write a single task snapshot to `<workspace>/.merlin/tasks/<timestamp>.json`.
-    ///
-    /// This avoids requiring `Task: Clone` when only a reference is available.
-    ///
-    /// # Errors
-    /// Returns an error if directory creation or file write fails.
-    async fn write_single_task_snapshot(&self, task: &Task) -> Result<PathBuf> {
-        self.write_tasks_snapshot(from_ref(task)).await
     }
 
     /// Gets the routing configuration.

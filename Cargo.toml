@@ -83,6 +83,13 @@ lto = false
 [profile.dev.package."*"]
 opt-level = 3
 
+# Test profile: Same as dev but without Cranelift to avoid Windows exception issues
+[profile.test]
+inherits = "dev"
+
+[profile.test.package."*"]
+opt-level = 3
+
 [profile.release]
 codegen-units = 1
 lto = "thin"

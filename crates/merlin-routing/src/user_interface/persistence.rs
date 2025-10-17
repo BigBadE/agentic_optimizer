@@ -1,4 +1,3 @@
-use super::output_tree::OutputTree;
 use super::task_manager::{TaskDisplay, TaskStatus};
 use crate::TaskId;
 use flate2::{Compression, read::GzDecoder, write::GzEncoder};
@@ -80,7 +79,7 @@ impl TaskPersistence {
             id: task_id,
             description: task.description.clone(),
             status: status_str.to_string(),
-            output_text: task.output_tree.to_text(),
+            output_text: task.output.clone(),
             output_lines: task.output_lines.clone(),
             start_time,
             end_time,
@@ -172,14 +171,6 @@ fn load_single_task(path: &Path) -> io::Result<LoadedTask> {
 
 /// Deserializes a task from its serializable form
 fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
-    let mut output_tree = OutputTree::default();
-
-    for line in serializable.output_text.lines() {
-        if !line.is_empty() {
-            output_tree.add_text(line.to_string());
-        }
-    }
-
     let status = match serializable.status.as_str() {
         "Completed" => TaskStatus::Completed,
         "Failed" => TaskStatus::Failed,
@@ -209,7 +200,7 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
         start_time,
         end_time,
         parent_id: serializable.parent_id,
-        output_tree,
+        output: serializable.output_text,
         steps: Vec::default(),
         current_step: None,
     };

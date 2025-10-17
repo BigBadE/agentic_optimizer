@@ -12,10 +12,10 @@
 )]
 
 use merlin_routing::TaskId;
-use merlin_routing::user_interface::output_tree::OutputTree;
 use merlin_routing::user_interface::persistence::TaskPersistence;
 use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskStatus};
 use std::collections::HashMap;
+use std::fmt::Write as _;
 use std::fs;
 use std::io::Result as IoResult;
 use std::time::Instant;
@@ -24,9 +24,7 @@ use tempfile::TempDir;
 type LoadResult = IoResult<HashMap<TaskId, TaskDisplay>>;
 
 fn create_test_task(description: &str, status: TaskStatus) -> TaskDisplay {
-    let mut output_tree = OutputTree::default();
-    output_tree.add_text(format!("Test output for {description}"));
-
+    let output = format!("Test output for {description}");
     let end_time = (status == TaskStatus::Completed).then(Instant::now);
 
     TaskDisplay {
@@ -37,7 +35,7 @@ fn create_test_task(description: &str, status: TaskStatus) -> TaskDisplay {
         start_time: Instant::now(),
         end_time,
         parent_id: None,
-        output_tree,
+        output,
         steps: Vec::new(),
         current_step: None,
     }
@@ -207,16 +205,14 @@ async fn test_output_text_persistence() {
     let mut task = create_test_task("Output task", TaskStatus::Running);
 
     // Add multiple output lines
-    task.output_tree.add_text("Line 1".to_string());
-    task.output_tree.add_text("Line 2".to_string());
-    task.output_tree.add_text("Line 3".to_string());
+    task.output.push_str("Line 1\nLine 2\nLine 3");
 
     persistence.save_task(task_id, &task).unwrap();
 
     let loaded = persistence.load_all_tasks().await.unwrap();
     let loaded_task = &loaded[&task_id];
 
-    let output_text = loaded_task.output_tree.to_text();
+    let output_text = &loaded_task.output;
     assert!(
         output_text.contains("Line 1"),
         "Output should contain line 1"
@@ -284,9 +280,14 @@ async fn test_compression_effectiveness() {
 
     // Add lots of text
     for i in 0..100 {
-        task.output_tree.add_text(format!(
+        if !task.output.is_empty() {
+            task.output.push('\n');
+        }
+        write!(
+            task.output,
             "Line {i}: This is a repeated line with similar content"
-        ));
+        )
+        .expect("write to String cannot fail");
     }
 
     persistence.save_task(task_id, &task).unwrap();
@@ -367,16 +368,15 @@ async fn test_unicode_in_output() {
     let task_id = TaskId::default();
     let mut task = create_test_task("Unicode task", TaskStatus::Running);
 
-    task.output_tree.add_text("Hello 世界 🌍".to_string());
-    task.output_tree.add_text("Привет мир".to_string());
-    task.output_tree.add_text("مرحبا بالعالم".to_string());
+    task.output
+        .push_str("Hello 世界 🌍\nПривет мир\nمرحبا بالعالم");
 
     persistence.save_task(task_id, &task).unwrap();
 
     let loaded = persistence.load_all_tasks().await.unwrap();
     let loaded_task = &loaded[&task_id];
 
-    let output = loaded_task.output_tree.to_text();
+    let output = &loaded_task.output;
     assert!(output.contains("世界"));
     assert!(output.contains("Привет"));
     assert!(output.contains("مرحبا"));

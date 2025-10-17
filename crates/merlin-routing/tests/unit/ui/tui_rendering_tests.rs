@@ -19,6 +19,7 @@ use crate::common::*;
 use merlin_routing::TaskId;
 use merlin_routing::user_interface::{
     input::InputManager,
+    layout::LayoutCache,
     renderer::{FocusedPane, RenderCtx, Renderer, UiCtx},
     state::UiState,
     task_manager::TaskManager,
@@ -56,16 +57,18 @@ fn test_render_empty_state() {
     let input = InputManager::default();
     let renderer = Renderer::new(Theme::default());
 
+    let mut layout_cache = LayoutCache::default();
     let result = terminal.draw(|frame| {
-        let ctx = RenderCtx {
+        let mut ctx = RenderCtx {
             ui_ctx: UiCtx {
                 task_manager: &manager,
                 state: &state,
             },
             input: &input,
             focused: FocusedPane::Input,
+            layout_cache: &mut layout_cache,
         };
-        renderer.render(frame, &ctx);
+        renderer.render(frame, &mut ctx);
     });
 
     result.unwrap();
@@ -86,18 +89,20 @@ fn test_render_with_tasks() {
     };
 
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     let result = terminal.draw(|frame| {
-        let ctx = RenderCtx {
+        let mut ctx = RenderCtx {
             ui_ctx: UiCtx {
                 task_manager: &manager,
                 state: &state,
             },
             input: &input,
             focused: FocusedPane::Tasks,
+            layout_cache: &mut layout_cache,
         };
-        renderer.render(frame, &ctx);
+        renderer.render(frame, &mut ctx);
     });
 
     result.unwrap();
@@ -126,17 +131,19 @@ fn test_render_all_panes() {
     let renderer = Renderer::new(Theme::default());
 
     // Test rendering each focused pane
+    let mut layout_cache = LayoutCache::default();
     for focused in [FocusedPane::Input, FocusedPane::Output, FocusedPane::Tasks] {
         let result = terminal.draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         });
 
         result.unwrap_or_else(|_| panic!("Rendering failed for pane: {focused:?}"));
@@ -154,18 +161,20 @@ fn test_render_with_completed_task() {
 
     let state = UiState::default();
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     let result = terminal.draw(|frame| {
-        let ctx = RenderCtx {
+        let mut ctx = RenderCtx {
             ui_ctx: UiCtx {
                 task_manager: &manager,
                 state: &state,
             },
             input: &input,
             focused: FocusedPane::Tasks,
+            layout_cache: &mut layout_cache,
         };
-        renderer.render(frame, &ctx);
+        renderer.render(frame, &mut ctx);
     });
 
     result.unwrap();
@@ -182,18 +191,20 @@ fn test_render_with_failed_task() {
 
     let state = UiState::default();
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     let result = terminal.draw(|frame| {
-        let ctx = RenderCtx {
+        let mut ctx = RenderCtx {
             ui_ctx: UiCtx {
                 task_manager: &manager,
                 state: &state,
             },
             input: &input,
             focused: FocusedPane::Tasks,
+            layout_cache: &mut layout_cache,
         };
-        renderer.render(frame, &ctx);
+        renderer.render(frame, &mut ctx);
     });
 
     result.unwrap();
@@ -211,21 +222,23 @@ fn test_all_themes_render() {
     // Test all available themes
     let mut theme = Theme::default();
     let start_theme_name = theme.name().to_string();
+    let mut layout_cache = LayoutCache::default();
 
     for _ in 0..10 {
         // Test up to 10 themes (cycling will repeat)
         let renderer = Renderer::new(theme);
 
         let result = terminal.draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Input,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         });
 
         result.unwrap_or_else(|_| panic!("Theme {} failed to render", theme.name()));

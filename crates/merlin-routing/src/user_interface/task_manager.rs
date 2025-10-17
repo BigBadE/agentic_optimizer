@@ -1,5 +1,4 @@
 use super::events::TaskProgress;
-use super::output_tree::OutputTree;
 use crate::TaskId;
 use std::cmp::Reverse;
 use std::collections::{HashMap, HashSet};
@@ -33,8 +32,8 @@ pub struct TaskDisplay {
     pub end_time: Option<Instant>,
     /// ID of the parent task (if this is a subtask)
     pub parent_id: Option<TaskId>,
-    /// Hierarchical output tree
-    pub output_tree: OutputTree,
+    /// Plain text output
+    pub output: String,
     /// List of task steps
     pub steps: Vec<TaskStepInfo>,
     /// Currently active step (shown as visual subtask in UI)

@@ -41,7 +41,7 @@ impl<'handler> EventHandler<'handler> {
                 self.handle_task_progress(task_id, progress);
             }
 
-            UiEvent::TaskOutput { task_id, output } => self.handle_task_output(task_id, output),
+            UiEvent::TaskOutput { task_id, output } => self.handle_task_output(task_id, &output),
 
             UiEvent::TaskCompleted { task_id, result } => {
                 self.handle_task_completed(task_id, result);
@@ -74,7 +74,7 @@ impl<'handler> EventHandler<'handler> {
                 task_id,
                 tool,
                 result,
-            } => self.handle_tool_call_completed(task_id, &tool, &result),
+            } => Self::handle_tool_call_completed(task_id, &tool, &result),
 
             UiEvent::ThinkingUpdate { .. } | UiEvent::SubtaskSpawned { .. } => {
                 // Deprecated events: functionality now handled by TaskStepStarted
@@ -125,7 +125,7 @@ impl<'handler> EventHandler<'handler> {
             start_time: Instant::now(),
             end_time: None,
             parent_id: normalized_parent_id,
-            output_tree: super::output_tree::OutputTree::default(),
+            output: String::new(),
             steps: Vec::default(),
             current_step: None,
         };
@@ -151,13 +151,26 @@ impl<'handler> EventHandler<'handler> {
         }
     }
 
-    fn handle_task_output(&mut self, task_id: TaskId, output: String) {
-        if let Some(task) = self.task_manager.get_task_mut(task_id) {
-            task.output_lines.push(output.clone());
-            task.output_tree.add_text(output);
+    fn handle_task_output(&mut self, task_id: TaskId, output: &str) {
+        let Some(task) = self.task_manager.get_task_mut(task_id) else {
+            return;
+        };
+
+        task.output_lines.push(output.to_string());
+
+        // Filter out "Prompt:" lines and append to output
+        for line in output.lines() {
+            if line.trim_start().starts_with("Prompt:") {
+                continue;
+            }
+
+            if !task.output.is_empty() {
+                task.output.push('\n');
+            }
+            task.output.push_str(line);
         }
 
-        // Auto-scroll to bottom if this is the active task and we were already at bottom
+        // Auto-scroll to bottom if this is the active task
         if self.state.active_task_id == Some(task_id) {
             self.state.auto_scroll_output_to_bottom = true;
         }
@@ -195,7 +208,10 @@ impl<'handler> EventHandler<'handler> {
             task.end_time = Some(Instant::now());
 
             let error_msg = format!("Error: {error}");
-            task.output_tree.add_text(error_msg);
+            if !task.output.is_empty() {
+                task.output.push('\n');
+            }
+            task.output.push_str(&error_msg);
         }
 
         if let Some(persistence) = self.persistence
@@ -218,7 +234,12 @@ impl<'handler> EventHandler<'handler> {
         if let Some(task_id) = self.state.active_task_id
             && let Some(task) = self.task_manager.get_task_mut(task_id)
         {
-            task.output_tree.add_text(format!("{prefix} {message}"));
+            if !task.output.is_empty() {
+                task.output.push('\n');
+            }
+            task.output.push_str(prefix);
+            task.output.push(' ');
+            task.output.push_str(&message);
         }
 
         self.state.add_conversation_entry(ConversationEntry {
@@ -261,16 +282,13 @@ impl<'handler> EventHandler<'handler> {
             {
                 task.current_step = None;
             }
-            task.output_tree.complete_step(step_id);
         }
     }
 
     fn handle_tool_call_started(_task_id: TaskId, _tool: String, _args: Value) {}
 
-    fn handle_tool_call_completed(&mut self, task_id: TaskId, tool: &str, result: &Value) {
-        if let Some(task) = self.task_manager.get_task_mut(task_id) {
-            task.output_tree.complete_tool_call(tool, result);
-        }
+    fn handle_tool_call_completed(_task_id: TaskId, _tool: &str, _result: &Value) {
+        // Tool call completion no longer updates output
     }
 
     fn select_task(&mut self, task_id: TaskId) {

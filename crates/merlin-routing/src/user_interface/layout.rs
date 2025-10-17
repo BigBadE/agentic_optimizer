@@ -29,7 +29,7 @@ impl LayoutCache {
     /// Gets the output viewport height (excluding borders)
     ///
     /// Returns the actual content height available for scrollable output.
-    /// Accounts for borders (2).
+    /// Accounts for borders only (2) - horizontal padding doesn't affect height.
     pub fn output_viewport_height(&self) -> u16 {
         self.output_area
             .map_or(0, |(_, height)| height.saturating_sub(2))

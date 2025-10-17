@@ -18,7 +18,6 @@
 use crate::common::*;
 use merlin_routing::TaskId;
 use merlin_routing::user_interface::events::{MessageLevel, TaskProgress, UiEvent};
-use merlin_routing::user_interface::output_tree::StepType;
 use merlin_routing::user_interface::task_manager::{TaskManager, TaskStatus};
 use std::time::Instant;
 
@@ -79,18 +78,23 @@ fn handle_task_steps(manager: &mut TaskManager, event: UiEvent) {
     match event {
         UiEvent::TaskStepStarted {
             task_id,
-            step_id,
             step_type,
             content,
+            ..
         } => {
             if let Some(task) = manager.get_task_mut(task_id) {
-                task.output_tree
-                    .add_step(step_id, StepType::from_string(&step_type), content);
+                use std::fmt::Write as _;
+                if !task.output.is_empty() {
+                    task.output.push('\n');
+                }
+                write!(task.output, "[{step_type}] {content}")
+                    .expect("write to String cannot fail");
             }
         }
-        UiEvent::TaskStepCompleted { task_id, step_id } => {
-            if let Some(task) = manager.get_task_mut(task_id) {
-                task.output_tree.complete_step(&step_id);
+        UiEvent::TaskStepCompleted { task_id, .. } => {
+            // Step completion no longer updates output
+            if let Some(_task) = manager.get_task_mut(task_id) {
+                // No-op
             }
         }
         _ => {}
@@ -314,8 +318,10 @@ fn test_task_step_started_event() {
     let Some(task) = manager.get_task(task_id) else {
         panic!("Task should exist");
     };
-    let nodes = task.output_tree.flatten_visible_nodes();
-    assert!(!nodes.is_empty());
+    assert!(
+        !task.output.is_empty(),
+        "Task output should contain step content"
+    );
 }
 
 #[test]
@@ -347,7 +353,10 @@ fn test_task_step_completed_event() {
     let Some(task) = manager.get_task(task_id) else {
         panic!("Task should exist");
     };
-    assert!(!task.output_tree.flatten_visible_nodes().is_empty());
+    assert!(
+        !task.output.is_empty(),
+        "Task output should contain step content"
+    );
 }
 
 #[test]

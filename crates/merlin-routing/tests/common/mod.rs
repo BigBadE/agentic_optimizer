@@ -18,7 +18,6 @@
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use merlin_core::{Response, TokenUsage};
 use merlin_routing::user_interface::event_source::InputEventSource;
-use merlin_routing::user_interface::output_tree::OutputTree;
 use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskStatus};
 use merlin_routing::user_interface::{TuiApp, UiChannel};
 use merlin_routing::{Result, TaskId, TaskResult, ValidationResult};
@@ -68,7 +67,7 @@ pub fn create_test_task_with_time(desc: &str, start: Instant) -> TaskDisplay {
         parent_id: None,
         progress: None,
         output_lines: vec![],
-        output_tree: OutputTree::default(),
+        output: String::new(),
         steps: vec![],
         current_step: None,
     }
@@ -84,7 +83,7 @@ pub fn create_child_task(desc: &str, parent_id: TaskId) -> TaskDisplay {
         parent_id: Some(parent_id),
         progress: None,
         output_lines: vec![],
-        output_tree: OutputTree::default(),
+        output: String::new(),
         steps: vec![],
         current_step: None,
     }
@@ -101,7 +100,7 @@ pub fn create_completed_task(desc: &str) -> TaskDisplay {
         parent_id: None,
         progress: None,
         output_lines: vec![],
-        output_tree: OutputTree::default(),
+        output: String::new(),
         steps: vec![],
         current_step: None,
     }
@@ -118,7 +117,7 @@ pub fn create_failed_task(desc: &str) -> TaskDisplay {
         parent_id: None,
         progress: None,
         output_lines: vec![],
-        output_tree: OutputTree::default(),
+        output: String::new(),
         steps: vec![],
         current_step: None,
     }

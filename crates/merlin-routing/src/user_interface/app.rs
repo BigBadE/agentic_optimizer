@@ -343,13 +343,12 @@ impl<B: Backend> TuiApp<B> {
                     history.push(("user".to_string(), task.description.clone()));
                 }
 
-                // Add assistant response from output tree
-                let output_text = task.output_tree.to_text();
-                if !output_text.is_empty()
-                    && !output_text.contains("Saving task")
-                    && !output_text.contains("Loading task")
+                // Add assistant response from output
+                if !task.output.is_empty()
+                    && !task.output.contains("Saving task")
+                    && !task.output.contains("Loading task")
                 {
-                    history.push(("assistant".to_string(), output_text));
+                    history.push(("assistant".to_string(), task.output.clone()));
                 }
             }
         }
@@ -385,8 +384,11 @@ impl<B: Backend> TuiApp<B> {
         let mut context = Vec::default();
 
         if let Some(parent_task) = self.task_manager.get_task(parent_id) {
-            let output = parent_task.output_tree.to_text();
-            context.push((parent_id, parent_task.description.clone(), output));
+            context.push((
+                parent_id,
+                parent_task.description.clone(),
+                parent_task.output.clone(),
+            ));
         }
 
         for &task_id in self.task_manager.task_order() {
@@ -397,8 +399,7 @@ impl<B: Backend> TuiApp<B> {
             if let Some(task) = self.task_manager.get_task(task_id)
                 && task.parent_id == Some(parent_id)
             {
-                let output = task.output_tree.to_text();
-                context.push((task_id, task.description.clone(), output));
+                context.push((task_id, task.description.clone(), task.output.clone()));
             }
         }
 
@@ -647,23 +648,6 @@ impl<B: Backend> TuiApp<B> {
                     .output_scroll_offset
                     .saturating_add(1)
                     .min(max_scroll);
-            }
-            // Right/Left expand/collapse output tree
-            KeyCode::Right | KeyCode::Char('l') => {
-                if let Some(task) = self.task_manager.get_task_mut(task_id) {
-                    task.output_tree.expand_selected();
-                }
-            }
-            KeyCode::Left | KeyCode::Char('h') => {
-                if let Some(task) = self.task_manager.get_task_mut(task_id) {
-                    task.output_tree.collapse_selected();
-                }
-            }
-            // Space toggles output tree node
-            KeyCode::Char(' ') => {
-                if let Some(task) = self.task_manager.get_task_mut(task_id) {
-                    task.output_tree.toggle_selected();
-                }
             }
             // Home/End scroll to top/bottom of output
             KeyCode::Home => {

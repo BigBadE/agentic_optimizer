@@ -31,7 +31,6 @@ use merlin_routing::TaskId;
 use merlin_routing::UiChannel;
 use merlin_routing::user_interface::event_source::InputEventSource as UiInputEventSource;
 use merlin_routing::user_interface::events::TaskProgress;
-use merlin_routing::user_interface::output_tree::OutputTree;
 use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskManager, TaskStatus};
 use merlin_routing::user_interface::{TuiApp, state::UiState};
 use ratatui::Terminal;
@@ -93,7 +92,7 @@ fn create_test_task(description: &str) -> TaskDisplay {
         parent_id: None,
         progress: None,
         output_lines: vec![],
-        output_tree: OutputTree::default(),
+        output: String::new(),
         steps: vec![],
         current_step: None,
     }
@@ -575,7 +574,7 @@ impl ScenarioRunner {
             parent_id,
             progress: None,
             output_lines: vec![],
-            output_tree: OutputTree::default(),
+            output: String::new(),
             steps: vec![],
             current_step: None,
         };
@@ -693,9 +692,7 @@ impl ScenarioRunner {
         let mut task = create_test_task(&data.text);
         task.status = TaskStatus::Running;
 
-        let mut output_tree = OutputTree::default();
-        output_tree.add_text(data.text.clone());
-        task.output_tree = output_tree;
+        task.output.clone_from(&data.text);
 
         app.task_manager_mut().add_task(task_id, task);
         app.state_mut().active_running_tasks.insert(task_id);

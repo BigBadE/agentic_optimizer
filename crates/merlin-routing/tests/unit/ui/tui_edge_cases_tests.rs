@@ -17,7 +17,6 @@
 use crate::common::*;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use merlin_routing::TaskId;
-use merlin_routing::user_interface::output_tree::{OutputTree, StepType};
 use merlin_routing::user_interface::task_manager::TaskManager;
 use merlin_routing::user_interface::{EmojiMode, calculate_width as ui_calculate_width};
 #[test]
@@ -38,170 +37,6 @@ fn test_task_manager_navigation_single_task() {
     let visible = manager.get_visible_tasks();
     assert_eq!(visible.len(), 1);
     assert_eq!(visible[0], task_id);
-}
-
-#[test]
-fn test_output_tree_navigation_empty() {
-    let tree = OutputTree::default();
-
-    assert_eq!(tree.flatten_visible_nodes().len(), 0);
-}
-
-#[test]
-fn test_output_tree_move_up_at_top() {
-    let mut tree = OutputTree::default();
-
-    tree.add_step(
-        "step1".to_string(),
-        StepType::Thinking,
-        "Content".to_string(),
-    );
-
-    assert_eq!(tree.selected_index(), 0);
-    tree.move_up();
-    // Should stay at 0
-    assert_eq!(tree.selected_index(), 0);
-}
-
-#[test]
-fn test_output_tree_move_down_at_bottom() {
-    let mut tree = OutputTree::default();
-
-    tree.add_step(
-        "step1".to_string(),
-        StepType::Thinking,
-        "Content".to_string(),
-    );
-    tree.complete_step("step1");
-
-    tree.move_to_end();
-    let max_index = tree.selected_index();
-    tree.move_down();
-    // Should stay at same position
-    assert_eq!(tree.selected_index(), max_index);
-}
-
-#[test]
-fn test_output_tree_move_to_start() {
-    let mut tree = OutputTree::default();
-
-    for index in 0..5 {
-        tree.add_step(
-            format!("step{index}"),
-            StepType::Thinking,
-            format!("Content {index}"),
-        );
-        tree.complete_step(&format!("step{index}"));
-    }
-
-    tree.move_to_end();
-    assert!(tree.selected_index() > 0);
-
-    tree.move_to_start();
-    assert_eq!(tree.selected_index(), 0);
-}
-
-#[test]
-fn test_output_tree_move_to_end() {
-    let mut tree = OutputTree::default();
-
-    for index in 0..5 {
-        tree.add_step(
-            format!("step{index}"),
-            StepType::Thinking,
-            format!("Content {index}"),
-        );
-        tree.complete_step(&format!("step{index}"));
-    }
-
-    tree.move_to_start();
-    tree.move_to_end();
-
-    let visible_count = tree.flatten_visible_nodes().len();
-    assert_eq!(tree.selected_index(), visible_count - 1);
-}
-
-#[test]
-fn test_output_tree_page_up() {
-    let mut tree = OutputTree::default();
-
-    for index in 0..20 {
-        tree.add_step(
-            format!("step{index}"),
-            StepType::Thinking,
-            format!("Content {index}"),
-        );
-        tree.complete_step(&format!("step{index}"));
-    }
-
-    tree.move_to_end();
-    let end_pos = tree.selected_index();
-    tree.page_up(10);
-
-    assert!(tree.selected_index() < end_pos);
-}
-
-#[test]
-fn test_output_tree_page_down() {
-    let mut tree = OutputTree::default();
-
-    for index in 0..20 {
-        tree.add_step(
-            format!("step{index}"),
-            StepType::Thinking,
-            format!("Content {index}"),
-        );
-        tree.complete_step(&format!("step{index}"));
-    }
-
-    tree.move_to_start();
-    tree.page_down(10);
-
-    assert!(tree.selected_index() >= 10);
-}
-
-#[test]
-fn test_output_tree_toggle_collapse() {
-    let mut tree = OutputTree::default();
-
-    tree.add_step(
-        "parent".to_string(),
-        StepType::Thinking,
-        "Parent".to_string(),
-    );
-    tree.add_step("child".to_string(), StepType::Thinking, "Child".to_string());
-    tree.complete_step("child");
-    tree.complete_step("parent");
-
-    let initial_visible = tree.flatten_visible_nodes().len();
-    tree.toggle_selected();
-    let after_toggle = tree.flatten_visible_nodes().len();
-
-    // Visibility should change
-    assert!(initial_visible != after_toggle || initial_visible == 1);
-}
-
-#[test]
-fn test_output_tree_expand_collapse_selected() {
-    let mut tree = OutputTree::default();
-
-    tree.add_step(
-        "parent".to_string(),
-        StepType::Thinking,
-        "Parent".to_string(),
-    );
-    tree.add_step("child".to_string(), StepType::Thinking, "Child".to_string());
-    tree.complete_step("child");
-    tree.complete_step("parent");
-
-    tree.collapse_selected();
-    let collapsed_count = tree.flatten_visible_nodes().len();
-
-    tree.expand_selected();
-    let expanded_count = tree.flatten_visible_nodes().len();
-
-    // Should have more nodes when expanded
-    assert!(expanded_count >= collapsed_count);
 }
 
 #[test]
@@ -287,55 +122,6 @@ fn test_input_manager_many_lines() {
 }
 
 #[test]
-fn test_output_tree_very_deep_nesting() {
-    let mut tree = OutputTree::default();
-
-    // Create deep nesting
-    for index in 0..50 {
-        tree.add_step(
-            format!("level{index}"),
-            StepType::Thinking,
-            format!("Level {index}"),
-        );
-    }
-
-    // Complete all from bottom up
-    for index in (0..50).rev() {
-        tree.complete_step(&format!("level{index}"));
-    }
-
-    let nodes = tree.flatten_visible_nodes();
-    assert_eq!(nodes.len(), 50);
-}
-
-#[test]
-fn test_output_tree_many_siblings() {
-    let mut tree = OutputTree::default();
-
-    // Add parent
-    tree.add_step(
-        "parent".to_string(),
-        StepType::Thinking,
-        "Parent".to_string(),
-    );
-
-    // Add 100 children
-    for index in 0..100 {
-        tree.add_step(
-            format!("child{index}"),
-            StepType::Thinking,
-            format!("Child {index}"),
-        );
-        tree.complete_step(&format!("child{index}"));
-    }
-
-    tree.complete_step("parent");
-
-    let nodes = tree.flatten_visible_nodes();
-    assert_eq!(nodes.len(), 101); // parent + 100 children
-}
-
-#[test]
 fn test_task_manager_many_tasks() {
     let mut manager = TaskManager::default();
 
@@ -409,22 +195,6 @@ fn test_emoji_stripping() {
     assert!(!stripped.contains('🚀'));
     assert!(stripped.contains("Hello"));
     assert!(stripped.contains("World"));
-}
-
-#[test]
-fn test_output_tree_to_text() {
-    let mut tree = OutputTree::default();
-
-    tree.add_step(
-        "step1".to_string(),
-        StepType::Thinking,
-        "Analyzing".to_string(),
-    );
-    tree.complete_step("step1");
-
-    let text = tree.to_text();
-    assert!(!text.is_empty());
-    assert!(text.contains("Analyzing"));
 }
 
 #[test]

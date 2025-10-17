@@ -19,6 +19,7 @@ use crate::common::*;
 use merlin_routing::TaskId;
 use merlin_routing::user_interface::{
     input::InputManager,
+    layout::LayoutCache,
     renderer::{FocusedPane, RenderCtx, Renderer, UiCtx},
     state::UiState,
     task_manager::{TaskManager, TaskStatus as UiTaskStatus},
@@ -72,19 +73,21 @@ fn test_task_list_shows_only_most_recent_conversation_on_launch() {
 
     let state = UiState::default();
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Tasks,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 
@@ -128,19 +131,21 @@ fn test_new_conversation_does_not_branch_from_previous() {
         ..Default::default()
     };
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Input,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 
@@ -190,19 +195,21 @@ fn test_task_list_only_shows_children_of_current_task() {
         ..Default::default()
     };
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Input,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 
@@ -249,16 +256,18 @@ fn test_task_list_does_not_exceed_screen_height() {
     let renderer = Renderer::new(Theme::default());
 
     // Should not panic even with many tasks
+    let mut layout_cache = LayoutCache::default();
     let result = terminal.draw(|frame| {
-        let ctx = RenderCtx {
+        let mut ctx = RenderCtx {
             ui_ctx: UiCtx {
                 task_manager: &manager,
                 state: &state,
             },
             input: &input,
             focused: FocusedPane::Tasks,
+            layout_cache: &mut layout_cache,
         };
-        renderer.render(frame, &ctx);
+        renderer.render(frame, &mut ctx);
     });
 
     assert!(
@@ -302,19 +311,21 @@ fn test_task_list_with_no_running_tasks_shows_most_recent() {
 
     let state = UiState::default();
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Tasks,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 
@@ -359,19 +370,21 @@ fn test_task_list_shows_nested_children_only_for_current_root() {
         ..Default::default()
     };
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Input,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 
@@ -430,20 +443,22 @@ fn test_task_list_expands_when_tasks_pane_focused() {
 
     let state = UiState::default();
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     // Render with Tasks pane focused
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Tasks,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 
@@ -485,20 +500,22 @@ fn test_task_list_shrinks_when_output_pane_focused() {
         ..Default::default()
     };
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     // Render with Output pane focused
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Output,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 
@@ -587,19 +604,21 @@ fn test_task_list_scrolling_through_conversations() {
         ..Default::default()
     };
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Input,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 
@@ -632,15 +651,16 @@ fn test_task_list_scrolling_through_conversations() {
 
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state_with_selection,
                 },
                 input: &input,
                 focused: FocusedPane::Input,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 
@@ -688,19 +708,21 @@ fn test_task_list_starts_at_top() {
         ..Default::default()
     };
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Tasks,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 
@@ -762,19 +784,21 @@ fn test_task_list_scrolling_down() {
         ..Default::default()
     };
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Tasks,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 
@@ -905,19 +929,21 @@ fn test_conversation_collapsed_by_default() {
 
     let state = UiState::default();
     let input = InputManager::default();
+    let mut layout_cache = LayoutCache::default();
     let renderer = Renderer::new(Theme::default());
 
     terminal
         .draw(|frame| {
-            let ctx = RenderCtx {
+            let mut ctx = RenderCtx {
                 ui_ctx: UiCtx {
                     task_manager: &manager,
                     state: &state,
                 },
                 input: &input,
                 focused: FocusedPane::Tasks,
+                layout_cache: &mut layout_cache,
             };
-            renderer.render(frame, &ctx);
+            renderer.render(frame, &mut ctx);
         })
         .unwrap();
 

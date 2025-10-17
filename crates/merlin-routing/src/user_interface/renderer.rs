@@ -13,7 +13,6 @@ use super::state::UiState;
 use super::task_manager::{TaskManager, TaskStatus};
 use super::theme::Theme;
 use std::time::{SystemTime, UNIX_EPOCH};
-use textwrap::wrap;
 
 /// Handles rendering of the TUI
 pub struct Renderer {
@@ -180,44 +179,11 @@ impl Renderer {
             return;
         };
 
-        let mut text = String::new();
-
-        if let Some(progress) = &task.progress
-            && let Some(total) = progress.total
-        {
-            let percent = (progress.current as f64 / total as f64 * 100.0) as u16;
-            let bar_width = 30;
-            let filled = (bar_width * percent as usize / 100).min(bar_width);
-            let empty = bar_width.saturating_sub(filled);
-            let eta_secs = (total.saturating_sub(progress.current)) / 2;
-
-            // Convert seconds to minutes:seconds format
-            let eta_minutes = eta_secs / 60;
-            let eta_remaining_secs = eta_secs % 60;
-
-            text.push('(');
-            text.push_str(&percent.to_string());
-            text.push_str("% ");
-            text.push_str(&"▓".repeat(filled));
-            text.push_str(&"░".repeat(empty));
-            text.push_str(" ETA ");
-            text.push_str(&eta_minutes.to_string());
-            text.push(':');
-            if eta_remaining_secs < 10 {
-                text.push('0');
-            }
-            text.push_str(&eta_remaining_secs.to_string());
-            text.push_str(")\n");
-        }
-
-        text.push_str(&Self::build_tree_text(
-            task,
-            area.width,
-            FocusedPane::Output,
-        ));
+        // Get plain text output from task
+        let text = task.output.clone();
 
         // Calculate content height and clamp scroll offset
-        // Account for borders (2)
+        // Account for borders only (2) - horizontal padding doesn't affect height
         let viewport_height = area.height.saturating_sub(2);
         let text_lines = scroll::count_text_lines(&text);
         let max_scroll = text_lines.saturating_sub(viewport_height);
@@ -233,7 +199,8 @@ impl Renderer {
                 Block::default()
                     .borders(Borders::ALL)
                     .title(title)
-                    .border_style(Style::default().fg(border_color)),
+                    .border_style(Style::default().fg(border_color))
+                    .padding(Padding::horizontal(1)),
             )
             .wrap(Wrap { trim: false })
             .scroll((clamped_scroll, 0));
@@ -901,32 +868,11 @@ impl Renderer {
     // Helper methods
 
     /// Calculate the number of lines that will be rendered for a task's output
-    pub fn calculate_output_line_count(task: &super::task_manager::TaskDisplay, width: u16) -> u16 {
-        let text = Self::build_tree_text(task, width, FocusedPane::Output);
-        text.lines().count() as u16
-    }
-
-    fn build_tree_text(
+    pub fn calculate_output_line_count(
         task: &super::task_manager::TaskDisplay,
-        width: u16,
-        _focused_pane: FocusedPane,
-    ) -> String {
-        let available_width = width.saturating_sub(4) as usize;
-
-        // Render the hierarchical output tree with steps
-        let tree_lines = task.output_tree.render();
-
-        tree_lines
-            .iter()
-            .filter(|line| !line.trim_start().starts_with("Prompt:"))
-            .flat_map(|line| {
-                wrap(line, available_width)
-                    .into_iter()
-                    .map(|cow| cow.to_string())
-                    .collect::<Vec<_>>()
-            })
-            .collect::<Vec<_>>()
-            .join("\n")
+        _width: u16,
+    ) -> u16 {
+        task.output.lines().count() as u16
     }
 }
 

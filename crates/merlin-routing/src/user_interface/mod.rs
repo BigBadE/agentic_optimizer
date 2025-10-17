@@ -14,8 +14,6 @@ mod text_width;
 pub mod event_source;
 /// Input management
 pub mod input;
-/// Output tree structure for hierarchical display
-pub mod output_tree;
 /// Rendering components
 pub mod renderer;
 /// UI state management
@@ -29,8 +27,8 @@ pub mod theme;
 /// TUI application and main event loop
 mod app;
 mod event_handler;
-/// Layout calculation utilities
-mod layout;
+/// Layout calculation utilities (public for testing)
+pub mod layout;
 /// Task persistence (public for testing)
 pub mod persistence;
 /// Scrolling utilities

@@ -1,7 +1,6 @@
 use crate::common::*;
 use crossterm::event::{Event, KeyCode, KeyEvent, KeyModifiers};
 use merlin_routing::TaskId;
-use merlin_routing::user_interface::output_tree::OutputTree;
 use merlin_routing::user_interface::renderer::FocusedPane;
 use merlin_routing::user_interface::task_manager::{TaskDisplay, TaskStatus};
 use std::time::Instant;
@@ -25,7 +24,7 @@ fn test_enter_toggles_expansion() {
         parent_id: None,
         progress: None,
         output_lines: vec![],
-        output_tree: OutputTree::default(),
+        output: String::new(),
         steps: vec![],
         current_step: None,
     };
@@ -38,7 +37,7 @@ fn test_enter_toggles_expansion() {
         parent_id: Some(parent_id),
         progress: None,
         output_lines: vec![],
-        output_tree: OutputTree::default(),
+        output: String::new(),
         steps: vec![],
         current_step: None,
     };

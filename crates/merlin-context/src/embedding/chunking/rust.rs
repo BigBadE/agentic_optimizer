@@ -186,13 +186,21 @@ fn is_rust_item_start(line: &str) -> bool {
         || line.starts_with("static ")
 }
 
-/// Extract a complete Rust item indices (handles brace matching)
+/// Extract a complete Rust item indices (handles brace matching with token limit)
 fn extract_rust_item_indices(lines: &[&str], start: usize) -> (usize, usize, String, usize) {
     let identifier = extract_rust_identifier(lines[start].trim());
     let mut brace_depth = 0;
     let mut found_opening_brace = false;
+    let mut buffer = String::default();
+    let mut last_balanced_line = start;
 
     for (offset, line) in lines[start..].iter().enumerate() {
+        // Add line to buffer to check tokens
+        if offset > 0 {
+            buffer.push('\n');
+        }
+        buffer.push_str(line);
+
         for character in line.chars() {
             match character {
                 '{' => {
@@ -207,6 +215,35 @@ fn extract_rust_item_indices(lines: &[&str], start: usize) -> (usize, usize, Str
                     }
                 }
                 _ => {}
+            }
+        }
+
+        // Track the last line where braces were balanced
+        if found_opening_brace && brace_depth == 0 {
+            last_balanced_line = start + offset;
+        }
+
+        // Check if we're exceeding MAX_CHUNK_TOKENS
+        let tokens = estimate_tokens(&buffer);
+        if tokens > MAX_CHUNK_TOKENS {
+            if offset > 0 && brace_depth == 0 {
+                // We're at a balanced point, stop here
+                let end_line = start + offset;
+                return (start, end_line, identifier, end_line);
+            }
+            if offset > 0 && last_balanced_line > start {
+                // Stop at the last balanced point we saw
+                return (start, last_balanced_line, identifier, last_balanced_line);
+            }
+            if offset > 10 {
+                // Force stop after accumulating some lines, even if not balanced
+                let end_line = start + offset;
+                tracing::warn!(
+                    "Force-stopping {identifier} at line {} due to MAX_CHUNK_TOKENS (depth={})",
+                    end_line + 1,
+                    brace_depth
+                );
+                return (start, end_line, identifier, end_line);
             }
         }
 
@@ -447,28 +484,28 @@ fn force_split_by_line_count(
 
         // Build chunks dynamically, ensuring they don't exceed MAX_CHUNK_TOKENS
         while current_end <= end_idx {
+            // Build a temporary buffer to test if adding this line would exceed MAX
+            let mut test_buffer = buffer.clone();
             if current_end > current_start {
-                buffer.push('\n');
+                test_buffer.push('\n');
             }
-            buffer.push_str(lines[current_end]);
+            test_buffer.push_str(lines[current_end]);
 
-            let tokens = estimate_tokens(&buffer);
+            let test_tokens = estimate_tokens(&test_buffer);
 
-            // If adding this line would exceed MAX, back up and emit the chunk
-            if tokens > MAX_CHUNK_TOKENS && current_end > current_start {
-                // Remove the last line we added
-                if let Some(pos) = buffer.rfind('\n') {
-                    buffer.truncate(pos);
+            // If adding this line would exceed MAX_CHUNK_TOKENS, stop here
+            if test_tokens > MAX_CHUNK_TOKENS {
+                // Only stop if we have at least one line in the chunk
+                if current_end > current_start {
+                    break;
                 }
-                current_end -= 1;
+                // For single huge lines, we have to include it (ensure progress)
+                buffer = test_buffer;
                 break;
             }
 
-            // If we're at MAX or close to it, emit the chunk
-            if tokens >= MAX_CHUNK_TOKENS * 9 / 10 {
-                break;
-            }
-
+            // Accept this line into the buffer
+            buffer = test_buffer;
             current_end += 1;
         }
 

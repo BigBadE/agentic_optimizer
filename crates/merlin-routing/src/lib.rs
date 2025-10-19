@@ -72,8 +72,6 @@ pub mod orchestrator;
 pub mod router;
 /// Streaming events and channels
 pub mod streaming;
-/// Tool implementations for file operations and commands
-pub mod tools;
 /// Core types for tasks, analysis, and validation
 pub mod types;
 /// Terminal user interface for task management
@@ -108,9 +106,9 @@ pub use router::{
     StrategyRouter,
 };
 pub use streaming::{StepId, StepType, StreamingChannel, StreamingEvent, TaskStep};
-pub use tools::{
-    ListFilesTool, ReadFileTool, RunCommandTool, SubagentTool, Tool, ToolRegistry, TypeScriptTool,
-    WriteFileTool,
+// Re-export tools from merlin-tools and merlin-typescript crates
+pub use merlin_tooling::{
+    BashTool, Tool, ToolRegistry, TypeScriptRuntime, generate_typescript_signatures,
 };
 pub use types::{
     CommandExecution,

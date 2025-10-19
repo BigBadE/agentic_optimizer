@@ -121,21 +121,24 @@ pub fn step_type_icon(step_type: &str) -> &'static str {
     }
 }
 
-/// Gets style for a step type
+/// Gets style for a step based on its status
 ///
 /// # Arguments
-/// * `step_type` - Type of step (e.g., `thinking`, `tool_call`, `validation`)
+/// * `_step_type` - Type of step (e.g., `thinking`, `tool_call`, `validation`) - reserved for future use
+/// * `status` - Status of the step
 ///
 /// # Returns
-/// Ratatui `Style` for the step type
-pub fn step_type_style(step_type: &str) -> Style {
-    let color = match step_type {
-        "thinking" => Color::Cyan,
-        "tool_call" => Color::Yellow,
-        "validation" => Color::Green,
-        "error" => Color::Red,
-        "planning" => Color::Blue,
-        _ => Color::Gray,
+/// Ratatui `Style` for the step
+pub fn step_style_with_status(
+    _step_type: &str,
+    status: super::super::task_manager::TaskStepStatus,
+) -> Style {
+    use super::super::task_manager::TaskStepStatus;
+
+    let color = match status {
+        TaskStepStatus::Running => Color::Gray,
+        TaskStepStatus::Completed => Color::Green,
+        TaskStepStatus::Failed => Color::Red,
     };
 
     Style::default().fg(color)

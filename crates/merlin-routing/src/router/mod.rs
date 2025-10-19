@@ -36,11 +36,11 @@ pub enum ModelTier {
         /// Name of the Groq model
         model_name: String,
     },
-    /// Premium cloud model (e.g., Claude, GPT-4)
+    /// Premium cloud model (e.g., Claude via `OpenRouter`)
     Premium {
-        /// Provider name (e.g., "anthropic", "openrouter")
+        /// Provider name (currently only "openrouter" is supported)
         provider: String,
-        /// Name of the premium model
+        /// Name of the premium model (e.g., "anthropic/claude-3.5-sonnet")
         model_name: String,
     },
 }
@@ -54,18 +54,12 @@ impl ModelTier {
             }),
             Self::Groq { .. } => Some(Self::Premium {
                 provider: "openrouter".to_owned(),
-                model_name: "deepseek/deepseek-coder".to_owned(),
+                model_name: "anthropic/claude-3-haiku".to_owned(),
             }),
-            Self::Premium { model_name, .. } if model_name.contains("deepseek") => {
-                Some(Self::Premium {
-                    provider: "openrouter".to_owned(),
-                    model_name: "anthropic/claude-3-haiku".to_owned(),
-                })
-            }
             Self::Premium { model_name, .. } if model_name.contains("haiku") => {
                 Some(Self::Premium {
-                    provider: "anthropic".to_owned(),
-                    model_name: "claude-3.5-sonnet".to_owned(),
+                    provider: "openrouter".to_owned(),
+                    model_name: "anthropic/claude-3.5-sonnet".to_owned(),
                 })
             }
             Self::Premium { .. } => None,

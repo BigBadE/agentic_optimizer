@@ -1,5 +1,5 @@
 use merlin_routing::TaskId;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 /// Maximum number of conversation entries to retain
 const MAX_CONVERSATION_HISTORY: usize = 50;
@@ -29,6 +29,10 @@ pub struct UiState {
     pub task_list_scroll_offset: usize,
     /// Set of expanded conversation IDs (showing child messages)
     pub expanded_conversations: HashSet<TaskId>,
+    /// Set of task IDs with expanded steps (showing step details)
+    pub expanded_steps: HashSet<TaskId>,
+    /// Per-task output scroll positions for preserving scroll when switching tasks
+    pub task_output_scroll: HashMap<TaskId, u16>,
     /// Flag to auto-scroll output to bottom on next render
     pub auto_scroll_output_to_bottom: bool,
 }

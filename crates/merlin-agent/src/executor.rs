@@ -7,7 +7,7 @@ use anyhow::Result as AnyResult;
 use merlin_context::ContextBuilder;
 use merlin_core::{Context, ModelProvider, Query};
 use merlin_languages::LanguageProvider;
-use merlin_tools::ToolInput;
+use merlin_tooling::ToolInput;
 use serde_json::{Value, from_str};
 use tracing::{info, warn};
 

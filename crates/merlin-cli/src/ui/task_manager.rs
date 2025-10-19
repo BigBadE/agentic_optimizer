@@ -37,6 +37,19 @@ pub struct TaskDisplay {
     pub steps: Vec<TaskStepInfo>,
     /// Currently active step (shown as visual subtask in UI)
     pub current_step: Option<TaskStepInfo>,
+    /// Retry count (0 = first attempt, increments on each retry)
+    pub retry_count: u32,
+}
+
+/// Status of a task step
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum TaskStepStatus {
+    /// Step is currently running
+    Running,
+    /// Step has completed successfully
+    Completed,
+    /// Step has failed
+    Failed,
 }
 
 /// Task step information
@@ -50,6 +63,8 @@ pub struct TaskStepInfo {
     pub step_type: String,
     /// Content of the step
     pub content: String,
+    /// Status of the step
+    pub status: TaskStepStatus,
 }
 
 /// Manages task storage, ordering, and hierarchy
@@ -294,6 +309,7 @@ mod tests {
             output: String::default(),
             steps: vec![],
             current_step: None,
+            retry_count: 0,
         }
     }
 

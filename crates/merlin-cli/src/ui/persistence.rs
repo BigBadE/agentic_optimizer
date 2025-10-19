@@ -193,6 +193,7 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
         output: serializable.output_text,
         steps: Vec::default(),
         current_step: None,
+        retry_count: 0,
     };
 
     (serializable.id, task_display)

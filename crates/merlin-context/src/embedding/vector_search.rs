@@ -547,9 +547,9 @@ impl VectorSearchManager {
         let mut type_boost = match ext {
             "rs" | "py" | "js" | "ts" | "jsx" | "tsx" | "java" | "c" | "cpp" | "h" | "hpp"
             | "go" | "rb" | "php" | "cs" | "swift" | "kt" | "scala" => 1.7,
-            "toml" | "yaml" | "yml" | "json" | "xml" => 0.5,
-            "md" | "txt" => 0.1, // Heavy penalty for all documentation
-            _ => 1.0,
+            "toml" | "yaml" | "yml" | "json" | "xml" => 0.25, // Reduced by 50%
+            "md" | "txt" => 0.05,                             // Reduced by 50%
+            _ => 0.5,                                         // Reduced by 50%
         };
 
         // Boost module entry points

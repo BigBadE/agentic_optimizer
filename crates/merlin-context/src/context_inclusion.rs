@@ -8,7 +8,7 @@ use merlin_core::FileContext;
 pub const MAX_CONTEXT_TOKENS: usize = 10_000;
 
 /// Minimum similarity score for semantic search results
-pub const MIN_SIMILARITY_SCORE: f32 = 0.4;
+pub const MIN_SIMILARITY_SCORE: f32 = 0.5;
 
 /// Context manager that tracks token usage
 pub struct ContextManager {

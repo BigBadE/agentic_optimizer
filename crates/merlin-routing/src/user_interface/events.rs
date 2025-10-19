@@ -42,6 +42,15 @@ pub enum UiEvent {
         /// Error message
         error: String,
     },
+    /// Task is retrying after a failure
+    TaskRetrying {
+        /// ID of the task
+        task_id: TaskId,
+        /// Current retry count (1 = first retry, 2 = second retry, etc.)
+        retry_count: u32,
+        /// Error message from the failed attempt
+        error: String,
+    },
     /// System-level message
     SystemMessage {
         /// Message severity level
@@ -66,6 +75,15 @@ pub enum UiEvent {
         task_id: TaskId,
         /// ID of the step
         step_id: String,
+    },
+    /// Task step has failed (streaming event)
+    TaskStepFailed {
+        /// ID of the task
+        task_id: TaskId,
+        /// ID of the step
+        step_id: String,
+        /// Error message
+        error: String,
     },
     /// Tool call started
     ToolCallStarted {

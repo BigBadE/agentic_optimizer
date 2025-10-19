@@ -21,14 +21,14 @@ impl RoutingStrategy for QualityCriticalStrategy {
 
         if task.priority == Priority::Critical {
             Ok(ModelTier::Premium {
-                provider: "anthropic".to_owned(),
-                model_name: "claude-3-5-sonnet-20241022".to_owned(),
+                provider: "openrouter".to_owned(),
+                model_name: "anthropic/claude-3-5-sonnet-20241022".to_owned(),
             })
         } else {
             // High priority
             Ok(ModelTier::Premium {
-                provider: "anthropic".to_owned(),
-                model_name: "claude-3-5-haiku-20241022".to_owned(),
+                provider: "openrouter".to_owned(),
+                model_name: "anthropic/claude-3-5-haiku-20241022".to_owned(),
             })
         }
     }
@@ -63,7 +63,7 @@ mod tests {
             model_name,
         } = tier
         {
-            assert_eq!(provider, "anthropic");
+            assert_eq!(provider, "openrouter");
             assert!(model_name.contains("sonnet"));
         } else {
             panic!("Expected Premium tier");

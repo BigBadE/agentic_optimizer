@@ -44,17 +44,11 @@ Displays file contents with line numbers.
 Executes shell commands (PowerShell on Windows, bash on Unix).
 
 **Parameters:**
-- `command` (string): Command to execute
-- `working_dir` (string, optional): Working directory for the command
-- `timeout_secs` (number, optional): Timeout in seconds (default: 30)
+- A single string containing the command to execute
 
 **Example:**
 ```json
-{
-  "command": "cargo build",
-  "working_dir": "/path/to/project",
-  "timeout_secs": 60
-}
+"cargo build"
 ```
 
 ## Usage
@@ -116,7 +110,7 @@ Edit a file by replacing old_string with new_string. Parameters: file_path (stri
 Show the contents of a file with line numbers. Parameters: file_path (string), start_line (number, optional), end_line (number, optional)
 
 ## bash
-Execute a shell command (bash on Unix, PowerShell on Windows). Parameters: command (string), working_dir (string, optional), timeout_secs (number, optional, default: 30)
+Execute a shell command (bash on Unix, PowerShell on Windows). Takes a single string parameter containing the command to execute.
 
 To use a tool, respond with a JSON object in the following format:
 ```json

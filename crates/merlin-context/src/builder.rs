@@ -5,12 +5,12 @@ use tokio::task::spawn_blocking;
 use walkdir::{DirEntry, WalkDir};
 
 use core::result::Result as CoreResult;
-use merlin_core::prompts::load_prompt;
 use merlin_core::{Context, Error, FileContext, Query, Result};
 use merlin_languages::LanguageProvider;
 
 use crate::context_inclusion::{
-    ContextManager, FilePriority, MAX_CONTEXT_TOKENS, PrioritizedFile, add_prioritized_files,
+    ContextManager, FilePriority, MAX_CONTEXT_TOKENS, MIN_SIMILARITY_SCORE, PrioritizedFile,
+    add_prioritized_files,
 };
 use crate::embedding::{ProgressCallback, SearchResult, VectorSearchManager};
 use crate::fs_utils::is_source_file;
@@ -19,15 +19,6 @@ use crate::query::{QueryAnalyzer, QueryIntent};
 type FileScoreInfo = (PathBuf, f32, Option<f32>, Option<f32>);
 type ProcessSearchResultsReturn = (Vec<PrioritizedFile>, Vec<FileScoreInfo>);
 type FileChunksMap = HashMap<PathBuf, Vec<(usize, usize, f32)>>;
-
-/// Loads the default system prompt from the prompts directory
-///
-/// # Panics
-/// Panics if the `coding_assistant` prompt cannot be loaded (should never happen as prompts are embedded)
-fn load_default_system_prompt() -> String {
-    load_prompt("coding_assistant")
-        .unwrap_or_else(|err| panic!("Failed to load coding_assistant prompt: {err}"))
-}
 
 /// Directories ignored during project scan.
 const IGNORED_DIRS: &[&str] = &[
@@ -152,7 +143,7 @@ impl ContextBuilder {
             self.max_files
         );
 
-        Ok(Context::new(load_default_system_prompt()).with_files(files))
+        Ok(Context::new(String::new()).with_files(files))
     }
 
     /// Use hybrid search to intelligently gather context
@@ -180,15 +171,13 @@ impl ContextBuilder {
             context_mgr.token_count()
         );
 
-        // Show relevant sections for prompt
-        tracing::info!("RELEVANT SECTIONS FOR PROMPT");
+        // List all chunks with their detailed scores
         tracing::info!(
-            "Total: {} chunks ({} tokens)",
+            "📁 Context files: {} files ({} tokens)",
             context_mgr.file_count(),
             context_mgr.token_count()
         );
 
-        // List all chunks with their sections and scores
         for (index, file) in context_mgr.files().iter().enumerate() {
             let tokens = ContextManager::estimate_tokens(&file.content);
 
@@ -226,31 +215,27 @@ impl ContextBuilder {
             );
 
             // Format score display
-            // Note: component scores are raw RRF contributions, total is normalized to 0-1
             let score_display = match (bm25, vector) {
                 (Some(bm25_score), Some(vec_score)) => {
-                    let sum = bm25_score + vec_score;
-                    format!(
-                        "score: {total_score:.3} (bm25: {bm25_score:.3} + vec: {vec_score:.3} = {sum:.3})"
-                    )
+                    format!("total:{total_score:.3} bm25:{bm25_score:.3} vec:{vec_score:.3}")
                 }
                 (Some(bm25_score), None) => {
-                    format!("score: {total_score:.3} (bm25: {bm25_score:.3})")
+                    format!("total:{total_score:.3} bm25:{bm25_score:.3} vec:N/A")
                 }
-                (None, Some(vec_score)) => format!("score: {total_score:.3} (vec: {vec_score:.3})"),
-                (None, None) => format!("score: {total_score:.3}"),
+                (None, Some(vec_score)) => {
+                    format!("total:{total_score:.3} bm25:N/A vec:{vec_score:.3}")
+                }
+                (None, None) => format!("total:{total_score:.3} bm25:N/A vec:N/A"),
             };
 
             tracing::info!(
-                "{}. {} [{}] ({}, {} tokens)",
-                index + 1,
+                "  [{index}] {} | {} | {} tok | {}",
                 file.path.display(),
                 section_info,
-                score_display,
-                tokens
+                tokens,
+                score_display
             );
         }
-        tracing::info!("=====================================");
 
         let files = context_mgr.into_files();
 
@@ -725,31 +710,52 @@ impl ContextBuilder {
             }
         }
 
-        // Merge overlapping chunks and extract
+        // Track scores for display and apply penalties (convert to absolute paths)
+        // Apply 0.5x penalty to non-source code files
+        let file_scores: Vec<FileScoreInfo> = filtered_matches
+            .iter()
+            .filter_map(|result| {
+                let path_str = result.file_path.to_str()?;
+                let (file_part, _) = path_str.rsplit_once(':')?;
+                let relative_path = PathBuf::from(file_part);
+                let absolute_path = self.project_root.join(relative_path);
+
+                // Apply penalty to non-source files
+                let is_source = Self::is_code_file(&absolute_path);
+                let score_multiplier = if is_source { 1.0 } else { 0.5 };
+                let adjusted_score = result.score * score_multiplier;
+
+                // Filter out files that fall below threshold after penalty
+                if adjusted_score < MIN_SIMILARITY_SCORE {
+                    return None;
+                }
+
+                Some((
+                    absolute_path,
+                    adjusted_score,
+                    result.bm25_score.map(|score| score * score_multiplier),
+                    result.vector_score.map(|score| score * score_multiplier),
+                ))
+            })
+            .collect();
+
+        // Merge overlapping chunks and extract (only for files that passed score threshold)
         let mut search_prioritized = Vec::new();
 
         for (file_path, mut chunks) in file_chunks {
+            // Check if this file passed the score threshold
+            let file_passed_threshold =
+                file_scores.iter().any(|(path, _, _, _)| path == &file_path);
+            if !file_passed_threshold {
+                continue;
+            }
+
             chunks.sort_by_key(|(start, _, _)| *start);
             let merged = Self::merge_overlapping_chunks(chunks);
             let is_code = Self::is_code_file(&file_path);
 
             Self::process_merged_chunks(&file_path, merged, is_code, &mut search_prioritized);
         }
-
-        // Track scores for display
-        let file_scores: Vec<FileScoreInfo> = filtered_matches
-            .iter()
-            .filter_map(|result| {
-                let path_str = result.file_path.to_str()?;
-                let (file_part, _) = path_str.rsplit_once(':')?;
-                Some((
-                    PathBuf::from(file_part),
-                    result.score,
-                    result.bm25_score,
-                    result.vector_score,
-                ))
-            })
-            .collect();
 
         (search_prioritized, file_scores)
     }

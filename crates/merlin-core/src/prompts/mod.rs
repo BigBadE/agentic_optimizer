@@ -5,9 +5,9 @@
 //! Prompts are embedded at compile time using `include_str!`.
 
 // Embed prompt files at compile time
-const CODING_ASSISTANT_MD: &str = include_str!("../../../../prompts/coding_assistant.md");
 const CONTEXT_PLANNING_MD: &str = include_str!("../../../../prompts/context_planning.md");
 const TASK_ASSESSMENT_MD: &str = include_str!("../../../../prompts/task_assessment.md");
+const TYPESCRIPT_AGENT_MD: &str = include_str!("../../../../prompts/typescript_agent.md");
 
 /// Loads a prompt by name
 ///
@@ -15,9 +15,9 @@ const TASK_ASSESSMENT_MD: &str = include_str!("../../../../prompts/task_assessme
 /// Returns an error if the prompt name is unknown or the prompt section cannot be extracted
 pub fn load_prompt(name: &str) -> Result<String, String> {
     let content = match name {
-        "coding_assistant" => CODING_ASSISTANT_MD,
         "context_planning" => CONTEXT_PLANNING_MD,
         "task_assessment" => TASK_ASSESSMENT_MD,
+        "typescript_agent" => TYPESCRIPT_AGENT_MD,
         _ => return Err(format!("Unknown prompt: {name}")),
     };
 
@@ -41,13 +41,9 @@ fn extract_prompt_section(content: &str) -> Result<String, String> {
         + prompt_start
         + 1;
 
-    // Find the next section or end of file
-    let prompt_end = content[prompt_content_start..]
-        .find("\n## ")
-        .map_or(content.len(), |pos| prompt_content_start + pos);
-
-    // Extract and trim the prompt content
-    Ok(content[prompt_content_start..prompt_end].trim().to_string())
+    // Take everything after "## Prompt" to the end of the file
+    // (all prompt files have ## Prompt as the last top-level section)
+    Ok(content[prompt_content_start..].trim().to_string())
 }
 
 #[cfg(test)]
@@ -74,20 +70,6 @@ It can have multiple lines.
             result,
             "This is the actual prompt content.\n\nIt can have multiple lines."
         );
-    }
-
-    #[test]
-    fn test_load_coding_assistant_prompt() {
-        let result = load_prompt("coding_assistant");
-        assert!(
-            result.is_ok(),
-            "Failed to load coding_assistant prompt: {:?}",
-            result.err()
-        );
-        let prompt = result.unwrap();
-        // Ensure Usage section is not included in the extracted prompt
-        assert!(!prompt.contains("## Usage"));
-        assert!(!prompt.contains("When used:"));
     }
 
     #[test]

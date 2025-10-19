@@ -6,9 +6,8 @@ use super::scheduler::ConflictAwareTaskGraph;
 use super::state::WorkspaceState;
 use crate::user_interface::UiChannel;
 use crate::{
-    AgentExecutor, ContextFetcher, ListFilesTool, ModelRouter, ReadFileTool, Result, RoutingConfig,
-    RoutingError, RunCommandTool, SubagentTool, Task, TaskResult, Tool, ToolRegistry,
-    TypeScriptTool, Validator, WriteFileTool,
+    AgentExecutor, BashTool, ContextFetcher, ModelRouter, Result, RoutingConfig, RoutingError,
+    Task, TaskResult, ToolRegistry, Validator,
 };
 use tokio::sync::Semaphore;
 use tokio::sync::mpsc;
@@ -178,39 +177,16 @@ impl ExecutorPool {
     ) -> Result<TaskResult> {
         // Build tool registry based on workspace root
         let workspace_root = workspace.root_path().clone();
-        let default_config = RoutingConfig::default();
 
-        // First, create the basic tools
-        let basic_tools: Vec<Arc<dyn Tool>> = vec![
-            Arc::new(ReadFileTool::new(workspace_root.clone())),
-            Arc::new(WriteFileTool::new(workspace_root.clone())),
-            Arc::new(ListFilesTool::new(workspace_root.clone())),
-            Arc::new(RunCommandTool::new(workspace_root.clone())),
-        ];
-
-        // Create advanced tools
-        let ts_tool = Arc::new(TypeScriptTool::new(basic_tools.clone()));
-        let config_arc = Arc::new(default_config.clone());
-        let subagent_tool = Arc::new(SubagentTool::new(config_arc));
-
-        // Build the complete registry
-        let mut tool_registry = ToolRegistry::default();
-        for tool in basic_tools {
-            tool_registry = tool_registry.with_tool(tool);
-        }
-        tool_registry = tool_registry.with_tool(ts_tool);
-        tool_registry = tool_registry.with_tool(subagent_tool);
-        let tool_registry = Arc::new(tool_registry);
+        // Create tool registry with only essential Rust-side tools
+        // File operations are handled by TypeScript runtime with fs module
+        let tool_registry = Arc::new(ToolRegistry::default().with_tool(Arc::new(BashTool)));
 
         // Create context fetcher and AgentExecutor
         let context_fetcher = ContextFetcher::new(workspace_root);
-        let mut executor = AgentExecutor::new(
-            router,
-            validator,
-            tool_registry,
-            context_fetcher,
-            default_config,
-        );
+        let config = RoutingConfig::default();
+        let mut executor =
+            AgentExecutor::new(router, validator, tool_registry, context_fetcher, config);
         let (sender, _receiver) = mpsc::unbounded_channel();
         let ui_channel = UiChannel::from_sender(sender);
 

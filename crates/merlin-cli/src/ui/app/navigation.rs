@@ -4,7 +4,7 @@
 //! and scroll management for the task list pane.
 
 use merlin_routing::TaskId;
-use std::collections::HashSet;
+use std::collections::{HashMap, HashSet};
 
 use crate::ui::task_manager::TaskManager;
 
@@ -55,6 +55,10 @@ pub struct NavigationContext<'nav> {
     pub expanded_conversations: &'nav HashSet<TaskId>,
     /// Current scroll offset in task list
     pub task_list_scroll_offset: &'nav mut usize,
+    /// Per-task output scroll positions
+    pub task_output_scroll: &'nav mut HashMap<TaskId, u16>,
+    /// Current output scroll offset
+    pub output_scroll_offset: &'nav mut u16,
 }
 
 /// Context for scroll adjustment operations
@@ -98,6 +102,12 @@ pub fn navigate_tasks_up(
     if ctx.active_task_id.is_none() {
         if let Some((last_id, _)) = visible_tasks.last() {
             *ctx.active_task_id = Some(*last_id);
+            // Restore scroll position for this task
+            if let Some(&scroll_pos) = ctx.task_output_scroll.get(last_id) {
+                *ctx.output_scroll_offset = scroll_pos;
+            } else {
+                *ctx.output_scroll_offset = 0;
+            }
             adjust_task_list_scroll(ScrollContext {
                 active_task_id: ctx.active_task_id.as_ref(),
                 expanded_conversations: ctx.expanded_conversations,
@@ -115,12 +125,22 @@ pub fn navigate_tasks_up(
         return;
     };
 
+    // Save current output scroll position before switching
+    ctx.task_output_scroll
+        .insert(current_id, *ctx.output_scroll_offset);
+
     // Find the previous task in the visible list (older, up the screen)
     if let Some(current_pos) = visible_tasks.iter().position(|(id, _)| *id == current_id)
         && current_pos > 0
     {
         let (prev_id, _) = visible_tasks[current_pos - 1];
         *ctx.active_task_id = Some(prev_id);
+        // Restore scroll position for the new task
+        if let Some(&scroll_pos) = ctx.task_output_scroll.get(&prev_id) {
+            *ctx.output_scroll_offset = scroll_pos;
+        } else {
+            *ctx.output_scroll_offset = 0;
+        }
         adjust_task_list_scroll(ScrollContext {
             active_task_id: ctx.active_task_id.as_ref(),
             expanded_conversations: ctx.expanded_conversations,
@@ -163,11 +183,21 @@ pub fn navigate_tasks_down(
         return;
     };
 
+    // Save current output scroll position before switching
+    ctx.task_output_scroll
+        .insert(current_id, *ctx.output_scroll_offset);
+
     // Find the next task in the visible list (newer, down the screen)
     if let Some(current_pos) = visible_tasks.iter().position(|(id, _)| *id == current_id) {
         if current_pos + 1 < visible_tasks.len() {
             let (next_id, _) = visible_tasks[current_pos + 1];
             *ctx.active_task_id = Some(next_id);
+            // Restore scroll position for the new task
+            if let Some(&scroll_pos) = ctx.task_output_scroll.get(&next_id) {
+                *ctx.output_scroll_offset = scroll_pos;
+            } else {
+                *ctx.output_scroll_offset = 0;
+            }
         } else {
             // At the newest visible task, move to placeholder
             *ctx.active_task_id = None;

@@ -57,12 +57,11 @@ fn test_tools_in_system_prompt() {
 
     let tools = executor.tool_registry().list_tools();
 
-    assert_eq!(tools.len(), 5, "Should have 5 tools registered");
+    // Only BashTool is registered now - file operations handled by TypeScript
+    assert_eq!(tools.len(), 1, "Should have 1 tool registered");
 
-    let tool_names: Vec<&str> = tools.iter().map(|(name, _)| *name).collect();
-    assert!(tool_names.contains(&"edit"), "Should have edit tool");
-    assert!(tool_names.contains(&"show"), "Should have show tool");
-    assert!(tool_names.contains(&"delete"), "Should have delete tool");
-    assert!(tool_names.contains(&"list"), "Should have list tool");
-    assert!(tool_names.contains(&"bash"), "Should have bash tool");
+    assert!(
+        tools.iter().map(|(name, _)| *name).any(|x| x == "bash"),
+        "Should have bash tool"
+    );
 }

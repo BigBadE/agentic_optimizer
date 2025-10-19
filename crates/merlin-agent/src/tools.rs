@@ -2,9 +2,7 @@ use std::collections::HashMap;
 use std::sync::Arc;
 
 use anyhow::Result;
-use merlin_tools::{
-    BashTool, DeleteTool, EditTool, ListTool, ShowTool, Tool, ToolInput, ToolOutput,
-};
+use merlin_tooling::{BashTool, Tool, ToolInput, ToolOutput};
 use tracing::info;
 
 /// Registry for managing and executing tools available to the agent
@@ -53,11 +51,7 @@ impl Default for ToolRegistry {
             tools: HashMap::default(),
         };
 
-        // Register all available tools
-        registry.register(Arc::new(ShowTool));
-        registry.register(Arc::new(EditTool));
-        registry.register(Arc::new(DeleteTool));
-        registry.register(Arc::new(ListTool));
+        // Register only BashTool - file operations handled by TypeScript
         registry.register(Arc::new(BashTool));
 
         registry

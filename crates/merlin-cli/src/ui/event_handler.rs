@@ -1,6 +1,6 @@
 use super::persistence::TaskPersistence;
 use super::state::{ConversationEntry, ConversationRole, UiState};
-use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo};
+use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo, TaskStepStatus};
 use merlin_routing::{MessageLevel, TaskId, TaskProgress, TaskResult, UiEvent};
 use serde_json::Value;
 use std::time::{Instant, SystemTime};
@@ -48,6 +48,12 @@ impl<'handler> EventHandler<'handler> {
 
             UiEvent::TaskFailed { task_id, error } => self.handle_task_failed(task_id, &error),
 
+            UiEvent::TaskRetrying {
+                task_id,
+                retry_count,
+                error,
+            } => self.handle_task_retrying(task_id, retry_count, &error),
+
             UiEvent::SystemMessage { level, message } => {
                 self.handle_system_message(level, message);
             }
@@ -62,6 +68,12 @@ impl<'handler> EventHandler<'handler> {
             UiEvent::TaskStepCompleted { task_id, step_id } => {
                 self.handle_task_step_completed(task_id, &step_id);
             }
+
+            UiEvent::TaskStepFailed {
+                task_id,
+                step_id,
+                error,
+            } => self.handle_task_step_failed(task_id, &step_id, &error),
 
             UiEvent::ToolCallStarted {
                 task_id,
@@ -127,6 +139,7 @@ impl<'handler> EventHandler<'handler> {
             output: String::new(),
             steps: Vec::default(),
             current_step: None,
+            retry_count: 0,
         };
 
         self.task_manager.add_task(task_id, task_display);
@@ -218,6 +231,13 @@ impl<'handler> EventHandler<'handler> {
         }
     }
 
+    fn handle_task_retrying(&mut self, task_id: TaskId, retry_count: u32, _error: &str) {
+        // Update retry count in task display
+        if let Some(task) = self.task_manager.get_task_mut(task_id) {
+            task.retry_count = retry_count;
+        }
+    }
+
     fn handle_system_message(&mut self, level: MessageLevel, message: String) {
         let prefix = match level {
             MessageLevel::Info => "[i]",
@@ -256,6 +276,7 @@ impl<'handler> EventHandler<'handler> {
                 step_id,
                 step_type: step_type.to_string(),
                 content,
+                status: TaskStepStatus::Running,
             };
 
             // Set as current step (replaces previous step)
@@ -268,6 +289,11 @@ impl<'handler> EventHandler<'handler> {
 
     fn handle_task_step_completed(&mut self, task_id: TaskId, step_id: &str) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
+            // Mark step as completed in history
+            if let Some(step) = task.steps.iter_mut().find(|step| step.step_id == step_id) {
+                step.status = TaskStepStatus::Completed;
+            }
+
             // Clear current step if it matches
             if task
                 .current_step
@@ -275,6 +301,22 @@ impl<'handler> EventHandler<'handler> {
                 .is_some_and(|step| step.step_id == step_id)
             {
                 task.current_step = None;
+            }
+        }
+    }
+
+    fn handle_task_step_failed(&mut self, task_id: TaskId, step_id: &str, _error: &str) {
+        if let Some(task) = self.task_manager.get_task_mut(task_id) {
+            // Mark step as failed in history
+            if let Some(step) = task.steps.iter_mut().find(|step| step.step_id == step_id) {
+                step.status = TaskStepStatus::Failed;
+            }
+
+            // Update current step status if it matches
+            if let Some(current_step) = &mut task.current_step
+                && current_step.step_id == step_id
+            {
+                current_step.status = TaskStepStatus::Failed;
             }
         }
     }

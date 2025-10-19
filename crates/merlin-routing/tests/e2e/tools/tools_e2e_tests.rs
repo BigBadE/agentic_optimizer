@@ -15,7 +15,7 @@
 )]
 
 use merlin_agent::ToolRegistry;
-use merlin_tools::ToolInput;
+use merlin_tooling::ToolInput;
 use serde_json::json;
 use std::path::PathBuf;
 use tempfile::TempDir;

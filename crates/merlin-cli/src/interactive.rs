@@ -134,10 +134,8 @@ async fn execute_user_task(params: TaskExecutionParams) {
         }
         Err(error) => {
             try_write_log(&ui_channel, &mut log_file, &format!("Error: {error}"));
-            ui_channel.send(UiEvent::SystemMessage {
-                level: MessageLevel::Error,
-                message: format!("Error: {error}"),
-            });
+            // Don't send error message to output box - escalation warnings are shown during retries
+            // and the final failure is indicated by the task status
             ui_channel.failed(task_id, error.to_string());
         }
     }

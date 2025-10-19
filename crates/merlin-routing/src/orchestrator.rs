@@ -1,12 +1,20 @@
 use std::sync::Arc;
 
 use crate::{
-    AgentExecutor, ConflictAwareTaskGraph, ContextFetcher, ExecutorPool, ListFilesTool,
-    LocalTaskAnalyzer, ModelRouter, ReadFileTool, Result, RoutingConfig, RoutingError,
-    RunCommandTool, StrategyRouter, SubagentTool, Task, TaskAnalysis, TaskAnalyzer, TaskGraph,
-    TaskResult, Tool, ToolRegistry, TypeScriptTool, UiChannel, ValidationPipeline, Validator,
-    WorkspaceState, WriteFileTool,
+    AgentExecutor, BashTool, ConflictAwareTaskGraph, ContextFetcher, ExecutorPool,
+    LocalTaskAnalyzer, MessageLevel, ModelRouter, ModelTier, Result, RoutingConfig, RoutingError,
+    StrategyRouter, Task, TaskAnalysis, TaskAnalyzer, TaskGraph, TaskResult, ToolRegistry,
+    UiChannel, UiEvent, ValidationPipeline, Validator, WorkspaceState,
 };
+
+/// Parameters for task execution (internal)
+struct TaskExecutionParams {
+    task: Task,
+    ui_channel: UiChannel,
+    conversation_history: Vec<(String, String)>,
+    tier_override: Option<ModelTier>,
+    is_retry: bool,
+}
 
 /// High-level orchestrator that coordinates all routing components
 #[derive(Clone)]
@@ -90,44 +98,138 @@ impl RoutingOrchestrator {
             .await
     }
 
-    /// Execute a task with streaming, tool support, and conversation history
+    /// Execute a task with streaming, tool support, and conversation history.
+    /// Automatically retries with escalated tiers on failure (up to 3 retries).
     ///
     /// # Errors
-    /// Returns an error if task execution or validation fails, or if a provider interaction returns an error
+    /// Returns an error if task execution or validation fails after all retries
     pub async fn execute_task_streaming_with_history(
         &self,
         task: Task,
         ui_channel: UiChannel,
         conversation_history: Vec<(String, String)>,
     ) -> Result<TaskResult> {
-        // Create tool registry with workspace tools
-        let workspace_root = self.workspace.root_path().clone();
+        const MAX_RETRIES: usize = 3;
+        let mut tier_override: Option<ModelTier> = None;
+        let mut retry_count = 0;
 
-        // First, create the basic tools
-        let basic_tools: Vec<Arc<dyn Tool>> = vec![
-            Arc::new(ReadFileTool::new(workspace_root.clone())),
-            Arc::new(WriteFileTool::new(workspace_root.clone())),
-            Arc::new(ListFilesTool::new(workspace_root.clone())),
-            Arc::new(RunCommandTool::new(workspace_root)),
-        ];
+        loop {
+            let is_retry = retry_count > 0;
 
-        // Create advanced tools
-        let ts_tool = Arc::new(TypeScriptTool::new(basic_tools.clone()));
-        let subagent_tool = Arc::new(SubagentTool::new(Arc::new(self.config.clone())));
+            let result = self
+                .execute_task_streaming_once(TaskExecutionParams {
+                    task: task.clone(),
+                    ui_channel: ui_channel.clone(),
+                    conversation_history: conversation_history.clone(),
+                    tier_override: tier_override.clone(),
+                    is_retry,
+                })
+                .await;
 
-        // Build the complete registry
-        let mut tool_registry = ToolRegistry::default();
-        for tool in basic_tools {
-            tool_registry = tool_registry.with_tool(tool);
+            match result {
+                Ok(task_result) => return Ok(task_result),
+                Err(error) => {
+                    retry_count += 1;
+
+                    // Log the failure for debugging (error message only)
+                    tracing::error!(
+                        "Task attempt {} failed with error: {:?}",
+                        retry_count,
+                        error
+                    );
+
+                    if retry_count >= MAX_RETRIES {
+                        tracing::error!("Task failed after {} retries: {}", MAX_RETRIES, error);
+                        return Err(error);
+                    }
+
+                    // Get the tier that was used (or would have been used)
+                    let Ok(current_tier) =
+                        self.get_current_tier(&task, tier_override.as_ref()).await
+                    else {
+                        tracing::error!("Failed to route task for escalation");
+                        return Err(error);
+                    };
+
+                    // Try to escalate tier
+                    if let Some(escalated_tier) = current_tier.escalate() {
+                        tracing::warn!(
+                            "Task failed with tier {}, escalating to {} (attempt {}/{})",
+                            current_tier,
+                            escalated_tier,
+                            retry_count + 1,
+                            MAX_RETRIES
+                        );
+
+                        // Send task retry event
+                        ui_channel.send(UiEvent::TaskRetrying {
+                            task_id: task.id,
+                            retry_count: retry_count as u32,
+                            error: error.to_string(),
+                        });
+
+                        ui_channel.send(UiEvent::SystemMessage {
+                            level: MessageLevel::Warning,
+                            message: format!(
+                                "Escalating to {} (attempt {}/{})",
+                                escalated_tier,
+                                retry_count + 1,
+                                MAX_RETRIES
+                            ),
+                        });
+
+                        tier_override = Some(escalated_tier);
+                    } else {
+                        tracing::error!("Task failed and cannot escalate further: {}", error);
+                        return Err(error);
+                    }
+                }
+            }
         }
-        tool_registry = tool_registry.with_tool(ts_tool);
-        tool_registry = tool_registry.with_tool(subagent_tool);
-        let tool_registry = Arc::new(tool_registry);
+    }
 
-        // Create context fetcher for building context
+    /// Get the current tier for escalation purposes
+    ///
+    /// # Errors
+    /// Returns an error if routing fails when `tier_override` is `None`
+    async fn get_current_tier(
+        &self,
+        task: &Task,
+        tier_override: Option<&ModelTier>,
+    ) -> Result<ModelTier> {
+        if let Some(override_tier) = tier_override {
+            Ok(override_tier.clone())
+        } else {
+            let decision = self.router.route(task).await?;
+            Ok(decision.tier)
+        }
+    }
+
+    /// Execute a task once without retry logic (internal method)
+    ///
+    /// # Errors
+    /// Returns an error if task execution or validation fails, or if a provider interaction returns an error
+    async fn execute_task_streaming_once(&self, params: TaskExecutionParams) -> Result<TaskResult> {
+        let mut executor = self.create_agent_executor(params.is_retry);
+        self.setup_conversation_history(&mut executor, params.conversation_history)
+            .await;
+
+        executor
+            .execute_streaming_with_tier_override_internal(
+                params.task,
+                params.ui_channel.clone(),
+                params.tier_override,
+                params.is_retry,
+            )
+            .await
+    }
+
+    /// Creates an agent executor with tool registry and context fetcher
+    fn create_agent_executor(&self, is_retry: bool) -> AgentExecutor {
+        let tool_registry = ToolRegistry::default().with_tool(Arc::new(BashTool));
+        let tool_registry = Arc::new(tool_registry);
         let context_fetcher = ContextFetcher::new(self.workspace.root_path().clone());
 
-        // Create agent executor
         let mut executor = AgentExecutor::new(
             Arc::clone(&self.router),
             Arc::clone(&self.validator),
@@ -136,12 +238,19 @@ impl RoutingOrchestrator {
             self.config.clone(),
         );
 
-        // Enable context dump if configured
-        if self.config.execution.context_dump {
+        if self.config.execution.context_dump && !is_retry {
             executor.enable_context_dump();
         }
 
-        // Set conversation history if provided
+        executor
+    }
+
+    /// Sets up conversation history on the executor
+    async fn setup_conversation_history(
+        &self,
+        executor: &mut AgentExecutor,
+        conversation_history: Vec<(String, String)>,
+    ) {
         if conversation_history.is_empty() {
             tracing::info!("No conversation history to set");
         } else {
@@ -153,9 +262,6 @@ impl RoutingOrchestrator {
                 .set_conversation_history(conversation_history)
                 .await;
         }
-
-        // Execute with streaming
-        executor.execute_streaming(task, ui_channel.clone()).await
     }
 
     /// Execute multiple tasks with dependency management

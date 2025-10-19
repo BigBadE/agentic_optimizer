@@ -1,4 +1,4 @@
-use serde_json::Value;
+use serde_json::from_value;
 use std::future::Future;
 use std::mem::replace;
 use std::pin::Pin;
@@ -6,17 +6,18 @@ use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;
 
+use crate::agent::AgentExecutionResult;
 use crate::{
-    ExecutionContext, ExecutionMode, ModelRouter, ModelTier, Result, RoutingConfig, RoutingError,
-    SubtaskSpec, Task, TaskAction, TaskDecision, TaskId, TaskResult, TaskState, ToolRegistry,
-    UiChannel, UiEvent, ValidationResult, Validator, streaming::StepType,
+    ExecutionContext, ExecutionMode, ModelRouter, ModelTier, Result, RoutingConfig,
+    RoutingDecision, RoutingError, SubtaskSpec, Task, TaskAction, TaskDecision, TaskId, TaskResult,
+    TaskState, UiChannel, UiEvent, ValidationResult, Validator,
     user_interface::events::TaskProgress,
 };
 use merlin_core::{Context, ModelProvider, Query, Response, TokenUsage};
 use merlin_local::LocalModelProvider;
-use merlin_providers::{AnthropicProvider, GroqProvider, OpenRouterProvider};
+use merlin_providers::{GroqProvider, OpenRouterProvider};
+use merlin_tooling::{ToolRegistry, TypeScriptRuntime, generate_typescript_signatures};
 use std::env;
-use std::fmt::Write as _;
 use std::sync::atomic::{AtomicBool, Ordering};
 
 use super::{ContextFetcher, SelfAssessor, StepTracker};
@@ -33,6 +34,7 @@ pub struct AgentExecutor {
     router: Arc<dyn ModelRouter>,
     validator: Arc<dyn Validator>,
     tool_registry: Arc<ToolRegistry>,
+    #[allow(dead_code, reason = "Kept for future step tracking functionality")]
     step_tracker: StepTracker,
     context_fetcher: Arc<Mutex<ContextFetcher>>,
     conversation_history: Arc<Mutex<ConversationHistory>>,
@@ -45,6 +47,16 @@ struct ExecInputs<'life> {
     query: &'life Query,
     context: &'life Context,
     ui_channel: &'life UiChannel,
+}
+
+/// Parameters for task execution
+struct ExecutionParams<'life> {
+    task_id: TaskId,
+    task: &'life Task,
+    provider: &'life Arc<dyn ModelProvider>,
+    context: &'life Context,
+    ui_channel: &'life UiChannel,
+    decision: &'life RoutingDecision,
 }
 
 /// Intent classification for queries
@@ -165,68 +177,63 @@ impl AgentExecutor {
         task: Task,
         ui_channel: UiChannel,
     ) -> Result<TaskResult> {
+        self.execute_streaming_with_tier_override(task, ui_channel, None)
+            .await
+    }
+
+    /// Execute a task with streaming updates and optional tier override
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if routing, provider creation, execution, or validation fails
+    pub async fn execute_streaming_with_tier_override(
+        &mut self,
+        task: Task,
+        ui_channel: UiChannel,
+        tier_override: Option<ModelTier>,
+    ) -> Result<TaskResult> {
+        self.execute_streaming_with_tier_override_internal(task, ui_channel, tier_override, false)
+            .await
+    }
+
+    /// Internal implementation of `execute_streaming_with_tier_override` with retry flag
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if routing, provider creation, execution, or validation fails
+    pub async fn execute_streaming_with_tier_override_internal(
+        &mut self,
+        task: Task,
+        ui_channel: UiChannel,
+        tier_override: Option<ModelTier>,
+        is_retry: bool,
+    ) -> Result<TaskResult> {
         let start = Instant::now();
         let task_id = task.id;
 
-        // Step 1: Route the task
-        let decision = self.router.route(&task).await?;
-
-        // Step 2: Create provider
+        // Route and create provider
+        let decision = self.route_task(&task, tier_override).await?;
         let provider = self.create_provider(&decision.tier)?;
 
-        // Step 3: Build context
-        ui_channel.send(UiEvent::TaskStepStarted {
-            task_id,
-            step_id: "context_analysis".to_owned(),
-            step_type: "thinking".to_owned(),
-            content: "Analyzing query intent".to_owned(),
-        });
-
-        let context = self.build_context(&task, &ui_channel).await?;
-
-        ui_channel.send(UiEvent::TaskStepCompleted {
-            task_id,
-            step_id: "context_analysis".to_owned(),
-        });
-
-        // Log context breakdown to debug.log
-        self.log_context_breakdown(&context).await;
-
-        // Dump full context if enabled
-        if self.context_dump_enabled.load(Ordering::Relaxed) {
-            self.dump_context_to_log(&context, &task).await;
-        }
-
-        // Step 4: Create query with tool descriptions
-        let query = self.create_query_with_tools(&task)?;
-
-        // Step 5: Execute with streaming
-        ui_channel.send(UiEvent::TaskStepStarted {
-            task_id,
-            step_id: "model_execution".to_owned(),
-            step_type: "tool_call".to_owned(),
-            content: format!("Executing with {}", decision.tier),
-        });
-
-        let response = self
-            .execute_with_streaming(
-                task_id,
-                ExecInputs {
-                    provider: &provider,
-                    query: &query,
-                    context: &context,
-                    ui_channel: &ui_channel,
-                },
-            )
+        // Build context with logging
+        let context = self
+            .build_and_log_context(&task, &ui_channel, task_id, is_retry)
             .await?;
 
-        ui_channel.send(UiEvent::TaskStepCompleted {
-            task_id,
-            step_id: "model_execution".to_owned(),
-        });
+        // Execute with streaming
+        let response = self
+            .execute_task_with_provider(ExecutionParams {
+                task_id,
+                task: &task,
+                provider: &provider,
+                context: &context,
+                ui_channel: &ui_channel,
+                decision: &decision,
+            })
+            .await?;
 
-        // Step 6: Validate
-        let validation = self.validator.validate(&response, &task).await?;
+        // Validate response
+        let validation = self.validate_response(&response, &task).await?;
 
         let duration_ms = start.elapsed().as_millis() as u64;
 
@@ -240,12 +247,123 @@ impl AgentExecutor {
         })
     }
 
-    /// Execute with streaming and tool calling support
+    /// Route task to appropriate tier
     ///
     /// # Errors
-    /// Returns an error if provider generation fails or tool execution fails.
+    /// Returns an error if routing fails when `tier_override` is `None`
+    async fn route_task(
+        &self,
+        task: &Task,
+        tier_override: Option<ModelTier>,
+    ) -> Result<RoutingDecision> {
+        if let Some(tier) = tier_override {
+            Ok(RoutingDecision {
+                tier,
+                estimated_cost: 0.0,
+                estimated_latency_ms: 0,
+                reasoning: "Escalated from previous failure".to_owned(),
+            })
+        } else {
+            self.router.route(task).await
+        }
+    }
+
+    /// Build context and log if not a retry
+    ///
+    /// # Errors
+    /// Returns an error if context building fails
+    async fn build_and_log_context(
+        &self,
+        task: &Task,
+        ui_channel: &UiChannel,
+        task_id: TaskId,
+        is_retry: bool,
+    ) -> Result<Context> {
+        ui_channel.send(UiEvent::TaskStepStarted {
+            task_id,
+            step_id: "context_analysis".to_owned(),
+            step_type: "thinking".to_owned(),
+            content: "Analyzing query intent".to_owned(),
+        });
+
+        let context = self.build_context_for_typescript(task, ui_channel).await?;
+
+        ui_channel.send(UiEvent::TaskStepCompleted {
+            task_id,
+            step_id: "context_analysis".to_owned(),
+        });
+
+        if !is_retry {
+            self.log_context_breakdown(&context).await;
+            if self.context_dump_enabled.load(Ordering::Relaxed) {
+                self.dump_context_to_log(&context, task).await;
+            }
+        }
+
+        Ok(context)
+    }
+
+    /// Execute task with provider and stream results
+    ///
+    /// # Errors
+    /// Returns an error if task execution fails
+    async fn execute_task_with_provider(&self, params: ExecutionParams<'_>) -> Result<Response> {
+        params.ui_channel.send(UiEvent::TaskStepStarted {
+            task_id: params.task_id,
+            step_id: "model_execution".to_owned(),
+            step_type: "tool_call".to_owned(),
+            content: format!("Executing with {}", params.decision.tier),
+        });
+
+        let query = Query::new(params.task.description.clone());
+        let response = self
+            .execute_with_streaming(
+                params.task_id,
+                ExecInputs {
+                    provider: params.provider,
+                    query: &query,
+                    context: params.context,
+                    ui_channel: params.ui_channel,
+                },
+            )
+            .await?;
+
+        params.ui_channel.send(UiEvent::TaskStepCompleted {
+            task_id: params.task_id,
+            step_id: "model_execution".to_owned(),
+        });
+
+        Ok(response)
+    }
+
+    /// Validate response and log failures
+    ///
+    /// # Errors
+    /// Returns an error if validation fails
+    async fn validate_response(
+        &self,
+        response: &Response,
+        task: &Task,
+    ) -> Result<ValidationResult> {
+        self.validator
+            .validate(response, task)
+            .await
+            .map_err(|validation_error| {
+                tracing::info!(
+                    "Validation failed. Model response was:\n{}\n\nError: {:?}",
+                    response.text,
+                    validation_error
+                );
+                validation_error
+            })
+    }
+
+    /// Execute with streaming and TypeScript code execution
+    ///
+    /// # Errors
+    /// Returns an error if provider generation fails or code execution fails.
     async fn execute_with_streaming(
-        &mut self,
+        &self,
         task_id: TaskId,
         inputs: ExecInputs<'_>,
     ) -> Result<Response> {
@@ -255,197 +373,176 @@ impl AgentExecutor {
             context,
             ui_channel,
         } = inputs;
-        // Execute the query directly without extra steps
+        // Execute the query directly
         let response = provider
             .generate(query, context)
             .await
             .map_err(|err| RoutingError::Other(format!("Provider error: {err}")))?;
 
-        // Log agent response to debug.log BEFORE processing
+        // Log agent response to debug.log
         tracing::debug!("Agent response text: {}", response.text);
 
-        // Parse tool calls from response
-        let tool_calls = Self::extract_tool_calls(&response.text);
+        // Extract TypeScript code from response
+        let code = Self::extract_typescript_code(&response.text);
 
-        if tool_calls.is_empty() {
-            tracing::debug!("No tool calls found in response");
-        } else {
-            tracing::debug!("Found {} tool call(s)", tool_calls.len());
-        }
+        if let Some(typescript_code) = code {
+            tracing::debug!("Found TypeScript code, executing...");
 
-        if !tool_calls.is_empty() {
-            self.execute_tool_calls(task_id, tool_calls, ui_channel)
+            // Execute TypeScript code and get result
+            let execution_result = self
+                .execute_typescript_code(task_id, &typescript_code, ui_channel)
                 .await?;
-        }
 
-        // Send output directly as text (no wrapper step)
-        ui_channel.send(UiEvent::TaskOutput {
-            task_id,
-            output: response.text.clone(),
-        });
+            // Handle result based on done status
+            if let Some(result_text) = execution_result.get_result() {
+                // Task is done - send final result to UI
+                ui_channel.send(UiEvent::TaskOutput {
+                    task_id,
+                    output: result_text.to_owned(),
+                });
+            } else if let Some(next_task_desc) = execution_result.get_next_task() {
+                // Task wants to continue - spawn new task
+                tracing::info!("Task requested continuation: {}", next_task_desc);
+                ui_channel.send(UiEvent::TaskOutput {
+                    task_id,
+                    output: format!("Continuing with: {next_task_desc}"),
+                });
+                // Note: Actual task spawning would happen in the orchestrator
+                // For now, we just indicate the continuation request
+            }
+        } else {
+            // No TypeScript code found - send response text as-is
+            tracing::debug!("No TypeScript code found in response");
+            ui_channel.send(UiEvent::TaskOutput {
+                task_id,
+                output: response.text.clone(),
+            });
+        }
 
         Ok(response)
     }
 
-    /// Execute all tool calls from the LLM response
+    /// Extract TypeScript code from markdown code blocks
     ///
-    /// # Errors
-    /// Returns an error if any tool execution fails
-    async fn execute_tool_calls(
-        &mut self,
-        task_id: TaskId,
-        tool_calls: Vec<(String, Value)>,
-        ui_channel: &UiChannel,
-    ) -> Result<()> {
-        for (tool_name, args) in tool_calls {
-            // Send tool call started event
-            ui_channel.send(UiEvent::ToolCallStarted {
-                task_id,
-                tool: tool_name.clone(),
-                args: args.clone(),
-            });
+    /// Looks for ```typescript or ```ts blocks and returns the concatenated code
+    fn extract_typescript_code(text: &str) -> Option<String> {
+        let mut code_blocks = Vec::new();
+        let mut remaining = text;
 
-            let tool_step = self.step_tracker.create_step(
-                task_id,
-                StepType::ToolCall {
-                    tool: tool_name.clone(),
-                    args: args.clone(),
-                },
-                format!("Calling tool: {tool_name}"),
-            );
+        // Find all ```typescript or ```ts blocks
+        while let Some(start_idx) = remaining
+            .find("```typescript")
+            .or_else(|| remaining.find("```ts"))
+        {
+            let is_typescript = remaining[start_idx..].starts_with("```typescript");
+            let prefix_len = if is_typescript { 13 } else { 5 }; // "```typescript" or "```ts"
 
-            ui_channel.send(UiEvent::TaskStepStarted {
-                task_id,
-                step_id: format!("{:?}", tool_step.id),
-                step_type: "tool_call".to_owned(),
-                content: tool_step.content.clone(),
-            });
+            let after_start = &remaining[start_idx + prefix_len..];
 
-            // Execute the tool
-            tracing::debug!("Executing tool: {} with args: {:?}", tool_name, args);
-            let result = match self.execute_tool(&tool_name, args.clone()).await {
-                Ok(val) => {
-                    tracing::debug!("Tool {} succeeded with result: {:?}", tool_name, val);
-                    val
+            // Find the closing ```
+            if let Some(end_idx) = after_start.find("```") {
+                let code = after_start[..end_idx].trim();
+                if !code.is_empty() {
+                    code_blocks.push(code.to_owned());
                 }
-                Err(err) => {
-                    tracing::error!("Tool {} failed with error: {}", tool_name, err);
-                    tracing::error!("Tool args were: {:?}", args);
-                    return Err(err);
-                }
-            };
-
-            // Send tool call completed event
-            ui_channel.send(UiEvent::ToolCallCompleted {
-                task_id,
-                tool: tool_name.clone(),
-                result: result.clone(),
-            });
-
-            let result_step = self.step_tracker.create_step(
-                task_id,
-                StepType::ToolResult {
-                    tool: tool_name.clone(),
-                    result: result.clone(),
-                },
-                format!("Tool result: {result}"),
-            );
-
-            ui_channel.send(UiEvent::TaskStepCompleted {
-                task_id,
-                step_id: format!("{:?}", result_step.id),
-            });
-
-            // Tool results are shown in the output tree via ToolCallCompleted events,
-            // no need to append them to response.text (which would create trailing newlines)
-            // In a real implementation, would re-query LLM with tool results to get final response
-        }
-        Ok(())
-    }
-
-    /// Execute a tool by name
-    ///
-    /// # Errors
-    /// Returns an error if the tool cannot be found or execution fails.
-    async fn execute_tool(&self, tool_name: &str, args: Value) -> Result<Value> {
-        let tool = self
-            .tool_registry
-            .get_tool(tool_name)
-            .ok_or_else(|| RoutingError::Other(format!("Tool not found: {tool_name}")))?;
-
-        tool.execute(args).await
-    }
-
-    /// Extract tool calls from LLM response
-    ///
-    /// Looks for JSON objects in the format: `{"tool": "tool_name", "params": {...}}`
-    fn extract_tool_calls(text: &str) -> Vec<(String, Value)> {
-        use serde_json::from_str;
-
-        // Try to find JSON in markdown code blocks first
-        let json_str = if let Some(start) = text.find("```json") {
-            let Some(after_start) = text.get(start + 7..) else {
-                return vec![];
-            };
-            let Some(end) = after_start.find("```") else {
-                return vec![];
-            };
-            let Some(content) = after_start.get(..end) else {
-                return vec![];
-            };
-            content.trim()
-        } else if let Some(start) = text.find('{') {
-            // Try to find raw JSON
-            let Some(end) = text.rfind('}') else {
-                return vec![];
-            };
-            let Some(content) = text.get(start..=end) else {
-                return vec![];
-            };
-            content
-        } else {
-            return vec![];
-        };
-
-        // Parse the JSON
-        let Ok(value) = from_str::<Value>(json_str) else {
-            tracing::warn!("Failed to parse tool call JSON");
-            return vec![];
-        };
-
-        // Extract tool name and params
-        let Some(tool_name) = value.get("tool").and_then(|val| val.as_str()) else {
-            tracing::warn!("Tool call JSON missing 'tool' field");
-            return vec![];
-        };
-
-        let Some(params) = value.get("params") else {
-            tracing::warn!("Tool call JSON missing 'params' field");
-            return vec![];
-        };
-
-        vec![(tool_name.to_owned(), params.clone())]
-    }
-
-    /// Create query with tool descriptions
-    ///
-    /// # Errors
-    /// Returns an error if formatting the prompt fails.
-    fn create_query_with_tools(&self, task: &Task) -> Result<Query> {
-        // Start with clear user request label
-        let mut prompt = format!("# User Request\n\n{}", task.description);
-
-        // Add tool descriptions to the prompt
-        let tools = self.tool_registry.list_tools();
-        if !tools.is_empty() {
-            prompt.push_str("\n\n# Available Tools\n");
-            for tool in tools {
-                writeln!(prompt, "- {}: {}", tool.name(), tool.description())?;
+                remaining = &after_start[end_idx + 3..];
+            } else {
+                break;
             }
         }
 
-        Ok(Query::new(prompt))
+        if code_blocks.is_empty() {
+            None
+        } else {
+            Some(code_blocks.join("\n\n"))
+        }
     }
+
+    /// Execute TypeScript code using the TypeScript runtime
+    ///
+    /// # Errors
+    /// Returns an error if code execution fails or result parsing fails
+    async fn execute_typescript_code(
+        &self,
+        task_id: TaskId,
+        code: &str,
+        ui_channel: &UiChannel,
+    ) -> Result<AgentExecutionResult> {
+        // Create TypeScript runtime and register tools
+        let mut runtime = TypeScriptRuntime::new();
+
+        // Get all tool names and then get Arc clones
+        let tool_names: Vec<String> = self
+            .tool_registry
+            .list_tools()
+            .iter()
+            .map(|tool| tool.name().to_owned())
+            .collect();
+
+        for tool_name in tool_names {
+            if let Some(tool) = self.tool_registry.get_tool(&tool_name) {
+                runtime.register_tool(tool);
+            }
+        }
+
+        // Send step started event
+        ui_channel.send(UiEvent::TaskStepStarted {
+            task_id,
+            step_id: "typescript_execution".to_owned(),
+            step_type: "tool_call".to_owned(),
+            content: "Executing TypeScript code".to_owned(),
+        });
+
+        // Execute code
+        tracing::debug!("Executing TypeScript code:\n{}", code);
+        let result_value = runtime.execute(code).await.map_err(|err| {
+            tracing::info!(
+                "TypeScript execution failed. Code was:\n{}\n\nError: {}",
+                code,
+                err
+            );
+
+            // Send step failed event
+            ui_channel.send(UiEvent::TaskStepFailed {
+                task_id,
+                step_id: "typescript_execution".to_owned(),
+                error: err.to_string(),
+            });
+
+            RoutingError::Other(format!("TypeScript execution failed: {err}"))
+        })?;
+
+        // Parse result as AgentExecutionResult
+        let execution_result: AgentExecutionResult =
+            from_value(result_value.clone()).map_err(|err| {
+                tracing::info!(
+                    "Failed to parse execution result. Code was:\n{}\n\nReturned value: {:?}\n\nError: {}",
+                    code,
+                    result_value,
+                    err
+                );
+
+                // Send step failed event
+                ui_channel.send(UiEvent::TaskStepFailed {
+                    task_id,
+                    step_id: "typescript_execution".to_owned(),
+                    error: format!("Failed to parse execution result: {err}"),
+                });
+
+                RoutingError::Other(format!("Failed to parse execution result: {err}"))
+            })?;
+
+        // Send step completed event
+        ui_channel.send(UiEvent::TaskStepCompleted {
+            task_id,
+            step_id: "typescript_execution".to_owned(),
+        });
+
+        tracing::debug!("TypeScript execution result: {:?}", execution_result);
+
+        Ok(execution_result)
+    }
+
     /// Create provider based on tier
     ///
     /// # Errors
@@ -498,56 +595,11 @@ impl AgentExecutor {
                     let provider = OpenRouterProvider::new(api_key)?.with_model(model_name.clone());
                     Ok(Arc::new(provider))
                 }
-                "anthropic" => {
-                    let api_key = self
-                        .config
-                        .get_api_key("anthropic")
-                        .or_else(|| env::var("ANTHROPIC_API_KEY").ok())
-                        .ok_or_else(|| {
-                            RoutingError::Other(
-                                "ANTHROPIC_API_KEY not found in config or environment".to_owned(),
-                            )
-                        })?;
-                    let provider = AnthropicProvider::new(api_key)?;
-                    Ok(Arc::new(provider))
-                }
                 _ => Err(RoutingError::Other(format!(
-                    "Unknown provider: {provider_name}"
+                    "Unknown premium provider: {provider_name}. Only 'openrouter' is supported."
                 ))),
             },
         }
-    }
-
-    /// Build context for conversational queries (no files)
-    async fn build_conversational_context(
-        conversation_history: &Arc<Mutex<ConversationHistory>>,
-    ) -> Context {
-        use merlin_core::prompts::load_prompt;
-
-        // Always load the proper coding assistant prompt
-        let base_prompt = load_prompt("coding_assistant")
-            .unwrap_or_else(|_| {
-                "You are a helpful AI coding assistant. Answer the user's question directly and conversationally.".to_owned()
-            });
-
-        let conv_history = conversation_history.lock().await;
-        let system_prompt = if conv_history.is_empty() {
-            base_prompt
-        } else {
-            // Append conversation history to the coding assistant prompt
-            let mut prompt = base_prompt;
-            prompt.push_str("\n\n## Conversation History\n\n");
-            for (role, content) in conv_history.iter() {
-                use std::fmt::Write as _;
-                #[allow(clippy::expect_used, reason = "Writing to String never fails")]
-                writeln!(prompt, "{role}: {content}").expect("Writing to String never fails");
-            }
-            prompt.push_str("\nAnswer the user's question based on this conversation and your role as a coding assistant.");
-            prompt
-        };
-        drop(conv_history);
-
-        Context::new(system_prompt)
     }
 
     /// Build context for a task
@@ -559,9 +611,9 @@ impl AgentExecutor {
         let query = Query::new(task.description.clone());
         let task_id = task.id;
 
-        // For conversational queries, skip file fetching and use minimal context
+        // For conversational queries, return empty context (prompt added later)
         if intent == QueryIntent::Conversational {
-            return Ok(Self::build_conversational_context(&self.conversation_history).await);
+            return Ok(Context::new(String::new()));
         }
 
         // For code queries, fetch file context as normal
@@ -618,6 +670,64 @@ impl AgentExecutor {
             task_id,
             step_id: "file_gathering".to_owned(),
         });
+
+        Ok(context)
+    }
+
+    /// Build context for TypeScript-based agent execution
+    ///
+    /// # Errors
+    /// Returns an error if context building or prompt loading fails
+    async fn build_context_for_typescript(
+        &self,
+        task: &Task,
+        ui_channel: &UiChannel,
+    ) -> Result<Context> {
+        use merlin_core::prompts::load_prompt;
+        use std::fmt::Write as _;
+
+        // Load TypeScript agent prompt template
+        let prompt_template = load_prompt("typescript_agent").map_err(|err| {
+            RoutingError::Other(format!("Failed to load typescript_agent prompt: {err}"))
+        })?;
+
+        // Generate TypeScript signatures for all tools
+        let tools = self.tool_registry.list_tools();
+        let signatures = generate_typescript_signatures(&tools).map_err(|err| {
+            RoutingError::Other(format!("Failed to generate TypeScript signatures: {err}"))
+        })?;
+
+        // Replace placeholder with actual signatures
+        let system_prompt = prompt_template.replace("{TOOL_SIGNATURES}", &signatures);
+
+        // Build base context (may include file context if relevant)
+        let intent = Self::classify_query_intent(&task.description);
+
+        let mut context = if intent == QueryIntent::Conversational {
+            Context::new(system_prompt)
+        } else {
+            // Get file context if needed
+            let base_context = self.build_context(task, ui_channel).await?;
+
+            // Combine TypeScript prompt with file context
+            let mut combined = Context::new(system_prompt);
+            combined.files = base_context.files;
+            combined
+        };
+
+        // Add conversation history if present
+        let conv_history = self.conversation_history.lock().await;
+        if !conv_history.is_empty() {
+            #[allow(clippy::expect_used, reason = "Writing to String never fails")]
+            write!(context.system_prompt, "\n\n## Conversation History\n\n")
+                .expect("Writing to String never fails");
+
+            for (role, content) in conv_history.iter() {
+                #[allow(clippy::expect_used, reason = "Writing to String never fails")]
+                writeln!(context.system_prompt, "{role}: {content}")
+                    .expect("Writing to String never fails");
+            }
+        }
 
         Ok(context)
     }
@@ -1035,23 +1145,8 @@ impl AgentExecutor {
     }
 
     /// Log file breakdown
-    fn log_file_breakdown(context: &Context) {
-        use tracing::info;
-
-        if context.files.is_empty() {
-            return;
-        }
-
-        info!("📁 File breakdown: {} files included", context.files.len());
-        for (index, file) in context.files.iter().enumerate() {
-            let tokens = file.content.len() / 4;
-            info!(
-                "  {}. {} - {} tokens",
-                index + 1,
-                file.path.display(),
-                tokens
-            );
-        }
+    fn log_file_breakdown(_context: &Context) {
+        // File list is now printed by the context builder
     }
 
     /// Dump full context to debug.log
@@ -1082,20 +1177,6 @@ impl AgentExecutor {
         info!("{}", context.system_prompt);
         info!("");
 
-        // Files
-        if !context.files.is_empty() {
-            info!("=== FILES ({}) ===", context.files.len());
-            for (index, file) in context.files.iter().enumerate() {
-                info!(
-                    "  {}. {} ({} bytes, ~{} tokens)",
-                    index + 1,
-                    file.path.display(),
-                    file.content.len(),
-                    file.content.len() / 4
-                );
-            }
-        }
-
         // Token estimate
         info!("=== STATISTICS ===");
         info!("Estimated tokens: {}", context.token_estimate());
@@ -1111,10 +1192,7 @@ impl AgentExecutor {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{
-        ListFilesTool, ReadFileTool, RunCommandTool, StrategyRouter, ToolRegistry,
-        ValidationPipeline, WriteFileTool,
-    };
+    use crate::{BashTool, StrategyRouter, ToolRegistry, ValidationPipeline};
     use std::path::PathBuf;
 
     #[tokio::test]
@@ -1139,19 +1217,344 @@ mod tests {
 
     #[tokio::test]
     async fn test_tool_registry_integration() {
-        let workspace = PathBuf::from(".");
-        let tool_registry = Arc::new(
-            ToolRegistry::default()
-                .with_tool(Arc::new(ReadFileTool::new(workspace.clone())))
-                .with_tool(Arc::new(WriteFileTool::new(workspace.clone())))
-                .with_tool(Arc::new(ListFilesTool::new(workspace.clone())))
-                .with_tool(Arc::new(RunCommandTool::new(workspace))),
-        );
+        let tool_registry = Arc::new(ToolRegistry::default().with_tool(Arc::new(BashTool)));
 
-        assert!(tool_registry.get_tool("read_file").is_some());
-        assert!(tool_registry.get_tool("write_file").is_some());
-        assert!(tool_registry.get_tool("list_files").is_some());
-        assert!(tool_registry.get_tool("run_command").is_some());
+        assert!(tool_registry.get_tool("bash").is_some());
         assert!(tool_registry.get_tool("nonexistent").is_none());
     }
+
+    #[test]
+    fn test_extract_typescript_code_single_block() {
+        let text = r#"
+I'll read the file using TypeScript:
+
+```typescript
+const content = await readFile("src/main.rs");
+return {done: true, result: content};
+```
+
+That should work!
+"#;
+        let code = AgentExecutor::extract_typescript_code(text);
+        assert!(code.is_some());
+        let code = code.unwrap();
+        assert!(code.contains("readFile"));
+        assert!(code.contains("done: true"));
+    }
+
+    #[test]
+    fn test_extract_typescript_code_ts_language() {
+        let text = r#"
+```ts
+const files = await listFiles("src");
+return {done: true, result: files.join(", ")};
+```
+"#;
+        let code = AgentExecutor::extract_typescript_code(text);
+        assert!(code.is_some());
+        let code = code.unwrap();
+        assert!(code.contains("listFiles"));
+    }
+
+    #[test]
+    fn test_extract_typescript_code_multiple_blocks() {
+        let text = r#"
+First block:
+```typescript
+const x = 1;
+```
+
+Second block:
+```typescript
+const y = 2;
+return {done: true, result: "ok"};
+```
+"#;
+        let code = AgentExecutor::extract_typescript_code(text);
+        assert!(code.is_some());
+        let code = code.unwrap();
+        assert!(code.contains("const x = 1"));
+        assert!(code.contains("const y = 2"));
+    }
+
+    #[test]
+    fn test_extract_typescript_code_no_blocks() {
+        let text = "Just regular text with no code blocks";
+        let code = AgentExecutor::extract_typescript_code(text);
+        assert!(code.is_none());
+    }
+
+    // Old JSON-based tests commented out - replaced by TypeScript-based system
+    /*
+    #[test]
+    fn test_extract_multiple_tool_calls_old() {
+        let text = r#"
+I'll check both files.
+
+```json
+{
+  "tool": "read_file",
+  "params": {
+    "file_path": "src/main.rs"
+  }
+}
+```
+
+```json
+{
+  "tool": "read_file",
+  "params": {
+    "file_path": "src/lib.rs"
+  }
+}
+```
+
+Done.
+"#;
+        let calls = AgentExecutor::extract_tool_calls(text);
+        assert_eq!(calls.len(), 2);
+        assert_eq!(calls[0].0, "read_file");
+        assert_eq!(calls[0].1["file_path"], "src/main.rs");
+        assert_eq!(calls[1].0, "read_file");
+        assert_eq!(calls[1].1["file_path"], "src/lib.rs");
+    }
+
+    #[test]
+    fn test_extract_tool_call_raw_json() {
+        let text = r#"
+Let me execute this command.
+
+{
+  "tool": "run_command",
+  "params": {
+    "command": "cargo build"
+  }
+}
+
+Running the build.
+"#;
+        let calls = AgentExecutor::extract_tool_calls(text);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "run_command");
+        assert_eq!(calls[0].1["command"], "cargo build");
+    }
+
+    #[test]
+    fn test_extract_tool_call_plain_code_block() {
+        let text = r#"
+Let me write the file.
+
+```
+{
+  "tool": "write_file",
+  "params": {
+    "file_path": "test.txt",
+    "content": "Hello, world!"
+  }
+}
+```
+"#;
+        let calls = AgentExecutor::extract_tool_calls(text);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "write_file");
+        assert_eq!(calls[0].1["file_path"], "test.txt");
+        assert_eq!(calls[0].1["content"], "Hello, world!");
+    }
+
+    #[test]
+    fn test_extract_tool_calls_mixed_formats() {
+        let text = r#"
+First, let me list the files.
+
+```json
+{
+  "tool": "list_files",
+  "params": {
+    "directory": "src"
+  }
+}
+```
+
+Now I'll read one.
+
+{
+  "tool": "read_file",
+  "params": {
+    "file_path": "src/main.rs"
+  }
+}
+
+And run a command.
+
+```
+{
+  "tool": "run_command",
+  "params": {
+    "command": "cargo test"
+  }
+}
+```
+"#;
+        let calls = AgentExecutor::extract_tool_calls(text);
+        assert_eq!(calls.len(), 3);
+        assert_eq!(calls[0].0, "list_files");
+        assert_eq!(calls[1].0, "read_file");
+        assert_eq!(calls[2].0, "run_command");
+    }
+
+    #[test]
+    fn test_extract_tool_calls_nested_braces() {
+        let text = r#"
+{
+  "tool": "write_file",
+  "params": {
+    "file_path": "config.json",
+    "content": "{\"nested\": {\"value\": 42}}"
+  }
+}
+"#;
+        let calls = AgentExecutor::extract_tool_calls(text);
+        assert_eq!(calls.len(), 1);
+        assert_eq!(calls[0].0, "write_file");
+        assert!(calls[0].1["content"].as_str().unwrap().contains("nested"));
+    }
+
+    #[test]
+    fn test_extract_tool_calls_no_tools() {
+        let text = "This is just a regular response with no tool calls.";
+        let calls = AgentExecutor::extract_tool_calls(text);
+        assert_eq!(calls.len(), 0);
+    }
+
+    #[test]
+    fn test_extract_tool_calls_invalid_json() {
+        let text = r#"
+```json
+{
+  "tool": "read_file",
+  "params": {
+    "file_path": "src/main.rs"
+  }
+  missing closing brace
+```
+"#;
+        let calls = AgentExecutor::extract_tool_calls(text);
+        assert_eq!(calls.len(), 0, "Invalid JSON should be skipped");
+    }
+
+    #[test]
+    fn test_extract_output_section_single() {
+        let text = "
+Some reasoning text here.
+
+<output>
+This is the output for the user.
+</output>
+
+More internal notes.
+";
+        let output = AgentExecutor::extract_output_section(text);
+        assert_eq!(output, "This is the output for the user.");
+    }
+
+    #[test]
+    fn test_extract_output_section_multiple() {
+        let text = "
+<output>
+First output section.
+</output>
+
+Some reasoning.
+
+<output>
+Second output section.
+</output>
+";
+        let output = AgentExecutor::extract_output_section(text);
+        assert_eq!(output, "First output section.\n\nSecond output section.");
+    }
+
+    #[test]
+    fn test_extract_output_section_no_tags() {
+        let text = "This is a response without output tags.";
+        let output = AgentExecutor::extract_output_section(text);
+        assert_eq!(output, text, "Should return original text when no tags");
+    }
+
+    #[test]
+    fn test_extract_output_section_empty() {
+        let text = "<output>\n</output>";
+        let output = AgentExecutor::extract_output_section(text);
+        assert_eq!(output, "", "Empty output tags should return empty string");
+    }
+
+    #[test]
+    fn test_extract_output_section_whitespace() {
+        let text = "
+<output>
+   This has leading and trailing whitespace.
+</output>
+";
+        let output = AgentExecutor::extract_output_section(text);
+        assert_eq!(
+            output, "This has leading and trailing whitespace.",
+            "Should trim whitespace"
+        );
+    }
+
+    #[test]
+    fn test_extract_output_section_malformed() {
+        let text = "
+<output>
+This has an opening tag but no closing tag.
+";
+        let output = AgentExecutor::extract_output_section(text);
+        assert_eq!(output, text, "Malformed tags should return original text");
+    }
+
+    #[test]
+    fn test_extract_output_section_with_tool_calls() {
+        let text = "
+Let me check the file.
+
+{
+  \"tool\": \"read_file\",
+  \"params\": {
+    \"file_path\": \"src/main.rs\"
+  }
+}
+
+<output>
+The main.rs file contains the application entry point.
+</output>
+";
+        let output = AgentExecutor::extract_output_section(text);
+        assert_eq!(
+            output,
+            "The main.rs file contains the application entry point."
+        );
+    }
+
+    #[test]
+    fn test_extract_output_multiline_content() {
+        let text = "
+<output>
+This is a multi-line output.
+
+It contains multiple paragraphs.
+
+And some code:
+```rust
+fn main() {
+    println!(\"Hello\");
+}
+```
+</output>
+";
+        let output = AgentExecutor::extract_output_section(text);
+        assert!(output.contains("multi-line output"));
+        assert!(output.contains("multiple paragraphs"));
+        assert!(output.contains("fn main()"));
+    }
+    */
 }

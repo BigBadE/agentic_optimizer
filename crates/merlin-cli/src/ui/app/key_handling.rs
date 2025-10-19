@@ -2,12 +2,21 @@
 
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::backend::Backend;
+use std::collections::HashSet;
+use std::hash::Hash;
 
 use super::conversation;
 use super::input_handler;
 use super::navigation;
 use super::tui_app::TuiApp;
 use crate::ui::renderer::FocusedPane;
+
+/// Toggle a value in a `HashSet` (remove if present, insert if absent)
+fn toggle_set<T: Eq + Hash>(set: &mut HashSet<T>, value: T) {
+    if !set.remove(&value) {
+        set.insert(value);
+    }
+}
 
 impl<B: Backend> TuiApp<B> {
     /// Handles a single key event and returns true if the app should quit
@@ -51,19 +60,32 @@ impl<B: Backend> TuiApp<B> {
                 }
             }
             FocusedPane::Tasks => {
-                // Toggle expand/collapse for the selected conversation
-                if let Some(selected_id) = self.state.active_task_id {
-                    let root_id =
-                        conversation::find_root_conversation(selected_id, &self.task_manager);
-                    if self.state.expanded_conversations.contains(&root_id) {
-                        self.state.expanded_conversations.remove(&root_id);
-                    } else {
-                        self.state.expanded_conversations.insert(root_id);
-                    }
-                }
+                self.handle_tasks_enter_key();
                 false
             }
             FocusedPane::Output => false,
+        }
+    }
+
+    /// Handles Enter key when Tasks pane is focused
+    fn handle_tasks_enter_key(&mut self) {
+        let Some(selected_id) = self.state.active_task_id else {
+            return;
+        };
+
+        // Check if selected task is a child with steps
+        let is_child_with_steps = self
+            .task_manager
+            .get_task(selected_id)
+            .is_some_and(|task| task.parent_id.is_some() && !task.steps.is_empty());
+
+        if is_child_with_steps {
+            // Toggle step expansion for child tasks with steps
+            toggle_set(&mut self.state.expanded_steps, selected_id);
+        } else {
+            // Toggle conversation expansion for root tasks or children without steps
+            let root_id = conversation::find_root_conversation(selected_id, &self.task_manager);
+            toggle_set(&mut self.state.expanded_conversations, root_id);
         }
     }
 
@@ -97,6 +119,8 @@ impl<B: Backend> TuiApp<B> {
                             active_task_id: &mut self.state.active_task_id,
                             expanded_conversations: &self.state.expanded_conversations,
                             task_list_scroll_offset: &mut self.state.task_list_scroll_offset,
+                            task_output_scroll: &mut self.state.task_output_scroll,
+                            output_scroll_offset: &mut self.state.output_scroll_offset,
                         },
                         terminal_height,
                         self.focused_pane == FocusedPane::Tasks,
@@ -111,6 +135,8 @@ impl<B: Backend> TuiApp<B> {
                             active_task_id: &mut self.state.active_task_id,
                             expanded_conversations: &self.state.expanded_conversations,
                             task_list_scroll_offset: &mut self.state.task_list_scroll_offset,
+                            task_output_scroll: &mut self.state.task_output_scroll,
+                            output_scroll_offset: &mut self.state.output_scroll_offset,
                         },
                         terminal_height,
                         self.focused_pane == FocusedPane::Tasks,

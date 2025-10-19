@@ -32,8 +32,8 @@ impl RoutingStrategy for ComplexityBasedStrategy {
                 model_name: "qwen2.5-32b-coder-preview".to_owned(),
             },
             Complexity::Complex => ModelTier::Premium {
-                provider: "anthropic".to_owned(),
-                model_name: "claude-3-5-sonnet-20241022".to_owned(),
+                provider: "openrouter".to_owned(),
+                model_name: "anthropic/claude-3-5-sonnet-20241022".to_owned(),
             },
         })
     }

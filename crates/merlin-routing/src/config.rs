@@ -26,11 +26,9 @@ pub struct RoutingConfig {
 /// API keys for model providers.
 #[derive(Debug, Clone, Serialize, Deserialize, Default)]
 pub struct ApiKeys {
-    /// Anthropic API key for Claude models
-    pub anthropic_api_key: Option<String>,
     /// Groq API key for Groq models
     pub groq_api_key: Option<String>,
-    /// `OpenRouter` API key for various models
+    /// `OpenRouter` API key for various models (including Claude via anthropic/* routes)
     pub openrouter_api_key: Option<String>,
 }
 
@@ -271,7 +269,7 @@ impl RoutingConfig {
             .map_err(|error| RoutingError::Other(format!("Failed to parse config: {error}")))?;
 
         tracing::debug!(
-            "Loaded config from {:?}: groq_api_key={}, openrouter_api_key={}, anthropic_api_key={}",
+            "Loaded config from {:?}: groq_api_key={}, openrouter_api_key={}",
             path,
             if config.api_keys.groq_api_key.is_some() {
                 "present"
@@ -279,11 +277,6 @@ impl RoutingConfig {
                 "missing"
             },
             if config.api_keys.openrouter_api_key.is_some() {
-                "present"
-            } else {
-                "missing"
-            },
-            if config.api_keys.anthropic_api_key.is_some() {
                 "present"
             } else {
                 "missing"
@@ -321,11 +314,6 @@ impl RoutingConfig {
     /// Get API key for a provider, checking config first, then environment variables
     pub fn get_api_key(&self, provider: &str) -> Option<String> {
         match provider {
-            "anthropic" => self
-                .api_keys
-                .anthropic_api_key
-                .clone()
-                .or_else(|| env::var("ANTHROPIC_API_KEY").ok()),
             "groq" => self
                 .api_keys
                 .groq_api_key
@@ -387,7 +375,6 @@ timeout_seconds = 300
 [api_keys]
 groq_api_key = "test_groq_key_123"
 openrouter_api_key = "test_openrouter_key_456"
-anthropic_api_key = "test_anthropic_key_789"
 
 [validation]
 enabled = true
@@ -435,10 +422,6 @@ similarity_threshold = 0.95
             config.api_keys.openrouter_api_key,
             Some("test_openrouter_key_456".to_owned())
         );
-        assert_eq!(
-            config.api_keys.anthropic_api_key,
-            Some("test_anthropic_key_789".to_owned())
-        );
 
         // Verify get_api_key method works
         assert_eq!(
@@ -448,10 +431,6 @@ similarity_threshold = 0.95
         assert_eq!(
             config.get_api_key("openrouter"),
             Some("test_openrouter_key_456".to_owned())
-        );
-        assert_eq!(
-            config.get_api_key("anthropic"),
-            Some("test_anthropic_key_789".to_owned())
         );
     }
 
@@ -474,10 +453,6 @@ similarity_threshold = 0.95
             println!(
                 "  openrouter_api_key present: {}",
                 config.api_keys.openrouter_api_key.is_some()
-            );
-            println!(
-                "  anthropic_api_key present: {}",
-                config.api_keys.anthropic_api_key.is_some()
             );
 
             // Verify get_api_key returns the keys

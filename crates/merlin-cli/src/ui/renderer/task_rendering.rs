@@ -152,7 +152,15 @@ fn render_child_task(ctx: &ChildTaskContext<'_>, lines: &mut Vec<Line<'static>>)
         theme,
     } = *ctx;
     let child_symbol = "├─";
-    let child_line = format!(" {child_symbol} [{}] {}", status_icon, task.description);
+    let retry_suffix = if task.retry_count > 0 {
+        format!(" (retry {})", task.retry_count)
+    } else {
+        String::new()
+    };
+    let child_line = format!(
+        " {child_symbol} [{}] {}{}",
+        status_icon, task.description, retry_suffix
+    );
 
     let truncated_line = truncate_text(&child_line, max_width);
     let style = render_helpers::selection_style(is_selected, theme);
@@ -169,12 +177,24 @@ fn render_child_task(ctx: &ChildTaskContext<'_>, lines: &mut Vec<Line<'static>>)
             confirm_style,
         )]));
     }
+    // Render all steps if expanded
+    else if ui_ctx.state.expanded_steps.contains(&task_id) && !task.steps.is_empty() {
+        for (index, step) in task.steps.iter().enumerate() {
+            let step_icon = render_helpers::step_type_icon(&step.step_type);
+            let is_last_step = index == task.steps.len() - 1;
+            let step_connector = if is_last_step { "└─" } else { "├─" };
+            let step_line = format!("  │  {step_connector} {} {}", step_icon, step.content);
+            let truncated_step = truncate_text(&step_line, max_width);
+            let step_style = render_helpers::step_style_with_status(&step.step_type, step.status);
+            lines.push(Line::from(vec![Span::styled(truncated_step, step_style)]));
+        }
+    }
     // Render current step as a sub-child if present
     else if let Some(step) = &task.current_step {
         let step_icon = render_helpers::step_type_icon(&step.step_type);
         let step_line = format!("  │  └─ {} {}", step_icon, step.content);
         let truncated_step = truncate_text(&step_line, max_width);
-        let step_style = render_helpers::step_type_style(&step.step_type);
+        let step_style = render_helpers::step_style_with_status(&step.step_type, step.status);
         lines.push(Line::from(vec![Span::styled(truncated_step, step_style)]));
     }
 }
@@ -214,12 +234,23 @@ fn render_root_task(ctx: &RootTaskContext<'_>, lines: &mut Vec<Line<'static>>) {
     // Add expand indicator if conversation has children
     let expand_indicator = render_helpers::expansion_indicator(has_children, is_expanded);
 
+    let retry_suffix = if task.retry_count > 0 {
+        format!(" (retry {})", task.retry_count)
+    } else {
+        String::new()
+    };
+
     let task_line = task.progress.as_ref().map_or_else(
-        || format!("{expand_indicator}[{status_icon}] {}", task.description),
+        || {
+            format!(
+                "{expand_indicator}[{status_icon}] {}{}",
+                task.description, retry_suffix
+            )
+        },
         |progress| {
             format!(
-                "{expand_indicator}[{status_icon}] {} [{}]",
-                task.description, progress.stage
+                "{expand_indicator}[{status_icon}] {}{} [{}]",
+                task.description, retry_suffix, progress.stage
             )
         },
     );
@@ -245,7 +276,7 @@ fn render_root_task(ctx: &RootTaskContext<'_>, lines: &mut Vec<Line<'static>>) {
         let step_icon = render_helpers::step_type_icon(&step.step_type);
         let step_line = format!(" └─ {} {}", step_icon, step.content);
         let truncated_step = truncate_text(&step_line, max_width);
-        let step_style = render_helpers::step_type_style(&step.step_type);
+        let step_style = render_helpers::step_style_with_status(&step.step_type, step.status);
         lines.push(Line::from(vec![Span::styled(truncated_step, step_style)]));
     }
 }
@@ -349,7 +380,7 @@ pub fn add_child_task_lines(
             let step_icon = render_helpers::step_type_icon(&step.step_type);
             let step_line = format!("{connector}└─ {} {}", step_icon, step.content);
             let truncated_step = truncate_text(&step_line, max_width);
-            let step_style = render_helpers::step_type_style(&step.step_type);
+            let step_style = render_helpers::step_style_with_status(&step.step_type, step.status);
             lines.push(Line::from(vec![Span::styled(truncated_step, step_style)]));
         }
     }

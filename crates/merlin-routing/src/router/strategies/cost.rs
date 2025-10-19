@@ -35,7 +35,7 @@ impl RoutingStrategy for CostOptimizationStrategy {
         // Cost-optimized routing:
         // Never use Local tier (max_tokens_for_local = 0 by default)
         // Groq (llama-3.1-8b, qwen-32b, llama-70b) - small to medium contexts
-        // Premium (haiku, yi-lightning, sonnet) - larger contexts
+        // Premium (haiku, sonnet) - larger contexts
 
         if self.max_tokens_for_local > 0
             && task.context_needs.estimated_tokens <= self.max_tokens_for_local
@@ -57,20 +57,14 @@ impl RoutingStrategy for CostOptimizationStrategy {
         } else if task.context_needs.estimated_tokens <= 50000 {
             // Use premium haiku for medium-large contexts
             Ok(ModelTier::Premium {
-                provider: "anthropic".to_owned(),
-                model_name: "claude-3-5-haiku-20241022".to_owned(),
-            })
-        } else if task.context_needs.estimated_tokens <= 100_000 {
-            // Use OpenRouter glm-4.6 for large contexts
-            Ok(ModelTier::Premium {
                 provider: "openrouter".to_owned(),
-                model_name: "01-ai/yi-lightning".to_owned(),
+                model_name: "anthropic/claude-3-5-haiku-20241022".to_owned(),
             })
         } else {
-            // Use best model for very large contexts
+            // Use sonnet for large contexts
             Ok(ModelTier::Premium {
-                provider: "anthropic".to_owned(),
-                model_name: "claude-3-5-sonnet-20241022".to_owned(),
+                provider: "openrouter".to_owned(),
+                model_name: "anthropic/claude-3-5-sonnet-20241022".to_owned(),
             })
         }
     }

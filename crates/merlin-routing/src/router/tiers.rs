@@ -199,7 +199,7 @@ mod tests {
         let decision = router.route(&critical_task).await?;
 
         if let ModelTier::Premium { provider, .. } = decision.tier {
-            assert_eq!(provider, "anthropic");
+            assert_eq!(provider, "openrouter");
         } else {
             panic!("Critical task should use premium tier");
         }

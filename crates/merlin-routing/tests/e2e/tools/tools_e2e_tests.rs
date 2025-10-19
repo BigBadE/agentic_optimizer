@@ -14,8 +14,7 @@
     reason = "Test allows"
 )]
 
-use merlin_agent::ToolRegistry;
-use merlin_tooling::ToolInput;
+use merlin_tooling::{ToolInput, ToolRegistry};
 use serde_json::json;
 use std::path::PathBuf;
 use tempfile::TempDir;

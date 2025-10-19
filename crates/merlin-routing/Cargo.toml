@@ -32,7 +32,6 @@ toml.workspace = true
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
-merlin-agent.workspace = true
 merlin-tooling.workspace = true
 
 [lints]

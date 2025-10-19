@@ -16,7 +16,6 @@ merlin-core = { path = "crates/merlin-core" }
 merlin-providers = { path = "crates/merlin-providers" }
 merlin-context = { path = "crates/merlin-context" }
 merlin-languages = { path = "crates/merlin-languages" }
-merlin-agent = { path = "crates/merlin-agent" }
 merlin-tooling = { path = "crates/merlin-tooling" }
 merlin-routing = { path = "crates/merlin-routing" }
 merlin-local = { path = "crates/merlin-local" }
@@ -59,16 +58,8 @@ unicode-width = "0.2"
 
 flate2 = "1.1"
 tempfile = "3.23"
-rquickjs = { version = "0.9", features = ["array-buffer", "classes", "futures", "loader", "macro", "parallel", "properties"] }
-
-# SWC for TypeScript transpilation
-swc_common = "14.0"
-swc_ecma_ast = "15.0"
-swc_ecma_parser = "24.0"
-swc_ecma_transforms_base = "27.0"
-swc_ecma_transforms_typescript = "30.0"
-swc_ecma_codegen = "17.0"
-swc_ecma_visit = "15.0"
+boa_engine = { version = "0.20", features = ["annex-b"] }
+boa_gc = "0.20"
 
 # Testing dependencies
 criterion = { version = "0.7", features = ["html_reports", "async_tokio"] }

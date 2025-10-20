@@ -21,7 +21,8 @@ use tokio::runtime::Runtime;
 fn create_runtime() -> Runtime {
     Runtime::new().unwrap_or_else(|err| panic!("Failed to create runtime: {err}"))
 }
-use merlin_routing::{RoutingConfig, RoutingOrchestrator};
+use merlin_agent::RoutingOrchestrator;
+use merlin_core::RoutingConfig;
 use std::time::Duration;
 
 /// Benchmark end-to-end request processing

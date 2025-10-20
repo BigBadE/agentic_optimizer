@@ -14,6 +14,7 @@ merlin-providers.workspace = true
 merlin-context.workspace = true
 merlin-languages.workspace = true
 merlin-routing.workspace = true
+merlin-agent.workspace = true
 merlin-local.workspace = true
 anyhow.workspace = true
 clap.workspace = true

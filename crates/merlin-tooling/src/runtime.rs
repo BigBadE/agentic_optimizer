@@ -99,6 +99,10 @@ impl TypeScriptRuntime {
     ///
     /// # Errors
     /// Returns error if execution fails
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Complex Promise handling and tool registration logic"
+    )]
     fn execute_sync(code: &str, tools: &HashMap<String, Arc<dyn Tool>>) -> ToolResult<Value> {
         tracing::debug!("Creating Boa context with job queue");
 
@@ -552,6 +556,10 @@ mod tests {
 
         fn description(&self) -> &'static str {
             "Echoes back the input"
+        }
+
+        fn typescript_signature(&self) -> &'static str {
+            "/**\n * Echoes back the input\n */\ndeclare function echo(params: any): Promise<any>;"
         }
 
         async fn execute(&self, input: ToolInput) -> ToolResult<ToolOutput> {

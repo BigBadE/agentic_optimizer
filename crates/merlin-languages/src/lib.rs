@@ -23,7 +23,7 @@ pub mod provider;
 
 pub use provider::{LanguageProvider, SearchQuery, SearchResult, SymbolInfo, SymbolKind};
 
-use merlin_core::Result;
+use merlin_core::CoreResult as Result;
 
 /// Supported language types for backend creation
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]

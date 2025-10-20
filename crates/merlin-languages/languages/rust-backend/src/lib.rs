@@ -32,7 +32,7 @@ use std::sync::{Arc, Mutex};
 use ra_ap_ide::{Analysis, AnalysisHost, FileId};
 use ra_ap_vfs::Vfs;
 
-use merlin_core::{Error, FileContext, Result};
+use merlin_core::{CoreResult as Result, Error, FileContext};
 /// Information about a code symbol (function, struct, etc.)
 #[derive(Debug, Clone)]
 pub struct SymbolInfo {

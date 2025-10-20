@@ -1,7 +1,7 @@
 //! Trait definition for context planning agents.
 
 use crate::query::{ContextPlan, QueryIntent};
-use merlin_core::Result;
+use merlin_core::CoreResult as Result;
 
 /// Trait for agents that generate context plans
 pub trait ContextAgent: Send + Sync {

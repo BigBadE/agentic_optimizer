@@ -10,7 +10,7 @@ use ra_ap_ide::{
 use ra_ap_ide_db::symbol_index::Query;
 
 use crate::{RustBackend, SearchQuery, SearchResult, SymbolInfo, SymbolKind};
-use merlin_core::{Error, FileContext, Result};
+use merlin_core::{CoreResult as Result, Error, FileContext};
 
 /// Helper type to perform symbol discovery and navigation queries.
 pub struct SymbolSearcher<'analysis> {

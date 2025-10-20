@@ -1,5 +1,5 @@
 use async_trait::async_trait;
-use merlin_core::{Context, Error, ModelProvider, Query, Response, Result, TokenUsage};
+use merlin_core::{Context, CoreResult, Error, ModelProvider, Query, Response, Result, TokenUsage};
 use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env;
@@ -28,7 +28,7 @@ impl GroqProvider {
     /// # Errors
     ///
     /// Returns an error if the `GROQ_API_KEY` environment variable is not set.
-    pub fn new() -> Result<Self> {
+    pub fn new() -> CoreResult<Self> {
         let api_key = env::var(ENV_GROQ_API_KEY)
             .map_err(|_| Error::Other(format!("{ENV_GROQ_API_KEY} not set")))?;
 
@@ -44,7 +44,7 @@ impl GroqProvider {
     /// # Errors
     ///
     /// Returns an error if the provided API key is empty.
-    pub fn with_api_key_direct(api_key: String) -> Result<Self> {
+    pub fn with_api_key_direct(api_key: String) -> CoreResult<Self> {
         if api_key.is_empty() {
             return Err(Error::MissingApiKey(ENV_GROQ_API_KEY.to_owned()));
         }
@@ -191,9 +191,7 @@ impl ModelProvider for GroqProvider {
                 .text()
                 .await
                 .unwrap_or_else(|_| "Unknown error".to_owned());
-            return Err(Error::Other(format!(
-                "Groq API error {status}: {error_text}"
-            )));
+            return Err(Error::Other(format!("Groq API error {status}: {error_text}")).into());
         }
 
         let groq_response: GroqResponse = response

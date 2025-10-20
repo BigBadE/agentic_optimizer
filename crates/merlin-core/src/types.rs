@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
-use crate::{Error, Result};
+use crate::{CoreResult, Error};
 
 /// A query submitted to a model provider for processing.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -121,7 +121,7 @@ pub struct FileContext {
 impl FileContext {
     /// # Errors
     /// Returns an error if the file cannot be read
-    pub fn from_path(path: &PathBuf) -> Result<Self> {
+    pub fn from_path(path: &PathBuf) -> CoreResult<Self> {
         let content =
             read_to_string(path).map_err(|_| Error::FileNotFound(path.display().to_string()))?;
 

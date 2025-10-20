@@ -84,6 +84,23 @@ pub trait Tool: Send + Sync {
     /// Returns a human-readable description of what this tool does and its parameters.
     fn description(&self) -> &'static str;
 
+    /// Returns the TypeScript function signature for this tool.
+    ///
+    /// This signature is used by the TypeScript runtime to provide proper type information.
+    /// The signature should include:
+    /// - `JSDoc` comment with the tool description
+    /// - `declare function` with proper parameter and return types
+    ///
+    /// # Examples
+    ///
+    /// ```text
+    /// /**
+    ///  * Reads a file from the filesystem
+    ///  */
+    /// declare function readFile(path: string): Promise<string>;
+    /// ```
+    fn typescript_signature(&self) -> &'static str;
+
     /// Executes the tool with the provided input parameters.
     ///
     /// # Errors
@@ -171,6 +188,10 @@ mod tests {
 
         fn description(&self) -> &'static str {
             "A mock tool for testing"
+        }
+
+        fn typescript_signature(&self) -> &'static str {
+            "/**\n * A mock tool for testing\n */\ndeclare function mockTool(params: any): Promise<any>;"
         }
 
         async fn execute(&self, input: ToolInput) -> ToolResult<ToolOutput> {

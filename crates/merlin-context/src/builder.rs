@@ -5,7 +5,7 @@ use tokio::task::spawn_blocking;
 use walkdir::{DirEntry, WalkDir};
 
 use core::result::Result as CoreResult;
-use merlin_core::{Context, Error, FileContext, Query, Result};
+use merlin_core::{Context, CoreResult as Result, Error, FileContext, Query};
 use merlin_languages::LanguageProvider;
 
 use crate::context_inclusion::{

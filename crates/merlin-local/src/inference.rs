@@ -1,7 +1,7 @@
 use crate::OllamaManager;
 use crate::models::{OllamaGenerateRequest, OllamaGenerateResponse};
 use async_trait::async_trait;
-use merlin_core::{Context, Error, ModelProvider, Query, Response, Result, TokenUsage};
+use merlin_core::{Context, CoreResult, Error, ModelProvider, Query, Response, Result, TokenUsage};
 use reqwest::Client;
 use std::time::Instant;
 
@@ -46,7 +46,7 @@ impl LocalModelProvider {
         &self,
         prompt: &str,
         system: Option<&str>,
-    ) -> Result<OllamaGenerateResponse> {
+    ) -> CoreResult<OllamaGenerateResponse> {
         let request = OllamaGenerateRequest {
             model: self.model_name.clone(),
             prompt: prompt.to_owned(),
@@ -115,7 +115,7 @@ impl ModelProvider for LocalModelProvider {
                 .is_err()
                 {
                     // Writing to String should never fail, but handle it gracefully
-                    return Err(Error::Other("Failed to write context to prompt".to_owned()));
+                    return Err(Error::Other("Failed to write context to prompt".to_owned()).into());
                 }
             }
         }

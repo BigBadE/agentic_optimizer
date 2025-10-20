@@ -3,7 +3,7 @@
 //! This module provides the core caching functionality with TTL-based expiration
 //! and optional semantic similarity matching.
 
-use crate::config::CacheConfig;
+use crate::CacheConfig;
 use merlin_core::Response;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;

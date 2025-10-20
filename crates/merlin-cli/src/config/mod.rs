@@ -5,7 +5,7 @@ use std::path::Path;
 use toml::from_str;
 use tracing::warn;
 
-use merlin_core::Result;
+use merlin_core::{Result, RoutingError};
 
 const ENV_OPENROUTER_API_KEY: &str = "OPENROUTER_API_KEY";
 
@@ -23,7 +23,8 @@ impl Config {
     /// Returns an error if reading the file or parsing TOML fails.
     pub fn from_file(path: &Path) -> Result<Self> {
         let content = read_to_string(path)?;
-        let config: Self = from_str(&content)?;
+        let config: Self = from_str(&content)
+            .map_err(|err| RoutingError::InvalidTask(format!("Failed to parse config: {err}")))?;
         Ok(config)
     }
 

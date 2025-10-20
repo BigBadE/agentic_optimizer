@@ -1,7 +1,8 @@
 //! Interactive mode functionality - TUI mode
 
 use anyhow::Result;
-use merlin_routing::{RoutingOrchestrator, Task, TaskId};
+use merlin_agent::RoutingOrchestrator;
+use merlin_routing::{Task, TaskId};
 
 use crate::ui::{MessageLevel, TuiApp, UiChannel, UiEvent};
 use std::fs;

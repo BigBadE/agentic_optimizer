@@ -2,11 +2,12 @@
 
 use anyhow::Result;
 use console::{Term, style};
+use merlin_agent::RoutingOrchestrator;
 use merlin_context::ContextBuilder;
 use merlin_core::{Context, ModelProvider as _, Query};
 use merlin_languages::{Language, create_backend};
 use merlin_providers::OpenRouterProvider;
-use merlin_routing::{RoutingConfig, RoutingOrchestrator};
+use merlin_routing::RoutingConfig;
 use std::path::{Path, PathBuf};
 use toml::to_string_pretty;
 

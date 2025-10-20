@@ -15,7 +15,8 @@
 )]
 
 use gungraun::{library_benchmark, library_benchmark_group, main};
-use merlin_routing::{RoutingConfig, RoutingOrchestrator};
+use merlin_agent::RoutingOrchestrator;
+use merlin_core::RoutingConfig;
 use std::hint::black_box;
 use tokio::runtime::Runtime;
 

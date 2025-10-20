@@ -119,20 +119,20 @@ impl TaskManager {
 
     /// Rebuilds task order from parent relationships
     ///
-    /// Orders tasks by timestamp (oldest first). Uses Instant for sorting within
-    /// a single program run for consistent ordering.
+    /// Orders tasks by creation time (oldest first). Uses `SystemTime` which persists
+    /// across program runs, unlike `Instant` which is relative to program start.
     pub fn rebuild_order(&mut self) {
         self.task_order.clear();
 
-        // Collect all task IDs with their timestamps
-        let mut all_tasks: Vec<(TaskId, Instant)> = self
+        // Collect all task IDs with their creation times
+        let mut all_tasks: Vec<(TaskId, SystemTime)> = self
             .tasks
             .iter()
-            .map(|(&id, task)| (id, task.timestamp))
+            .map(|(&id, task)| (id, task.created_at))
             .collect();
 
-        // Sort by timestamp ascending (oldest first)
-        all_tasks.sort_by_key(|(_, timestamp)| *timestamp);
+        // Sort by creation time ascending (oldest first)
+        all_tasks.sort_by_key(|(_, created_at)| *created_at);
 
         // Add root tasks first, then recursively add their children
         for (task_id, _) in &all_tasks {

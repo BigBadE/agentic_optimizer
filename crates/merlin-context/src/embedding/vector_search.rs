@@ -21,7 +21,7 @@ use crate::embedding::{BM25Index, EmbeddingClient, SearchResult, VectorStore, ge
 use crate::fs_utils::is_source_file;
 use bincode::config::standard as bincode_config;
 use bincode::{Decode, Encode, decode_from_slice, encode_to_vec};
-use merlin_core::{Error, Result};
+use merlin_core::{CoreResult as Result, Error};
 
 type ChunkResult = (PathBuf, FileChunk, Vec<f32>, String, u64);
 type FileChunksData = (PathBuf, String, Vec<FileChunk>, u64);

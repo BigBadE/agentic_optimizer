@@ -92,11 +92,52 @@ impl Tool for BashTool {
     }
 
     fn description(&self) -> &'static str {
-        "Execute a shell command using bash. Takes a single string parameter containing the command to execute. On Windows, requires Git Bash or similar to be installed."
+        "Execute a shell command using bash. \n\
+         Usage: bash(\"command string\")\n\
+         Example: bash(\"ls -la\") or bash(\"grep -r TODO . --exclude-dir={.git,target,node_modules}\")\n\
+         \n\
+         IMPORTANT for grep/search commands:\n\
+         - Always exclude build artifacts: --exclude-dir={.git,target,node_modules,dist,build}\n\
+         - Exclude binary files: --binary-files=without-match or -I\n\
+         - Filter by file type using multiple --include flags (one per extension)\n\
+         - Example: bash(\"grep -r -I 'pattern' . --include='*.rs' --exclude-dir={.git,target}\")\n\
+         - Example: bash(\"grep -r 'TODO' . --include='*.rs' --include='*.toml' --exclude-dir={.git,target}\")"
+    }
+
+    fn typescript_signature(&self) -> &'static str {
+        "/**\n\
+         * Execute a shell command using bash. \n\
+         * Usage: bash(\"command string\")\n\
+         * Example: bash(\"ls -la\") or bash(\"grep -r TODO . --exclude-dir={.git,target,node_modules}\")\n\
+         * \n\
+         * IMPORTANT for grep/search commands:\n\
+         * - Always exclude build artifacts: --exclude-dir={.git,target,node_modules,dist,build}\n\
+         * - Exclude binary files: --binary-files=without-match or -I\n\
+         * - Filter by file type using multiple --include flags (one per extension)\n\
+         * - Example: bash(\"grep -r -I 'pattern' . --include='*.rs' --exclude-dir={.git,target}\")\n\
+         * - Example: bash(\"grep -r 'TODO' . --include='*.rs' --include='*.toml' --exclude-dir={.git,target}\")\n\
+         */\n\
+         declare function bash(command: string): Promise<{ stdout: string; stderr: string; exit_code: number }>;"
     }
 
     async fn execute(&self, input: ToolInput) -> ToolResult<ToolOutput> {
-        let command: String = from_value(input.params)?;
+        // Support both direct string parameter (from TypeScript runtime)
+        // and object parameter (from agent/routing system)
+        let command: String = if input.params.is_string() {
+            // Direct string from TypeScript: bash("command")
+            from_value(input.params)?
+        } else {
+            // Object from agent: { "command": "..." }
+            from_value(
+                input
+                    .params
+                    .get("command")
+                    .ok_or_else(|| {
+                        ToolError::InvalidInput("Missing 'command' parameter".to_owned())
+                    })?
+                    .clone(),
+            )?
+        };
         self.execute_command(&command).await
     }
 }

@@ -1,4 +1,4 @@
-use merlin_core::{FileContext, Result};
+use merlin_core::{CoreResult as Result, FileContext};
 use std::path::{Path, PathBuf};
 
 /// Information about a code symbol (function, struct, etc.)

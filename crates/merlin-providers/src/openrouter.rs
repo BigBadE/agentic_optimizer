@@ -4,9 +4,9 @@ use std::time::Instant;
 use async_trait::async_trait;
 use reqwest::Client;
 use serde::Deserialize;
-use serde_json::json;
+use serde_json::{Value, json};
 
-use merlin_core::{Context, Error, ModelProvider, Query, Response, Result, TokenUsage};
+use merlin_core::{Context, CoreResult, Error, ModelProvider, Query, Response, Result, TokenUsage};
 
 /// `OpenRouter` API endpoint URL.
 const OPENROUTER_API_URL: &str = "https://openrouter.ai/api/v1/chat/completions";
@@ -30,7 +30,7 @@ impl OpenRouterProvider {
     ///
     /// # Errors
     /// Returns an error if the provided API key is empty.
-    pub fn new(api_key: String) -> Result<Self> {
+    pub fn new(api_key: String) -> CoreResult<Self> {
         if api_key.is_empty() {
             return Err(Error::MissingApiKey(ENV_OPENROUTER_API_KEY.to_owned()));
         }
@@ -46,7 +46,7 @@ impl OpenRouterProvider {
     ///
     /// # Errors
     /// Returns an error if the env var is missing.
-    pub fn from_env() -> Result<Self> {
+    pub fn from_env() -> CoreResult<Self> {
         let api_key = env::var(ENV_OPENROUTER_API_KEY)
             .map_err(|_| Error::MissingApiKey(ENV_OPENROUTER_API_KEY.to_owned()))?;
         Self::new(api_key)
@@ -56,7 +56,7 @@ impl OpenRouterProvider {
     ///
     /// # Errors
     /// Returns an error if the API key is not provided.
-    pub fn from_config_or_env(config_key: Option<String>) -> Result<Self> {
+    pub fn from_config_or_env(config_key: Option<String>) -> CoreResult<Self> {
         let api_key = config_key
             .or_else(|| env::var(ENV_OPENROUTER_API_KEY).ok())
             .ok_or_else(|| {
@@ -72,6 +72,32 @@ impl OpenRouterProvider {
     pub fn with_model(mut self, model: String) -> Self {
         self.model = model;
         self
+    }
+
+    /// Builds messages from context and query for the `OpenRouter` API.
+    fn build_messages(context: &Context, query: &Query) -> Vec<Value> {
+        let mut messages = vec![json!({
+            "role": "system",
+            "content": context.system_prompt
+        })];
+
+        if !context.files.is_empty() {
+            messages.push(json!({
+                "role": "user",
+                "content": [{
+                    "type": "text",
+                    "text": format!("Context:\n{}", context.files_to_string()),
+                    "cache_control": {"type": "ephemeral"}
+                }]
+            }));
+        }
+
+        messages.push(json!({
+            "role": "user",
+            "content": query.text
+        }));
+
+        messages
     }
 }
 
@@ -131,26 +157,7 @@ impl ModelProvider for OpenRouterProvider {
     async fn generate(&self, query: &Query, context: &Context) -> Result<Response> {
         let start = Instant::now();
 
-        let mut messages = vec![json!({
-            "role": "system",
-            "content": context.system_prompt
-        })];
-
-        if !context.files.is_empty() {
-            messages.push(json!({
-                "role": "user",
-                "content": [{
-                    "type": "text",
-                    "text": format!("Context:\n{}", context.files_to_string()),
-                    "cache_control": {"type": "ephemeral"}
-                }]
-            }));
-        }
-
-        messages.push(json!({
-            "role": "user",
-            "content": query.text
-        }));
+        let messages = Self::build_messages(context, query);
 
         let request_body = json!({
             "model": self.model,
@@ -170,17 +177,22 @@ impl ModelProvider for OpenRouterProvider {
             .header("X-Title", "Agentic Optimizer")
             .json(&request_body)
             .send()
-            .await?;
+            .await
+            .map_err(|err| Error::Provider(format!("Request failed: {err}")))?;
 
         if !response.status().is_success() {
             let status = response.status();
             let error_text = response.text().await.unwrap_or_default();
             return Err(Error::Provider(format!(
                 "OpenRouter API request failed with status {status}: {error_text}"
-            )));
+            ))
+            .into());
         }
 
-        let api_response: OpenRouterResponse = response.json().await?;
+        let api_response: OpenRouterResponse = response
+            .json()
+            .await
+            .map_err(|err| Error::Provider(format!("Failed to parse response: {err}")))?;
 
         let text = api_response
             .choices

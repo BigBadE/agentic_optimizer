@@ -16,7 +16,8 @@
 use std::hint::black_box;
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
-use merlin_routing::{RoutingConfig, RoutingOrchestrator};
+use merlin_agent::RoutingOrchestrator;
+use merlin_core::RoutingConfig;
 use std::time::Duration;
 use tokio::runtime::Runtime;
 
@@ -89,7 +90,8 @@ fn bench_task_decomposition(criterion: &mut Criterion) {
 
 /// Benchmark task graph construction
 fn bench_task_graph(criterion: &mut Criterion) {
-    use merlin_routing::{Task, executor::graph::TaskGraph};
+    use merlin_agent::TaskGraph;
+    use merlin_core::Task;
 
     let mut group = criterion.benchmark_group("task_graph");
 

@@ -16,8 +16,8 @@
     reason = "Test allows"
 )]
 
+use merlin_context::ContextFetcher;
 use merlin_core::Query;
-use merlin_routing::agent::ContextFetcher;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};

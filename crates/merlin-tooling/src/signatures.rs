@@ -16,54 +16,11 @@ pub fn generate_typescript_signatures(tools: &[&dyn Tool]) -> Result<String, Fmt
     let mut output = String::new();
 
     for tool in tools {
-        let signature = generate_tool_signature(*tool)?;
-        writeln!(output, "{signature}")?;
+        writeln!(output, "{}", tool.typescript_signature())?;
         writeln!(output)?;
     }
 
     Ok(output)
-}
-
-/// Generate a TypeScript function signature for a single tool
-///
-/// # Errors
-/// Returns an error if formatting fails
-fn generate_tool_signature(tool: &dyn Tool) -> Result<String, FmtError> {
-    let mut sig = String::new();
-
-    // Add JSDoc comment with description
-    writeln!(sig, "/**")?;
-    writeln!(sig, " * {}", tool.description())?;
-    writeln!(sig, " */")?;
-
-    // For now, use a simple signature since we don't have parameter schemas
-    // Tools can provide TypeScript-compatible parameters
-    write!(
-        sig,
-        "declare function {}(params: any): Promise<any>;",
-        to_camel_case(tool.name())
-    )?;
-
-    Ok(sig)
-}
-
-/// Convert `snake_case` to `camelCase`
-fn to_camel_case(input_str: &str) -> String {
-    let mut result = String::new();
-    let mut capitalize_next = false;
-
-    for character in input_str.chars() {
-        if character == '_' {
-            capitalize_next = true;
-        } else if capitalize_next {
-            result.push(character.to_ascii_uppercase());
-            capitalize_next = false;
-        } else {
-            result.push(character);
-        }
-    }
-
-    result
 }
 
 #[cfg(test)]
@@ -84,29 +41,13 @@ mod tests {
             "Reads a file from the filesystem"
         }
 
+        fn typescript_signature(&self) -> &'static str {
+            "/**\n * Reads a file from the filesystem\n */\ndeclare function readFile(path: string): Promise<string>;"
+        }
+
         async fn execute(&self, _input: ToolInput) -> ToolResult<ToolOutput> {
             Ok(ToolOutput::success("test"))
         }
-    }
-
-    #[test]
-    fn test_to_camel_case() {
-        assert_eq!(to_camel_case("read_file"), "readFile");
-        assert_eq!(to_camel_case("write_file"), "writeFile");
-        assert_eq!(to_camel_case("list_files"), "listFiles");
-        assert_eq!(to_camel_case("run_command"), "runCommand");
-    }
-
-    #[test]
-    fn test_generate_tool_signature() {
-        let tool = MockTool;
-        let signature = generate_tool_signature(&tool).unwrap();
-
-        assert!(signature.contains("/**"));
-        assert!(signature.contains("Reads a file from the filesystem"));
-        assert!(signature.contains("*/"));
-        assert!(signature.contains("declare function readFile"));
-        assert!(signature.contains("Promise<any>"));
     }
 
     #[test]
@@ -115,5 +56,7 @@ mod tests {
         let signatures = generate_typescript_signatures(&tools).unwrap();
 
         assert!(signatures.contains("declare function readFile"));
+        assert!(signatures.contains("Reads a file from the filesystem"));
+        assert!(signatures.contains("Promise<string>"));
     }
 }

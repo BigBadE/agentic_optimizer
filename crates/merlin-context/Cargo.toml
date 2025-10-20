@@ -24,10 +24,7 @@ toml.workspace = true
 clap.workspace = true
 chrono.workspace = true
 futures.workspace = true
-
-[[bin]]
-name = "benchmark"
-path = "src/bin/benchmark.rs"
+regex.workspace = true
 
 [lints]
 workspace = true

@@ -83,6 +83,10 @@ mod tests {
             "A mock tool for testing"
         }
 
+        fn typescript_signature(&self) -> &'static str {
+            "/**\n * A mock tool for testing\n */\ndeclare function mockTool(params: any): Promise<any>;"
+        }
+
         async fn execute(&self, _input: ToolInput) -> ToolResult<ToolOutput> {
             Ok(ToolOutput::success("test"))
         }

@@ -8,7 +8,7 @@ use super::agent::ContextAgent;
 use super::prompts;
 use crate::models::{ModelConfig, TaskComplexity};
 use crate::query::{ContextPlan, QueryIntent};
-use merlin_core::{Error, Result};
+use merlin_core::{CoreResult as Result, Error};
 use ollama_rs::{Ollama, generation::chat::ChatMessage};
 use serde_json::Value;
 

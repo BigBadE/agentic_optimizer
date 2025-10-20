@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::provider::{LanguageProvider, SearchQuery, SearchResult, SymbolInfo, SymbolKind};
-use merlin_core::{FileContext, Result};
+use merlin_core::{CoreResult as Result, FileContext};
 use rust_backend::{RustBackend, SearchQuery as RustSearchQuery, SymbolKind as RustSymbolKind};
 
 /// Wrapper for `RustBackend` that implements `LanguageProvider`

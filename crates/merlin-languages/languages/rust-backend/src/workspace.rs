@@ -12,7 +12,7 @@ use ra_ap_project_model::{CargoConfig, RustLibSource};
 use ra_ap_vfs::Vfs;
 
 use crate::cache::WorkspaceCache;
-use merlin_core::{Error, Result};
+use merlin_core::{CoreResult as Result, Error};
 
 /// File ID mapping from paths to rust-analyzer file IDs
 pub type FileIdMap = HashMap<PathBuf, FileId>;

@@ -8,7 +8,7 @@ use ra_ap_ide::Analysis;
 use ra_ap_syntax::{AstNode as _, SyntaxKind, ast};
 
 use crate::RustBackend;
-use merlin_core::{Error, FileContext, Result};
+use merlin_core::{CoreResult as Result, Error, FileContext};
 
 /// Helper to compute related files and imports for a Rust source file.
 pub struct ContextBuilder<'analysis> {

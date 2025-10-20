@@ -18,6 +18,7 @@ merlin-context = { path = "crates/merlin-context" }
 merlin-languages = { path = "crates/merlin-languages" }
 merlin-tooling = { path = "crates/merlin-tooling" }
 merlin-routing = { path = "crates/merlin-routing" }
+merlin-agent = { path = "crates/merlin-agent" }
 merlin-local = { path = "crates/merlin-local" }
 rust-backend = { path = "crates/merlin-languages/languages/rust-backend" }
 

@@ -836,7 +836,7 @@ return {
 async fn test_typescript_arrow_function_types() {
     let runtime = TypeScriptRuntime::new();
 
-    let code = r#"
+    let code = r"
 const multiply = (a: number, b: number): number => a * b;
 const isAdult = (age: number): boolean => age >= 18;
 
@@ -845,7 +845,7 @@ return {
     adult: isAdult(20),
     child: isAdult(15)
 };
-"#;
+";
 
     let result = runtime.execute(code).await;
     assert!(result.is_ok(), "Failed: {:?}", result.err());
@@ -1043,7 +1043,7 @@ async function agent_code(): Promise<object> {
     assert!(value.is_object());
     let obj = value.as_object().unwrap();
     assert_eq!(obj.get("done"), Some(&serde_json::json!(true)));
-    let output = obj.get("output").and_then(|v| v.as_str()).unwrap();
+    let output = obj.get("output").and_then(|val| val.as_str()).unwrap();
     assert!(output.contains("first"));
     assert!(output.contains("second"));
 }
@@ -1081,7 +1081,7 @@ return config;
 async fn test_typescript_enum() {
     let runtime = TypeScriptRuntime::new();
 
-    let code = r#"
+    let code = r"
 enum Status {
     Pending = 0,
     Success = 1,
@@ -1091,7 +1091,7 @@ enum Status {
 const current: Status = Status.Success;
 
 return { status: current };
-"#;
+";
 
     let result = runtime.execute(code).await;
     assert!(result.is_ok(), "Failed: {:?}", result.err());
@@ -1136,7 +1136,7 @@ async function agent_code(): Promise<object> {
     assert_eq!(obj.get("done"), Some(&serde_json::json!(true)));
     assert!(
         obj.get("data")
-            .and_then(|v| v.as_str())
+            .and_then(|val| val.as_str())
             .unwrap()
             .contains("test output")
     );
@@ -1163,4 +1163,27 @@ async function agent_code(): Promise<string> {
     assert!(value.is_string());
     let output = value.as_str().unwrap();
     assert!(output.contains("TODO"));
+}
+
+/// Test the exact user code with grep command
+#[tokio::test]
+async fn test_user_grep_command() {
+    let mut runtime = TypeScriptRuntime::new();
+    runtime.register_tool(Arc::new(BashTool));
+
+    // Use a simpler grep command that won't fail
+    let code = r#"
+async function agent_code(): Promise<string> {
+    let r = await bash("grep -r TODO . --exclude-dir=target 2>&1 || echo 'No matches'");
+    if (r.stderr) return "Error searching TODOs: " + r.stderr;
+    return r.stdout || "No TODOs found in the codebase";
+}
+"#;
+
+    let result = runtime.execute(code).await;
+    println!("Result: {result:?}");
+    if let Err(ref err) = result {
+        println!("Error details: {err}");
+    }
+    assert!(result.is_ok(), "Failed: {:?}", result.err());
 }

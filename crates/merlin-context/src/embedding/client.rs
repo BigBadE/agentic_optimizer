@@ -1,7 +1,7 @@
 //! Embedding and vector search functionality using Ollama.
 
 use crate::models::ModelConfig;
-use merlin_core::{Error, Result};
+use merlin_core::{CoreResult as Result, Error};
 use ollama_rs::Ollama;
 use std::cmp::Ordering;
 use std::collections::HashMap;

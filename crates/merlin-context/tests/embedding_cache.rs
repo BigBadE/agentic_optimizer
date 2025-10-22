@@ -17,6 +17,7 @@
 )]
 
 use merlin_context::VectorSearchManager;
+use std::env;
 use std::fs;
 use tempfile::TempDir;
 
@@ -50,6 +51,9 @@ fn create_test_project() -> TempDir {
 
 #[tokio::test]
 async fn test_cache_initialization_and_persistence() {
+    // Ensure each test uses its own cache directory (not global MERLIN_FOLDER)
+    env::remove_var("MERLIN_FOLDER");
+
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
 
@@ -93,6 +97,8 @@ async fn test_cache_initialization_and_persistence() {
 
 #[tokio::test]
 async fn test_cache_invalidation_on_file_modification() {
+    env::remove_var("MERLIN_FOLDER");
+
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
 
@@ -134,6 +140,8 @@ async fn test_cache_invalidation_on_file_modification() {
 
 #[tokio::test]
 async fn test_cache_handles_new_files() {
+    env::remove_var("MERLIN_FOLDER");
+
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
 
@@ -172,6 +180,8 @@ async fn test_cache_handles_new_files() {
 
 #[tokio::test]
 async fn test_cache_handles_deleted_files() {
+    env::remove_var("MERLIN_FOLDER");
+
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
 
@@ -206,6 +216,8 @@ async fn test_cache_handles_deleted_files() {
 
 #[tokio::test]
 async fn test_empty_cache_rebuilds() {
+    env::remove_var("MERLIN_FOLDER");
+
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
 
@@ -248,6 +260,8 @@ async fn test_empty_cache_rebuilds() {
 
 #[tokio::test]
 async fn test_search_returns_relevant_results() {
+    env::remove_var("MERLIN_FOLDER");
+
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
 
@@ -301,6 +315,8 @@ fn test_cache_directory_creation() {
 
 #[tokio::test]
 async fn test_concurrent_file_processing() {
+    env::remove_var("MERLIN_FOLDER");
+
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
 
@@ -348,6 +364,8 @@ fn test_chunk_count_consistency() {
 
 #[tokio::test]
 async fn test_cache_version_validation() {
+    env::remove_var("MERLIN_FOLDER");
+
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
 
@@ -390,6 +408,8 @@ async fn test_batch_processing_timeout() {
     use std::time::Duration;
     use tokio::time::timeout;
 
+    env::remove_var("MERLIN_FOLDER");
+
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
     let project_root = temp_dir.path().to_path_buf();
     let src_dir = project_root.join("src");
@@ -410,9 +430,10 @@ async fn test_batch_processing_timeout() {
     // Initialize vector search manager with a timeout
     let mut manager = VectorSearchManager::new(project_root.clone());
 
-    // Set a reasonable timeout - should complete in 30 seconds if working correctly
+    // Set a reasonable timeout - should complete in 120 seconds if working correctly
+    // This needs to be long enough to allow model pulling on first run
     // If it hangs after 10 files, this will catch it
-    let result = timeout(Duration::from_secs(30), manager.initialize()).await;
+    let result = timeout(Duration::from_secs(120), manager.initialize()).await;
 
     match result {
         Ok(Ok(())) => {

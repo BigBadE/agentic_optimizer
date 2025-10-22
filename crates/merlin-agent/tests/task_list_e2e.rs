@@ -61,18 +61,14 @@ async fn test_all_fixtures_with_agent_execution() {
         let mock_provider = Arc::new(fixture.create_mock_provider()) as Arc<dyn ModelProvider>;
 
         // 2. Create provider registry with mock provider
-        let provider_registry = Arc::new(
+        let provider_registry =
             ProviderRegistry::with_mock_provider(&mock_provider).expect(&format!(
                 "Failed to create provider registry for fixture: {}",
                 fixture.name
-            )),
-        );
+            ));
 
-        // 3. Create router, validator, and other components
-        let router = Arc::new(StrategyRouter::with_default_strategies().expect(&format!(
-            "Failed to create router for fixture: {}",
-            fixture.name
-        )));
+        // 3. Create router with mock provider registry (not default strategies!)
+        let router = Arc::new(StrategyRouter::new(provider_registry.clone()));
 
         let validator = Arc::new(ValidationPipeline::with_default_stages());
         let tool_registry = Arc::new(ToolRegistry::default());
@@ -86,7 +82,7 @@ async fn test_all_fixtures_with_agent_execution() {
             tool_registry,
             context_fetcher,
             config,
-            provider_registry,
+            provider_registry: Arc::new(provider_registry),
         })
         .expect(&format!(
             "Failed to create agent executor for fixture: {}",

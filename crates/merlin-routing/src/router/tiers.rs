@@ -162,6 +162,7 @@ mod tests {
     }
 
     #[tokio::test]
+    #[ignore = "Requires Ollama running locally"]
     async fn test_custom_model_registry() -> Result<()> {
         let mut config = RoutingConfig::default();
         config.tiers.groq_enabled = false;

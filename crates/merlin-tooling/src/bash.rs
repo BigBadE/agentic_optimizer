@@ -30,19 +30,31 @@ impl BashTool {
 
         // Use spawn_blocking to run blocking I/O on Tokio's global thread pool
         // This works even when called from a current_thread runtime
-        tracing::debug!("About to call spawn_blocking");
+        tracing::debug!("About to call spawn_blocking for command: {}", command);
         let output = spawn_blocking(move || {
             tracing::debug!("Inside spawn_blocking, about to run command");
             // Use bash on all platforms for consistency
-            // On Windows, this requires Git Bash or similar to be installed
-            let result = Command::new("bash").arg("-c").arg(&command).output();
+            // On Windows, Git Bash should be in PATH via GitHub Actions
+            // On Unix systems, bash is standard
+            let result = Command::new("bash")
+                .arg("-c")
+                .arg(&command)
+                .env("LANG", "C.UTF-8") // Ensure consistent locale
+                .output();
 
-            tracing::debug!("Command finished in spawn_blocking");
+            tracing::debug!(
+                "Command finished in spawn_blocking with result: {:?}",
+                result.as_ref().map(|output| output.status)
+            );
             result
         })
         .await
         .map_err(|err| ToolError::ExecutionFailed(format!("Task join failed: {err}")))?
-        .map_err(|err| ToolError::ExecutionFailed(format!("Command execution failed: {err}")))?;
+        .map_err(|err| {
+            ToolError::ExecutionFailed(format!(
+                "Command execution failed (is bash available in PATH?): {err}"
+            ))
+        })?;
 
         let stdout = String::from_utf8_lossy(&output.stdout).to_string();
         let stderr = String::from_utf8_lossy(&output.stderr).to_string();
@@ -52,6 +64,13 @@ impl BashTool {
         let message = if success {
             format!("Command executed successfully (exit code: {exit_code})")
         } else {
+            tracing::warn!(
+                "Command failed: {} | Exit code: {} | Stdout: {} | Stderr: {}",
+                command_str,
+                exit_code,
+                stdout,
+                stderr
+            );
             format!("Command failed with exit code: {exit_code}")
         };
 

@@ -18,14 +18,11 @@
     )
 )]
 
-use merlin_agent::RoutingOrchestrator;
-use merlin_core::{ModelProvider, Result, RoutingConfig};
+use merlin_core::Result;
 use merlin_providers::MockProvider;
-use merlin_routing::ProviderRegistry;
 use serde::{Deserialize, Serialize};
 use std::fs;
 use std::path::Path;
-use std::sync::Arc;
 
 /// Mock response pattern matching.
 #[derive(Debug, Clone, Serialize)]
@@ -147,23 +144,6 @@ impl TaskListFixture {
         }
 
         provider
-    }
-
-    /// Create a test orchestrator with this fixture's mock provider.
-    ///
-    /// # Errors
-    /// Returns error if orchestrator creation fails.
-    pub fn create_test_orchestrator(&self) -> Result<RoutingOrchestrator> {
-        let config = RoutingConfig::default();
-        let _mock_provider = Arc::new(self.create_mock_provider()) as Arc<dyn ModelProvider>;
-
-        // Create a provider registry with just the mock provider
-        let _provider_registry = ProviderRegistry::new(config.clone())?;
-
-        // TODO: Need to expose a way to register custom providers in ProviderRegistry
-        // For now, this is a placeholder showing the intended usage
-
-        RoutingOrchestrator::new(config)
     }
 
     /// Verify that actual task list matches expected structure.

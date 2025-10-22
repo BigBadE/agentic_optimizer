@@ -15,7 +15,7 @@ runs:
     - name: Checkout repository
       uses: actions/checkout@v4
       with:
-        repository: 'https://github.com/BigBadE/valor'
+        repository: 'BigBadE/valor'
         path: benchmarks/crates/quality/test_repositories/valor
 
     - name: Setup fast cargo config

@@ -33,13 +33,23 @@ jobs:
 
       - name: Setup bash environment (Windows)
         if: matrix.os == 'windows-latest'
+        shell: pwsh
+        run: |
+          # Add Git Bash to PATH for Windows
+          $gitPath = "C:\Program Files\Git\bin"
+          if (Test-Path $gitPath) {
+            echo "Adding Git Bash to PATH: $gitPath"
+            echo "$gitPath" | Out-File -FilePath $env:GITHUB_PATH -Encoding utf8 -Append
+          } else {
+            echo "Warning: Git Bash not found at $gitPath"
+          }
+
+      - name: Verify bash availability (Windows)
+        if: matrix.os == 'windows-latest'
         shell: bash
         run: |
-          # Ensure bash is in PATH and working
           echo "Bash version: $(bash --version | head -1)"
           echo "PATH: $PATH"
-          # Test echo command
-          echo 'Test echo' || echo "Echo failed"
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
@@ -47,14 +57,10 @@ jobs:
           profile: ci
           components: clippy, rustfmt
 
-      - name: Install cargo-llvm-cov
-        uses: taiki-e/install-action@cargo-llvm-cov
-
-      - name: Run tests with coverage
-        run: cargo build --profile ci --verbose && cargo llvm-cov --profile ci --lcov --output-path coverage.info --ignore-filename-regex "test_repositories|benchmarks" --all-features --workspace --no-fail-fast --lib --bins --tests --verbose -- --nocapture
+      - name: Run tests
+        run: cargo build --profile ci --verbose && cargo test --profile ci --all-features --workspace --no-fail-fast --lib --bins --tests --verbose -- --nocapture
 
       - name: Clean up build artifacts to free disk space
-        if: always()
         run: |
           # Remove build artifacts but keep dependencies
           rm -rf target/ci/deps/*.d target/ci/deps/*.o 2>/dev/null || true
@@ -62,12 +68,3 @@ jobs:
           find target/ci -type f -executable -delete 2>/dev/null || true
           # Show remaining disk usage
           df -h
-
-      - name: Upload coverage to Codecov
-        if: github.event_name == 'push' && matrix.os == 'ubuntu-latest'
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./coverage.info
-          verbose: true
-          fail_ci_if_error: false

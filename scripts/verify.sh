@@ -40,8 +40,11 @@ fi
 cargo fmt --all -q
 cargo clippy --all-targets --all-features -- -D warnings
 
-# Run full workspace tests
-cargo test --workspace --no-fail-fast --lib --bins --tests -- --nocapture
+# Run full workspace tests with coverage
+echo "[verify] Running tests with coverage instrumentation..."
+cargo build --profile ci --verbose
+mkdir -p benchmarks/data/coverage
+cargo llvm-cov --profile ci --lcov --output-path benchmarks/data/coverage/latest.info --ignore-filename-regex "test_repositories|benchmarks" --all-features --workspace --no-fail-fast --lib --bins --tests -- --nocapture
 
 # Optionally run Ollama-specific tests by name filter
 if [ "$RUN_OLLAMA" = true ]; then

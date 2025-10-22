@@ -1121,7 +1121,17 @@ impl AgentExecutor {
         info!("Task: {}", task.description);
         info!("");
 
-        // Conversation history
+        self.log_conversation_history().await;
+        Self::log_system_prompt(context);
+        Self::log_statistics(context);
+
+        info!("================================================");
+    }
+
+    /// Log conversation history section
+    async fn log_conversation_history(&self) {
+        use tracing::info;
+
         let conv_history = self.conversation_history.lock().await;
         if !conv_history.is_empty() {
             info!(
@@ -1134,14 +1144,21 @@ impl AgentExecutor {
                 info!("");
             }
         }
-        drop(conv_history);
+    }
 
-        // System prompt
+    /// Log system prompt section
+    fn log_system_prompt(context: &Context) {
+        use tracing::info;
+
         info!("=== SYSTEM PROMPT ===");
         info!("{}", context.system_prompt);
         info!("");
+    }
 
-        // Token estimate
+    /// Log statistics section
+    fn log_statistics(context: &Context) {
+        use tracing::info;
+
         info!("=== STATISTICS ===");
         info!("Estimated tokens: {}", context.token_estimate());
         info!("Files: {}", context.files.len());
@@ -1149,7 +1166,6 @@ impl AgentExecutor {
             "System prompt length: {} chars",
             context.system_prompt.len()
         );
-        info!("================================================");
     }
 }
 

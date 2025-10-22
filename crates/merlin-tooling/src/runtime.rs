@@ -208,11 +208,11 @@ impl TypeScriptRuntime {
         error_check.as_object().map_or_else(
             || format!("{error_check:?}"),
             |err_obj| {
-                err_obj
-                    .get(js_string!("message"), context)
-                    .ok()
-                    .and_then(|val| val.as_string().map(JsString::to_std_string_escaped))
-                    .unwrap_or_else(|| format!("{error_check:?}"))
+                let result = (|| {
+                    let val = err_obj.get(js_string!("message"), context).ok()?;
+                    val.as_string().map(JsString::to_std_string_escaped)
+                })();
+                result.unwrap_or_else(|| format!("{error_check:?}"))
             },
         )
     }

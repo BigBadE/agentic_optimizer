@@ -4,6 +4,7 @@
     test,
     allow(
         dead_code,
+        unsafe_code,
         clippy::expect_used,
         clippy::unwrap_used,
         clippy::panic,
@@ -12,6 +13,7 @@
         clippy::print_stdout,
         clippy::print_stderr,
         clippy::tests_outside_test_module,
+        clippy::undocumented_unsafe_blocks,
         reason = "Test allows"
     )
 )]
@@ -52,7 +54,11 @@ fn create_test_project() -> TempDir {
 #[tokio::test]
 async fn test_cache_initialization_and_persistence() {
     // Ensure each test uses its own cache directory (not global MERLIN_FOLDER)
-    env::remove_var("MERLIN_FOLDER");
+    // SAFETY: We are in a test environment and need to ensure clean state.
+    // This is safe because we are in a single-threaded test context.
+    unsafe {
+        env::remove_var("MERLIN_FOLDER");
+    }
 
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
@@ -97,7 +103,11 @@ async fn test_cache_initialization_and_persistence() {
 
 #[tokio::test]
 async fn test_cache_invalidation_on_file_modification() {
-    env::remove_var("MERLIN_FOLDER");
+    // SAFETY: We are in a test environment and need to ensure clean state.
+    // This is safe because we are in a single-threaded test context.
+    unsafe {
+        env::remove_var("MERLIN_FOLDER");
+    }
 
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
@@ -140,7 +150,11 @@ async fn test_cache_invalidation_on_file_modification() {
 
 #[tokio::test]
 async fn test_cache_handles_new_files() {
-    env::remove_var("MERLIN_FOLDER");
+    // SAFETY: We are in a test environment and need to ensure clean state.
+    // This is safe because we are in a single-threaded test context.
+    unsafe {
+        env::remove_var("MERLIN_FOLDER");
+    }
 
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
@@ -180,7 +194,11 @@ async fn test_cache_handles_new_files() {
 
 #[tokio::test]
 async fn test_cache_handles_deleted_files() {
-    env::remove_var("MERLIN_FOLDER");
+    // SAFETY: We are in a test environment and need to ensure clean state.
+    // This is safe because we are in a single-threaded test context.
+    unsafe {
+        env::remove_var("MERLIN_FOLDER");
+    }
 
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
@@ -216,7 +234,11 @@ async fn test_cache_handles_deleted_files() {
 
 #[tokio::test]
 async fn test_empty_cache_rebuilds() {
-    env::remove_var("MERLIN_FOLDER");
+    // SAFETY: We are in a test environment and need to ensure clean state.
+    // This is safe because we are in a single-threaded test context.
+    unsafe {
+        env::remove_var("MERLIN_FOLDER");
+    }
 
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
@@ -260,7 +282,11 @@ async fn test_empty_cache_rebuilds() {
 
 #[tokio::test]
 async fn test_search_returns_relevant_results() {
-    env::remove_var("MERLIN_FOLDER");
+    // SAFETY: We are in a test environment and need to ensure clean state.
+    // This is safe because we are in a single-threaded test context.
+    unsafe {
+        env::remove_var("MERLIN_FOLDER");
+    }
 
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
@@ -315,7 +341,11 @@ fn test_cache_directory_creation() {
 
 #[tokio::test]
 async fn test_concurrent_file_processing() {
-    env::remove_var("MERLIN_FOLDER");
+    // SAFETY: We are in a test environment and need to ensure clean state.
+    // This is safe because we are in a single-threaded test context.
+    unsafe {
+        env::remove_var("MERLIN_FOLDER");
+    }
 
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
@@ -364,7 +394,11 @@ fn test_chunk_count_consistency() {
 
 #[tokio::test]
 async fn test_cache_version_validation() {
-    env::remove_var("MERLIN_FOLDER");
+    // SAFETY: We are in a test environment and need to ensure clean state.
+    // This is safe because we are in a single-threaded test context.
+    unsafe {
+        env::remove_var("MERLIN_FOLDER");
+    }
 
     let temp_dir = create_test_project();
     let project_root = temp_dir.path().to_path_buf();
@@ -408,7 +442,11 @@ async fn test_batch_processing_timeout() {
     use std::time::Duration;
     use tokio::time::timeout;
 
-    env::remove_var("MERLIN_FOLDER");
+    // SAFETY: We are in a test environment and need to ensure clean state.
+    // This is safe because we are in a single-threaded test context.
+    unsafe {
+        env::remove_var("MERLIN_FOLDER");
+    }
 
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
     let project_root = temp_dir.path().to_path_buf();

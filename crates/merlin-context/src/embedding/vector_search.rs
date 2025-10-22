@@ -1133,8 +1133,6 @@ impl VectorSearchManager {
     /// # Errors
     /// Returns an error if any embedding task fails
     async fn embed_files(&mut self, files: Vec<PathBuf>) -> Result<()> {
-        const CHECKPOINT_INTERVAL_CHUNKS: usize = 500;
-
         let total_files = files.len();
         info!(
             "Starting optimized embedding pipeline for {} files",
@@ -1157,10 +1155,34 @@ impl VectorSearchManager {
         let (all_chunk_results, file_chunk_map) = self.embed_chunk_batches(file_chunks_data).await;
 
         // Phase 3: Process results and update indices
+        let processed_chunks = self.process_and_index_chunks(all_chunk_results).await;
+
+        tracing::info!(
+            "Completed: {} files, {processed_chunks} chunks",
+            file_chunk_map.len()
+        );
+        self.report_progress(
+            "Complete",
+            processed_chunks as u64,
+            Some(processed_chunks as u64),
+        );
+
+        Ok(())
+    }
+
+    /// Process chunk results, build indices, and save checkpoints
+    ///
+    /// # Errors
+    /// Returns an error if processing fails
+    async fn process_and_index_chunks(&mut self, all_chunk_results: Vec<ChunkResult>) -> usize {
+        const CHECKPOINT_INTERVAL_CHUNKS: usize = 500;
+
         tracing::info!("Building search indices and writing cache...");
         self.report_progress("Building indices", 0, Some(all_chunk_results.len() as u64));
+
         let mut processed_chunks: usize = 0;
         let mut next_checkpoint = CHECKPOINT_INTERVAL_CHUNKS;
+
         for chunk_result in all_chunk_results {
             let chunk_count = self.process_chunk_results(vec![chunk_result]);
             processed_chunks += chunk_count;
@@ -1186,17 +1208,7 @@ impl VectorSearchManager {
             warn!("Failed to save final cache: {error}");
         }
 
-        tracing::info!(
-            "Completed: {} files, {processed_chunks} chunks",
-            file_chunk_map.len()
-        );
-        self.report_progress(
-            "Complete",
-            processed_chunks as u64,
-            Some(processed_chunks as u64),
-        );
-
-        Ok(())
+        processed_chunks
     }
 
     /// Parallel file reading and chunking using blocking tasks

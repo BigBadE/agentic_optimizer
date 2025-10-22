@@ -154,9 +154,9 @@ impl ContextManager {
 
     /// Calculate importance score for a file entry
     fn calculate_importance_score(entry: &FileContextEntry) -> f32 {
-        let recency_weight = 0.3;
-        let access_weight = 0.3;
-        let relevance_weight = 0.4;
+        let recency_weight: f32 = 0.3;
+        let access_weight: f32 = 0.3;
+        let relevance_weight: f32 = 0.4;
 
         let now = SystemTime::now()
             .duration_since(UNIX_EPOCH)
@@ -167,9 +167,10 @@ impl ContextManager {
 
         let access_score = (entry.access_count as f32).min(10.0) / 10.0;
 
-        recency_weight * recency_score
-            + access_weight * access_score
-            + relevance_weight * entry.relevance_score
+        relevance_weight.mul_add(
+            entry.relevance_score,
+            recency_weight.mul_add(recency_score, access_weight * access_score),
+        )
     }
 
     /// Estimate token count for a file

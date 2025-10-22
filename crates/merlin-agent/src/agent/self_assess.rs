@@ -1,8 +1,8 @@
-use merlin_core::{
-    Complexity, ExecutionContext, ExecutionMode, Result, RoutingError, SubtaskSpec, Task,
-    TaskAction, TaskDecision,
-};
 use merlin_core::{Context, ModelProvider, Query, prompts::load_prompt};
+use merlin_core::{
+    ExecutionContext, ExecutionMode, Result, RoutingError, SubtaskSpec, Task, TaskAction,
+    TaskDecision,
+};
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
 use std::sync::Arc;
@@ -101,7 +101,7 @@ impl SelfAssessor {
                 let subtasks = parsed.details.subtasks.unwrap_or_else(|| {
                     vec![SubtaskSpec {
                         description: task.description.clone(),
-                        complexity: Complexity::Medium,
+                        difficulty: 5,
                     }]
                 });
 

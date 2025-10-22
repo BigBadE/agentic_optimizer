@@ -1,0 +1,159 @@
+{
+  "name": "Test Failure Recovery",
+  "description": "Agent writes code that initially fails tests, then fixes it after seeing the failure",
+  "initial_query": "Implement a divide function that handles division by zero",
+  "mock_responses": [
+    {
+      "pattern": "Implement a divide function",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<TaskList> {",
+        "  return {",
+        "    id: \"divide_impl\",",
+        "    title: \"Implement divide function with error handling\",",
+        "    steps: [",
+        "      {",
+        "        id: \"create_function\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Create divide function\",",
+        "        verification: \"Function exists and compiles\"",
+        "      },",
+        "      {",
+        "        id: \"write_tests\",",
+        "        step_type: \"Test\",",
+        "        description: \"Write tests including division by zero\",",
+        "        verification: \"Tests compile and cover edge cases\"",
+        "      },",
+        "      {",
+        "        id: \"run_tests\",",
+        "        step_type: \"Verify\",",
+        "        description: \"Run tests to verify implementation\",",
+        "        verification: \"All tests pass\"",
+        "      }",
+        "    ]",
+        "  };",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "Create divide function",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  // Initial implementation - BUGGY, doesn't handle zero",
+        "  const code = `pub fn divide(a: i32, b: i32) -> i32 {",
+        "    a / b",
+        "}`;",
+        "  await bash(`echo '${code}' > src/math.rs`);",
+        "  return \"Created divide function\";",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "Write tests including division by zero",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  const tests = `",
+        "#[cfg(test)]",
+        "mod tests {",
+        "    use super::*;",
+        "",
+        "    #[test]",
+        "    fn test_divide_normal() {",
+        "        assert_eq!(divide(10, 2), 5);",
+        "    }",
+        "",
+        "    #[test]",
+        "    #[should_panic]",
+        "    fn test_divide_by_zero() {",
+        "        divide(10, 0);",
+        "    }",
+        "}`;",
+        "  await bash(`echo '${tests}' >> src/math.rs`);",
+        "  return \"Added tests for divide function\";",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "Run tests to verify implementation",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  const result = await bash(\"cargo test math\");",
+        "  if (result.exit_code === 0) {",
+        "    return \"All tests passed successfully\";",
+        "  } else {",
+        "    return `Tests failed with error: attempt to divide by zero. The function needs proper error handling.`;",
+        "  }",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "fix",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  // Fixed implementation with Result type",
+        "  const code = `pub fn divide(a: i32, b: i32) -> Result<i32, String> {",
+        "    if b == 0 {",
+        "        return Err(\"Division by zero\".to_string());",
+        "    }",
+        "    Ok(a / b)",
+        "}",
+        "",
+        "#[cfg(test)]",
+        "mod tests {",
+        "    use super::*;",
+        "",
+        "    #[test]",
+        "    fn test_divide_normal() {",
+        "        assert_eq!(divide(10, 2), Ok(5));",
+        "    }",
+        "",
+        "    #[test]",
+        "    fn test_divide_by_zero() {",
+        "        assert!(divide(10, 0).is_err());",
+        "    }",
+        "}`;",
+        "  await bash(`echo '${code}' > src/math.rs`);",
+        "  return \"Fixed divide function to return Result and handle zero\";",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "verify fix",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  const result = await bash(\"cargo test math\");",
+        "  if (result.exit_code === 0) {",
+        "    return \"All tests now pass after fix\";",
+        "  } else {",
+        "    return `Tests still failing: ${result.stderr}`;",
+        "  }",
+        "}",
+        "```"
+      ]
+    }
+  ],
+  "expected_task_list": {
+    "total_tasks": 3,
+    "task_descriptions": [
+      "Create divide function",
+      "Write tests including division by zero",
+      "Run tests to verify"
+    ],
+    "dependency_chain": [[], [1], [2]]
+  },
+  "expected_outcomes": {
+    "all_tasks_completed": true,
+    "files_created": ["src/math.rs"],
+    "tests_passed": true
+  }
+}

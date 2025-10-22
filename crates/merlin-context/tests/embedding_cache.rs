@@ -1,12 +1,19 @@
 //! Tests for embedding cache behavior and validation
 
-#![cfg(test)]
-#![allow(
-    clippy::expect_used,
-    clippy::print_stderr,
-    clippy::missing_panics_doc,
-    clippy::min_ident_chars,
-    reason = "Test code: panics and prints are acceptable for test failures and debugging"
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
 )]
 
 use merlin_context::VectorSearchManager;
@@ -14,9 +21,6 @@ use std::fs;
 use tempfile::TempDir;
 
 /// Create a test project directory with sample files
-///
-/// # Panics
-/// Panics if file system operations fail (acceptable in tests)
 fn create_test_project() -> TempDir {
     let temp_dir = TempDir::new().expect("Failed to create temp directory");
     let src_dir = temp_dir.path().join("src");
@@ -302,10 +306,10 @@ async fn test_concurrent_file_processing() {
 
     // Add more files to test concurrent processing
     let src_dir = project_root.join("src");
-    for i in 0..20 {
+    for idx in 0..20 {
         fs::write(
-            src_dir.join(format!("module_{i}.rs")),
-            format!("pub fn function_{i}() -> i32 {{\n    {i}\n}}\n"),
+            src_dir.join(format!("module_{idx}.rs")),
+            format!("pub fn function_{idx}() -> i32 {{\n    {idx}\n}}\n"),
         )
         .expect("Failed to write test file");
     }
@@ -393,11 +397,11 @@ async fn test_batch_processing_timeout() {
 
     // Create exactly 15 files to test batch processing (batch size is 10)
     // This should trigger at least 2 batches
-    for i in 0..15 {
+    for idx in 0..15 {
         fs::write(
-            src_dir.join(format!("module_{i}.rs")),
+            src_dir.join(format!("module_{idx}.rs")),
             format!(
-                "//! Module {i}\n\npub fn function_{i}() -> i32 {{\n    {i}\n}}\n\npub struct Struct{i} {{\n    value: i32,\n}}\n"
+                "//! Module {idx}\n\npub fn function_{idx}() -> i32 {{\n    {idx}\n}}\n\npub struct Struct{idx} {{\n    value: i32,\n}}\n"
             ),
         )
         .expect("Failed to write test file");

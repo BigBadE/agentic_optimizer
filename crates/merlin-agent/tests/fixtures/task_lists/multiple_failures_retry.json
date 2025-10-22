@@ -1,0 +1,116 @@
+{
+  "name": "Multiple Failures with Retries",
+  "description": "Agent handles multiple consecutive failures, retries, and eventual success",
+  "initial_query": "Implement a function that needs multiple attempts to get right",
+  "mock_responses": [
+    {
+      "pattern": "Implement a function",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<TaskList> {",
+        "  return {",
+        "    id: \"multi_retry\",",
+        "    title: \"Function with multiple retries\",",
+        "    steps: [",
+        "      {",
+        "        id: \"impl\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Implement sorting function\",",
+        "        verification: \"Function compiles\"",
+        "      },",
+        "      {",
+        "        id: \"test\",",
+        "        step_type: \"Test\",",
+        "        description: \"Test sorting function\",",
+        "        verification: \"Tests pass\"",
+        "      }",
+        "    ]",
+        "  };",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "Implement sorting",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  // First attempt - buggy bubble sort",
+        "  const code = `pub fn sort(arr: &mut [i32]) {",
+        "    // Bug: off by one error",
+        "    for i in 0..arr.len() {",
+        "        for j in 0..arr.len() {",
+        "            if arr[j] > arr[j+1] {",
+        "                arr.swap(j, j+1);",
+        "            }",
+        "        }",
+        "    }",
+        "}`;",
+        "  await bash(`echo '${code}' > src/sort.rs`);",
+        "  return \"Created sort function (attempt 1)\";",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "Test sorting",
+      "response": "Tests failed: index out of bounds"
+    },
+    {
+      "pattern": "fix.*index out of bounds",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  // Second attempt - still buggy",
+        "  const code = `pub fn sort(arr: &mut [i32]) {",
+        "    for i in 0..arr.len() {",
+        "        for j in 0..arr.len()-1 {",
+        "            // Bug: wrong comparison",
+        "            if arr[j] < arr[j+1] {",
+        "                arr.swap(j, j+1);",
+        "            }",
+        "        }",
+        "    }",
+        "}`;",
+        "  await bash(`echo '${code}' > src/sort.rs`);",
+        "  return \"Fixed bounds check (attempt 2)\";",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "fix.*wrong",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  // Third attempt - correct",
+        "  const code = `pub fn sort(arr: &mut [i32]) {",
+        "    for i in 0..arr.len() {",
+        "        for j in 0..arr.len()-1-i {",
+        "            if arr[j] > arr[j+1] {",
+        "                arr.swap(j, j+1);",
+        "            }",
+        "        }",
+        "    }",
+        "}`;",
+        "  await bash(`echo '${code}' > src/sort.rs`);",
+        "  return \"Fixed comparison logic (attempt 3)\";",
+        "}",
+        "```"
+      ]
+    }
+  ],
+  "expected_task_list": {
+    "total_tasks": 2,
+    "task_descriptions": [
+      "Implement sorting function",
+      "Test sorting function"
+    ],
+    "dependency_chain": [[], [1]]
+  },
+  "expected_outcomes": {
+    "all_tasks_completed": true,
+    "files_created": ["src/sort.rs"],
+    "tests_passed": true
+  }
+}

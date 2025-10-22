@@ -17,11 +17,21 @@
 //! # Example
 //!
 //! ```no_run
-//! use merlin_agent::{AgentExecutor, TaskWorkspace, ValidationPipeline};
+//! use merlin_agent::{AgentExecutor, ValidationPipeline};
+//! use merlin_routing::StrategyRouter;
+//! use merlin_tooling::ToolRegistry;
+//! use merlin_context::ContextFetcher;
+//! use merlin_core::RoutingConfig;
+//! use std::sync::Arc;
 //!
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let workspace = TaskWorkspace::new("./workspace".into())?;
-//! let pipeline = ValidationPipeline::default();
+//! let router = Arc::new(StrategyRouter::with_default_strategies()?);
+//! let validator = Arc::new(ValidationPipeline::with_default_stages());
+//! let tool_registry = Arc::new(ToolRegistry::default());
+//! let context_fetcher = ContextFetcher::new(".".into());
+//! let config = RoutingConfig::default();
+//!
+//! let _executor = AgentExecutor::new(router, validator, tool_registry, context_fetcher, config)?;
 //! # Ok(())
 //! # }
 //! ```
@@ -51,9 +61,10 @@ pub mod orchestrator;
 pub mod validator;
 
 pub use agent::{
-    AgentExecutor, ContextFetcher, ContextManager, ContextStats, ConversationManager,
-    ConversationMessage, ConversationSummary, CoordinatorStats, SelfAssessor, StepTracker,
-    TaskCoordinator, TaskProgress as AgentTaskProgress, TaskStatus,
+    AgentExecutor, AgentExecutorWrapper, CommandResult, CommandRunner, ContextFetcher,
+    ContextManager, ContextStats, ConversationManager, ConversationMessage, ConversationSummary,
+    CoordinatorStats, RealAgentExecutorWrapper, SelfAssessor, StepTracker, TaskCoordinator,
+    TaskListExecutor, TaskListResult, TaskProgress as AgentTaskProgress, TaskStatus,
 };
 pub use executor::{
     BuildResult, ConflictAwareTaskGraph, ConflictReport, ExecutorPool, FileConflict,

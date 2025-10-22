@@ -14,7 +14,7 @@ This prompt is used for the TypeScript-based agent system where the model writes
 
 **Output format:**
 - ONLY TypeScript code wrapped in ```typescript code blocks
-- Code must return a string containing the task result
+- Code must return a string OR a TaskList object (for multi-step workflows)
 - CRITICAL: Return ONLY code, NO explanatory text before or after the code block
 - If text is included, only the code block will be extracted and executed
 
@@ -60,8 +60,8 @@ CRITICAL RULES:
 3. RETURN VALUE
    - For simple tasks: return a string containing your output
    - For complex multi-step workflows: return a TaskList object
-   - Example: return "Task completed successfully"
-   - Example: return { id: "task_1", title: "Fix bug", steps: [...], status: "NotStarted" }
+   - Example (simple): return "Task completed successfully"
+   - Example (TaskList): return { id: "task_1", title: "Fix bug", steps: [...], status: "NotStarted" }
 
 4. ALWAYS AWAIT TOOLS
    - All tools are async and return Promises
@@ -119,7 +119,7 @@ interface TaskList {
     id: string;                    // Unique ID (e.g., "task_1")
     title: string;                 // Overall goal (e.g., "Fix authentication bug")
     steps: TaskStep[];             // Ordered list of steps
-    status: TaskListStatus;        // "NotStarted" | "InProgress" | "Completed" | "Failed" | "PartiallyComplete"
+    status?: TaskListStatus;       // Optional: defaults to "NotStarted" if not specified
 }
 
 interface TaskStep {
@@ -127,7 +127,7 @@ interface TaskStep {
     step_type: StepType;           // "Debug" | "Feature" | "Refactor" | "Verify" | "Test"
     description: string;           // What this step does
     verification: string;          // How to verify success
-    status: StepStatus;            // "Pending" | "InProgress" | "Completed" | "Failed" | "Skipped"
+    status?: StepStatus;           // Optional: defaults to "Pending" if not specified
     error?: string;                // Optional error message
     result?: string;               // Optional result/output
     exit_command?: string;         // Optional custom verification command (null = use default for step type)
@@ -152,7 +152,11 @@ Each step type has a default verification command that must pass (exit code 0) f
 You can override with a custom `exit_command` for specific requirements (e.g., `cargo test --lib auth`).
 Set `exit_command: null` to use the default for that step type.
 
-**TaskList Example:**
+**TaskList Example (TypeScript):**
+
+For multi-step workflows, return a TaskList object. The system will automatically serialize it,
+parse it, and execute each step with verification.
+
 ```typescript
 async function agent_code(): Promise<TaskList> {
     return {
@@ -163,47 +167,39 @@ async function agent_code(): Promise<TaskList> {
                 id: "step_1",
                 step_type: "Debug",
                 description: "Read auth.rs to understand current implementation",
-                verification: "File loads and code structure is clear",
-                status: "Pending",
-                error: null,
-                result: null,
-                exit_command: null  // Uses default: cargo check
+                verification: "File loads and code structure is clear"
             },
             {
                 id: "step_2",
                 step_type: "Feature",
                 description: "Add timeout configuration to AuthConfig struct",
-                verification: "Code compiles without errors",
-                status: "Pending",
-                error: null,
-                result: null,
-                exit_command: null  // Uses default: cargo check
+                verification: "Code compiles without errors"
             },
             {
                 id: "step_3",
                 step_type: "Verify",
                 description: "Run cargo check on auth module",
-                verification: "cargo check passes",
-                status: "Pending",
-                error: null,
-                result: null,
-                exit_command: null  // Uses default: cargo check
+                verification: "cargo check passes"
             },
             {
                 id: "step_4",
                 step_type: "Test",
                 description: "Run authentication tests",
                 verification: "All tests pass",
-                status: "Pending",
-                error: null,
-                result: null,
-                exit_command: "cargo test --lib auth"  // Custom command for specific module
+                exit_command: "cargo test --lib auth"  // Custom command
             }
-        ],
-        status: "NotStarted"
+        ]
     };
 }
 ```
+
+**How TaskLists Work:**
+1. Agent returns TaskList object from TypeScript code
+2. System serializes it and parses it as a TaskList
+3. Each step is executed sequentially using the agent
+4. After each step, the exit_command is run for verification
+5. If verification fails, agent attempts auto-fix
+6. Process continues until all steps complete or a step fails
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 

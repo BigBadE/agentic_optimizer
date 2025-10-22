@@ -74,7 +74,10 @@ impl UiChannel {
 
     /// Sends task completed event
     pub fn completed(&self, task_id: TaskId, result: TaskResult) {
-        self.send(UiEvent::TaskCompleted { task_id, result });
+        self.send(UiEvent::TaskCompleted {
+            task_id,
+            result: Box::new(result),
+        });
     }
 
     /// Sends task failed event

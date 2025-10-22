@@ -30,7 +30,7 @@ fn bench_end_to_end_request(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("end_to_end_request");
 
     let config = RoutingConfig::default();
-    let orchestrator = RoutingOrchestrator::new(config);
+    let orchestrator = RoutingOrchestrator::new(config).expect("Failed to create orchestrator");
     let runtime = create_runtime();
 
     let test_cases = vec![
@@ -83,7 +83,8 @@ fn bench_request_throughput(criterion: &mut Criterion) {
             &size,
             |bencher, &size| {
                 let config = RoutingConfig::default();
-                let orchestrator = RoutingOrchestrator::new(config);
+                let orchestrator =
+                    RoutingOrchestrator::new(config).expect("Failed to create orchestrator");
                 let requests: Vec<_> = (0..size).map(|idx| format!("Add feature {idx}")).collect();
 
                 bencher.iter(|| {

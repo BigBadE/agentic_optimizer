@@ -81,13 +81,9 @@ pub struct ScrollContext<'scroll> {
 ///
 /// Navigates through both root conversations and expanded children.
 /// Up moves to older tasks (up the screen).
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "NavigationContext contains mutable refs that must be consumed"
-)]
 pub fn navigate_tasks_up(
     task_manager: &TaskManager,
-    ctx: NavigationContext<'_>,
+    ctx: &mut NavigationContext<'_>,
     terminal_height: u16,
     focused_pane_is_tasks: bool,
 ) {
@@ -108,7 +104,7 @@ pub fn navigate_tasks_up(
             } else {
                 *ctx.output_scroll_offset = 0;
             }
-            adjust_task_list_scroll(ScrollContext {
+            adjust_task_list_scroll(&mut ScrollContext {
                 active_task_id: ctx.active_task_id.as_ref(),
                 expanded_conversations: ctx.expanded_conversations,
                 task_list_scroll_offset: ctx.task_list_scroll_offset,
@@ -141,7 +137,7 @@ pub fn navigate_tasks_up(
         } else {
             *ctx.output_scroll_offset = 0;
         }
-        adjust_task_list_scroll(ScrollContext {
+        adjust_task_list_scroll(&mut ScrollContext {
             active_task_id: ctx.active_task_id.as_ref(),
             expanded_conversations: ctx.expanded_conversations,
             task_list_scroll_offset: ctx.task_list_scroll_offset,
@@ -156,13 +152,9 @@ pub fn navigate_tasks_up(
 ///
 /// Navigates through both root conversations and expanded children.
 /// Down moves to newer tasks (down the screen) or to placeholder.
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "NavigationContext contains mutable refs that must be consumed"
-)]
 pub fn navigate_tasks_down(
     task_manager: &TaskManager,
-    ctx: NavigationContext<'_>,
+    ctx: &mut NavigationContext<'_>,
     terminal_height: u16,
     focused_pane_is_tasks: bool,
 ) {
@@ -202,7 +194,7 @@ pub fn navigate_tasks_down(
             // At the newest visible task, move to placeholder
             *ctx.active_task_id = None;
         }
-        adjust_task_list_scroll(ScrollContext {
+        adjust_task_list_scroll(&mut ScrollContext {
             active_task_id: ctx.active_task_id.as_ref(),
             expanded_conversations: ctx.expanded_conversations,
             task_list_scroll_offset: ctx.task_list_scroll_offset,
@@ -214,11 +206,7 @@ pub fn navigate_tasks_down(
 }
 
 /// Adjusts task list scroll to keep the selected task visible
-#[allow(
-    clippy::needless_pass_by_value,
-    reason = "ScrollContext contains mutable ref that must be consumed"
-)]
-pub fn adjust_task_list_scroll(ctx: ScrollContext<'_>) {
+pub fn adjust_task_list_scroll(ctx: &mut ScrollContext<'_>) {
     // Get all visible tasks in display order (includes expanded children)
     let visible_tasks = build_visible_task_list(ctx.task_manager, ctx.expanded_conversations);
     let total_visible = visible_tasks.len();

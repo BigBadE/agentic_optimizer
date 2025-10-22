@@ -10,7 +10,7 @@
         clippy::missing_errors_doc,
         clippy::print_stdout,
         clippy::print_stderr,
-        reason = "Allow for tests"
+        reason = "Test allows"
     )
 )]
 
@@ -23,6 +23,8 @@ pub mod context_manager;
 pub mod embedding;
 mod fs_utils;
 pub mod models;
+/// Intelligent context pruning for token optimization
+pub mod pruning;
 pub mod query;
 pub mod subagent;
 
@@ -32,3 +34,4 @@ pub use context_manager::{ContextManager, ContextStats};
 pub use embedding::{
     EmbeddingClient, ProgressCallback, SearchResult, VectorSearchManager, VectorStore,
 };
+pub use pruning::{DependencyGraph, RelevanceScorer, TokenBudgetAllocator};

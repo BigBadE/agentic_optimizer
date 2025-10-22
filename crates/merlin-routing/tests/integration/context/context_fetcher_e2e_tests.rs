@@ -1,19 +1,18 @@
 //! End-to-end tests for ContextFetcher functionality
-#![allow(
-    clippy::unwrap_used,
-    clippy::expect_used,
-    clippy::panic,
-    clippy::missing_panics_doc,
-    clippy::missing_errors_doc,
-    clippy::tests_outside_test_module,
-    clippy::assertions_on_result_states,
-    clippy::min_ident_chars,
-    clippy::redundant_clone,
-    clippy::overly_complex_bool_expr,
-    clippy::len_zero,
-    clippy::doc_markdown,
-    clippy::needless_raw_string_hashes,
-    reason = "Test allows"
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
 )]
 
 use merlin_context::ContextFetcher;

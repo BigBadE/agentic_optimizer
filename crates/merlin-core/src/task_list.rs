@@ -86,7 +86,8 @@ pub struct TaskStep {
     pub description: String,
     /// Verification requirement - how to confirm this step succeeded
     pub verification: String,
-    /// Current status of this step
+    /// Current status of this step (defaults to Pending if not specified)
+    #[serde(default = "default_step_status")]
     pub status: StepStatus,
     /// Optional error message if step failed
     pub error: Option<String>,
@@ -95,6 +96,10 @@ pub struct TaskStep {
     /// Exit condition command that must pass for step completion.
     /// If None, uses the default command for the step type.
     pub exit_command: Option<String>,
+}
+
+fn default_step_status() -> StepStatus {
+    StepStatus::Pending
 }
 
 impl TaskStep {
@@ -191,8 +196,13 @@ pub struct TaskList {
     pub title: String,
     /// Ordered list of steps to execute
     pub steps: Vec<TaskStep>,
-    /// Overall status derived from step statuses
+    /// Overall status derived from step statuses (defaults to `NotStarted` if not specified)
+    #[serde(default = "default_task_list_status")]
     pub status: TaskListStatus,
+}
+
+fn default_task_list_status() -> TaskListStatus {
+    TaskListStatus::NotStarted
 }
 
 /// Overall status of a task list
@@ -225,23 +235,32 @@ impl fmt::Display for TaskListStatus {
 impl TaskList {
     /// Creates a new task list
     pub fn new(id: String, title: String, steps: Vec<TaskStep>) -> Self {
+        let status = if steps.is_empty() {
+            TaskListStatus::Completed
+        } else {
+            TaskListStatus::NotStarted
+        };
+
         Self {
             id,
             title,
             steps,
-            status: TaskListStatus::NotStarted,
+            status,
         }
     }
 
     /// Updates the overall status based on step statuses
     pub fn update_status(&mut self) {
         if self.steps.is_empty() {
-            self.status = TaskListStatus::NotStarted;
+            self.status = TaskListStatus::Completed;
             return;
         }
 
         let has_failed = self.steps.iter().any(TaskStep::is_failed);
-        let all_completed = self.steps.iter().all(TaskStep::is_completed);
+        let all_completed_or_skipped = self
+            .steps
+            .iter()
+            .all(|step| step.is_completed() || matches!(step.status, StepStatus::Skipped));
         let any_in_progress = self
             .steps
             .iter()
@@ -250,7 +269,7 @@ impl TaskList {
 
         self.status = if has_failed {
             TaskListStatus::Failed
-        } else if all_completed {
+        } else if all_completed_or_skipped {
             TaskListStatus::Completed
         } else if any_in_progress {
             TaskListStatus::InProgress

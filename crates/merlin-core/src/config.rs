@@ -450,6 +450,13 @@ enabled = true
 ttl_hours = 24
 max_size_mb = 100
 similarity_threshold = 0.95
+
+[task_list_commands]
+debug_command = "cargo check"
+feature_command = "cargo check"
+refactor_command = "cargo clippy -- -D warnings"
+verify_command = "cargo check"
+test_command = "cargo test"
 "#;
 
         let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");

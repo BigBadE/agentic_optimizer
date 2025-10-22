@@ -1049,40 +1049,18 @@ impl VectorSearchManager {
         chunk_count
     }
 
-    /// Embed a batch of files (chunked) - optimized version
+    /// Process chunk batches and generate embeddings
     ///
-    /// # Errors
-    /// Returns an error if any embedding task fails
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Complex pipeline with multiple phases"
-    )]
-    async fn embed_files(&mut self, files: Vec<PathBuf>) -> Result<()> {
+    /// Returns vector of chunk results and file-chunk mapping
+    async fn embed_chunk_batches(
+        &self,
+        file_chunks_data: Vec<FileChunksData>,
+    ) -> (
+        Vec<(PathBuf, FileChunk, Vec<f32>, String, u64)>,
+        FileChunkMap,
+    ) {
         const CHUNK_BATCH_SIZE: usize = 50;
-        const CHECKPOINT_INTERVAL_CHUNKS: usize = 500;
 
-        let total_files = files.len();
-        let mut processed_files = 0; // for info only
-        let mut processed_chunks: usize = 0;
-
-        info!(
-            "Starting optimized embedding pipeline for {} files",
-            total_files
-        );
-
-        // Phase 1: Parallel file reading and chunking (CPU-bound)
-        tracing::info!("Reading and chunking files...");
-        self.report_progress("Reading files", 0, Some(total_files as u64));
-        let file_chunks_data = Self::parallel_read_and_chunk(files, &self.project_root).await;
-
-        info!("Chunked {} files into chunks", file_chunks_data.len());
-        self.report_progress(
-            "Chunking complete",
-            file_chunks_data.len() as u64,
-            Some(total_files as u64),
-        );
-
-        // Phase 2: Cross-file chunk batching and embedding (I/O-bound)
         let client = EmbeddingClient::default();
         let mut all_chunk_results = Vec::new();
         let mut chunk_queue = Vec::new();
@@ -1147,14 +1125,45 @@ impl VectorSearchManager {
             all_chunk_results.len()
         );
 
+        (all_chunk_results, file_chunk_map)
+    }
+
+    /// Embed a batch of files (chunked) - optimized version
+    ///
+    /// # Errors
+    /// Returns an error if any embedding task fails
+    async fn embed_files(&mut self, files: Vec<PathBuf>) -> Result<()> {
+        const CHECKPOINT_INTERVAL_CHUNKS: usize = 500;
+
+        let total_files = files.len();
+        info!(
+            "Starting optimized embedding pipeline for {} files",
+            total_files
+        );
+
+        // Phase 1: Parallel file reading and chunking (CPU-bound)
+        tracing::info!("Reading and chunking files...");
+        self.report_progress("Reading files", 0, Some(total_files as u64));
+        let file_chunks_data = Self::parallel_read_and_chunk(files, &self.project_root).await;
+
+        info!("Chunked {} files into chunks", file_chunks_data.len());
+        self.report_progress(
+            "Chunking complete",
+            file_chunks_data.len() as u64,
+            Some(total_files as u64),
+        );
+
+        // Phase 2: Cross-file chunk batching and embedding (I/O-bound)
+        let (all_chunk_results, file_chunk_map) = self.embed_chunk_batches(file_chunks_data).await;
+
         // Phase 3: Process results and update indices
         tracing::info!("Building search indices and writing cache...");
         self.report_progress("Building indices", 0, Some(all_chunk_results.len() as u64));
+        let mut processed_chunks: usize = 0;
         let mut next_checkpoint = CHECKPOINT_INTERVAL_CHUNKS;
         for chunk_result in all_chunk_results {
             let chunk_count = self.process_chunk_results(vec![chunk_result]);
             processed_chunks += chunk_count;
-            processed_files = file_chunk_map.len();
 
             // Progressive cache saving by chunks without modulo
             if processed_chunks >= next_checkpoint {
@@ -1177,7 +1186,10 @@ impl VectorSearchManager {
             warn!("Failed to save final cache: {error}");
         }
 
-        tracing::info!("Completed: {processed_files} files, {processed_chunks} chunks");
+        tracing::info!(
+            "Completed: {} files, {processed_chunks} chunks",
+            file_chunk_map.len()
+        );
         self.report_progress(
             "Complete",
             processed_chunks as u64,

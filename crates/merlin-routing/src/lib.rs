@@ -25,14 +25,11 @@
 //! # Example
 //!
 //! ```no_run
-//! use merlin_routing::{RoutingOrchestrator, RoutingConfig, Task};
+//! use merlin_routing::StrategyRouter;
 //!
-//! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
-//! let config = RoutingConfig::default();
-//! let orchestrator = RoutingOrchestrator::new(config);
-//!
-//! let task = Task::new("Implement a new feature".to_owned());
-//! let results = orchestrator.execute_tasks(vec![task]).await?;
+//! # fn example() -> Result<(), Box<dyn std::error::Error>> {
+//! // Create a router with default configuration
+//! let _router = StrategyRouter::with_default_strategies()?;
 //! # Ok(())
 //! # }
 //! ```
@@ -65,24 +62,22 @@ pub mod user_interface;
 
 // Re-export types from merlin-core for backward compatibility
 pub use merlin_core::{
-    CacheConfig, CommandExecution, Complexity, ContextRequirements, ExecutionConfig,
-    ExecutionContext, ExecutionMode, ExecutionStrategy, FileChange, MessageLevel, Priority, Result,
-    RoutingConfig, RoutingError, Severity, StageResult, StepId, StepType, StreamingChannel,
-    StreamingEvent, SubtaskSpec, Task, TaskAction, TaskAnalysis, TaskDecision, TaskId,
-    TaskProgress, TaskResult, TaskState, TaskStep, TierConfig, UiChannel, UiEvent,
-    ValidationConfig, ValidationError, ValidationResult, ValidationStageType, WorkspaceConfig,
+    CacheConfig, CommandExecution, ContextRequirements, ExecutionConfig, ExecutionContext,
+    ExecutionMode, ExecutionStrategy, FileChange, MessageLevel, Priority, Result, RoutingConfig,
+    RoutingError, Severity, StageResult, StepId, StepType, StreamingChannel, StreamingEvent,
+    SubtaskSpec, Task, TaskAction, TaskAnalysis, TaskDecision, TaskId, TaskProgress, TaskResult,
+    TaskState, TaskStep, TierConfig, UiChannel, UiEvent, ValidationConfig, ValidationError,
+    ValidationResult, ValidationStageType, WorkspaceConfig,
 };
 
 pub use analyzer::{
-    Action, ComplexityEstimator, Intent, IntentExtractor, LocalTaskAnalyzer, Scope, TaskAnalyzer,
-    TaskDecomposer,
+    Action, Intent, IntentExtractor, LocalTaskAnalyzer, Scope, TaskAnalyzer, TaskDecomposer,
 };
 pub use cache::{CachedResponse, ResponseCache};
 pub use metrics::{DailyReport, MetricsCollector, MetricsReport, RequestMetrics, TierBreakdown};
 pub use router::{
-    AvailabilityChecker, ComplexityBasedStrategy, CostOptimizationStrategy, LongContextStrategy,
-    ModelRouter, ModelTier, QualityCriticalStrategy, RoutingDecision, RoutingStrategy,
-    StrategyRouter,
+    AvailabilityChecker, Model, ModelRegistry, ModelRouter, ProviderRegistry, RoutingDecision,
+    StrategyRouter, TierCategory,
 };
 // Re-export tools from merlin-tools and merlin-typescript crates
 pub use merlin_tooling::{

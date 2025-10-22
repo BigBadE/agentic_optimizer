@@ -22,6 +22,8 @@
 
 /// Shell execution tool implementation.
 mod bash;
+/// Dynamic context request tool for agents.
+pub mod context_request;
 /// Tool registry for managing available tools.
 mod registry;
 /// TypeScript/JavaScript runtime using QuickJS.
@@ -32,6 +34,9 @@ mod signatures;
 mod tool;
 
 pub use bash::BashTool;
+pub use context_request::{
+    ContextFile, ContextRequestArgs, ContextRequestResult, ContextRequestTool, ContextTracker,
+};
 pub use registry::ToolRegistry;
 pub use runtime::TypeScriptRuntime;
 pub use signatures::generate_typescript_signatures;

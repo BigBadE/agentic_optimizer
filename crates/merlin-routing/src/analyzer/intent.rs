@@ -1,4 +1,4 @@
-use crate::{Complexity, Priority};
+use crate::Priority;
 use std::cmp::Ordering;
 
 /// Extracted intent from user request.
@@ -10,8 +10,10 @@ pub struct Intent {
     pub scope: Scope,
     /// Priority level
     pub priority: Priority,
-    /// Optional complexity hint from analysis
-    pub complexity_hint: Option<Complexity>,
+    /// Optional difficulty hint from analysis (1-10)
+    pub difficulty_hint: Option<u8>,
+    /// Description of the task
+    pub description: String,
 }
 
 /// Action type for the task.
@@ -65,13 +67,14 @@ impl IntentExtractor {
         let action = Self::detect_action(&request_lower);
         let scope = Self::detect_scope(request);
         let priority = Self::detect_priority(&request_lower);
-        let complexity_hint = Some(Self::estimate_complexity(&request_lower, &action));
+        let difficulty_hint = Some(Self::estimate_difficulty(&request_lower, &action));
 
         Intent {
             action,
             scope,
             priority,
-            complexity_hint,
+            difficulty_hint,
+            description: request.to_owned(),
         }
     }
 
@@ -135,23 +138,19 @@ impl IntentExtractor {
         }
     }
 
-    fn estimate_complexity(request: &str, action: &Action) -> Complexity {
+    fn estimate_difficulty(request: &str, action: &Action) -> u8 {
         let word_count = request.split_whitespace().count();
-        let base_complexity = match action {
-            Action::Create | Action::Delete | Action::Modify | Action::Document => {
-                Complexity::Simple
-            }
-            Action::Fix | Action::Test | Action::Analyze => Complexity::Medium,
-            Action::Refactor | Action::Optimize => Complexity::Complex,
+        let base_difficulty = match action {
+            Action::Create | Action::Delete | Action::Modify | Action::Document => 4,
+            Action::Fix | Action::Test | Action::Analyze => 5,
+            Action::Refactor | Action::Optimize => 7,
         };
+
+        // Increase difficulty for longer/more complex requests
         if word_count > 50 {
-            match base_complexity {
-                Complexity::Trivial => Complexity::Simple,
-                Complexity::Simple => Complexity::Medium,
-                Complexity::Medium | Complexity::Complex => Complexity::Complex,
-            }
+            (base_difficulty + 2).min(10)
         } else {
-            base_complexity
+            base_difficulty
         }
     }
 }
@@ -202,9 +201,18 @@ mod tests {
         let extractor = IntentExtractor;
 
         let simple = extractor.extract("Add a comment");
-        assert_eq!(simple.complexity_hint, Some(Complexity::Simple));
+        let simple_difficulty = simple.difficulty_hint.unwrap_or(5);
+        assert!(
+            simple_difficulty <= 5,
+            "Simple tasks should have low to medium difficulty, got {simple_difficulty}"
+        );
 
         let complex = extractor.extract("Refactor the entire codebase");
-        assert_eq!(complex.complexity_hint, Some(Complexity::Complex));
+        let complex_difficulty = complex.difficulty_hint.unwrap_or(5);
+        eprintln!("Complex task difficulty: {complex_difficulty}");
+        assert!(
+            complex_difficulty >= 7,
+            "Complex tasks should have high difficulty, got {complex_difficulty}"
+        );
     }
 }

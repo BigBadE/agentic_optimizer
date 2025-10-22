@@ -15,14 +15,8 @@ use crate::utils::{cleanup_old_tasks, get_merlin_folder, try_write_log};
 
 /// Flags for interactive mode configuration
 pub struct InteractiveFlags {
-    /// Whether validation is enabled
-    #[allow(dead_code, reason = "Field reserved for future validation toggle")]
-    pub validation_enabled: bool,
     /// Whether to use local models only
     pub local_only: bool,
-    /// Whether to dump full context to debug.log
-    #[allow(dead_code, reason = "Field used via environment variable")]
-    pub context_dump: bool,
 }
 
 /// Handle interactive agent session with multi-model routing

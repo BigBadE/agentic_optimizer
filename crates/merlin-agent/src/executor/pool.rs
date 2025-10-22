@@ -186,7 +186,7 @@ impl ExecutorPool {
         let context_fetcher = ContextFetcher::new(workspace_root);
         let config = RoutingConfig::default();
         let mut executor =
-            AgentExecutor::new(router, validator, tool_registry, context_fetcher, config);
+            AgentExecutor::new(router, validator, tool_registry, context_fetcher, &config)?;
         let (sender, _receiver) = mpsc::unbounded_channel();
         let ui_channel = UiChannel::from_sender(sender);
 
@@ -201,24 +201,20 @@ mod tests {
     use tempfile::TempDir;
 
     use merlin_core::{Response, Task, ValidationResult};
-    use merlin_routing::{ModelTier, RoutingDecision};
+    use merlin_routing::{Model, RoutingDecision};
 
     struct MockRouter;
 
     #[async_trait]
     impl ModelRouter for MockRouter {
         async fn route(&self, _task: &Task) -> Result<RoutingDecision> {
-            Ok(RoutingDecision {
-                tier: ModelTier::Local {
-                    model_name: "test".to_owned(),
-                },
-                estimated_cost: 0.0,
-                estimated_latency_ms: 0,
-                reasoning: "test".to_owned(),
-            })
+            Ok(RoutingDecision::new(
+                Model::Llama318BInstant,
+                "test".to_owned(),
+            ))
         }
 
-        async fn is_available(&self, _tier: &ModelTier) -> bool {
+        async fn is_available(&self, _model: &Model) -> bool {
             true
         }
     }

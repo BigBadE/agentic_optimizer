@@ -1,0 +1,109 @@
+{
+  "name": "Simple Implementation Task",
+  "description": "Agent decomposes a task into a task list and executes it step by step",
+  "initial_query": "Implement a simple calculator function that adds two numbers",
+  "mock_responses": [
+    {
+      "pattern": "Implement a simple calculator",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<TaskList> {",
+        "  return {",
+        "    id: \"calc_impl\",",
+        "    title: \"Implement calculator with add function\",",
+        "    steps: [",
+        "      {",
+        "        id: \"create_file\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Create calculator.rs with add function\",",
+        "        verification: \"File exists with correct function signature\"",
+        "      },",
+        "      {",
+        "        id: \"write_tests\",",
+        "        step_type: \"Test\",",
+        "        description: \"Add unit tests for add function\",",
+        "        verification: \"Tests are present and compile\"",
+        "      },",
+        "      {",
+        "        id: \"verify\",",
+        "        step_type: \"Verify\",",
+        "        description: \"Run tests to verify implementation\",",
+        "        verification: \"All tests pass\"",
+        "      }",
+        "    ]",
+        "  };",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "Create calculator.rs with add function",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  const code = `pub fn add(a: i32, b: i32) -> i32 {",
+        "    a + b",
+        "}`;",
+        "  await bash(`echo '${code}' > src/calculator.rs`);",
+        "  return \"Created calculator.rs with add function\";",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "Add unit tests for add function",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  const tests = `",
+        "#[cfg(test)]",
+        "mod tests {",
+        "    use super::*;",
+        "",
+        "    #[test]",
+        "    fn test_add_positive() {",
+        "        assert_eq!(add(2, 3), 5);",
+        "    }",
+        "",
+        "    #[test]",
+        "    fn test_add_negative() {",
+        "        assert_eq!(add(-2, -3), -5);",
+        "    }",
+        "}`;",
+        "  await bash(`echo '${tests}' >> src/calculator.rs`);",
+        "  return \"Added unit tests to calculator.rs\";",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "Run tests to verify implementation",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  const result = await bash(\"cargo test calculator\");",
+        "  if (result.exit_code === 0) {",
+        "    return \"All tests passed successfully\";",
+        "  } else {",
+        "    return `Tests failed: ${result.stderr}`;",
+        "  }",
+        "}",
+        "```"
+      ]
+    }
+  ],
+  "expected_task_list": {
+    "total_tasks": 3,
+    "task_descriptions": [
+      "Create calculator.rs with add function",
+      "Add unit tests for add function",
+      "Run tests to verify implementation"
+    ],
+    "dependency_chain": [[], [1], [2]]
+  },
+  "expected_outcomes": {
+    "all_tasks_completed": true,
+    "files_created": ["src/calculator.rs"],
+    "tests_passed": true
+  }
+}

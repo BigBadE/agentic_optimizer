@@ -31,7 +31,7 @@ fn bench_request_analysis(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("request_analysis");
 
     let config = RoutingConfig::default();
-    let orchestrator = RoutingOrchestrator::new(config);
+    let orchestrator = RoutingOrchestrator::new(config).expect("Failed to create orchestrator");
     let runtime = create_runtime();
 
     let test_cases = vec![
@@ -68,7 +68,7 @@ fn bench_task_decomposition(criterion: &mut Criterion) {
     let mut group = criterion.benchmark_group("task_decomposition");
 
     let config = RoutingConfig::default();
-    let orchestrator = RoutingOrchestrator::new(config);
+    let orchestrator = RoutingOrchestrator::new(config).expect("Failed to create orchestrator");
     let runtime = create_runtime();
 
     let requests = vec![

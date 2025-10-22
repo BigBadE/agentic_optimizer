@@ -28,7 +28,7 @@ fn create_runtime() -> Runtime {
 #[library_benchmark]
 fn gungraun_e2e_simple_query() {
     let config = RoutingConfig::default();
-    let orchestrator = RoutingOrchestrator::new(config);
+    let orchestrator = RoutingOrchestrator::new(config).expect("Failed to create orchestrator");
     let runtime = create_runtime();
 
     runtime.block_on(async {
@@ -42,7 +42,7 @@ fn gungraun_e2e_simple_query() {
 #[library_benchmark]
 fn gungraun_e2e_code_modification() {
     let config = RoutingConfig::default();
-    let orchestrator = RoutingOrchestrator::new(config);
+    let orchestrator = RoutingOrchestrator::new(config).expect("Failed to create orchestrator");
     let runtime = create_runtime();
 
     runtime.block_on(async {
@@ -56,7 +56,7 @@ fn gungraun_e2e_code_modification() {
 #[library_benchmark]
 fn gungraun_e2e_complex_refactor() {
     let config = RoutingConfig::default();
-    let orchestrator = RoutingOrchestrator::new(config);
+    let orchestrator = RoutingOrchestrator::new(config).expect("Failed to create orchestrator");
     let runtime = create_runtime();
 
     runtime.block_on(async {
@@ -72,7 +72,7 @@ fn gungraun_e2e_complex_refactor() {
 #[library_benchmark]
 fn gungraun_sequential_requests() {
     let config = RoutingConfig::default();
-    let orchestrator = RoutingOrchestrator::new(config);
+    let orchestrator = RoutingOrchestrator::new(config).expect("Failed to create orchestrator");
     let runtime = create_runtime();
 
     let requests = vec!["Add a comment", "Fix the bug", "Refactor the code"];

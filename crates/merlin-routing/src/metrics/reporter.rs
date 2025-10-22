@@ -178,6 +178,7 @@ impl MetricsReport {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::metrics::collector::RequestMetricsParams;
     use merlin_core::TokenUsage;
 
     #[test]
@@ -193,14 +194,14 @@ mod tests {
     fn test_daily_report_with_data() {
         let mut collector = MetricsCollector::new();
 
-        let metrics = RequestMetrics::new(
-            "test".to_owned(),
-            "local".to_owned(),
-            100,
-            TokenUsage::default(),
-            true,
-            false,
-        );
+        let metrics = RequestMetrics::new(RequestMetricsParams {
+            query: "test".to_owned(),
+            tier_used: "local".to_owned(),
+            latency_ms: 100,
+            tokens_used: TokenUsage::default(),
+            success: true,
+            escalated: false,
+        });
 
         collector.record(metrics);
 

@@ -33,7 +33,7 @@ fn create_runtime() -> Runtime {
 #[library_benchmark]
 fn gungraun_analyze_simple_request() {
     let config = RoutingConfig::default();
-    let orchestrator = RoutingOrchestrator::new(config);
+    let orchestrator = RoutingOrchestrator::new(config).expect("Failed to create orchestrator");
     let runtime = create_runtime();
 
     runtime.block_on(async {
@@ -47,7 +47,7 @@ fn gungraun_analyze_simple_request() {
 #[library_benchmark]
 fn gungraun_analyze_medium_request() {
     let config = RoutingConfig::default();
-    let orchestrator = RoutingOrchestrator::new(config);
+    let orchestrator = RoutingOrchestrator::new(config).expect("Failed to create orchestrator");
     let runtime = create_runtime();
 
     runtime.block_on(async {
@@ -63,7 +63,7 @@ fn gungraun_analyze_medium_request() {
 #[library_benchmark]
 fn gungraun_analyze_complex_request() {
     let config = RoutingConfig::default();
-    let orchestrator = RoutingOrchestrator::new(config);
+    let orchestrator = RoutingOrchestrator::new(config).expect("Failed to create orchestrator");
     let runtime = create_runtime();
 
     runtime.block_on(async {

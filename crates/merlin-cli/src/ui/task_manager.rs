@@ -165,21 +165,6 @@ impl TaskManager {
         false
     }
 
-    /// Checks if a task has children
-    ///
-    /// TODO: Use this for task hierarchy features (e.g., showing parent tasks differently).
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "Utility for future task hierarchy UI")
-    )]
-    pub(crate) fn has_children(&self, task_id: TaskId) -> bool {
-        self.task_order.iter().any(|id| {
-            self.tasks
-                .get(id)
-                .is_some_and(|task| task.parent_id == Some(task_id))
-        })
-    }
-
     /// Iterates over all tasks
     pub fn iter_tasks(&self) -> impl Iterator<Item = (TaskId, &TaskDisplay)> {
         self.tasks.iter().map(|(&id, task)| (id, task))
@@ -188,17 +173,6 @@ impl TaskManager {
     /// Gets the task order
     pub fn task_order(&self) -> &[TaskId] {
         &self.task_order
-    }
-
-    /// Checks if task manager is empty
-    ///
-    /// Useful for conditional rendering and test assertions.
-    #[cfg_attr(
-        not(test),
-        allow(dead_code, reason = "Utility for conditional UI rendering")
-    )]
-    pub(crate) fn is_empty(&self) -> bool {
-        self.tasks.is_empty()
     }
 
     // Private helper methods

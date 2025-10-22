@@ -1,15 +1,14 @@
 //! Keyboard input handling and dispatch
 
+use super::conversation;
+use super::input_handler;
+use super::tui_app::TuiApp;
+use crate::ui::app::navigation::{NavigationContext, navigate_tasks_down, navigate_tasks_up};
+use crate::ui::renderer::FocusedPane;
 use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
 use ratatui::backend::Backend;
 use std::collections::HashSet;
 use std::hash::Hash;
-
-use super::conversation;
-use super::input_handler;
-use super::navigation;
-use super::tui_app::TuiApp;
-use crate::ui::renderer::FocusedPane;
 
 /// Toggle a value in a `HashSet` (remove if present, insert if absent)
 fn toggle_set<T: Eq + Hash>(set: &mut HashSet<T>, value: T) {
@@ -113,9 +112,9 @@ impl<B: Backend> TuiApp<B> {
                 KeyCode::Up => {
                     let terminal_height =
                         self.terminal.size().map(|size| size.height).unwrap_or(30);
-                    navigation::navigate_tasks_up(
+                    navigate_tasks_up(
                         &self.task_manager,
-                        navigation::NavigationContext {
+                        &mut NavigationContext {
                             active_task_id: &mut self.state.active_task_id,
                             expanded_conversations: &self.state.expanded_conversations,
                             task_list_scroll_offset: &mut self.state.task_list_scroll_offset,
@@ -129,9 +128,9 @@ impl<B: Backend> TuiApp<B> {
                 KeyCode::Down => {
                     let terminal_height =
                         self.terminal.size().map(|size| size.height).unwrap_or(30);
-                    navigation::navigate_tasks_down(
+                    navigate_tasks_down(
                         &self.task_manager,
-                        navigation::NavigationContext {
+                        &mut NavigationContext {
                             active_task_id: &mut self.state.active_task_id,
                             expanded_conversations: &self.state.expanded_conversations,
                             task_list_scroll_offset: &mut self.state.task_list_scroll_offset,

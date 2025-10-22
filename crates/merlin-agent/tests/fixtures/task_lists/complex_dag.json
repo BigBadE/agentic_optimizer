@@ -1,0 +1,104 @@
+{
+  "name": "Complex DAG Dependencies",
+  "description": "Agent handles complex directed acyclic graph with multiple convergence points",
+  "initial_query": "Create a build system with: src → compile, tests → compile, compile + tests → link, link → package, docs → package",
+  "mock_responses": [
+    {
+      "pattern": "build system",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<TaskList> {",
+        "  return {",
+        "    id: \"build_dag\",",
+        "    title: \"Complex build DAG\",",
+        "    steps: [",
+        "      {",
+        "        id: \"write_src\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Write source code\",",
+        "        verification: \"Source files exist\"",
+        "      },",
+        "      {",
+        "        id: \"write_tests\",",
+        "        step_type: \"Test\",",
+        "        description: \"Write test code\",",
+        "        verification: \"Test files exist\"",
+        "      },",
+        "      {",
+        "        id: \"compile\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Compile source and tests\",",
+        "        verification: \"Compilation succeeds\"",
+        "      },",
+        "      {",
+        "        id: \"link\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Link compiled objects\",",
+        "        verification: \"Linking succeeds\"",
+        "      },",
+        "      {",
+        "        id: \"write_docs\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Write documentation\",",
+        "        verification: \"Docs exist\"",
+        "      },",
+        "      {",
+        "        id: \"package\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Package executable and docs\",",
+        "        verification: \"Package created\"",
+        "      }",
+        "    ]",
+        "  };",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "Write source code",
+      "response": "Created src/main.rs"
+    },
+    {
+      "pattern": "Write test code",
+      "response": "Created tests/integration.rs"
+    },
+    {
+      "pattern": "Compile",
+      "response": "Compiled successfully"
+    },
+    {
+      "pattern": "Link",
+      "response": "Linked successfully"
+    },
+    {
+      "pattern": "Write documentation",
+      "response": "Created README.md"
+    },
+    {
+      "pattern": "Package",
+      "response": "Created package.tar.gz"
+    }
+  ],
+  "expected_task_list": {
+    "total_tasks": 6,
+    "task_descriptions": [
+      "Write source code",
+      "Write test code",
+      "Compile source and tests",
+      "Link compiled objects",
+      "Write documentation",
+      "Package executable and docs"
+    ],
+    "dependency_chain": [[], [], [1, 2], [3], [], [4, 5]]
+  },
+  "expected_outcomes": {
+    "all_tasks_completed": true,
+    "files_created": [
+      "src/main.rs",
+      "tests/integration.rs",
+      "README.md",
+      "package.tar.gz"
+    ],
+    "tests_passed": true
+  }
+}

@@ -99,10 +99,6 @@ impl TypeScriptRuntime {
     ///
     /// # Errors
     /// Returns error if execution fails
-    #[allow(
-        clippy::too_many_lines,
-        reason = "Complex Promise handling and tool registration logic"
-    )]
     fn execute_sync(code: &str, tools: &HashMap<String, Arc<dyn Tool>>) -> ToolResult<Value> {
         tracing::debug!("Creating Boa context with job queue");
 
@@ -129,86 +125,82 @@ impl TypeScriptRuntime {
         tracing::debug!("Running job queue to resolve Promises");
         context.run_jobs();
 
-        // Check if result is a Promise and extract its value by storing it and using a helper
-        let final_result = if let Some(obj) = result.as_object() {
-            // Check if it's a Promise by looking at its constructor name
-            let is_promise = obj
-                .get(js_string!("constructor"), &mut context)
-                .ok()
-                .and_then(|constructor| constructor.as_object().cloned())
-                .and_then(|constructor_obj| {
-                    constructor_obj.get(js_string!("name"), &mut context).ok()
-                })
-                .and_then(|name| name.as_string().map(JsString::to_std_string_escaped))
-                .is_some_and(|name| name == "Promise");
-
-            if is_promise {
-                tracing::debug!("Result is a Promise, extracting resolved value");
-
-                // Store the promise in a global variable and use JavaScript to extract its value
-                context
-                    .register_global_property(
-                        js_string!("__promise__"),
-                        result.clone(),
-                        Attribute::all(),
-                    )
-                    .map_err(|err| {
-                        ToolError::ExecutionFailed(format!("Failed to register promise: {err}"))
-                    })?;
-
-                // Use a JavaScript helper to extract the resolved value
-                // Set up the .then() handler first
-                let setup_handler = r"
-                    let __result__;
-                    let __error__;
-                    __promise__.then(
-                        value => { __result__ = value; },
-                        error => { __error__ = error; }
-                    );
-                ";
-
-                context
-                    .eval(Source::from_bytes(setup_handler))
-                    .map_err(|err| {
-                        ToolError::ExecutionFailed(format!(
-                            "Failed to setup promise handler: {err}"
-                        ))
-                    })?;
-
-                // Now run jobs to execute the .then() callback
-                context.run_jobs();
-
-                // Check if there was an error
-                let error_check = context
-                    .eval(Source::from_bytes("__error__"))
-                    .map_err(|err| {
-                        ToolError::ExecutionFailed(format!("Failed to check promise error: {err}"))
-                    })?;
-                if !error_check.is_undefined() {
-                    // Try to get the error message
-                    let error_msg = Self::extract_error_message(&error_check, &mut context);
-                    return Err(ToolError::ExecutionFailed(format!(
-                        "Promise rejected: {error_msg}"
-                    )));
-                }
-
-                // Get the result
-                context
-                    .eval(Source::from_bytes("__result__"))
-                    .map_err(|err| {
-                        ToolError::ExecutionFailed(format!(
-                            "Failed to extract promise value: {err}"
-                        ))
-                    })?
-            } else {
-                result
-            }
-        } else {
-            result
-        };
+        // Extract Promise value if result is a Promise
+        let final_result = Self::extract_promise_if_needed(result, &mut context)?;
 
         // Convert result to JSON
         Self::js_value_to_json(&final_result, &mut context)
+    }
+
+    /// Extract Promise value if the result is a Promise
+    ///
+    /// # Errors
+    /// Returns error if Promise extraction fails
+    fn extract_promise_if_needed(result: JsValue, context: &mut Context) -> ToolResult<JsValue> {
+        let Some(obj) = result.as_object() else {
+            return Ok(result);
+        };
+
+        // Check if it's a Promise by looking at its constructor name
+        let is_promise = obj
+            .get(js_string!("constructor"), context)
+            .ok()
+            .and_then(|constructor| constructor.as_object().cloned())
+            .and_then(|constructor_obj| constructor_obj.get(js_string!("name"), context).ok())
+            .and_then(|name| name.as_string().map(JsString::to_std_string_escaped))
+            .is_some_and(|name| name == "Promise");
+
+        if !is_promise {
+            return Ok(result);
+        }
+
+        tracing::debug!("Result is a Promise, extracting resolved value");
+
+        // Store the promise in a global variable and use JavaScript to extract its value
+        context
+            .register_global_property(js_string!("__promise__"), result.clone(), Attribute::all())
+            .map_err(|err| {
+                ToolError::ExecutionFailed(format!("Failed to register promise: {err}"))
+            })?;
+
+        // Use a JavaScript helper to extract the resolved value
+        let setup_handler = r"
+            let __result__;
+            let __error__;
+            __promise__.then(
+                value => { __result__ = value; },
+                error => { __error__ = error; }
+            );
+        ";
+
+        context
+            .eval(Source::from_bytes(setup_handler))
+            .map_err(|err| {
+                ToolError::ExecutionFailed(format!("Failed to setup promise handler: {err}"))
+            })?;
+
+        // Now run jobs to execute the .then() callback
+        context.run_jobs();
+
+        // Check if there was an error
+        let error_check = context
+            .eval(Source::from_bytes("__error__"))
+            .map_err(|err| {
+                ToolError::ExecutionFailed(format!("Failed to check promise error: {err}"))
+            })?;
+        if !error_check.is_undefined() {
+            let error_msg = Self::extract_error_message(&error_check, context);
+            return Err(ToolError::ExecutionFailed(format!(
+                "Promise rejected: {error_msg}"
+            )));
+        }
+
+        // Get the result
+        context
+            .eval(Source::from_bytes("__result__"))
+            .map_err(|err| {
+                ToolError::ExecutionFailed(format!("Failed to extract promise value: {err}"))
+            })
     }
 
     /// Extract error message from a JavaScript error value
@@ -243,18 +235,43 @@ impl TypeScriptRuntime {
             // 3. The closure only captures Arc which is safe to share
             #[allow(
                 unsafe_code,
-                clippy::undocumented_unsafe_blocks,
                 reason = "Arc<dyn Tool> is not Trace, but safe to use as documented above"
             )]
             let func = unsafe {
                 NativeFunction::from_closure(move |_this, args, ctx| {
                     tracing::debug!("Tool '{}' called from JavaScript", tool_clone.name());
 
-                    // Get parameters (first argument)
+                    // Get parameters - handle both object and positional argument patterns
                     let params = if args.is_empty() {
                         serde_json::json!({})
-                    } else {
+                    } else if args.len() == 1 {
+                        // Single argument - could be object or simple value
                         Self::js_value_to_json_static(&args[0], ctx)?
+                    } else {
+                        // Multiple arguments - convert to named params for requestContext
+                        // This handles: requestContext(pattern, reason, max_files?)
+                        if tool_clone.name() == "requestContext" {
+                            let pattern = Self::js_value_to_json_static(&args[0], ctx)?;
+                            let reason = if args.len() > 1 {
+                                Self::js_value_to_json_static(&args[1], ctx)?
+                            } else {
+                                serde_json::json!("")
+                            };
+                            let max_files = if args.len() > 2 {
+                                Self::js_value_to_json_static(&args[2], ctx)?
+                            } else {
+                                serde_json::json!(5) // Default max_files
+                            };
+
+                            serde_json::json!({
+                                "pattern": pattern,
+                                "reason": reason,
+                                "max_files": max_files
+                            })
+                        } else {
+                            // For other tools, take first argument as params
+                            Self::js_value_to_json_static(&args[0], ctx)?
+                        }
                     };
 
                     // Create tool input
@@ -380,12 +397,18 @@ impl TypeScriptRuntime {
             // Just call sync function
             format!("{trimmed}\nagent_code();")
         } else {
+            // Check if code contains top-level await
+            let has_await = trimmed.contains("await ");
+
             // Check if code contains a top-level return statement
             let has_return = trimmed
                 .lines()
                 .any(|line| line.trim_start().starts_with("return "));
 
-            if has_return {
+            if has_await {
+                // Wrap in async IIFE to support top-level await
+                format!("(async () => {{ {trimmed} }})()")
+            } else if has_return {
                 // Wrap in IIFE since it has explicit return
                 // This handles cases like: function foo() { ... } return foo()
                 format!("(function() {{ {trimmed} }})()")
@@ -417,17 +440,10 @@ impl TypeScriptRuntime {
             Ok(Value::Bool(boolean))
         } else if let Some(number) = value.as_number() {
             // Check if it's an integer value (no fractional part)
-            #[allow(
-                clippy::float_cmp,
-                reason = "Intentionally comparing to check for exact integer value"
-            )]
-            if number.fract() == 0.0 && number.is_finite() {
+            if number.fract().abs() < f64::EPSILON && number.is_finite() {
                 // It's a whole number, convert to i64 if in range
-                #[allow(
-                    clippy::cast_possible_truncation,
-                    reason = "Checked that number has no fractional part"
-                )]
-                Ok(Value::Number(Number::from(number as i64)))
+                let int_value = number.round() as i64;
+                Ok(Value::Number(Number::from(int_value)))
             } else {
                 Ok(Number::from_f64(number).map_or(Value::Null, Value::Number))
             }
@@ -533,13 +549,6 @@ impl Default for TypeScriptRuntime {
 }
 
 #[cfg(test)]
-#[cfg_attr(
-    test,
-    allow(
-        clippy::absolute_paths,
-        reason = "Test module allows absolute paths for clarity"
-    )
-)]
 mod tests {
     use super::*;
     use crate::{ToolInput, ToolOutput};

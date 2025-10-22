@@ -188,7 +188,7 @@ impl<'handler> EventHandler<'handler> {
         }
     }
 
-    fn handle_task_completed(&mut self, task_id: TaskId, result: TaskResult) {
+    fn handle_task_completed(&mut self, task_id: TaskId, result: Box<TaskResult>) {
         self.state.active_running_tasks.remove(&task_id);
 
         if let Some(task) = self.task_manager.get_task_mut(task_id) {

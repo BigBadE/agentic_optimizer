@@ -1,0 +1,94 @@
+{
+  "name": "Deep Dependency Chain",
+  "description": "Agent handles long chains of sequential dependencies efficiently",
+  "initial_query": "Build a pipeline: parse JSON → validate schema → transform data → generate report → send email",
+  "mock_responses": [
+    {
+      "pattern": "pipeline",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<TaskList> {",
+        "  return {",
+        "    id: \"pipeline\",",
+        "    title: \"Data processing pipeline\",",
+        "    steps: [",
+        "      {",
+        "        id: \"parse\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Parse JSON input\",",
+        "        verification: \"JSON parser created\"",
+        "      },",
+        "      {",
+        "        id: \"validate\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Validate against schema\",",
+        "        verification: \"Schema validator implemented\"",
+        "      },",
+        "      {",
+        "        id: \"transform\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Transform data\",",
+        "        verification: \"Data transformer works\"",
+        "      },",
+        "      {",
+        "        id: \"report\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Generate report\",",
+        "        verification: \"Report generator complete\"",
+        "      },",
+        "      {",
+        "        id: \"email\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Send email notification\",",
+        "        verification: \"Email sender configured\"",
+        "      }",
+        "    ]",
+        "  };",
+        "}",
+        "```"
+      ]
+    },
+    {
+      "pattern": "Parse JSON",
+      "response": "Created JSON parser"
+    },
+    {
+      "pattern": "Validate against schema",
+      "response": "Created schema validator"
+    },
+    {
+      "pattern": "Transform data",
+      "response": "Created data transformer"
+    },
+    {
+      "pattern": "Generate report",
+      "response": "Created report generator"
+    },
+    {
+      "pattern": "Send email",
+      "response": "Created email sender"
+    }
+  ],
+  "expected_task_list": {
+    "total_tasks": 5,
+    "task_descriptions": [
+      "Parse JSON input",
+      "Validate against schema",
+      "Transform data",
+      "Generate report",
+      "Send email notification"
+    ],
+    "dependency_chain": [[], [1], [2], [3], [4]]
+  },
+  "expected_outcomes": {
+    "all_tasks_completed": true,
+    "files_created": [
+      "src/parser.rs",
+      "src/validator.rs",
+      "src/transformer.rs",
+      "src/report.rs",
+      "src/email.rs"
+    ],
+    "tests_passed": true
+  }
+}

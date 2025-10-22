@@ -88,8 +88,10 @@ impl ContextFetcher {
         let mut files = HashSet::new();
 
         // Pattern 1: Explicit file paths (with extension)
-        #[allow(clippy::expect_used, reason = "Regex pattern is known to be valid")]
-        let path_regex = Regex::new(r"([a-zA-Z0-9_\-./]+\.[a-z]{1,4})").expect("Valid regex");
+        let Ok(path_regex) = Regex::new(r"([a-zA-Z0-9_\-./]+\.[a-z]{1,4})") else {
+            // Hardcoded regex pattern is guaranteed valid, but handle gracefully
+            return Vec::new();
+        };
         for cap in path_regex.captures_iter(text) {
             if let Some(matched) = cap.get(1) {
                 let path_str = matched.as_str();
@@ -101,9 +103,10 @@ impl ContextFetcher {
         }
 
         // Pattern 2: Module paths (Rust-specific for now)
-        #[allow(clippy::expect_used, reason = "Regex pattern is known to be valid")]
-        let module_regex =
-            Regex::new(r"(?:crate|super|self)::([a-zA-Z0-9_:]+)").expect("Valid regex");
+        let Ok(module_regex) = Regex::new(r"(?:crate|super|self)::([a-zA-Z0-9_:]+)") else {
+            // Hardcoded regex pattern is guaranteed valid, but handle gracefully
+            return files.into_iter().collect();
+        };
         for cap in module_regex.captures_iter(text) {
             let Some(matched) = cap.get(1) else {
                 continue;
@@ -250,9 +253,7 @@ impl ContextFetcher {
             let mut conversation_text =
                 String::from("\n\n=== Previous Conversation (newest at bottom) ===\n");
             for (role, content) in messages {
-                #[allow(clippy::expect_used, reason = "Writing to string never fails")]
-                write!(conversation_text, "{role}: {content}\n\n")
-                    .expect("Writing to string never fails");
+                let _write_result = write!(conversation_text, "{role}: {content}\n\n");
             }
             conversation_text.push_str("=== End Previous Conversation ===\n\n");
             context.system_prompt.push_str(&conversation_text);
@@ -260,32 +261,9 @@ impl ContextFetcher {
 
         Ok(context)
     }
-
-    /// Detect programming language from file extension
-    #[allow(dead_code, reason = "Utility function for future use")]
-    fn detect_language(path: &Path) -> String {
-        path.extension()
-            .and_then(|ext| ext.to_str())
-            .map_or("unknown", |ext| match ext {
-                "rs" => "rust",
-                "py" => "python",
-                "js" | "jsx" => "javascript",
-                "ts" | "tsx" => "typescript",
-                "go" => "go",
-                "java" => "java",
-                "cpp" | "cc" | "cxx" => "cpp",
-                "c" | "h" => "c",
-                _ => "unknown",
-            })
-            .to_owned()
-    }
 }
 
 #[cfg(test)]
-#[allow(
-    clippy::min_ident_chars,
-    reason = "Test code uses short variable names"
-)]
 mod tests {
     use super::*;
     use tempfile::TempDir;
@@ -325,7 +303,7 @@ mod tests {
         let text = "Please check src/main.rs and update lib.rs in the source directory";
         let files = fetcher.extract_file_references(text);
 
-        assert!(files.iter().any(|p| p.ends_with("src/main.rs")));
+        assert!(files.iter().any(|path| path.ends_with("src/main.rs")));
     }
 
     #[tokio::test]
@@ -371,25 +349,5 @@ mod tests {
 
         // Should have conversation history in system prompt
         assert!(context.system_prompt.contains("Previous Conversation"));
-    }
-
-    #[test]
-    fn test_detect_language() {
-        assert_eq!(
-            ContextFetcher::detect_language(Path::new("test.rs")),
-            "rust"
-        );
-        assert_eq!(
-            ContextFetcher::detect_language(Path::new("test.py")),
-            "python"
-        );
-        assert_eq!(
-            ContextFetcher::detect_language(Path::new("test.js")),
-            "javascript"
-        );
-        assert_eq!(
-            ContextFetcher::detect_language(Path::new("test.unknown")),
-            "unknown"
-        );
     }
 }

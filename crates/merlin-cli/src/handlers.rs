@@ -257,11 +257,7 @@ pub async fn handle_interactive(
 
     let orchestrator = RoutingOrchestrator::new(config);
 
-    let flags = InteractiveFlags {
-        validation_enabled: !matches!(validation, Validation::Disabled),
-        local_only,
-        context_dump,
-    };
+    let flags = InteractiveFlags { local_only };
 
-    handle_interactive_agent(orchestrator, project, flags).await
+    handle_interactive_agent(orchestrator?, project, flags).await
 }

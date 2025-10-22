@@ -1,15 +1,19 @@
 //! Tests for self-determining task execution.
 
-#![allow(
-    clippy::min_ident_chars,
-    clippy::tests_outside_test_module,
-    clippy::missing_panics_doc,
-    clippy::expect_used,
-    clippy::redundant_clone,
-    clippy::assertions_on_result_states,
-    clippy::unwrap_used,
-    missing_docs,
-    reason = "Integration tests have different conventions"
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
 )]
 
 use merlin_routing::{

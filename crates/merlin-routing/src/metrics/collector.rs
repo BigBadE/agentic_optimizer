@@ -93,25 +93,30 @@ impl RequestMetricsBuilder {
     }
 }
 
+/// Parameters for creating request metrics
+pub struct RequestMetricsParams {
+    /// The query text
+    pub query: String,
+    /// Model tier used
+    pub tier_used: String,
+    /// Latency in milliseconds
+    pub latency_ms: u64,
+    /// Tokens used
+    pub tokens_used: TokenUsage,
+    /// Whether the request succeeded
+    pub success: bool,
+    /// Whether the request was escalated to a higher tier
+    pub escalated: bool,
+}
+
 impl RequestMetrics {
     /// Creates new request metrics
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Kept for backward compatibility, use builder instead"
-    )]
-    pub fn new(
-        query: String,
-        tier_used: String,
-        latency_ms: u64,
-        tokens_used: TokenUsage,
-        success: bool,
-        escalated: bool,
-    ) -> Self {
-        RequestMetricsBuilder::new(query, tier_used)
-            .latency_ms(latency_ms)
-            .tokens_used(tokens_used)
-            .success(success)
-            .escalated(escalated)
+    pub fn new(params: RequestMetricsParams) -> Self {
+        RequestMetricsBuilder::new(params.query, params.tier_used)
+            .latency_ms(params.latency_ms)
+            .tokens_used(params.tokens_used)
+            .success(params.success)
+            .escalated(params.escalated)
             .build()
     }
 
@@ -219,14 +224,14 @@ mod tests {
     fn test_metrics_collector() {
         let mut collector = MetricsCollector::new();
 
-        let metrics = RequestMetrics::new(
-            "test query".to_owned(),
-            "local".to_owned(),
-            100,
-            TokenUsage::default(),
-            true,
-            false,
-        );
+        let metrics = RequestMetrics::new(RequestMetricsParams {
+            query: "test query".to_owned(),
+            tier_used: "local".to_owned(),
+            latency_ms: 100,
+            tokens_used: TokenUsage::default(),
+            success: true,
+            escalated: false,
+        });
 
         collector.record(metrics);
         assert_eq!(collector.len(), 1);
@@ -252,14 +257,14 @@ mod tests {
     fn test_requests_today() {
         let mut collector = MetricsCollector::new();
 
-        let metrics = RequestMetrics::new(
-            "test".to_owned(),
-            "local".to_owned(),
-            100,
-            TokenUsage::default(),
-            true,
-            false,
-        );
+        let metrics = RequestMetrics::new(RequestMetricsParams {
+            query: "test".to_owned(),
+            tier_used: "local".to_owned(),
+            latency_ms: 100,
+            tokens_used: TokenUsage::default(),
+            success: true,
+            escalated: false,
+        });
 
         collector.record(metrics);
 

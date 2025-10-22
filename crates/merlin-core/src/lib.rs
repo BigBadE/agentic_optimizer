@@ -13,7 +13,7 @@
         clippy::missing_errors_doc,
         clippy::print_stdout,
         clippy::print_stderr,
-        reason = "Allow for tests"
+        reason = "Test allows"
     )
 )]
 
@@ -56,9 +56,9 @@ pub use routing_error::RoutingError;
 pub use routing_error::Result;
 pub use streaming::{StepId, StepType, StreamingChannel, StreamingEvent, TaskStep};
 pub use task::{
-    CommandExecution, Complexity, ContextRequirements, ExecutionContext, ExecutionMode,
-    ExecutionStrategy, FileChange, Priority, Severity, StageResult, SubtaskSpec, Task, TaskAction,
-    TaskAnalysis, TaskDecision, TaskId, TaskResult, TaskState, ValidationError, ValidationResult,
+    CommandExecution, ContextRequirements, ExecutionContext, ExecutionMode, ExecutionStrategy,
+    FileChange, Priority, Severity, StageResult, SubtaskSpec, Task, TaskAction, TaskAnalysis,
+    TaskDecision, TaskId, TaskResult, TaskState, ValidationError, ValidationResult,
     ValidationStage as ValidationStageType,
 };
 pub use task_list::{

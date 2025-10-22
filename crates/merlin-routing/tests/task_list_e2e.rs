@@ -15,8 +15,6 @@
         clippy::print_stdout,
         clippy::print_stderr,
         clippy::tests_outside_test_module,
-        clippy::min_ident_chars,
-        clippy::shadow_unrelated,
         reason = "Test allows"
     )
 )]
@@ -281,22 +279,22 @@ async fn test_refactor_task_list_workflow() {
     let debug_count = task_list
         .steps
         .iter()
-        .filter(|s| matches!(s.step_type, TaskStepType::Debug))
+        .filter(|step| matches!(step.step_type, TaskStepType::Debug))
         .count();
     let refactor_count = task_list
         .steps
         .iter()
-        .filter(|s| matches!(s.step_type, TaskStepType::Refactor))
+        .filter(|step| matches!(step.step_type, TaskStepType::Refactor))
         .count();
     let verify_count = task_list
         .steps
         .iter()
-        .filter(|s| matches!(s.step_type, TaskStepType::Verify))
+        .filter(|step| matches!(step.step_type, TaskStepType::Verify))
         .count();
     let test_count = task_list
         .steps
         .iter()
-        .filter(|s| matches!(s.step_type, TaskStepType::Test))
+        .filter(|step| matches!(step.step_type, TaskStepType::Test))
         .count();
 
     assert_eq!(debug_count, 1);
@@ -314,7 +312,11 @@ async fn test_task_list_step_ids_are_unique() {
     let task_list: TaskList = from_value(result).unwrap();
 
     // Collect all step IDs
-    let step_ids: Vec<&str> = task_list.steps.iter().map(|s| s.id.as_str()).collect();
+    let step_ids: Vec<&str> = task_list
+        .steps
+        .iter()
+        .map(|step| step.id.as_str())
+        .collect();
 
     // Verify uniqueness
     let mut unique_ids = step_ids.clone();
@@ -392,9 +394,9 @@ async fn test_task_list_step_lifecycle_methods() {
     }
 
     // Test next pending step after first complete
-    let next_step = task_list.next_pending_step();
-    assert!(next_step.is_some());
-    assert_eq!(next_step.unwrap().id, "step_2");
+    let next_step_after_complete = task_list.next_pending_step();
+    assert!(next_step_after_complete.is_some());
+    assert_eq!(next_step_after_complete.unwrap().id, "step_2");
 
     // Test failing a step
     if let Some(step) = task_list.get_step_mut("step_2") {

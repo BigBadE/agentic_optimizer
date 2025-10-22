@@ -8,9 +8,10 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
-
-use crate::{Response, TokenUsage};
 use uuid::Uuid;
+
+use crate::task_list::TaskList;
+use crate::{Response, TokenUsage};
 
 /// Unique identifier for a task
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -31,8 +32,8 @@ pub struct Task {
     pub id: TaskId,
     /// Human-readable description of what this task should accomplish
     pub description: String,
-    /// Estimated complexity level
-    pub complexity: Complexity,
+    /// Difficulty rating from 1 (easiest) to 10 (hardest)
+    pub difficulty: u8,
     /// Priority for scheduling
     pub priority: Priority,
     /// Other tasks that must complete before this one
@@ -55,7 +56,7 @@ impl Task {
         Self {
             id: TaskId::default(),
             description,
-            complexity: Complexity::Simple,
+            difficulty: 5, // Default to medium difficulty
             priority: Priority::Medium,
             dependencies: Vec::default(),
             context_needs: ContextRequirements::default(),
@@ -64,10 +65,17 @@ impl Task {
         }
     }
 
-    /// Sets the complexity level.
+    /// Sets the difficulty level (1-10).
+    ///
+    /// # Panics
+    /// Panics if difficulty is not in range 1-10.
     #[must_use]
-    pub fn with_complexity(mut self, complexity: Complexity) -> Self {
-        self.complexity = complexity;
+    pub fn with_difficulty(mut self, difficulty: u8) -> Self {
+        assert!(
+            (1..=10).contains(&difficulty),
+            "Difficulty must be between 1 and 10, got {difficulty}"
+        );
+        self.difficulty = difficulty;
         self
     }
 
@@ -96,19 +104,6 @@ impl Task {
     pub fn requires_build_check(&self) -> bool {
         !self.context_needs.required_files.is_empty()
     }
-}
-
-/// Task complexity level.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Serialize, Deserialize)]
-pub enum Complexity {
-    /// Very simple task, can be handled by smallest model
-    Trivial,
-    /// Simple task with straightforward logic
-    Simple,
-    /// Moderate complexity requiring careful thought
-    Medium,
-    /// Complex task requiring advanced reasoning
-    Complex,
 }
 
 /// Task priority level.
@@ -203,6 +198,9 @@ pub struct TaskResult {
     pub validation: ValidationResult,
     /// Execution duration in milliseconds
     pub duration_ms: u64,
+    /// Optional `TaskList` if the agent returned a multi-step workflow
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub task_list: Option<TaskList>,
 }
 
 /// Validation result with pass/fail status and detailed feedback.
@@ -406,8 +404,13 @@ pub enum TaskAction {
 pub struct SubtaskSpec {
     /// Description of what the subtask should do
     pub description: String,
-    /// Estimated complexity
-    pub complexity: Complexity,
+    /// Difficulty rating from 1 (easiest) to 10 (hardest)
+    #[serde(default = "default_difficulty")]
+    pub difficulty: u8,
+}
+
+fn default_difficulty() -> u8 {
+    5
 }
 
 /// How to execute multiple subtasks.

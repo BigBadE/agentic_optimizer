@@ -3,13 +3,20 @@
 //! These tests verify that conversation history is properly tracked,
 //! passed through the system, and used in context building.
 
-#![cfg(test)]
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::min_ident_chars,
-    clippy::missing_panics_doc,
-    reason = "Test code is allowed to use expect/unwrap and doesn't need panic docs"
+#![cfg_attr(
+    test,
+    allow(
+        dead_code,
+        clippy::expect_used,
+        clippy::unwrap_used,
+        clippy::panic,
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        clippy::print_stdout,
+        clippy::print_stderr,
+        clippy::tests_outside_test_module,
+        reason = "Test allows"
+    )
 )]
 
 use merlin_core::Query;

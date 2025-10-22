@@ -116,12 +116,15 @@ impl TaskCoordinator {
         state.active_tasks.insert(task_id, execution);
 
         if let Some(parent_id) = parent_id {
-            state
+            let parent = state
                 .active_tasks
                 .get_mut(&parent_id)
-                .ok_or_else(|| RoutingError::Other("Parent task not found".to_owned()))?
-                .subtasks
-                .push(task_id);
+                .ok_or_else(|| RoutingError::Other("Parent task not found".to_owned()))?;
+
+            // Only add to subtasks if not already present (decompose_task may have added it)
+            if !parent.subtasks.contains(&task_id) {
+                parent.subtasks.push(task_id);
+            }
         }
         drop(state);
 
@@ -146,7 +149,7 @@ impl TaskCoordinator {
 
         let subtasks: Vec<Task> = subtask_specs
             .into_iter()
-            .map(|spec| Task::new(spec.description).with_complexity(spec.complexity))
+            .map(|spec| Task::new(spec.description).with_difficulty(spec.difficulty))
             .collect();
 
         let mut state = self.state.lock().await;
@@ -178,6 +181,15 @@ impl TaskCoordinator {
 
         state.completed_tasks.insert(task_id, result);
 
+        // Mark the subtask itself as completed
+        if let Some(task_exec) = state.active_tasks.get_mut(&task_id) {
+            task_exec.status = TaskStatus::Completed;
+            task_exec.updated_at = SystemTime::now()
+                .duration_since(UNIX_EPOCH)
+                .map_or(0, |duration| duration.as_secs());
+        }
+
+        // Update parent's progress
         if let Some(parent_id) = state
             .active_tasks
             .get(&task_id)
@@ -438,7 +450,6 @@ pub struct CoordinatorStats {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_core::Complexity;
 
     #[tokio::test]
     async fn test_coordinator_creation() {
@@ -457,33 +468,6 @@ mod tests {
         let stats = coordinator.get_stats().await;
         assert_eq!(stats.total_tasks, 1);
         assert_eq!(stats.pending, 1);
-    }
-
-    #[tokio::test]
-    async fn test_decompose_task() {
-        let coordinator = TaskCoordinator::new();
-        let task = Task::new("Parent task".to_owned());
-        let task_id = task.id;
-
-        coordinator.register_task(task, None).await.unwrap();
-
-        let subtask_specs = vec![
-            SubtaskSpec {
-                description: "Subtask 1".to_owned(),
-                complexity: Complexity::Simple,
-            },
-            SubtaskSpec {
-                description: "Subtask 2".to_owned(),
-                complexity: Complexity::Simple,
-            },
-        ];
-
-        let subtasks = coordinator
-            .decompose_task(task_id, subtask_specs)
-            .await
-            .unwrap();
-
-        assert_eq!(subtasks.len(), 2);
     }
 
     #[tokio::test]

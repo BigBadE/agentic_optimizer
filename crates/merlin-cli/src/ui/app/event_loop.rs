@@ -7,6 +7,7 @@ use tracing::warn;
 
 use super::navigation;
 use super::tui_app::TuiApp;
+use crate::ui::app::navigation::ScrollContext;
 use crate::ui::event_handler::EventHandler;
 use crate::ui::renderer::{FocusedPane, RenderCtx, UiCtx};
 use crate::ui::state::{ConversationEntry, ConversationRole};
@@ -186,7 +187,7 @@ impl<B: Backend> TuiApp<B> {
     /// Adjusts task list scroll to keep the selected task visible
     pub(super) fn adjust_task_list_scroll(&mut self) {
         let terminal_height = self.terminal.size().map(|size| size.height).unwrap_or(30);
-        navigation::adjust_task_list_scroll(navigation::ScrollContext {
+        navigation::adjust_task_list_scroll(&mut ScrollContext {
             active_task_id: self.state.active_task_id.as_ref(),
             expanded_conversations: &self.state.expanded_conversations,
             task_list_scroll_offset: &mut self.state.task_list_scroll_offset,

@@ -33,7 +33,7 @@ pub enum UiEvent {
         /// ID of the task
         task_id: TaskId,
         /// Final result
-        result: TaskResult,
+        result: Box<TaskResult>,
     },
     /// Task failed with an error
     TaskFailed {

@@ -9,7 +9,9 @@
 
 use criterion::{BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
 use merlin_core::TokenUsage;
-use merlin_routing::{MetricsCollector, MetricsReport, RequestMetrics};
+use merlin_routing::{
+    MetricsCollector, MetricsReport, RequestMetrics, metrics::collector::RequestMetricsParams,
+};
 use std::hint::black_box;
 use std::time::Duration;
 
@@ -20,15 +22,15 @@ fn bench_metrics_recording(c: &mut Criterion) {
         group.bench_with_input(BenchmarkId::from_parameter(size), size, |b, &size| {
             b.iter(|| {
                 let mut collector = MetricsCollector::new();
-                for i in 0..size {
-                    let metrics = RequestMetrics::new(
-                        format!("query_{i}"),
-                        "local".to_owned(),
-                        100,
-                        TokenUsage::default(),
-                        true,
-                        false,
-                    );
+                for idx in 0..size {
+                    let metrics = RequestMetrics::new(RequestMetricsParams {
+                        query: format!("query_{idx}"),
+                        tier_used: "local".to_owned(),
+                        latency_ms: 100,
+                        tokens_used: TokenUsage::default(),
+                        success: true,
+                        escalated: false,
+                    });
                     collector.record(black_box(metrics));
                 }
             });
@@ -46,27 +48,27 @@ fn bench_daily_report_generation(c: &mut Criterion) {
             let mut collector = MetricsCollector::new();
 
             // Pre-populate with metrics
-            for i in 0..size {
-                let metrics = RequestMetrics::new(
-                    format!("query_{i}"),
-                    if i % 3 == 0 {
+            for idx in 0..size {
+                let metrics = RequestMetrics::new(RequestMetricsParams {
+                    query: format!("query_{idx}"),
+                    tier_used: if idx % 3 == 0 {
                         "local"
-                    } else if i % 3 == 1 {
+                    } else if idx % 3 == 1 {
                         "groq"
                     } else {
                         "claude"
                     }
                     .to_owned(),
-                    100 + (i % 200) as u64,
-                    TokenUsage {
+                    latency_ms: 100 + (idx % 200) as u64,
+                    tokens_used: TokenUsage {
                         input: 100,
                         output: 50,
                         cache_read: 0,
                         cache_write: 0,
                     },
-                    i % 10 != 0, // 90% success rate
-                    i % 5 == 0,  // 20% escalation rate
-                );
+                    success: idx % 10 != 0,
+                    escalated: idx % 5 == 0,
+                });
                 collector.record(metrics);
             }
 

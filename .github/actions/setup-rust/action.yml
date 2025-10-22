@@ -2,7 +2,7 @@ name: "Setup Rust"
 description: "Installs Rust, caches deps, runs cargo-chef"
 inputs:
   profile:
-    description: "Cargo profile to use (dev, ci-release, release)"
+    description: "Cargo profile to use (dev, ci, release)"
     required: false
     default: "dev"
   components:
@@ -43,14 +43,6 @@ runs:
         override: true
         components: ${{ inputs.components }}
 
-    #- uses: taiki-e/install-action@v2
-    #  with:
-    #    tool: cargo-chef
-    #
-    #- name: Prepare chef recipe
-    #  shell: bash
-    #  run: cargo chef prepare --recipe-path recipe.json
-
     - name: Cache dependencies
       uses: actions/cache@v4
       with:
@@ -65,39 +57,39 @@ runs:
         TARGET_DIR="target/${{ inputs.profile }}"
         if [ -d "$TARGET_DIR" ]; then
           # Calculate cache size in MB
-          if [[ "$OSTYPE" == "darwin"* ]]; then
-            CACHE_SIZE=$(du -sm "$TARGET_DIR" | cut -f1)
-          else
-            CACHE_SIZE=$(du -sm "$TARGET_DIR" | cut -f1)
-          fi
+          CACHE_SIZE=$(du -sm "$TARGET_DIR" | cut -f1)
           echo "Current cache size: ${CACHE_SIZE}MB"
 
-          # If cache is over 1GB (1024MB), clean it
-          if [ "$CACHE_SIZE" -gt 1024 ]; then
-            echo "Cache size exceeds 1GB, cleaning..."
+          # More aggressive cleanup for CI profile (500MB limit)
+          if [ "${{ inputs.profile }}" = "ci" ]; then
+            MAX_SIZE=500
+          else
+            MAX_SIZE=1024
+          fi
+
+          # If cache exceeds limit, clean it
+          if [ "$CACHE_SIZE" -gt "$MAX_SIZE" ]; then
+            echo "Cache size exceeds ${MAX_SIZE}MB, cleaning..."
             # Remove incremental compilation artifacts
             find "$TARGET_DIR" -type d -name "incremental" -exec rm -rf {} + 2>/dev/null || true
+            # Remove build scripts and their outputs
+            find "$TARGET_DIR" -type d -name "build" -exec rm -rf {} + 2>/dev/null || true
+            # Remove examples and benches (not needed in CI)
+            find "$TARGET_DIR" -type d -name "examples" -exec rm -rf {} + 2>/dev/null || true
+            find "$TARGET_DIR" -type d -name "benches" -exec rm -rf {} + 2>/dev/null || true
             # Remove old build artifacts (keep only .rlib, .rmeta, and executables)
             find "$TARGET_DIR" -type f ! -name "*.rlib" ! -name "*.rmeta" ! -name "*.exe" ! -perm /111 -delete 2>/dev/null || true
             # Remove fingerprint files older than 7 days
             find "$TARGET_DIR" -name ".fingerprint" -type d -exec find {} -type f -mtime +7 -delete \; 2>/dev/null || true
 
             # Recalculate size
-            if [[ "$OSTYPE" == "darwin"* ]]; then
-              NEW_SIZE=$(du -sm "$TARGET_DIR" | cut -f1)
-            else
-              NEW_SIZE=$(du -sm "$TARGET_DIR" | cut -f1)
-            fi
+            NEW_SIZE=$(du -sm "$TARGET_DIR" | cut -f1)
             echo "Cache size after cleanup: ${NEW_SIZE}MB"
 
-            # If still over 1GB, remove entire cache
-            if [ "$NEW_SIZE" -gt 1024 ]; then
+            # If still over limit, remove entire cache
+            if [ "$NEW_SIZE" -gt "$MAX_SIZE" ]; then
               echo "Cache still too large after cleanup, removing entirely..."
               rm -rf "$TARGET_DIR"
             fi
           fi
         fi
-
-    #- name: Cook dependencies
-    #  shell: bash
-    #  run: cargo chef cook --profile ${{ inputs.profile }} --recipe-path recipe.json

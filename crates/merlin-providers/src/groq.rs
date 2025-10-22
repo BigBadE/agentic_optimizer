@@ -256,4 +256,81 @@ mod tests {
         let cost = provider.estimate_cost(&context);
         assert!(cost.abs() < f64::EPSILON);
     }
+
+    #[test]
+    fn test_with_api_key_direct_empty() {
+        // Test that creating a provider with an empty API key returns an error
+        let result = GroqProvider::with_api_key_direct(String::new());
+        assert!(result.is_err(), "Empty API key should return an error");
+
+        if let Err(err) = result {
+            assert!(
+                matches!(err, Error::MissingApiKey(_)),
+                "Should be a MissingApiKey error"
+            );
+        }
+    }
+
+    #[test]
+    fn test_with_api_key_direct_valid() {
+        // Test that creating a provider with a valid API key succeeds
+        let result = GroqProvider::with_api_key_direct("valid_key".to_owned());
+        assert!(result.is_ok(), "Valid API key should succeed");
+
+        let provider = result.unwrap();
+        assert_eq!(provider.api_key, "valid_key");
+        assert_eq!(provider.model, DEFAULT_MODEL);
+    }
+
+    #[test]
+    fn test_with_model() {
+        // Test that with_model correctly sets the model
+        let provider = GroqProvider {
+            client: Client::default(),
+            api_key: "test_key".to_owned(),
+            model: DEFAULT_MODEL.to_owned(),
+        };
+
+        let provider = provider.with_model("custom-model".to_owned());
+        assert_eq!(provider.model, "custom-model");
+    }
+
+    #[test]
+    fn test_with_api_key() {
+        // Test that with_api_key correctly updates the API key
+        let provider = GroqProvider {
+            client: Client::default(),
+            api_key: "old_key".to_owned(),
+            model: DEFAULT_MODEL.to_owned(),
+        };
+
+        let provider = provider.with_api_key("new_key".to_owned());
+        assert_eq!(provider.api_key, "new_key");
+    }
+
+    #[test]
+    fn test_groq_provider_name() {
+        let provider = GroqProvider {
+            client: Client::default(),
+            api_key: "test_key".to_owned(),
+            model: DEFAULT_MODEL.to_owned(),
+        };
+
+        assert_eq!(provider.name(), "Groq");
+    }
+
+    #[test]
+    fn test_model_chaining() {
+        // Test that methods can be chained
+        let result = GroqProvider::with_api_key_direct("test_key".to_owned());
+        assert!(result.is_ok());
+
+        let provider = result
+            .unwrap()
+            .with_model("custom-model".to_owned())
+            .with_api_key("new_key".to_owned());
+
+        assert_eq!(provider.model, "custom-model");
+        assert_eq!(provider.api_key, "new_key");
+    }
 }

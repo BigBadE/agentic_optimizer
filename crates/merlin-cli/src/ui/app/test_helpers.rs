@@ -1,7 +1,7 @@
 //! Test helpers and accessors for `TuiApp`
 //!
 //! These methods provide controlled access to internal state for testing purposes.
-//! They are only available when compiling tests.
+//! They are available when compiling tests or when the `test-util` feature is enabled.
 //!
 //! # Testing Pattern
 //!
@@ -12,23 +12,24 @@
 //!
 //! Never manipulate internal state directly - use the provided methods.
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
 use ratatui::backend::Backend;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
 use super::tui_app::TuiApp;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
 use crate::ui::event_source::InputEventSource;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
 use crate::ui::renderer::FocusedPane;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
 use crate::ui::state::{ConversationEntry, ConversationRole, UiState};
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
 use crate::ui::task_manager::TaskManager;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
 use merlin_routing::TaskId;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-util"))]
+#[allow(dead_code, reason = "Test utilities")]
 impl<B: Backend> TuiApp<B> {
     /// Gets a reference to the terminal backend
     ///

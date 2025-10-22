@@ -1593,4 +1593,144 @@ fn main() {
             Some("Check the logs for errors")
         );
     }
+
+    #[test]
+    fn test_extract_typescript_code_syntax_error() {
+        // Test that TypeScript code with syntax errors can still be extracted
+        let text = r"
+```typescript
+const x = ;  // Syntax error
+return {done: true};
+```
+";
+        let code = AgentExecutor::extract_typescript_code(text);
+        assert!(code.is_some());
+        let code = code.unwrap();
+        assert!(code.contains("const x ="));
+    }
+
+    #[test]
+    fn test_extract_typescript_code_no_code_blocks() {
+        // Test that text without code blocks returns None
+        let text = "This is just plain text without any code blocks.";
+        let code = AgentExecutor::extract_typescript_code(text);
+        assert!(code.is_none());
+    }
+
+    #[test]
+    fn test_extract_typescript_code_empty_block() {
+        // Test that empty code blocks are filtered out and return None
+        let text = r"
+```typescript
+```
+";
+        let code = AgentExecutor::extract_typescript_code(text);
+        assert!(code.is_none(), "Empty code blocks should be filtered out");
+    }
+
+    #[test]
+    fn test_agent_execution_result_error_handling() {
+        // Test that error results without "done" or "continue" fields are handled
+        use serde_json::{Result as SerdeResult, json};
+
+        let error_value = json!({
+            "error": "Something went wrong",
+            "message": "Detailed error message"
+        });
+
+        // When neither done nor continue is present, it should fail to parse
+        let result: SerdeResult<AgentExecutionResult> = from_value(error_value);
+        // This should fail to parse since the structure is malformed
+        assert!(
+            result.is_err(),
+            "Malformed execution results should fail to parse"
+        );
+    }
+
+    #[test]
+    fn test_extract_typescript_code_with_indentation() {
+        // Test that indented code blocks are preserved
+        let text = r#"
+Here's the code:
+
+```typescript
+function test() {
+    if (true) {
+        const nested = "value";
+        return {done: true, result: nested};
+    }
+}
+```
+"#;
+        let code = AgentExecutor::extract_typescript_code(text);
+        assert!(code.is_some());
+        let code = code.unwrap();
+        assert!(code.contains("    if (true)"));
+        assert!(code.contains("        const nested"));
+    }
+
+    #[test]
+    fn test_extract_typescript_code_mixed_languages() {
+        // Test that only TypeScript blocks are extracted, not other languages
+        let text = r"
+```rust
+fn main() {}
+```
+
+```typescript
+const x = 1;
+return {done: true};
+```
+
+```python
+def test():
+    pass
+```
+";
+        let code = AgentExecutor::extract_typescript_code(text);
+        assert!(code.is_some());
+        let code = code.unwrap();
+        assert!(code.contains("const x = 1"));
+        assert!(!code.contains("fn main"));
+        assert!(!code.contains("def test"));
+    }
+
+    #[test]
+    fn test_parse_task_list_from_invalid_json() {
+        use serde_json::json;
+
+        // Test with malformed task list (missing required fields)
+        let invalid_value = json!({
+            "title": "Invalid",
+            // Missing "id", "steps", and "status" fields
+        });
+
+        let result = AgentExecutor::parse_task_list_from_value(&invalid_value);
+        assert!(result.is_none(), "Malformed task list should return None");
+    }
+
+    #[test]
+    fn test_parse_task_list_from_valid_json() {
+        use serde_json::json;
+
+        let valid_value = json!({
+            "id": "test-list",
+            "title": "Test List",
+            "steps": [
+                {
+                    "id": "step1",
+                    "step_type": "Feature",
+                    "description": "Task 1",
+                    "verification": "Run tests",
+                    "exit_command": "echo test"
+                }
+            ]
+        });
+
+        let result = AgentExecutor::parse_task_list_from_value(&valid_value);
+        assert!(result.is_some(), "Valid task list should parse");
+        let task_list = result.unwrap();
+        assert_eq!(task_list.title, "Test List");
+        assert_eq!(task_list.steps.len(), 1);
+    }
 }

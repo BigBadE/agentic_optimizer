@@ -47,15 +47,6 @@ impl InputManager {
         self.input_area.insert_newline();
     }
 
-    /// **DEPRECATED**: Direct access to `input_area` - tests should use `TuiApp` with event sources
-    ///
-    /// This method exists only for legacy tests. New tests MUST use `TuiApp` with `TestEventSource`.
-    /// See `TESTS.md` for the correct pattern.
-    #[cfg(test)]
-    pub(crate) fn input_area_mut(&mut self) -> &mut TextArea<'static> {
-        &mut self.input_area
-    }
-
     /// Records a manual newline at the current cursor position
     pub fn record_manual_newline(&mut self) {
         let (row, _) = self.input_area.cursor();

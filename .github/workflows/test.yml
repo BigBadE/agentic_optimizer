@@ -16,6 +16,7 @@ concurrency:
 env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0  # Disable incremental compilation to save disk space
 
 jobs:
   test:
@@ -33,14 +34,24 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
-          profile: debug
+          profile: ci
           components: clippy, rustfmt
 
       - name: Install cargo-llvm-cov
         uses: taiki-e/install-action@cargo-llvm-cov
 
       - name: Run tests with coverage
-        run: cargo build --verbose && cargo llvm-cov --lcov --output-path coverage.info --ignore-filename-regex "test_repositories|benchmarks" --all-features --workspace --no-fail-fast --lib --bins --tests --verbose -- --nocapture
+        run: cargo build --profile ci --verbose && cargo llvm-cov --profile ci --lcov --output-path coverage.info --ignore-filename-regex "test_repositories|benchmarks" --all-features --workspace --no-fail-fast --lib --bins --tests --verbose -- --nocapture
+
+      - name: Clean up build artifacts to free disk space
+        if: always()
+        run: |
+          # Remove build artifacts but keep dependencies
+          rm -rf target/ci/deps/*.d target/ci/deps/*.o 2>/dev/null || true
+          # Remove test executables
+          find target/ci -type f -executable -delete 2>/dev/null || true
+          # Show remaining disk usage
+          df -h
 
       - name: Upload coverage to Codecov
         if: github.event_name == 'push' && matrix.os == 'ubuntu-latest'

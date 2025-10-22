@@ -13,6 +13,7 @@ concurrency:
 
 env:
   CARGO_TERM_COLOR: always
+  CARGO_INCREMENTAL: 0  # Disable incremental compilation to save disk space
 
 jobs:
   style:
@@ -25,14 +26,14 @@ jobs:
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
         with:
-          profile: debug
+          profile: ci
           components: clippy, rustfmt
 
       - name: Cache test
-        run: cargo build --verbose
+        run: cargo build --profile ci --verbose
 
       - name: Run clippy
-        run: cargo clippy --workspace --all-targets --all-features -- -D warnings
+        run: cargo clippy --profile ci --workspace --all-targets --all-features -- -D warnings
 
       - name: Check formatting
         run: cargo fmt --all -- --check

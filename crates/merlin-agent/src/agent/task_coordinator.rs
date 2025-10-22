@@ -121,6 +121,13 @@ impl TaskCoordinator {
                 .get_mut(&parent_id)
                 .ok_or_else(|| RoutingError::Other("Parent task not found".to_owned()))?;
 
+            // Check if adding this subtask would exceed the limit
+            if parent.subtasks.len() >= MAX_SUBTASKS_PER_TASK {
+                return Err(RoutingError::Other(format!(
+                    "Maximum subtasks per task ({MAX_SUBTASKS_PER_TASK}) exceeded"
+                )));
+            }
+
             // Only add to subtasks if not already present (decompose_task may have added it)
             if !parent.subtasks.contains(&task_id) {
                 parent.subtasks.push(task_id);
@@ -448,8 +455,35 @@ pub struct CoordinatorStats {
     pub checkpoints: usize,
 }
 #[cfg(test)]
+#[cfg_attr(
+    test,
+    allow(clippy::unwrap_used, reason = "Tests use unwrap for clarity")
+)]
 mod tests {
     use super::*;
+    use merlin_core::{Response, TokenUsage, ValidationResult};
+    use std::time::Duration;
+    use tokio::spawn;
+    use tokio::time::sleep;
+
+    /// Helper to create a test `TaskResult`
+    fn create_test_result(task_id: TaskId) -> TaskResult {
+        TaskResult {
+            task_id,
+            response: Response {
+                text: "Test response".to_owned(),
+                confidence: 1.0,
+                tokens_used: TokenUsage::default(),
+                provider: "test".to_owned(),
+                latency_ms: 0,
+            },
+            tier_used: "test".to_owned(),
+            tokens_used: TokenUsage::default(),
+            validation: ValidationResult::default(),
+            duration_ms: 0,
+            task_list: None,
+        }
+    }
 
     #[tokio::test]
     async fn test_coordinator_creation() {
@@ -487,6 +521,540 @@ mod tests {
             } else {
                 assert!(result.is_err());
             }
+        }
+    }
+
+    #[tokio::test]
+    async fn test_max_subtasks_enforcement() {
+        let coordinator = TaskCoordinator::new();
+        let parent_task = Task::new("Parent task".to_owned());
+        let parent_id = parent_task.id;
+        coordinator.register_task(parent_task, None).await.unwrap();
+
+        // Add up to MAX_SUBTASKS_PER_TASK
+        for idx in 0..MAX_SUBTASKS_PER_TASK {
+            let subtask = Task::new(format!("Subtask {idx}"));
+            coordinator
+                .register_task(subtask, Some(parent_id))
+                .await
+                .unwrap();
+        }
+
+        // Next subtask should fail
+        let extra_subtask = Task::new("Extra subtask".to_owned());
+        let result = coordinator
+            .register_task(extra_subtask, Some(parent_id))
+            .await;
+        assert!(result.is_err());
+    }
+
+    #[tokio::test]
+    async fn test_task_completion() {
+        let coordinator = TaskCoordinator::new();
+        let task = Task::new("Test task".to_owned());
+        let task_id = task.id;
+
+        coordinator.register_task(task, None).await.unwrap();
+        coordinator.start_task(task_id).await.unwrap();
+
+        let result = create_test_result(task_id);
+
+        coordinator
+            .complete_subtask(task_id, result.clone())
+            .await
+            .unwrap();
+
+        // Verify task is marked as completed
+        let execution = coordinator
+            .state
+            .lock()
+            .await
+            .active_tasks
+            .get(&task_id)
+            .unwrap()
+            .clone();
+        assert_eq!(execution.status, TaskStatus::Completed);
+    }
+
+    #[tokio::test]
+    async fn test_task_hierarchy() {
+        let coordinator = TaskCoordinator::new();
+
+        let parent = Task::new("Parent".to_owned());
+        let parent_id = parent.id;
+        coordinator.register_task(parent, None).await.unwrap();
+
+        let child1 = Task::new("Child 1".to_owned());
+        let child1_id = child1.id;
+        coordinator
+            .register_task(child1, Some(parent_id))
+            .await
+            .unwrap();
+
+        let child2 = Task::new("Child 2".to_owned());
+        let child2_id = child2.id;
+        coordinator
+            .register_task(child2, Some(parent_id))
+            .await
+            .unwrap();
+
+        let parent_exec = coordinator
+            .state
+            .lock()
+            .await
+            .active_tasks
+            .get(&parent_id)
+            .unwrap()
+            .clone();
+        assert_eq!(parent_exec.subtasks.len(), 2);
+        assert!(parent_exec.subtasks.contains(&child1_id));
+        assert!(parent_exec.subtasks.contains(&child2_id));
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_creation() {
+        let coordinator = TaskCoordinator::new();
+        let task = Task::new("Test task".to_owned());
+        let task_id = task.id;
+        coordinator.register_task(task, None).await.unwrap();
+
+        coordinator
+            .create_checkpoint(task_id, "test checkpoint".to_owned())
+            .await
+            .unwrap();
+
+        let checkpoints = coordinator.state.lock().await.checkpoints.clone();
+        assert_eq!(checkpoints.len(), 1);
+        assert_eq!(checkpoints[0].description, "test checkpoint");
+    }
+
+    #[tokio::test]
+    async fn test_checkpoint_limit() {
+        let coordinator = TaskCoordinator::new();
+        let task = Task::new("Test task".to_owned());
+        let task_id = task.id;
+        coordinator.register_task(task, None).await.unwrap();
+
+        // Create more than MAX_CHECKPOINTS
+        for idx in 0..=(MAX_CHECKPOINTS + 5) {
+            coordinator
+                .create_checkpoint(task_id, format!("checkpoint {idx}"))
+                .await
+                .unwrap();
+        }
+
+        let checkpoint_count = coordinator.state.lock().await.checkpoints.len();
+        assert_eq!(checkpoint_count, MAX_CHECKPOINTS);
+    }
+
+    #[tokio::test]
+    async fn test_get_task_status() {
+        let coordinator = TaskCoordinator::new();
+        let task = Task::new("Test task".to_owned());
+        let task_id = task.id;
+
+        coordinator.register_task(task, None).await.unwrap();
+
+        let pending_status = coordinator
+            .state
+            .lock()
+            .await
+            .active_tasks
+            .get(&task_id)
+            .unwrap()
+            .status
+            .clone();
+        assert_eq!(pending_status, TaskStatus::Pending);
+
+        coordinator.start_task(task_id).await.unwrap();
+
+        let in_progress_status = coordinator
+            .state
+            .lock()
+            .await
+            .active_tasks
+            .get(&task_id)
+            .unwrap()
+            .status
+            .clone();
+        assert_eq!(in_progress_status, TaskStatus::InProgress);
+    }
+
+    #[tokio::test]
+    async fn test_nonexistent_task() {
+        let coordinator = TaskCoordinator::new();
+        let fake_id = TaskId::default();
+
+        let result = coordinator.start_task(fake_id).await;
+        assert!(result.is_err());
+
+        let _result = coordinator
+            .complete_subtask(fake_id, create_test_result(fake_id))
+            .await;
+        // This won't error because complete_subtask just inserts into completed_tasks
+        // But we can verify the task isn't in active_tasks
+        assert!(
+            !coordinator
+                .state
+                .lock()
+                .await
+                .active_tasks
+                .contains_key(&fake_id)
+        );
+    }
+
+    #[tokio::test]
+    async fn test_task_stats() {
+        let coordinator = TaskCoordinator::new();
+
+        // Create various tasks
+        let task1 = Task::new("Task 1".to_owned());
+        let task1_id = task1.id;
+        coordinator.register_task(task1, None).await.unwrap();
+
+        let task2 = Task::new("Task 2".to_owned());
+        let task2_id = task2.id;
+        coordinator.register_task(task2, None).await.unwrap();
+
+        let task3 = Task::new("Task 3".to_owned());
+        coordinator.register_task(task3, None).await.unwrap();
+
+        // Start some tasks
+        coordinator.start_task(task1_id).await.unwrap();
+        coordinator.start_task(task2_id).await.unwrap();
+
+        // Complete one task
+        coordinator
+            .complete_subtask(task1_id, create_test_result(task1_id))
+            .await
+            .unwrap();
+
+        let stats = coordinator.get_stats().await;
+        assert_eq!(stats.total_tasks, 3);
+        assert_eq!(stats.pending, 1);
+        assert_eq!(stats.in_progress, 1);
+        assert_eq!(stats.completed, 1);
+        assert_eq!(stats.failed, 0);
+    }
+
+    #[tokio::test]
+    async fn test_decompose_task() {
+        let coordinator = TaskCoordinator::new();
+        let parent_task = Task::new("Parent task".to_owned());
+        let parent_id = parent_task.id;
+
+        coordinator
+            .register_task(parent_task, None)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register parent task");
+
+        let subtask_specs = vec![
+            SubtaskSpec {
+                description: "Subtask 1".to_owned(),
+                difficulty: 1,
+            },
+            SubtaskSpec {
+                description: "Subtask 2".to_owned(),
+                difficulty: 2,
+            },
+        ];
+
+        let subtasks = coordinator
+            .decompose_task(parent_id, subtask_specs)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to decompose task");
+
+        assert_eq!(subtasks.len(), 2);
+
+        // Verify parent status changed to Waiting
+        let parent_exec = coordinator
+            .state
+            .lock()
+            .await
+            .active_tasks
+            .get(&parent_id)
+            .expect("Parent task not found")
+            .clone();
+        assert_eq!(parent_exec.status, TaskStatus::WaitingForSubtasks);
+        assert_eq!(parent_exec.subtasks.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_decompose_task_not_found() {
+        let coordinator = TaskCoordinator::new();
+        let fake_id = TaskId::default();
+
+        let subtask_specs = vec![SubtaskSpec {
+            description: "Subtask".to_owned(),
+            difficulty: 5,
+        }];
+
+        let result = coordinator.decompose_task(fake_id, subtask_specs).await;
+        result.unwrap_err();
+    }
+
+    #[tokio::test]
+    async fn test_concurrent_subtask_completion() {
+        let coordinator = TaskCoordinator::new();
+        let parent_task = Task::new("Parent".to_owned());
+        let parent_id = parent_task.id;
+
+        coordinator
+            .register_task(parent_task, None)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register parent");
+
+        // Create 3 subtasks
+        let child1 = Task::new("Child 1".to_owned());
+        let child1_id = child1.id;
+        let child2 = Task::new("Child 2".to_owned());
+        let child2_id = child2.id;
+        let child3 = Task::new("Child 3".to_owned());
+        let child3_id = child3.id;
+
+        coordinator
+            .register_task(child1, Some(parent_id))
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register child1");
+        coordinator
+            .register_task(child2, Some(parent_id))
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register child2");
+        coordinator
+            .register_task(child3, Some(parent_id))
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register child3");
+
+        // Complete them concurrently
+        let coord1 = coordinator.clone();
+        let coord2 = coordinator.clone();
+        let coord3 = coordinator.clone();
+
+        let handle1 = spawn(async move {
+            coord1
+                .complete_subtask(child1_id, create_test_result(child1_id))
+                .await
+        });
+        let handle2 = spawn(async move {
+            coord2
+                .complete_subtask(child2_id, create_test_result(child2_id))
+                .await
+        });
+        let handle3 = spawn(async move {
+            coord3
+                .complete_subtask(child3_id, create_test_result(child3_id))
+                .await
+        });
+
+        handle1
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Task 1 panicked")
+            .map_err(|err| err.to_string())
+            .expect("Task 1 failed");
+        handle2
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Task 2 panicked")
+            .map_err(|err| err.to_string())
+            .expect("Task 2 failed");
+        handle3
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Task 3 panicked")
+            .map_err(|err| err.to_string())
+            .expect("Task 3 failed");
+
+        // Verify parent is now completed
+        let parent_exec = coordinator
+            .state
+            .lock()
+            .await
+            .active_tasks
+            .get(&parent_id)
+            .expect("Parent not found")
+            .clone();
+        assert_eq!(parent_exec.status, TaskStatus::Completed);
+        assert_eq!(parent_exec.completed_subtasks.len(), 3);
+    }
+
+    #[tokio::test]
+    async fn test_get_subtasks() {
+        let coordinator = TaskCoordinator::new();
+        let parent = Task::new("Parent".to_owned());
+        let parent_id = parent.id;
+
+        coordinator
+            .register_task(parent, None)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register parent");
+
+        let child1 = Task::new("Child 1".to_owned());
+        let child2 = Task::new("Child 2".to_owned());
+
+        coordinator
+            .register_task(child1.clone(), Some(parent_id))
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register child1");
+        coordinator
+            .register_task(child2.clone(), Some(parent_id))
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register child2");
+
+        let subtasks = coordinator
+            .get_subtasks(parent_id)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to get subtasks");
+        assert_eq!(subtasks.len(), 2);
+    }
+
+    #[tokio::test]
+    async fn test_get_progress() {
+        let coordinator = TaskCoordinator::new();
+        let parent = Task::new("Parent".to_owned());
+        let parent_id = parent.id;
+
+        coordinator
+            .register_task(parent, None)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register parent");
+
+        let child1 = Task::new("Child 1".to_owned());
+        let child1_id = child1.id;
+        let child2 = Task::new("Child 2".to_owned());
+
+        coordinator
+            .register_task(child1, Some(parent_id))
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register child1");
+        coordinator
+            .register_task(child2, Some(parent_id))
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register child2");
+
+        // Initial progress should be 0%
+        let progress = coordinator
+            .get_progress(parent_id)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to get progress");
+        assert_eq!(progress.total_subtasks, 2);
+        assert_eq!(progress.completed_subtasks, 0);
+        assert!((progress.progress_percent - 0.0).abs() < f32::EPSILON);
+
+        // Complete one subtask
+        coordinator
+            .complete_subtask(child1_id, create_test_result(child1_id))
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to complete subtask");
+
+        // Progress should be 50%
+        let final_progress = coordinator
+            .get_progress(parent_id)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to get progress");
+        assert_eq!(final_progress.completed_subtasks, 1);
+        assert!((final_progress.progress_percent - 50.0).abs() < f32::EPSILON);
+    }
+
+    #[tokio::test]
+    async fn test_is_ready() {
+        let coordinator = TaskCoordinator::new();
+        let task = Task::new("Test task".to_owned());
+        let task_id = task.id;
+
+        coordinator
+            .register_task(task, None)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register task");
+
+        // Should be ready when pending
+        let ready = coordinator
+            .is_ready(task_id)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to check if ready");
+        assert!(ready);
+
+        // Should not be ready when in progress
+        coordinator
+            .start_task(task_id)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to start task");
+        let ready_in_progress = coordinator
+            .is_ready(task_id)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to check if ready");
+        assert!(!ready_in_progress);
+    }
+
+    #[tokio::test]
+    async fn test_cleanup_old_tasks() {
+        let coordinator = TaskCoordinator::new();
+
+        let task1 = Task::new("Task 1".to_owned());
+        let task1_id = task1.id;
+        coordinator
+            .register_task(task1, None)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register task1");
+
+        coordinator
+            .start_task(task1_id)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to start task1");
+        coordinator
+            .complete_subtask(task1_id, create_test_result(task1_id))
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to complete task1");
+
+        // Wait more than 1 second to ensure task1 is old enough
+        sleep(Duration::from_secs(1)).await;
+
+        let task2 = Task::new("Task 2".to_owned());
+        let task2_id = task2.id;
+        coordinator
+            .register_task(task2, None)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to register task2");
+
+        // Cleanup tasks older than 0 seconds (should remove task1 but not task2)
+        let removed = coordinator
+            .cleanup_old_tasks(0)
+            .await
+            .map_err(|err| err.to_string())
+            .expect("Failed to cleanup");
+
+        // task1 should be removed
+        assert_eq!(removed, 1);
+
+        {
+            let state = coordinator.state.lock().await;
+            assert!(!state.active_tasks.contains_key(&task1_id));
+            assert!(state.active_tasks.contains_key(&task2_id));
+            drop(state);
         }
     }
 }

@@ -104,6 +104,18 @@ strip = "symbols"
 debug = true
 strip = false
 
+# CI profile: Optimized for minimal disk usage in GitHub Actions
+[profile.ci]
+inherits = "dev"
+opt-level = 0          # No optimization for faster compilation
+debug = 0              # No debug info to save disk space
+incremental = false    # Disable incremental compilation to save disk space
+strip = "symbols"      # Strip symbols to reduce binary size
+
+[profile.ci.package."*"]
+opt-level = 2          # Some optimization for dependencies (smaller than opt-level 3)
+debug = 0              # No debug info for dependencies
+
 [workspace.lints.rust]
 unsafe_code = "deny"
 warnings = "deny"

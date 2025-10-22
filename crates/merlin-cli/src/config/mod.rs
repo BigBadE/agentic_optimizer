@@ -1,3 +1,7 @@
+//! Configuration management for Merlin CLI
+//!
+//! Handles loading configuration from files and environment variables.
+
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs::read_to_string;

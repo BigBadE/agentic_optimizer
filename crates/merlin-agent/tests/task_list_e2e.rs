@@ -24,7 +24,7 @@
 mod task_list_fixture_runner;
 
 use merlin_agent::agent::executor::AgentExecutorParams;
-use merlin_agent::{AgentExecutor, ValidationPipeline};
+use merlin_agent::{AgentExecutor, ValidationPipeline, Validator};
 use merlin_context::ContextFetcher;
 use merlin_core::ui::UiChannel;
 use merlin_core::{ModelProvider, RoutingConfig, Task};
@@ -33,6 +33,7 @@ use merlin_tooling::ToolRegistry;
 use std::path::PathBuf;
 use std::sync::Arc;
 use task_list_fixture_runner::TaskListFixture;
+use tokio::spawn;
 use tokio::sync::mpsc;
 
 /// Test all fixtures with real agent execution using mock providers.
@@ -46,42 +47,32 @@ async fn test_all_fixtures_with_agent_execution() {
         "No fixtures found in tests/fixtures/task_lists"
     );
 
-    println!("\n========================================");
-    println!(
-        "Testing {} fixtures with real agent execution",
-        fixtures.len()
-    );
-    println!("========================================\n");
+    // Create shared resources once (these are expensive to create)
+    let validator = Arc::new(ValidationPipeline::with_default_stages()) as Arc<dyn Validator>;
+    let tool_registry = Arc::new(ToolRegistry::default());
+    let config = RoutingConfig::default();
 
     for fixture in &fixtures {
-        println!("📋 {}", fixture.name);
-        println!("   {}", fixture.description);
-
-        // 1. Create mock provider from fixture
+        // Create mock provider from fixture
         let mock_provider = Arc::new(fixture.create_mock_provider()) as Arc<dyn ModelProvider>;
 
-        // 2. Create provider registry with mock provider
+        // Create provider registry with mock provider
         let provider_registry =
             ProviderRegistry::with_mock_provider(&mock_provider).expect(&format!(
                 "Failed to create provider registry for fixture: {}",
                 fixture.name
             ));
 
-        // 3. Create router with mock provider registry (not default strategies!)
+        // Create router with mock provider registry (not default strategies!)
         let router = Arc::new(StrategyRouter::new(provider_registry.clone()));
 
-        let validator = Arc::new(ValidationPipeline::with_default_stages());
-        let tool_registry = Arc::new(ToolRegistry::default());
-        let context_fetcher = ContextFetcher::new(PathBuf::from("."));
-        let config = RoutingConfig::default();
-
-        // 4. Create agent executor with injected mock provider
+        // Create agent executor with injected mock provider
         let mut agent_executor = AgentExecutor::with_provider_registry(AgentExecutorParams {
             router,
-            validator,
-            tool_registry,
-            context_fetcher,
-            config,
+            validator: Arc::clone(&validator),
+            tool_registry: Arc::clone(&tool_registry),
+            context_fetcher: ContextFetcher::new(PathBuf::from(".")),
+            config: config.clone(),
             provider_registry: Arc::new(provider_registry),
         })
         .expect(&format!(
@@ -89,13 +80,19 @@ async fn test_all_fixtures_with_agent_execution() {
             fixture.name
         ));
 
-        // 5. Create task and UI channel
+        // Create task and execute (no UI channel needed for tests)
         let task = Task::new(fixture.initial_query.clone());
-        let (tx, _rx) = mpsc::unbounded_channel();
+        let (tx, mut rx) = mpsc::unbounded_channel();
         let ui_channel = UiChannel::from_sender(tx);
 
-        // 6. Execute task through real agent executor
-        println!("   🚀 Executing task through agent...");
+        // Spawn a task to drain the UI channel to prevent blocking
+        let _drain_handle = spawn(async move {
+            while rx.recv().await.is_some() {
+                // Drain events
+            }
+        });
+
+        // Execute task through real agent executor
         let task_result = agent_executor
             .execute_streaming(task, ui_channel)
             .await
@@ -104,22 +101,15 @@ async fn test_all_fixtures_with_agent_execution() {
                 fixture.name
             ));
 
-        println!(
-            "   📝 Agent response: {} chars",
-            task_result.response.text.len()
-        );
-
-        // 7. Verify response is not empty
+        // Verify response is not empty
         assert!(
             !task_result.response.text.is_empty(),
             "Fixture {} produced empty response",
             fixture.name
         );
 
-        // 8. Extract and verify the generated task list
+        // Extract and verify the generated task list
         if let Some(task_list) = task_result.task_list {
-            println!("   📊 Generated TaskList: {} steps", task_list.steps.len());
-
             // Verify task list has reasonable structure
             assert!(
                 !task_list.title.is_empty(),
@@ -149,26 +139,13 @@ async fn test_all_fixtures_with_agent_execution() {
                     expected_desc
                 );
             }
-
-            println!(
-                "   ✅ Verified {} generated tasks match expected structure",
-                task_list.steps.len()
-            );
         } else if fixture.expected_task_list.total_tasks > 0 {
             panic!(
                 "Fixture {}: No TaskList generated but expected {} tasks",
                 fixture.name, fixture.expected_task_list.total_tasks
             );
-        } else {
-            println!("   ✅ No TaskList expected or generated (correct)");
         }
-
-        println!();
     }
-
-    println!("========================================");
-    println!("✅ All {} fixtures executed!", fixtures.len());
-    println!("========================================");
 }
 
 /// Test fixture structure validation without agent execution.

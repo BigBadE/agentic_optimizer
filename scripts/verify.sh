@@ -42,9 +42,11 @@ cargo clippy --all-targets --all-features -- -D warnings
 
 # Run full workspace tests with coverage
 echo "[verify] Running tests with coverage instrumentation..."
-cargo build --profile ci --verbose
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
+export MERLIN_FOLDER="${ROOT_DIR}/target/.merlin"
 mkdir -p benchmarks/data/coverage
-cargo llvm-cov --profile ci --lcov --output-path benchmarks/data/coverage/latest.info --ignore-filename-regex "test_repositories|benchmarks" --all-features --workspace --no-fail-fast --lib --bins --tests -- --nocapture
+cargo llvm-cov --lcov --output-path benchmarks/data/coverage/latest.info --ignore-filename-regex "test_repositories|benchmarks" --all-features --workspace --no-fail-fast --lib --bins --tests -- --nocapture
+cargo sweep --time 1 -r
 
 # Optionally run Ollama-specific tests by name filter
 if [ "$RUN_OLLAMA" = true ]; then

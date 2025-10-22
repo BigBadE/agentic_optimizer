@@ -17,6 +17,7 @@ env:
   CARGO_TERM_COLOR: always
   RUST_BACKTRACE: 1
   CARGO_INCREMENTAL: 0  # Disable incremental compilation to save disk space
+  GIT_BASH: ${{ matrix.os == 'windows-latest' && 'C:\Program Files\Git\bin\bash.exe' || '' }}
 
 jobs:
   test:

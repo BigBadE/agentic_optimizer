@@ -1,4 +1,4 @@
-use std::process::Command;
+use std::{env, process::Command};
 
 use async_trait::async_trait;
 use serde_json::from_value;
@@ -34,9 +34,15 @@ impl BashTool {
         let output = spawn_blocking(move || {
             tracing::debug!("Inside spawn_blocking, about to run command");
             // Use bash on all platforms for consistency
-            // On Windows, Git Bash should be in PATH via GitHub Actions
+            // On Windows, try GIT_BASH env var if bash is not in PATH
             // On Unix systems, bash is standard
-            let result = Command::new("bash")
+            let bash_cmd = if cfg!(windows) {
+                env::var("GIT_BASH").unwrap_or_else(|_| "bash".to_owned())
+            } else {
+                "bash".to_owned()
+            };
+
+            let result = Command::new(bash_cmd)
                 .arg("-c")
                 .arg(&command)
                 .env("LANG", "C.UTF-8") // Ensure consistent locale

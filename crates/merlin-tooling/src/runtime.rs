@@ -228,16 +228,17 @@ impl TypeScriptRuntime {
         for (name, tool) in tools {
             let tool_clone = Arc::clone(tool);
 
-            // Create tool function
-            // SAFETY: Arc<dyn Tool> is not Trace, but it's safe to use here because:
-            // 1. The tool registry is owned by TypeScriptRuntime which outlives the Context
-            // 2. Tools are immutable and thread-safe (Arc)
-            // 3. The closure only captures Arc which is safe to share
             #[allow(
                 unsafe_code,
                 reason = "Arc<dyn Tool> is not Trace, but safe to use as documented above"
             )]
-            let func = unsafe {
+            let func =
+                // Create tool function
+                // SAFETY: Arc<dyn Tool> is not Trace, but it's safe to use here because:
+                // 1. The tool registry is owned by TypeScriptRuntime which outlives the Context
+                // 2. Tools are immutable and thread-safe (Arc)
+                // 3. The closure only captures Arc which is safe to share
+                unsafe {
                 NativeFunction::from_closure(move |_this, args, ctx| {
                     tracing::debug!("Tool '{}' called from JavaScript", tool_clone.name());
 

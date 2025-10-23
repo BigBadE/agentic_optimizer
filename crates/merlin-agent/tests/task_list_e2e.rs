@@ -5,6 +5,7 @@
     test,
     allow(
         dead_code,
+        unsafe_code,
         clippy::expect_used,
         clippy::unwrap_used,
         clippy::panic,
@@ -30,15 +31,29 @@ use merlin_core::ui::UiChannel;
 use merlin_core::{ModelProvider, RoutingConfig, Task};
 use merlin_routing::{ProviderRegistry, StrategyRouter};
 use merlin_tooling::ToolRegistry;
+use std::env;
 use std::path::PathBuf;
 use std::sync::Arc;
 use task_list_fixture_runner::TaskListFixture;
 use tokio::spawn;
 use tokio::sync::mpsc;
 
+/// Set up test environment to use temp directory for caches
+fn setup_test_env() {
+    // Set MERLIN_FOLDER to temp directory to avoid polluting project directories with .merlin
+    if env::var("MERLIN_FOLDER").is_err() {
+        let temp_dir = env::temp_dir().join("merlin_agent_tests");
+        // SAFETY: Setting env var once at test start before any concurrent access
+        unsafe {
+            env::set_var("MERLIN_FOLDER", &temp_dir);
+        }
+    }
+}
+
 /// Test all fixtures with real agent execution using mock providers.
 #[tokio::test]
 async fn test_all_fixtures_with_agent_execution() {
+    setup_test_env();
     let fixtures = TaskListFixture::discover_fixtures("tests/fixtures/task_lists")
         .expect("Failed to discover fixtures");
 

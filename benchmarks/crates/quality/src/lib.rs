@@ -1,7 +1,6 @@
 //! Quality benchmarking for context retrieval system.
 #![allow(
     dead_code,
-    unsafe_code,
     clippy::expect_used,
     clippy::unwrap_used,
     clippy::panic,
@@ -22,7 +21,6 @@ use merlin_core::{FileContext, Query};
 use merlin_languages::{Language, LanguageProvider, create_backend};
 use metrics::{AggregateMetrics, BenchmarkMetrics};
 use std::collections::HashMap;
-use std::env::{set_var, temp_dir, var};
 use std::fs::create_dir_all;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -93,17 +91,6 @@ async fn run_benchmarks_for_project(
     project_root_str: &str,
     test_cases: Vec<TestCase>,
 ) -> Vec<BenchmarkResult> {
-    // Set MERLIN_FOLDER to use temp directory for caches if not already set
-    // This prevents polluting the project directory with .merlin folders
-    if var("MERLIN_FOLDER").is_err() {
-        let temp_merlin = temp_dir().join("merlin_quality_bench");
-        // SAFETY: Setting MERLIN_FOLDER before any concurrent access is safe
-        // as this runs at the start of each benchmark project initialization
-        unsafe {
-            set_var("MERLIN_FOLDER", &temp_merlin);
-        }
-    }
-
     let project_root = Path::new(project_root_str).to_path_buf();
 
     // Create language backend

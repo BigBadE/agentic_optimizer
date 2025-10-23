@@ -11,6 +11,7 @@
         clippy::missing_panics_doc,
         clippy::print_stdout,
         clippy::tests_outside_test_module,
+        unsafe_code,
         reason = "Test allows"
     )
 )]
@@ -19,14 +20,28 @@ use merlin_agent::{RoutingOrchestrator, Validator};
 use merlin_core::ui::UiChannel;
 use merlin_core::{Result, RoutingConfig, Task};
 use merlin_routing::{ModelRouter, TaskAnalyzer};
+use std::env;
 use std::sync::Arc;
 use tokio::sync::mpsc;
+
+/// Set up test environment to use temp directory for caches
+fn setup_test_env() {
+    // Set MERLIN_FOLDER to temp directory to avoid polluting project directories with .merlin
+    if env::var("MERLIN_FOLDER").is_err() {
+        let temp_dir = env::temp_dir().join("merlin_agent_tests");
+        // SAFETY: Setting env var once at test start before any concurrent access
+        unsafe {
+            env::set_var("MERLIN_FOLDER", &temp_dir);
+        }
+    }
+}
 
 /// Helper to create a test orchestrator with local-only config
 ///
 /// # Errors
 /// Returns error if orchestrator creation fails
 fn create_test_orchestrator() -> Result<RoutingOrchestrator> {
+    setup_test_env();
     let mut config = RoutingConfig::default();
     // Disable cloud providers for tests
     config.tiers.groq_enabled = false;
@@ -48,6 +63,7 @@ async fn test_orchestrator_with_custom_components() {
     use merlin_agent::ValidationPipeline;
     use merlin_routing::{LocalTaskAnalyzer, ProviderRegistry, StrategyRouter};
 
+    setup_test_env();
     let mut config = RoutingConfig::default();
     config.tiers.groq_enabled = false;
     config.tiers.premium_enabled = false;

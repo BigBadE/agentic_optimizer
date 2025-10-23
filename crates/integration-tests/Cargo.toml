@@ -1,0 +1,47 @@
+[package]
+name = "integration-tests"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+# Merlin crates
+merlin-agent = { path = "../merlin-agent" }
+merlin-cli = { path = "../merlin-cli" }
+merlin-context = { path = "../merlin-context" }
+merlin-core = { path = "../merlin-core" }
+merlin-providers = { path = "../merlin-providers" }
+merlin-routing = { path = "../merlin-routing" }
+merlin-tooling = { path = "../merlin-tooling" }
+
+# Async runtime
+tokio = { workspace = true, features = ["full", "test-util"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# TUI
+ratatui = { workspace = true }
+crossterm = { workspace = true }
+tui-textarea = { workspace = true }
+
+# Utilities
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# Testing
+tempfile = { workspace = true }
+
+[lib]
+name = "integration_tests"
+path = "src/lib.rs"
+
+[[test]]
+name = "e2e_scenarios"
+path = "tests/e2e_scenarios.rs"
+harness = true
+
+[lints]
+workspace = true

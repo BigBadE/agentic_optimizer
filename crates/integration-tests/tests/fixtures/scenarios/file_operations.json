@@ -1,0 +1,37 @@
+{
+  "name": "file_operations",
+  "description": "Tests file reading and writing operations",
+  "setup": {
+    "workspace_files": [
+      {
+        "path": "source.txt",
+        "content": "Original content"
+      }
+    ],
+    "env_vars": {}
+  },
+  "steps": [
+    {
+      "action": {
+        "type": "mock_agent_response",
+        "data": {
+          "pattern": "copy",
+          "response": [
+            "I will copy source.txt to dest.txt",
+            "Operation completed successfully"
+          ]
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 50
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

@@ -176,8 +176,14 @@ impl WorkspaceCache {
 }
 
 #[cfg(test)]
+#[allow(
+    unsafe_code,
+    clippy::undocumented_unsafe_blocks,
+    reason = "Test module needs to clear environment variables"
+)]
 mod tests {
     use super::*;
+    use std::env;
     use std::fs;
     use std::io::Write as _;
     use std::thread;
@@ -362,6 +368,10 @@ mod tests {
 
     #[test]
     fn test_cache_doesnt_rebuild_unchanged() {
+        unsafe {
+            env::remove_var("MERLIN_FOLDER");
+        }
+
         let (_temp_dir, project_root, file_metadata) = create_test_project();
 
         // Create and save initial cache

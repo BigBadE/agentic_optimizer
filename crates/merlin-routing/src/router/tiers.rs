@@ -183,4 +183,75 @@ mod tests {
 
         Ok(())
     }
+
+    #[test]
+    fn test_availability_checker_always_true() {
+        let checker = AvailabilityChecker::default();
+        assert!(checker.check(Model::Llama318BInstant));
+        assert!(checker.check(Model::Qwen25Coder7B));
+        assert!(checker.check(Model::Claude35Sonnet));
+    }
+
+    #[test]
+    fn test_router_accessors() -> Result<()> {
+        use std::sync::Arc;
+
+        let router = create_test_router()?;
+        // Test that model_registry accessor works
+        router.model_registry().select_model(5).unwrap();
+        // Test that provider_registry accessor works - it returns a valid Arc reference
+        assert!(Arc::strong_count(router.provider_registry()) > 0);
+        Ok(())
+    }
+
+    #[test]
+    fn test_with_default_strategies_creation() {
+        // This might fail in CI without API keys, which is expected
+        let result = StrategyRouter::with_default_strategies();
+        // Just ensure it doesn't panic
+        drop(result);
+    }
+
+    #[tokio::test]
+    async fn test_is_available_local_model() -> Result<()> {
+        let router = create_test_router()?;
+
+        // Local models should be available if Ollama is running
+        // We don't assert true/false as it depends on environment
+        let _ = router.is_available(&Model::Qwen25Coder7B).await;
+
+        Ok(())
+    }
+
+    #[tokio::test]
+    async fn test_route_with_invalid_model() -> Result<()> {
+        let router = create_test_router()?;
+
+        // Try to route a task when cloud providers are disabled
+        let task = Task::new("Test task".to_owned()).with_difficulty(2);
+        let result = router.route(&task).await;
+
+        // Should fail because default registry uses Groq models
+        assert!(result.is_err());
+        assert!(result.unwrap_err().to_string().contains("not available"));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_with_model_registry_constructor() -> Result<()> {
+        let mut config = RoutingConfig::default();
+        // Disable cloud providers for tests
+        config.tiers.groq_enabled = false;
+        config.tiers.premium_enabled = false;
+
+        let provider_registry = ProviderRegistry::new(config)?;
+        let model_registry = ModelRegistry::with_defaults();
+
+        let router = StrategyRouter::with_model_registry(model_registry, provider_registry);
+
+        // Verify the router was created successfully
+        router.model_registry().select_model(5).unwrap();
+        Ok(())
+    }
 }

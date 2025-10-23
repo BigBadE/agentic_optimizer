@@ -170,3 +170,191 @@ impl ContextPlan {
         self
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_query_intent_creation() {
+        let intent = QueryIntent {
+            action: Action::Create,
+            keywords: vec!["test".to_owned()],
+            entities: vec!["User".to_owned()],
+            scope: Scope::Focused,
+            complexity: Complexity::Simple,
+        };
+
+        assert_eq!(intent.action, Action::Create);
+        assert_eq!(intent.keywords.len(), 1);
+        assert_eq!(intent.entities.len(), 1);
+        assert_eq!(intent.scope, Scope::Focused);
+        assert_eq!(intent.complexity, Complexity::Simple);
+    }
+
+    #[test]
+    fn test_action_variants() {
+        use Action::*;
+
+        assert_eq!(Create, Create);
+        assert_ne!(Create, Modify);
+
+        // Test all variants exist
+        let actions = [Create, Modify, Debug, Explain, Refactor, Search];
+        assert_eq!(actions.len(), 6);
+    }
+
+    #[test]
+    fn test_scope_variants() {
+        use Scope::*;
+
+        assert_eq!(Focused, Focused);
+        assert_ne!(Focused, Module);
+
+        let scopes = [Focused, Module, Codebase];
+        assert_eq!(scopes.len(), 3);
+    }
+
+    #[test]
+    fn test_complexity_ordering() {
+        assert!(Complexity::Simple < Complexity::Medium);
+        assert!(Complexity::Medium < Complexity::Complex);
+        assert!(Complexity::Simple < Complexity::Complex);
+
+        assert_eq!(Complexity::Simple, Complexity::Simple);
+        assert_ne!(Complexity::Simple, Complexity::Complex);
+    }
+
+    #[test]
+    fn test_context_plan_default() {
+        let plan = ContextPlan::default();
+
+        assert!(plan.keywords.is_empty());
+        assert!(plan.symbols.is_empty());
+        assert!(plan.file_patterns.is_empty());
+        assert!(!plan.include_tests);
+        assert_eq!(plan.max_depth, 2);
+        assert!(matches!(plan.strategy, ExpansionStrategy::Focused { .. }));
+        assert!(plan.reasoning.is_empty());
+    }
+
+    #[test]
+    fn test_context_plan_new() {
+        let strategy = ExpansionStrategy::Semantic {
+            query: "test".to_owned(),
+            top_k: 10,
+        };
+        let plan = ContextPlan::new(strategy);
+
+        assert!(matches!(plan.strategy, ExpansionStrategy::Semantic { .. }));
+    }
+
+    #[test]
+    fn test_context_plan_builder() {
+        let plan = ContextPlan::default()
+            .with_keywords(vec!["auth".to_owned(), "login".to_owned()])
+            .with_symbols(vec!["User".to_owned()])
+            .with_patterns(vec!["*.rs".to_owned()])
+            .with_tests(true)
+            .with_max_depth(3)
+            .with_reasoning("Need to understand auth flow".to_owned());
+
+        assert_eq!(plan.keywords.len(), 2);
+        assert_eq!(plan.symbols.len(), 1);
+        assert_eq!(plan.file_patterns.len(), 1);
+        assert!(plan.include_tests);
+        assert_eq!(plan.max_depth, 3);
+        assert!(!plan.reasoning.is_empty());
+    }
+
+    #[test]
+    fn test_expansion_strategy_focused() {
+        let strategy = ExpansionStrategy::Focused {
+            symbols: vec!["main".to_owned()],
+        };
+
+        match strategy {
+            ExpansionStrategy::Focused { symbols } => {
+                assert_eq!(symbols.len(), 1);
+            }
+            _ => panic!("Expected Focused strategy"),
+        }
+    }
+
+    #[test]
+    fn test_expansion_strategy_broad() {
+        let strategy = ExpansionStrategy::Broad {
+            patterns: vec!["test_*.rs".to_owned()],
+        };
+
+        match strategy {
+            ExpansionStrategy::Broad { patterns } => {
+                assert_eq!(patterns.len(), 1);
+            }
+            _ => panic!("Expected Broad strategy"),
+        }
+    }
+
+    #[test]
+    fn test_expansion_strategy_entry_point() {
+        let strategy = ExpansionStrategy::EntryPointBased {
+            entry_files: vec![PathBuf::from("src/main.rs")],
+        };
+
+        match strategy {
+            ExpansionStrategy::EntryPointBased { entry_files } => {
+                assert_eq!(entry_files.len(), 1);
+            }
+            _ => panic!("Expected EntryPointBased strategy"),
+        }
+    }
+
+    #[test]
+    fn test_expansion_strategy_semantic() {
+        let strategy = ExpansionStrategy::Semantic {
+            query: "authentication logic".to_owned(),
+            top_k: 5,
+        };
+
+        match strategy {
+            ExpansionStrategy::Semantic { query, top_k } => {
+                assert_eq!(query, "authentication logic");
+                assert_eq!(top_k, 5);
+            }
+            _ => panic!("Expected Semantic strategy"),
+        }
+    }
+
+    #[test]
+    fn test_serde_query_intent() {
+        use serde_json::{from_str, to_string};
+
+        let intent = QueryIntent {
+            action: Action::Modify,
+            keywords: vec!["func".to_owned()],
+            entities: vec![],
+            scope: Scope::Module,
+            complexity: Complexity::Medium,
+        };
+
+        let json = to_string(&intent).expect("serialize");
+        let deserialized: QueryIntent = from_str(&json).expect("deserialize");
+
+        assert_eq!(deserialized.action, Action::Modify);
+        assert_eq!(deserialized.scope, Scope::Module);
+        assert_eq!(deserialized.complexity, Complexity::Medium);
+    }
+
+    #[test]
+    fn test_serde_context_plan() {
+        use serde_json::{from_str, to_string};
+
+        let plan = ContextPlan::default().with_keywords(vec!["test".to_owned()]);
+
+        let json = to_string(&plan).expect("serialize");
+        let deserialized: ContextPlan = from_str(&json).expect("deserialize");
+
+        assert_eq!(deserialized.keywords.len(), 1);
+        assert_eq!(deserialized.max_depth, 2);
+    }
+}

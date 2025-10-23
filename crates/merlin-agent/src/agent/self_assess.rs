@@ -183,4 +183,230 @@ mod tests {
         // GATHER action exists in the parser but isn't shown in the prompt template
         assert!(prompt.contains("JSON"));
     }
+
+    #[test]
+    fn test_parse_complete_action() {
+        let task = Task::new("test task".to_owned());
+        let response = r#"{
+            "action": "COMPLETE",
+            "reasoning": "Task is simple",
+            "confidence": 0.9,
+            "details": {
+                "result": "Task completed successfully"
+            }
+        }"#;
+
+        let decision = SelfAssessor::parse_decision(response, &task).unwrap();
+
+        match decision.action {
+            TaskAction::Complete { result } => {
+                assert_eq!(result, "Task completed successfully");
+            }
+            _ => panic!("Expected Complete action"),
+        }
+        assert_eq!(decision.reasoning, "Task is simple");
+        assert!((decision.confidence - 0.9).abs() < 0.001);
+    }
+
+    #[test]
+    fn test_parse_decompose_action() {
+        let task = Task::new("complex task".to_owned());
+        let response = r#"{
+            "action": "DECOMPOSE",
+            "reasoning": "Task is complex",
+            "confidence": 0.8,
+            "details": {
+                "subtasks": [
+                    {"description": "subtask 1", "difficulty": 3},
+                    {"description": "subtask 2", "difficulty": 5}
+                ],
+                "execution_mode": "Parallel"
+            }
+        }"#;
+
+        let decision = SelfAssessor::parse_decision(response, &task).unwrap();
+
+        match decision.action {
+            TaskAction::Decompose {
+                subtasks,
+                execution_mode,
+            } => {
+                assert_eq!(subtasks.len(), 2);
+                assert_eq!(subtasks[0].description, "subtask 1");
+                assert_eq!(subtasks[0].difficulty, 3);
+                assert!(matches!(execution_mode, ExecutionMode::Parallel));
+            }
+            _ => panic!("Expected Decompose action"),
+        }
+    }
+
+    #[test]
+    fn test_parse_decompose_default_sequential() {
+        let task = Task::new("task".to_owned());
+        let response = r#"{
+            "action": "DECOMPOSE",
+            "reasoning": "Needs decomposition",
+            "confidence": 0.7,
+            "details": {
+                "subtasks": [
+                    {"description": "subtask 1", "difficulty": 2}
+                ]
+            }
+        }"#;
+
+        let decision = SelfAssessor::parse_decision(response, &task).unwrap();
+
+        match decision.action {
+            TaskAction::Decompose { execution_mode, .. } => {
+                assert!(matches!(execution_mode, ExecutionMode::Sequential));
+            }
+            _ => panic!("Expected Decompose action"),
+        }
+    }
+
+    #[test]
+    fn test_parse_gather_action() {
+        let task = Task::new("research task".to_owned());
+        let response = r#"{
+            "action": "GATHER",
+            "reasoning": "Need more context",
+            "confidence": 0.6,
+            "details": {
+                "needs": ["file1.rs", "file2.rs"]
+            }
+        }"#;
+
+        let decision = SelfAssessor::parse_decision(response, &task).unwrap();
+
+        match decision.action {
+            TaskAction::GatherContext { needs } => {
+                assert_eq!(needs.len(), 2);
+                assert_eq!(needs[0], "file1.rs");
+            }
+            _ => panic!("Expected GatherContext action"),
+        }
+    }
+
+    #[test]
+    fn test_parse_json_with_surrounding_text() {
+        let task = Task::new("task".to_owned());
+        let response = r#"
+            Here is my assessment:
+            {
+                "action": "COMPLETE",
+                "reasoning": "Simple task",
+                "confidence": 0.95,
+                "details": {
+                    "result": "Done"
+                }
+            }
+            This is the result.
+        "#;
+
+        let decision = SelfAssessor::parse_decision(response, &task).unwrap();
+        assert!(matches!(decision.action, TaskAction::Complete { .. }));
+    }
+
+    #[test]
+    fn test_parse_unknown_action_error() {
+        let task = Task::new("task".to_owned());
+        let response = r#"{
+            "action": "UNKNOWN_ACTION",
+            "reasoning": "Test",
+            "confidence": 0.5,
+            "details": {}
+        }"#;
+
+        let result = SelfAssessor::parse_decision(response, &task);
+        let err = result.unwrap_err();
+        assert!(err.to_string().contains("Unknown action"));
+    }
+
+    #[test]
+    fn test_parse_invalid_json_error() {
+        let task = Task::new("task".to_owned());
+        let response = "This is not valid JSON";
+
+        let result = SelfAssessor::parse_decision(response, &task);
+        result.unwrap_err();
+    }
+
+    #[test]
+    fn test_parse_complete_without_result() {
+        let task = Task::new("test task".to_owned());
+        let response = r#"{
+            "action": "COMPLETE",
+            "reasoning": "Done",
+            "confidence": 1.0,
+            "details": {}
+        }"#;
+
+        let decision = SelfAssessor::parse_decision(response, &task).unwrap();
+
+        match decision.action {
+            TaskAction::Complete { result } => {
+                assert!(result.contains("test task"));
+            }
+            _ => panic!("Expected Complete action"),
+        }
+    }
+
+    #[test]
+    fn test_parse_decompose_without_subtasks() {
+        let task = Task::new("task".to_owned());
+        let response = r#"{
+            "action": "DECOMPOSE",
+            "reasoning": "Decompose needed",
+            "confidence": 0.8,
+            "details": {}
+        }"#;
+
+        let decision = SelfAssessor::parse_decision(response, &task).unwrap();
+
+        match decision.action {
+            TaskAction::Decompose { subtasks, .. } => {
+                assert_eq!(subtasks.len(), 1);
+                assert_eq!(subtasks[0].description, "task");
+            }
+            _ => panic!("Expected Decompose action"),
+        }
+    }
+
+    #[test]
+    fn test_parse_gather_without_needs() {
+        let task = Task::new("task".to_owned());
+        let response = r#"{
+            "action": "GATHER",
+            "reasoning": "Need context",
+            "confidence": 0.5,
+            "details": {}
+        }"#;
+
+        let decision = SelfAssessor::parse_decision(response, &task).unwrap();
+
+        match decision.action {
+            TaskAction::GatherContext { needs } => {
+                assert!(needs.is_empty());
+            }
+            _ => panic!("Expected GatherContext action"),
+        }
+    }
+
+    #[test]
+    fn test_parse_assessment_response_public_method() {
+        let provider: Arc<dyn ModelProvider> =
+            Arc::new(LocalModelProvider::new("qwen2.5-coder:7b".to_string()));
+        let assessor = SelfAssessor::new(provider);
+        let task = Task::new("test".to_owned());
+
+        let response = r#"{
+            "action": "COMPLETE",
+            "reasoning": "Done",
+            "confidence": 0.9,
+            "details": {"result": "Success"}
+        }"#;
+
+        let result = assessor.parse_assessment_response(response, &task);
+        result.unwrap();
+    }
 }

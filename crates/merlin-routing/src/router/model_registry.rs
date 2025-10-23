@@ -263,7 +263,7 @@ mod tests {
     }
 
     #[test]
-    #[should_panic(expected = "Difficulty level must be between 1 and 10")]
+    #[should_panic(expected = "Difficulty level must be between 1 and 10, got 0")]
     fn test_register_range_panics_on_invalid() {
         let mut registry = ModelRegistry::new();
         registry.register_range(0..=5, Model::Llama318BInstant);

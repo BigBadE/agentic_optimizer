@@ -197,3 +197,292 @@ pub fn add_prioritized_files(
 
     added
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::PathBuf;
+
+    fn create_test_file(path: &str, content: &str) -> FileContext {
+        FileContext {
+            path: PathBuf::from(path),
+            content: content.to_owned(),
+        }
+    }
+
+    #[test]
+    fn test_context_manager_new() {
+        let manager = ContextManager::new(1000);
+        assert_eq!(manager.token_count(), 0);
+        assert_eq!(manager.file_count(), 0);
+        assert_eq!(manager.remaining_tokens(), 1000);
+        assert!(!manager.is_full());
+    }
+
+    #[test]
+    fn test_context_manager_default() {
+        let manager = ContextManager::default();
+        assert_eq!(manager.max_tokens, MAX_CONTEXT_TOKENS);
+    }
+
+    #[test]
+    fn test_estimate_tokens() {
+        let text = "Hello world";
+        let tokens = ContextManager::estimate_tokens(text);
+        // "Hello world" = 11 chars, 2 words
+        // char_estimate = 11/4 = 2
+        // word_estimate = (2*10)/13 = 1
+        // midpoint(2, 1) = 1
+        assert!(tokens > 0);
+    }
+
+    #[test]
+    fn test_try_add_file_success() {
+        let mut manager = ContextManager::new(1000);
+        let file = create_test_file("test.rs", "fn main() {}");
+
+        assert!(manager.try_add_file(file));
+        assert_eq!(manager.file_count(), 1);
+        assert!(manager.token_count() > 0);
+    }
+
+    #[test]
+    fn test_try_add_file_exceeds_limit() {
+        let mut manager = ContextManager::new(10); // Very small limit
+        let large_content = &"x".repeat(1000);
+        let file = create_test_file("test.rs", large_content);
+
+        assert!(!manager.try_add_file(file));
+        assert_eq!(manager.file_count(), 0);
+    }
+
+    #[test]
+    fn test_add_file_truncated_fits() {
+        let mut manager = ContextManager::new(1000);
+        let file = create_test_file("test.rs", "small content");
+
+        assert!(manager.add_file_truncated(file));
+        assert_eq!(manager.file_count(), 1);
+    }
+
+    #[test]
+    fn test_add_file_truncated_needs_truncation() {
+        let mut manager = ContextManager::new(50);
+        let large_content = &"x".repeat(500);
+        let file = create_test_file("test.rs", large_content);
+
+        assert!(manager.add_file_truncated(file));
+        assert_eq!(manager.file_count(), 1);
+        // Content should be truncated
+        assert!(manager.files()[0].content.contains("[truncated]"));
+    }
+
+    #[test]
+    fn test_add_file_truncated_already_full() {
+        // Create manager with very small limit
+        let mut manager = ContextManager::new(1);
+        let large_content = &"test content that is definitely more than one token ".repeat(10);
+        let file1 = create_test_file("test1.rs", large_content);
+
+        // Add first file with truncation - should work
+        let added1 = manager.add_file_truncated(file1);
+        assert!(added1, "Should be able to add first file with truncation");
+
+        // Now try to add a second file when at/near capacity
+        let file2 = create_test_file("test2.rs", large_content);
+        let added2 = manager.add_file_truncated(file2);
+
+        // Check that behavior is consistent: either both files added or limit reached
+        if added2 {
+            assert_eq!(
+                manager.file_count(),
+                2,
+                "Should have 2 files if second was added"
+            );
+        } else {
+            assert_eq!(
+                manager.file_count(),
+                1,
+                "Should have 1 file if second was rejected"
+            );
+            assert!(
+                manager.is_full(),
+                "Manager should be full when rejecting files"
+            );
+        }
+    }
+
+    #[test]
+    fn test_remaining_tokens() {
+        let mut manager = ContextManager::new(1000);
+        // Use content that's long enough to produce tokens
+        let content = "fn main() { println!(\"Hello, world!\"); }";
+        let file = create_test_file("test.rs", content);
+        let initial_tokens = manager.token_count();
+        manager.try_add_file(file);
+
+        let remaining = manager.remaining_tokens();
+        assert!(
+            manager.token_count() > initial_tokens,
+            "Should have added tokens"
+        );
+        assert_eq!(remaining, 1000 - manager.token_count());
+    }
+
+    #[test]
+    fn test_is_full() {
+        // Create a manager with very small limit
+        let mut manager = ContextManager::new(1);
+        assert!(!manager.is_full());
+
+        // Add a file that will definitely exceed the limit
+        let large_content = &"x ".repeat(100); // 200 chars, 100 words
+        let file = create_test_file("test.rs", large_content);
+
+        // This should fail because file is too large
+        let added = manager.try_add_file(file);
+        assert!(!added, "Should not be able to add file exceeding limit");
+        assert!(
+            !manager.is_full(),
+            "Manager should not be full when add failed"
+        );
+
+        // Now with truncation it should work
+        let file2 = create_test_file("test2.rs", large_content);
+        let added2 = manager.add_file_truncated(file2);
+        // Either it added with truncation, or it's already full
+        assert!(added2 || manager.is_full());
+    }
+
+    #[test]
+    fn test_into_files() {
+        let mut manager = ContextManager::new(1000);
+        let file = create_test_file("test.rs", "content");
+        manager.try_add_file(file);
+
+        let files = manager.into_files();
+        assert_eq!(files.len(), 1);
+    }
+
+    #[test]
+    fn test_files_reference() {
+        let mut manager = ContextManager::new(1000);
+        let file = create_test_file("test.rs", "content");
+        manager.try_add_file(file);
+
+        assert_eq!(manager.files().len(), 1);
+        assert_eq!(manager.file_count(), 1);
+    }
+
+    #[test]
+    fn test_file_priority_ordering() {
+        assert!(FilePriority::Critical > FilePriority::High);
+        assert!(FilePriority::High > FilePriority::Medium);
+        assert!(FilePriority::Medium > FilePriority::Low);
+    }
+
+    #[test]
+    fn test_prioritized_file_new() {
+        let file = create_test_file("test.rs", "content");
+        let prio = PrioritizedFile::new(file, FilePriority::High);
+
+        assert_eq!(prio.priority, FilePriority::High);
+        assert!(prio.score.is_none());
+    }
+
+    #[test]
+    fn test_prioritized_file_with_score() {
+        let file = create_test_file("test.rs", "content");
+        let prio = PrioritizedFile::with_score(file, FilePriority::Medium, 0.8);
+
+        assert_eq!(prio.priority, FilePriority::Medium);
+        assert_eq!(prio.score, Some(0.8));
+    }
+
+    #[test]
+    fn test_add_prioritized_files_sorts_by_priority() {
+        let mut manager = ContextManager::new(10000);
+
+        let files = vec![
+            PrioritizedFile::new(create_test_file("low.rs", "content"), FilePriority::Low),
+            PrioritizedFile::new(
+                create_test_file("critical.rs", "content"),
+                FilePriority::Critical,
+            ),
+            PrioritizedFile::new(
+                create_test_file("medium.rs", "content"),
+                FilePriority::Medium,
+            ),
+            PrioritizedFile::new(create_test_file("high.rs", "content"), FilePriority::High),
+        ];
+
+        let added = add_prioritized_files(&mut manager, files);
+
+        assert_eq!(added, 4);
+        assert_eq!(manager.file_count(), 4);
+
+        // Critical should be first
+        assert!(manager.files()[0].path.ends_with("critical.rs"));
+    }
+
+    #[test]
+    fn test_add_prioritized_files_sorts_by_score() {
+        let mut manager = ContextManager::new(10000);
+
+        let files = vec![
+            PrioritizedFile::with_score(
+                create_test_file("file1.rs", "content"),
+                FilePriority::High,
+                0.5,
+            ),
+            PrioritizedFile::with_score(
+                create_test_file("file2.rs", "content"),
+                FilePriority::High,
+                0.9,
+            ),
+            PrioritizedFile::with_score(
+                create_test_file("file3.rs", "content"),
+                FilePriority::High,
+                0.7,
+            ),
+        ];
+
+        let added = add_prioritized_files(&mut manager, files);
+
+        assert_eq!(added, 3);
+        // Highest score should be first
+        assert!(manager.files()[0].path.ends_with("file2.rs"));
+    }
+
+    #[test]
+    fn test_add_prioritized_files_stops_when_full() {
+        let mut manager = ContextManager::new(50); // Small limit
+        let large_content = &"x".repeat(1000);
+
+        let files = vec![
+            PrioritizedFile::new(
+                create_test_file("file1.rs", "content"),
+                FilePriority::Critical,
+            ),
+            PrioritizedFile::new(
+                create_test_file("file2.rs", large_content),
+                FilePriority::High,
+            ),
+            PrioritizedFile::new(
+                create_test_file("file3.rs", "content"),
+                FilePriority::Medium,
+            ),
+        ];
+
+        let added = add_prioritized_files(&mut manager, files);
+
+        // Should stop adding when full
+        assert!(added < 3);
+    }
+
+    #[test]
+    fn test_constants() {
+        assert_eq!(MAX_CONTEXT_TOKENS, 10_000);
+        assert!((MIN_SIMILARITY_SCORE - 0.5).abs() < 0.001);
+    }
+}

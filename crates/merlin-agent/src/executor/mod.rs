@@ -18,7 +18,7 @@ pub mod state;
 /// Transactional workspace operations
 pub mod transaction;
 
-pub use build_isolation::{BuildResult, IsolatedBuildEnv, LintResult, TestResult};
+pub use build_isolation::{BuildResult, CommandResult, IsolatedBuildEnv, LintResult, TestResult};
 pub use graph::TaskGraph;
 pub use isolation::{FileLockManager, ReadLockGuard, WriteLockGuard};
 pub use pool::ExecutorPool;

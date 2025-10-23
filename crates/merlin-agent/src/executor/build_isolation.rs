@@ -209,6 +209,47 @@ impl IsolatedBuildEnv {
             duration_ms,
         })
     }
+
+    /// Get the path to the isolated environment
+    pub fn path(&self) -> &Path {
+        self.temp_dir.path()
+    }
+
+    /// Run a custom command in the isolated environment
+    ///
+    /// # Errors
+    /// Returns an error if the command fails to execute or times out.
+    pub async fn run_command(
+        &self,
+        command: &str,
+        args: &[&str],
+        timeout_duration: Duration,
+    ) -> Result<CommandResult> {
+        let start = Instant::now();
+
+        let output = timeout(
+            timeout_duration,
+            Command::new(command)
+                .args(args)
+                .current_dir(self.temp_dir.path())
+                .output(),
+        )
+        .await
+        .map_err(|_| {
+            RoutingError::Timeout(timeout_duration.as_millis().try_into().unwrap_or(u64::MAX))
+        })??;
+
+        let duration_ms = start.elapsed().as_millis() as u64;
+        let exit_code = output.status.code().unwrap_or(-1);
+
+        Ok(CommandResult {
+            success: output.status.success(),
+            stdout: String::from_utf8_lossy(&output.stdout).to_string(),
+            stderr: String::from_utf8_lossy(&output.stderr).to_string(),
+            duration_ms,
+            exit_code,
+        })
+    }
 }
 
 /// Result of a build validation
@@ -248,6 +289,21 @@ pub struct LintResult {
     pub warnings: Vec<String>,
     /// Lint execution duration in milliseconds
     pub duration_ms: u64,
+}
+
+/// Result of running a custom command
+#[derive(Debug, Clone)]
+pub struct CommandResult {
+    /// Whether the command succeeded
+    pub success: bool,
+    /// Standard output from the command
+    pub stdout: String,
+    /// Standard error from the command
+    pub stderr: String,
+    /// Command execution duration in milliseconds
+    pub duration_ms: u64,
+    /// Command exit code
+    pub exit_code: i32,
 }
 
 fn parse_test_count(output: &str, status: &str) -> usize {

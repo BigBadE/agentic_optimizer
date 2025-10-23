@@ -45,7 +45,17 @@ echo "[verify] Running tests with coverage instrumentation..."
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 export MERLIN_FOLDER="${ROOT_DIR}/target/.merlin"
 mkdir -p benchmarks/data/coverage
-cargo llvm-cov --lcov --output-path benchmarks/data/coverage/latest.info --ignore-filename-regex "test_repositories|benchmarks" --all-features --workspace --no-fail-fast --lib --bins --tests -- --nocapture
+
+# Run main tests with coverage
+cargo llvm-cov --no-report --ignore-filename-regex "test_repositories|benchmarks" --all-features --workspace --no-fail-fast --lib --bins --tests -- --nocapture
+
+# Run ignored env var tests serially with coverage
+echo "[verify] Running ignored env var tests (serial)..."
+cargo llvm-cov --no-report --ignore-filename-regex "test_repositories|benchmarks" -p merlin-context --lib -- --ignored --test-threads=1
+
+# Generate coverage report
+cargo llvm-cov report --lcov --output-path benchmarks/data/coverage/latest.info
+git add benchmarks/data/coverage/latest.info
 cargo sweep --time 1 -r
 
 # Optionally run Ollama-specific tests by name filter

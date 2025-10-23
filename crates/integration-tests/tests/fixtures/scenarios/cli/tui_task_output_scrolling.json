@@ -1,0 +1,131 @@
+{
+  "name": "TUI Task Output Scrolling",
+  "description": "Tests scrolling through task output with multiple output events",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [120, 40]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Task with Long Output"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Line 1: Starting processing..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Line 2: Loading dependencies..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Line 3: Analyzing code structure..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Line 4: Running validation checks..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Line 5: Generating report..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 7,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "pagedown"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 8,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "pageup"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 9,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "down"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 10,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "up"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 11,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 100
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    }
+  ]
+}

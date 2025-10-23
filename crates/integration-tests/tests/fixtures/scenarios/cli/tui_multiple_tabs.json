@@ -1,0 +1,66 @@
+{
+  "name": "TUI Multiple Tab Presses",
+  "description": "Tests cycling through panes with multiple tab presses",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [120, 40]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "user_input",
+        "data": {
+          "text": "Initial text",
+          "submit": false
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "input_text": "Initial"
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "tab"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "tab"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "tab"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 50
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

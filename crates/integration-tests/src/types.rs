@@ -87,6 +87,11 @@ pub enum StepAction {
         /// Task wait configuration
         data: WaitForTasksData,
     },
+    /// Send a UI event directly to the TUI
+    SendUiEvent {
+        /// UI event data
+        data: UiEventData,
+    },
 }
 
 /// Data for user input action
@@ -180,6 +185,29 @@ pub struct WaitForTasksData {
 
 const fn default_timeout() -> u64 {
     5000
+}
+
+/// UI event data for injecting events
+#[derive(Debug, Clone, Deserialize, Serialize)]
+pub struct UiEventData {
+    /// Event type
+    #[serde(rename = "type")]
+    pub event_type: String,
+    /// Task description (for `TaskStarted`)
+    #[serde(default)]
+    pub description: Option<String>,
+    /// Task ID (optional, auto-generated if not provided)
+    #[serde(default)]
+    pub task_id: Option<String>,
+    /// Parent task ID (for subtasks)
+    #[serde(default)]
+    pub parent_id: Option<String>,
+    /// Output text (for `TaskOutput`)
+    #[serde(default)]
+    pub text: Option<String>,
+    /// Progress percentage (for `TaskProgress`)
+    #[serde(default)]
+    pub progress: Option<u32>,
 }
 
 /// Expected outcomes after a step

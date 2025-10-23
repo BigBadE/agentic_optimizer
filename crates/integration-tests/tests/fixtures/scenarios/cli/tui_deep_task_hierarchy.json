@@ -1,0 +1,179 @@
+{
+  "name": "TUI Deep Task Hierarchy",
+  "description": "Tests rendering of a complex multi-level task tree with 10+ tasks",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [120, 50]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Root Task: Implement Feature X"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Subtask 1.1: Design API"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Subtask 1.2: Implement Backend"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Subtask 1.3: Create Tests"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Subtask 1.4: Write Documentation"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Root Task: Fix Bug Y"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 7,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Subtask 2.1: Reproduce Issue"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 8,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Subtask 2.2: Identify Root Cause"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 9,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Subtask 2.3: Apply Fix"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 10,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Root Task: Refactor Module Z"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 11,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Subtask 3.1: Extract Functions"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 12,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Subtask 3.2: Update Tests"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 12
+        }
+      }
+    },
+    {
+      "step": 13,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Task tree rendering with 12 tasks..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 14,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_progress",
+          "progress": 75
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 15,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 100
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

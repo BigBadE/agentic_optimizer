@@ -1,0 +1,81 @@
+{
+  "name": "TUI Key Combinations Test",
+  "description": "Tests various key combinations including Ctrl, Alt, and special keys",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "user_input",
+        "data": {
+          "text": "Test text for deletion",
+          "submit": false
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "input_text": "Test text"
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "Ctrl+u"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "user_input",
+        "data": {
+          "text": "New text",
+          "submit": false
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "input_text": "New text"
+        }
+      }
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "home"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "end"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "backspace"
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

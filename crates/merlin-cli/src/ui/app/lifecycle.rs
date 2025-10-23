@@ -18,6 +18,8 @@ use crate::ui::renderer::{FocusedPane, Renderer};
 use crate::ui::state::UiState;
 use crate::ui::task_manager::TaskManager;
 use crate::ui::theme::Theme;
+#[cfg(any(test, feature = "test-util"))]
+use merlin_routing::UiEvent;
 use merlin_routing::{Result, RoutingError};
 
 impl TuiApp<CrosstermBackend<io::Stdout>> {
@@ -92,6 +94,38 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
 }
 
 impl<B: Backend> TuiApp<B> {
+    /// Creates a new `TuiApp` for testing with a custom backend
+    ///
+    /// # Testing Only
+    /// This constructor is available when the `test-util` feature is enabled.
+    #[cfg(any(test, feature = "test-util"))]
+    #[allow(
+        dead_code,
+        reason = "Only used in integration tests with test-util feature"
+    )]
+    #[must_use]
+    pub fn new_for_test(
+        terminal: Terminal<B>,
+        event_receiver: mpsc::UnboundedReceiver<UiEvent>,
+    ) -> Self {
+        use crate::ui::event_source::CrosstermEventSource;
+
+        Self {
+            terminal,
+            event_receiver,
+            task_manager: TaskManager::default(),
+            state: UiState::default(),
+            input_manager: InputManager::default(),
+            renderer: Renderer::new(Theme::default()),
+            focused_pane: FocusedPane::Input,
+            pending_input: None,
+            persistence: None,
+            event_source: Box::new(CrosstermEventSource),
+            last_render_time: Instant::now(),
+            layout_cache: layout::LayoutCache::new(),
+        }
+    }
+
     /// Loads tasks asynchronously
     pub async fn load_tasks_async(&mut self) {
         if let Some(persistence) = &self.persistence {

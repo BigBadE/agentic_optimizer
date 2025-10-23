@@ -1,0 +1,108 @@
+{
+  "name": "TUI Conversation Threading",
+  "description": "Tests conversation threading with parent-child task relationships",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [120, 40]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Initial user question"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Assistant response to question"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Follow-up question in same conversation"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 2
+        }
+      }
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Assistant follow-up response"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Third message in conversation thread"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 3
+        }
+      }
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "up"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 7,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "down"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 8,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 100
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

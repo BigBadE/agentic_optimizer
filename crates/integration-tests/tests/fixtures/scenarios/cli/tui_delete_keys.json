@@ -1,0 +1,76 @@
+{
+  "name": "TUI Delete and Backspace Keys",
+  "description": "Tests delete and backspace functionality",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "user_input",
+        "data": {
+          "text": "ABCDEF",
+          "submit": false
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "input_text": "ABCDEF"
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "backspace"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "backspace"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "home"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "delete"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 50
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

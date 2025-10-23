@@ -1,0 +1,46 @@
+{
+  "name": "TUI Ctrl+C Quit",
+  "description": "Tests that Ctrl+C properly triggers quit",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "user_input",
+        "data": {
+          "text": "Some text",
+          "submit": false
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "input_text": "Some text"
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "Ctrl+c"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 50
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

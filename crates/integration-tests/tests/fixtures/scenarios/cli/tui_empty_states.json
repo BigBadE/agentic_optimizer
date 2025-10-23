@@ -1,0 +1,136 @@
+{
+  "name": "TUI Empty States and Edge Cases",
+  "description": "Tests handling of empty input, no tasks, and edge cases",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "enter"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "backspace"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "delete"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "tab"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "up"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "down"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 7,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "pageup"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 8,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "pagedown"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 9,
+      "action": {
+        "type": "user_input",
+        "data": {
+          "text": " ",
+          "submit": false
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 10,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "backspace"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 11,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "escape"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 12,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 50
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 0
+        }
+      }
+    }
+  ]
+}

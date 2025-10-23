@@ -7,7 +7,7 @@ use std::time::Duration;
 /// Implementations must mirror crossterm's semantics:
 /// - `poll(timeout)` waits up to timeout for an event and returns whether one is available.
 /// - `read()` blocks until an event is available and returns it.
-pub trait InputEventSource {
+pub trait InputEventSource: Send + Sync {
     /// Wait up to `timeout` for an event to become available.
     ///
     /// # Errors

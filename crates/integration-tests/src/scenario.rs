@@ -4,13 +4,18 @@ use crate::serde_json::from_str;
 use crate::tui_helpers::{TestEventSource, parse_key};
 use crate::types::{
     EventExpectation, MockResponseData, Scenario, ScenarioStep, StepAction, StepExpectations,
-    TaskExpectations, UiExpectations, UserInputData, WaitCondition, WaitData, WaitForTasksData,
+    TaskExpectations, UiEventData, UiExpectations, UserInputData, WaitCondition, WaitData,
+    WaitForTasksData,
 };
 use anyhow::{Context as _, Error, Result, anyhow};
 use merlin_agent::RoutingOrchestrator;
-use merlin_core::{Task, TaskResult};
+use merlin_cli::ui::TuiApp;
+use merlin_core::ui::{TaskProgress, UiEvent};
+use merlin_core::{Task, TaskId, TaskResult};
 use merlin_providers::MockProvider;
-use merlin_routing::{RoutingConfig, UiChannel, UiEvent};
+use merlin_routing::{RoutingConfig, UiChannel};
+use ratatui::Terminal;
+use ratatui::backend::TestBackend;
 use std::collections::HashMap;
 use std::env;
 use std::fs;
@@ -35,6 +40,8 @@ pub struct ScenarioRunner {
     collected_events: Arc<TokioMutex<Vec<UiEvent>>>,
     mock_provider: Arc<MockProvider>,
     task_results: TaskResults,
+    tui_app: Option<TuiApp<TestBackend>>,
+    tui_sender: Option<mpsc::UnboundedSender<UiEvent>>,
 }
 
 impl ScenarioRunner {
@@ -67,6 +74,8 @@ impl ScenarioRunner {
             collected_events: Arc::new(TokioMutex::new(Vec::new())),
             mock_provider: Arc::new(MockProvider::new("test_provider")),
             task_results: Arc::new(TokioMutex::new(HashMap::new())),
+            tui_app: None,
+            tui_sender: None,
         })
     }
 
@@ -78,6 +87,7 @@ impl ScenarioRunner {
         // Setup
         self.setup_workspace()?;
         self.setup_orchestrator()?;
+        self.setup_tui()?;
 
         // Execute steps
         for (step_index, step) in self.scenario.steps.clone().into_iter().enumerate() {
@@ -89,6 +99,9 @@ impl ScenarioRunner {
                     self.scenario.name
                 )
             })?;
+
+            // Process TUI ticks to handle events
+            self.process_tui_ticks(5).await?;
 
             self.verify_expectations(&step.expectations)
                 .await
@@ -180,6 +193,53 @@ impl ScenarioRunner {
         Ok(())
     }
 
+    /// Set up TUI with test backend
+    ///
+    /// # Errors
+    /// Returns error if TUI creation fails
+    fn setup_tui(&mut self) -> Result<()> {
+        let [width, height] = self.scenario.setup.terminal_size;
+        let backend = TestBackend::new(width, height);
+        let terminal = Terminal::new(backend).context("Failed to create test terminal")?;
+
+        // Create a new receiver that will get the same events
+        // For now, we'll create a separate channel and the TUI will receive events
+        // that we explicitly send to it
+        let (tui_sender, tui_receiver) = mpsc::unbounded_channel();
+
+        // Store the TUI sender for sending events
+        // We'll use the collector channel for verification and tui_sender for display
+        self.tui_sender = Some(tui_sender);
+
+        let mut app = TuiApp::new_for_test(terminal, tui_receiver);
+        app.set_event_source(Box::new(self.event_source.clone()));
+
+        self.tui_app = Some(app);
+        Ok(())
+    }
+
+    /// Process TUI ticks to handle queued events
+    ///
+    /// # Errors
+    /// Returns error if tick processing fails
+    async fn process_tui_ticks(&mut self, count: usize) -> Result<()> {
+        if let Some(ref mut app) = self.tui_app {
+            for _ in 0..count {
+                match app.tick() {
+                    Ok(should_quit) if should_quit => break,
+                    Err(err) => {
+                        tracing::debug!("TUI tick error (expected in tests): {err}");
+                        break;
+                    }
+                    Ok(_) => {}
+                }
+                // Small delay between ticks
+                sleep(Duration::from_millis(10)).await;
+            }
+        }
+        Ok(())
+    }
+
     /// Execute a single scenario step
     ///
     /// # Errors
@@ -202,6 +262,10 @@ impl ScenarioRunner {
                 Ok(())
             }
             StepAction::WaitForTasks { data } => self.execute_wait_for_tasks(data).await,
+            StepAction::SendUiEvent { data } => {
+                self.send_ui_event(data);
+                Ok(())
+            }
         }
     }
 
@@ -288,26 +352,44 @@ impl ScenarioRunner {
     /// Returns error if task execution fails
     #[allow(dead_code, reason = "Will be used in future scenario implementations")]
     async fn execute_task(&self, task_description: &str) -> Result<()> {
+        // Extract needed fields before any await points
         let orchestrator = self
             .orchestrator
             .as_ref()
-            .ok_or_else(|| anyhow!("Orchestrator not initialized"))?;
+            .ok_or_else(|| anyhow!("Orchestrator not initialized"))?
+            .clone();
         let ui_channel = self
             .ui_channel
             .as_ref()
-            .ok_or_else(|| anyhow!("UI channel not initialized"))?;
+            .ok_or_else(|| anyhow!("UI channel not initialized"))?
+            .clone();
+        let task_results = Arc::clone(&self.task_results);
 
+        // Call static implementation
+        Self::execute_task_impl(orchestrator, ui_channel, task_results, task_description).await
+    }
+
+    /// Implementation of `execute_task` that doesn't hold self
+    ///
+    /// # Errors
+    /// Returns error if task execution fails
+    async fn execute_task_impl(
+        orchestrator: RoutingOrchestrator,
+        ui_channel: UiChannel,
+        task_results: TaskResults,
+        task_description: &str,
+    ) -> Result<()> {
         // Create a task
         let task = Task::new(task_description.to_owned());
         let task_id = format!("{:?}", task.id);
 
         // Execute the task
         let result = orchestrator
-            .execute_task_streaming(task, ui_channel.clone())
+            .execute_task_streaming(task, ui_channel)
             .await?;
 
         // Store the result
-        self.task_results.lock().await.insert(task_id, result);
+        task_results.lock().await.insert(task_id, result);
 
         Ok(())
     }
@@ -317,7 +399,18 @@ impl ScenarioRunner {
     /// # Errors
     /// Returns error if timeout is reached before tasks complete
     async fn execute_wait_for_tasks(&self, data: &WaitForTasksData) -> Result<()> {
-        let timeout_duration = Duration::from_millis(data.timeout_ms);
+        // Extract timeout before calling static implementation
+        let timeout_ms = data.timeout_ms;
+
+        Self::execute_wait_for_tasks_impl(timeout_ms).await
+    }
+
+    /// Implementation of `execute_wait_for_tasks` that doesn't hold self
+    ///
+    /// # Errors
+    /// Returns error if timeout is reached before tasks complete
+    async fn execute_wait_for_tasks_impl(timeout_ms: u64) -> Result<()> {
+        let timeout_duration = Duration::from_millis(timeout_ms);
 
         timeout(timeout_duration, async {
             // TODO: Poll task manager for completion
@@ -330,54 +423,162 @@ impl ScenarioRunner {
         Ok(())
     }
 
+    /// Send a UI event directly to the TUI
+    fn send_ui_event(&self, data: &UiEventData) {
+        let event = match data.event_type.as_str() {
+            "task_started" => {
+                let task_id = TaskId::default();
+                let description = data
+                    .description
+                    .clone()
+                    .unwrap_or_else(|| "Test Task".to_owned());
+                UiEvent::TaskStarted {
+                    task_id,
+                    description,
+                    parent_id: None,
+                }
+            }
+            "task_output" => {
+                let task_id = TaskId::default();
+                let output = data.text.clone().unwrap_or_else(|| "Output".to_owned());
+                UiEvent::TaskOutput { task_id, output }
+            }
+            "task_progress" => {
+                let task_id = TaskId::default();
+                let current = u64::from(data.progress.unwrap_or(50));
+                let progress = TaskProgress {
+                    stage: "test".to_owned(),
+                    current,
+                    total: Some(100),
+                    message: "Progress".to_owned(),
+                };
+                UiEvent::TaskProgress { task_id, progress }
+            }
+            _ => {
+                tracing::warn!("Unsupported UI event type for testing: {}", data.event_type);
+                return;
+            }
+        };
+
+        // Send to both collectors and TUI
+        if let Some(ref channel) = self.ui_channel {
+            channel.send(event.clone());
+        }
+        if let Some(ref sender) = self.tui_sender {
+            drop(sender.send(event));
+        }
+    }
+
     /// Verify all expectations for a step
     ///
     /// # Errors
     /// Returns error if any expectation is not met
     async fn verify_expectations(&self, expectations: &StepExpectations) -> Result<()> {
-        // Verify UI state
-        if let Some(ref ui_exp) = expectations.ui_state {
-            self.verify_ui_state(ui_exp);
+        // Extract UI data synchronously before any await points
+        let ui_data = expectations.ui_state.as_ref().map(|ui_exp| {
+            self.tui_app.as_ref().map_or_else(
+                || (ui_exp.clone(), 0, String::new()),
+                |app| {
+                    (
+                        ui_exp.clone(),
+                        app.task_manager().iter_tasks().count(),
+                        app.get_input_text(),
+                    )
+                },
+            )
+        });
+
+        // Extract data needed for async operations before any await points
+        let task_exp_opt = expectations.task_state.clone();
+        let task_results = Arc::clone(&self.task_results);
+        let event_exps = expectations.events.clone();
+        let collected_events = Arc::clone(&self.collected_events);
+
+        // Now call the static implementation
+        Self::verify_expectations_impl(
+            ui_data,
+            task_exp_opt,
+            task_results,
+            event_exps,
+            collected_events,
+        )
+        .await
+    }
+
+    /// Implementation of `verify_expectations` that doesn't hold self
+    ///
+    /// # Errors
+    /// Returns error if any expectation is not met
+    async fn verify_expectations_impl(
+        ui_data: Option<(UiExpectations, usize, String)>,
+        task_exp_opt: Option<TaskExpectations>,
+        task_results: TaskResults,
+        event_exps: Vec<EventExpectation>,
+        collected_events: Arc<TokioMutex<Vec<UiEvent>>>,
+    ) -> Result<()> {
+        // Verify UI state with extracted data
+        if let Some((ui_exp, task_count, input_text)) = ui_data {
+            Self::verify_ui_state_with_data(&ui_exp, task_count, &input_text);
         }
 
         // Verify task state
-        if let Some(ref task_exp) = expectations.task_state {
-            self.verify_task_state(task_exp).await?;
+        if let Some(ref task_exp) = task_exp_opt {
+            Self::verify_task_state_impl(task_results, task_exp).await?;
         }
 
         // Verify events
-        for event_exp in &expectations.events {
-            self.verify_event(event_exp).await?;
+        for event_exp in &event_exps {
+            Self::verify_event_impl(Arc::clone(&collected_events), event_exp).await?;
         }
 
         Ok(())
     }
 
-    /// Verify UI state matches expectations
-    #[allow(
-        clippy::unused_self,
-        reason = "Will use self when TUI integration is complete"
-    )]
-    fn verify_ui_state(&self, expectations: &UiExpectations) {
-        // Verify focused element if specified
-        if expectations.focused.is_some() {
-            // Would check TUI app state here - for now just succeed
-            // This would require integrating with actual TUI app
+    /// Verify UI state with extracted data (doesn't need TUI app reference)
+    ///
+    /// # Panics
+    /// Panics if task count doesn't match expected count or input text doesn't match
+    fn verify_ui_state_with_data(
+        expectations: &UiExpectations,
+        actual_task_count: usize,
+        actual_input_text: &str,
+    ) {
+        // Verify task count if specified
+        if let Some(expected_count) = expectations.task_count {
+            assert_eq!(
+                actual_task_count, expected_count,
+                "Expected {expected_count} tasks, found {actual_task_count}"
+            );
         }
 
         // Verify input text if specified
         if let Some(ref expected_text) = expectations.input_text {
-            // For now, just log - would check actual input manager state
-            tracing::debug!("Expected input text: {}", expected_text);
+            assert!(
+                actual_input_text.contains(expected_text),
+                "Expected input to contain '{expected_text}', got: '{actual_input_text}'"
+            );
+        }
+
+        // Verify snapshot if specified
+        if expectations.snapshot.is_some() {
+            tracing::debug!("Snapshot verification not yet implemented");
+        }
+
+        // Verify focused element if specified
+        if expectations.focused.is_some() {
+            tracing::debug!("Focus verification not yet implemented");
         }
     }
 
-    /// Verify task state matches expectations
+    /// Verify task state matches expectations (implementation without self reference)
     ///
     /// # Errors
     /// Returns error if task state doesn't match
-    async fn verify_task_state(&self, expectations: &TaskExpectations) -> Result<()> {
-        let results = self.task_results.lock().await;
+    async fn verify_task_state_impl(
+        task_results: TaskResults,
+        expectations: &TaskExpectations,
+    ) -> Result<()> {
+        let results = task_results.lock().await;
 
         // Verify task count if specified
         if let Some(expected_count) = expectations.total
@@ -399,13 +600,16 @@ impl ScenarioRunner {
         Ok(())
     }
 
-    /// Verify event was received
+    /// Verify event was received (implementation without self reference)
     ///
     /// # Errors
     /// Returns error if event wasn't received
-    async fn verify_event(&self, expectation: &EventExpectation) -> Result<()> {
+    async fn verify_event_impl(
+        collected_events: Arc<TokioMutex<Vec<UiEvent>>>,
+        expectation: &EventExpectation,
+    ) -> Result<()> {
         // Check if any event matches the expectation
-        let found = self.collected_events.lock().await.iter().any(|event| {
+        let found = collected_events.lock().await.iter().any(|event| {
             match expectation.event_type.as_str() {
                 "task_started" => matches!(event, UiEvent::TaskStarted { .. }),
                 "task_completed" => matches!(event, UiEvent::TaskCompleted { .. }),

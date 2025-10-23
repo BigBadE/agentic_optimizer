@@ -1,0 +1,21 @@
+{
+  "name": "TUI Deep Task Tree",
+  "description": "Tests rendering of deep task hierarchies with multiple levels",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [120, 40]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 10
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

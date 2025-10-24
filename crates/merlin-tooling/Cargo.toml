@@ -7,23 +7,22 @@ edition.workspace = true
 tempfile.workspace = true
 
 [dependencies]
+async-trait.workspace = true
+boa_engine.workspace = true
+futures.workspace = true
+glob.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+swc_common.workspace = true
+swc_ecma_ast.workspace = true
+swc_ecma_codegen.workspace = true
+swc_ecma_parser.workspace = true
+swc_ecma_transforms_base.workspace = true
+swc_ecma_transforms_typescript.workspace = true
+swc_ecma_visit.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
 tracing.workspace = true
-async-trait.workspace = true
-boa_engine.workspace = true
-boa_gc.workspace = true
-futures.workspace = true
-glob = "0.3"
-swc_common = "14.0"
-swc_ecma_ast = "15.0"
-swc_ecma_codegen = "17.0"
-swc_ecma_parser = "24.0"
-swc_ecma_transforms_typescript = "30.0"
-swc_ecma_transforms_base = "27.0"
-swc_ecma_visit = "15.0"
 
 [lints]
 workspace = true

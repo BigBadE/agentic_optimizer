@@ -4,30 +4,29 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-merlin-core.workspace = true
-merlin-routing.workspace = true
 merlin-context.workspace = true
-merlin-providers.workspace = true
-merlin-local.workspace = true
+merlin-core.workspace = true
 merlin-languages.workspace = true
+merlin-local.workspace = true
+merlin-providers.workspace = true
+merlin-routing.workspace = true
 merlin-tooling.workspace = true
 async-trait.workspace = true
-tokio.workspace = true
-uuid.workspace = true
 petgraph.workspace = true
+regex.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-thiserror.workspace = true
 tempfile.workspace = true
+thiserror.workspace = true
+tokio.workspace = true
 tracing.workspace = true
-regex.workspace = true
-once_cell.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 tracing-subscriber.workspace = true
 walkdir.workspace = true
 tempfile.workspace = true
-num_cpus = "1.16"
+num_cpus.workspace = true
 
 [lints]
 workspace = true

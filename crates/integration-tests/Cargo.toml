@@ -4,7 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-# Merlin crates
+# Merlin crates (alphabetically organized)
 merlin-agent = { path = "../merlin-agent" }
 merlin-cli = { path = "../merlin-cli", features = ["test-util"] }
 merlin-context = { path = "../merlin-context" }
@@ -13,27 +13,19 @@ merlin-providers = { path = "../merlin-providers" }
 merlin-routing = { path = "../merlin-routing" }
 merlin-tooling = { path = "../merlin-tooling" }
 
-# Async runtime
+# External dependencies
+anyhow.workspace = true
+crossterm.workspace = true
+num_cpus.workspace = true
+ratatui.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
+thiserror.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
-
-# Serialization
-serde = { workspace = true }
-serde_json = { workspace = true }
-
-# TUI
-ratatui = { workspace = true }
-crossterm = { workspace = true }
-tui-textarea = { workspace = true }
-
-# Utilities
-anyhow = { workspace = true }
-thiserror = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
-
-# Testing
-tempfile = { workspace = true }
-num_cpus = "1.16"
+tracing.workspace = true
+tracing-subscriber.workspace = true
+tui-textarea.workspace = true
 
 [lib]
 name = "integration_tests"

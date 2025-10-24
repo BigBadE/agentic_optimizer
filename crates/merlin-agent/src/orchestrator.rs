@@ -27,6 +27,8 @@ pub struct RoutingOrchestrator {
     router: Arc<dyn ModelRouter>,
     validator: Arc<dyn Validator>,
     workspace: Arc<WorkspaceState>,
+    /// Provider registry (for testing, allows injecting mock providers)
+    provider_registry: Option<Arc<ProviderRegistry>>,
 }
 
 impl RoutingOrchestrator {
@@ -57,6 +59,41 @@ impl RoutingOrchestrator {
             router,
             validator,
             workspace,
+            provider_registry: None,
+        })
+    }
+
+    /// Creates a new orchestrator for testing with a custom router.
+    ///
+    /// This bypasses provider initialization and uses the provided router directly.
+    /// Useful for testing with mock providers.
+    ///
+    /// **Note**: This is intended for testing only. For production use, use `new()` instead.
+    ///
+    /// # Errors
+    /// Returns an error if configuration is invalid.
+    pub fn new_with_router(
+        config: RoutingConfig,
+        router: Arc<dyn ModelRouter>,
+        provider_registry: Arc<ProviderRegistry>,
+    ) -> Result<Self> {
+        let analyzer = Arc::new(
+            LocalTaskAnalyzer::default().with_max_parallel(config.execution.max_concurrent_tasks),
+        );
+
+        let validator = Arc::new(
+            ValidationPipeline::with_default_stages().with_early_exit(config.validation.early_exit),
+        );
+
+        let workspace = WorkspaceState::new(config.workspace.root_path.clone());
+
+        Ok(Self {
+            config,
+            analyzer,
+            router,
+            validator,
+            workspace,
+            provider_registry: Some(provider_registry),
         })
     }
 
@@ -186,13 +223,27 @@ impl RoutingOrchestrator {
         let tool_registry = Arc::new(tool_registry);
         let context_fetcher = ContextFetcher::new(self.workspace.root_path().clone());
 
-        let mut executor = AgentExecutor::new(
-            Arc::clone(&self.router),
-            Arc::clone(&self.validator),
-            tool_registry,
-            context_fetcher,
-            &self.config,
-        )?;
+        let mut executor = if let Some(ref registry) = self.provider_registry {
+            // Use injected provider registry (for testing)
+            use crate::agent::executor::AgentExecutorParams;
+            AgentExecutor::with_provider_registry(AgentExecutorParams {
+                router: Arc::clone(&self.router),
+                validator: Arc::clone(&self.validator),
+                tool_registry,
+                context_fetcher,
+                config: self.config.clone(),
+                provider_registry: Arc::clone(registry),
+            })?
+        } else {
+            // Create new provider registry (production)
+            AgentExecutor::new(
+                Arc::clone(&self.router),
+                Arc::clone(&self.validator),
+                tool_registry,
+                context_fetcher,
+                &self.config,
+            )?
+        };
 
         if self.config.execution.context_dump {
             executor.enable_context_dump();

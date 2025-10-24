@@ -1,0 +1,29 @@
+{
+  "name": "Negative Test - Provider Error",
+  "description": "Tests behavior when provider returns an error",
+  "initial_query": "Implement a feature",
+  "mock_responses": [
+    {
+      "pattern": "Implement a feature",
+      "response": "",
+      "expected_tool_calls": [],
+      "use_once": true,
+      "should_fail": true,
+      "error_message": "Provider API error: rate limit exceeded"
+    }
+  ],
+  "expected_task_list": null,
+  "expected_outcomes": {
+    "all_tasks_completed": false,
+    "files": [],
+    "validation_passed": false,
+    "response": null,
+    "min_tool_calls": 0,
+    "max_tool_calls": 0,
+    "min_provider_calls": 1,
+    "max_provider_calls": 5
+  },
+  "setup_files": {},
+  "env_vars": {},
+  "tags": ["negative", "error_handling", "provider_error"]
+}

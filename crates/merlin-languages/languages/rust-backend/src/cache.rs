@@ -3,7 +3,7 @@
 use std::collections::HashMap;
 use std::env;
 use std::fs::{self as filesystem, File};
-use std::io::{BufReader, BufWriter};
+use std::io::{BufReader, BufWriter, ErrorKind};
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
@@ -171,7 +171,7 @@ impl WorkspaceCache {
                     tracing::info!("Cleared rust-analyzer cache");
                     Ok(())
                 }
-                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                Err(error) if error.kind() == ErrorKind::NotFound => {
                     // File was already deleted (race condition) - treat as success
                     Ok(())
                 }

@@ -1,0 +1,95 @@
+{
+  "name": "Negative Test - Insufficient Responses",
+  "description": "Tests behavior when task list needs more responses than provided",
+  "initial_query": "Implement a multi-step feature",
+  "mock_responses": [
+    {
+      "pattern": "Implement a multi-step feature",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<TaskList> {",
+        "  return {",
+        "    id: \"multi_step\",",
+        "    title: \"Multi-step implementation\",",
+        "    steps: [",
+        "      {",
+        "        id: \"step1\",",
+        "        step_type: \"Feature\",",
+        "        description: \"First step\",",
+        "        verification: \"Step 1 complete\"",
+        "      },",
+        "      {",
+        "        id: \"step2\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Second step\",",
+        "        verification: \"Step 2 complete\"",
+        "      }",
+        "    ]",
+        "  };",
+        "}",
+        "```"
+      ],
+      "expected_tool_calls": [],
+      "use_once": true,
+      "should_fail": false
+    },
+    {
+      "pattern": "First step",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  await writeFile('step1.txt', 'Step 1 done');",
+        "  return \"Completed step 1\";",
+        "}",
+        "```"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool": "writeFile",
+          "args_pattern": "step1.txt",
+          "result_pattern": null
+        }
+      ],
+      "use_once": true,
+      "should_fail": false
+    }
+  ],
+  "expected_task_list": {
+    "total_tasks": 2,
+    "task_descriptions": [
+      "First step",
+      "Second step"
+    ],
+    "dependency_chain": [[], [1]]
+  },
+  "expected_outcomes": {
+    "all_tasks_completed": false,
+    "files": [
+      {
+        "path": "step1.txt",
+        "contains": ["Step 1 done"],
+        "not_contains": [],
+        "exact_content": null,
+        "must_exist": true,
+        "must_not_exist": false
+      },
+      {
+        "path": "step2.txt",
+        "contains": [],
+        "not_contains": [],
+        "exact_content": null,
+        "must_exist": false,
+        "must_not_exist": true
+      }
+    ],
+    "validation_passed": false,
+    "response": null,
+    "min_tool_calls": 1,
+    "max_tool_calls": 3,
+    "min_provider_calls": 2,
+    "max_provider_calls": 5
+  },
+  "setup_files": {},
+  "env_vars": {},
+  "tags": ["negative", "error_handling", "insufficient_responses"]
+}

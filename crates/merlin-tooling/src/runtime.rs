@@ -4,7 +4,6 @@
 
 use std::collections::HashMap;
 use std::fmt::Write as _;
-use std::rc::Rc;
 use std::sync::Arc;
 use std::thread::scope;
 use std::time::Duration;
@@ -13,9 +12,7 @@ use boa_engine::JsNativeError;
 use boa_engine::object::JsObject;
 use boa_engine::object::builtins::JsArray;
 use boa_engine::property::Attribute;
-use boa_engine::{
-    Context, JsResult, JsString, JsValue, NativeFunction, Source, job::SimpleJobQueue, js_string,
-};
+use boa_engine::{Context, JsResult, JsValue, NativeFunction, Source, js_string};
 use serde_json::{Map, Number, Value};
 use tokio::runtime::Builder;
 use tokio::task::spawn_blocking;
@@ -100,16 +97,10 @@ impl TypeScriptRuntime {
     /// # Errors
     /// Returns error if execution fails
     fn execute_sync(code: &str, tools: &HashMap<String, Arc<dyn Tool>>) -> ToolResult<Value> {
-        tracing::debug!("Creating Boa context with job queue");
+        tracing::debug!("Creating Boa context");
 
-        // Create context with a job queue for Promise support
-        let job_queue = Rc::new(SimpleJobQueue::new());
-        let mut context = Context::builder()
-            .job_queue(job_queue)
-            .build()
-            .map_err(|err| {
-                ToolError::ExecutionFailed(format!("Failed to create context: {err}"))
-            })?;
+        // Create context - Boa 0.21 handles job queue internally
+        let mut context = Context::default();
 
         // Register tools as global functions
         Self::register_tool_functions(&mut context, tools)?;
@@ -123,7 +114,7 @@ impl TypeScriptRuntime {
 
         // Run all pending jobs (resolve Promises)
         tracing::debug!("Running job queue to resolve Promises");
-        context.run_jobs();
+        let _result = context.run_jobs();
 
         // Extract Promise value if result is a Promise
         let final_result = Self::extract_promise_if_needed(result, &mut context)?;
@@ -145,9 +136,12 @@ impl TypeScriptRuntime {
         let is_promise = obj
             .get(js_string!("constructor"), context)
             .ok()
-            .and_then(|constructor| constructor.as_object().cloned())
+            .and_then(|constructor| constructor.as_object())
             .and_then(|constructor_obj| constructor_obj.get(js_string!("name"), context).ok())
-            .and_then(|name| name.as_string().map(JsString::to_std_string_escaped))
+            .and_then(|name| {
+                name.as_string()
+                    .map(|js_str| js_str.to_std_string_escaped())
+            })
             .is_some_and(|name| name == "Promise");
 
         if !is_promise {
@@ -158,7 +152,7 @@ impl TypeScriptRuntime {
 
         // Store the promise in a global variable and use JavaScript to extract its value
         context
-            .register_global_property(js_string!("__promise__"), result.clone(), Attribute::all())
+            .register_global_property(js_string!("__promise__"), result, Attribute::all())
             .map_err(|err| {
                 ToolError::ExecutionFailed(format!("Failed to register promise: {err}"))
             })?;
@@ -180,7 +174,7 @@ impl TypeScriptRuntime {
             })?;
 
         // Now run jobs to execute the .then() callback
-        context.run_jobs();
+        let _result = context.run_jobs();
 
         // Check if there was an error
         let error_check = context
@@ -210,7 +204,7 @@ impl TypeScriptRuntime {
             |err_obj| {
                 let result = (|| {
                     let val = err_obj.get(js_string!("message"), context).ok()?;
-                    val.as_string().map(JsString::to_std_string_escaped)
+                    val.as_string().map(|js_str| js_str.to_std_string_escaped())
                 })();
                 result.unwrap_or_else(|| format!("{error_check:?}"))
             },
@@ -508,7 +502,7 @@ impl TypeScriptRuntime {
                 Ok(js_array.into())
             }
             Value::Object(obj) => {
-                let js_obj = JsObject::default();
+                let js_obj = JsObject::with_object_proto(context.intrinsics());
                 for (key, val) in obj {
                     let js_val = Self::json_to_js_value_static(val, context)?;
                     js_obj.set(js_string!(key.as_str()), js_val, true, context)?;

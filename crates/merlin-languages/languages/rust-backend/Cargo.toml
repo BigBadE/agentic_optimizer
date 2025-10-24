@@ -8,24 +8,18 @@ workspace = true
 
 [dependencies]
 merlin-core.workspace = true
-
-# Rust analyzer integration
+anyhow.workspace = true
 ra_ap_ide.workspace = true
 ra_ap_ide_db.workspace = true
-ra_ap_hir.workspace = true
+ra_ap_load-cargo.workspace = true
+ra_ap_project_model.workspace = true
 ra_ap_syntax.workspace = true
 ra_ap_vfs.workspace = true
-ra_ap_paths.workspace = true
-ra_ap_project_model.workspace = true
-ra_ap_load-cargo.workspace = true
-
-# Utilities
-anyhow.workspace = true
+serde.workspace = true
+serde_json.workspace = true
 thiserror.workspace = true
 tracing.workspace = true
 walkdir.workspace = true
-serde.workspace = true
-serde_json.workspace = true
 
 [dev-dependencies]
 tempfile.workspace = true

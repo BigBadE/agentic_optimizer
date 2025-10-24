@@ -1,0 +1,154 @@
+{
+  "name": "Parallel Task Execution",
+  "description": "Tests parallel execution of independent tasks",
+  "initial_query": "Create three independent utility functions",
+  "mock_responses": [
+    {
+      "pattern": "Create three independent utility functions",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<TaskList> {",
+        "  return {",
+        "    id: \"utils\",",
+        "    title: \"Create utility functions\",",
+        "    steps: [",
+        "      {",
+        "        id: \"string_utils\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Create string utility functions\",",
+        "        verification: \"String utils created\"",
+        "      },",
+        "      {",
+        "        id: \"math_utils\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Create math utility functions\",",
+        "        verification: \"Math utils created\"",
+        "      },",
+        "      {",
+        "        id: \"array_utils\",",
+        "        step_type: \"Feature\",",
+        "        description: \"Create array utility functions\",",
+        "        verification: \"Array utils created\"",
+        "      }",
+        "    ]",
+        "  };",
+        "}",
+        "```"
+      ],
+      "expected_tool_calls": [],
+      "use_once": true,
+      "should_fail": false
+    },
+    {
+      "pattern": "string utility",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  await writeFile('src/string_utils.rs', 'pub fn reverse(s: &str) -> String { s.chars().rev().collect() }');",
+        "  return \"Created string utils\";",
+        "}",
+        "```"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool": "writeFile",
+          "args_pattern": "string_utils.rs",
+          "result_pattern": null
+        }
+      ],
+      "use_once": true,
+      "should_fail": false
+    },
+    {
+      "pattern": "math utility",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  await writeFile('src/math_utils.rs', 'pub fn square(n: i32) -> i32 { n * n }');",
+        "  return \"Created math utils\";",
+        "}",
+        "```"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool": "writeFile",
+          "args_pattern": "math_utils.rs",
+          "result_pattern": null
+        }
+      ],
+      "use_once": true,
+      "should_fail": false
+    },
+    {
+      "pattern": "array utility",
+      "response": [
+        "```typescript",
+        "async function agent_code(): Promise<string> {",
+        "  await writeFile('src/array_utils.rs', 'pub fn sum(arr: &[i32]) -> i32 { arr.iter().sum() }');",
+        "  return \"Created array utils\";",
+        "}",
+        "```"
+      ],
+      "expected_tool_calls": [
+        {
+          "tool": "writeFile",
+          "args_pattern": "array_utils.rs",
+          "result_pattern": null
+        }
+      ],
+      "use_once": true,
+      "should_fail": false
+    }
+  ],
+  "expected_task_list": {
+    "total_tasks": 3,
+    "task_descriptions": [
+      "string utility",
+      "math utility",
+      "array utility"
+    ],
+    "dependency_chain": [[], [], []]
+  },
+  "expected_outcomes": {
+    "all_tasks_completed": true,
+    "files": [
+      {
+        "path": "src/string_utils.rs",
+        "contains": ["reverse"],
+        "not_contains": [],
+        "exact_content": null,
+        "must_exist": true,
+        "must_not_exist": false
+      },
+      {
+        "path": "src/math_utils.rs",
+        "contains": ["square"],
+        "not_contains": [],
+        "exact_content": null,
+        "must_exist": true,
+        "must_not_exist": false
+      },
+      {
+        "path": "src/array_utils.rs",
+        "contains": ["sum"],
+        "not_contains": [],
+        "exact_content": null,
+        "must_exist": true,
+        "must_not_exist": false
+      }
+    ],
+    "validation_passed": true,
+    "response": {
+      "contains": ["utility"],
+      "not_contains": [],
+      "min_length": 10
+    },
+    "min_tool_calls": 3,
+    "max_tool_calls": 10,
+    "min_provider_calls": 3,
+    "max_provider_calls": 6
+  },
+  "setup_files": {},
+  "env_vars": {},
+  "tags": ["parallel", "task_list", "independent_tasks"]
+}

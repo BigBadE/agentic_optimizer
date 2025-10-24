@@ -91,6 +91,10 @@ rustflags = [
 # [profile.dev]
 # debug = 1
 
+# This prevents constantly re-building dependencies if the timestamp changes.
+[unstable]
+checksum-freshness = true
+
 # This enables you to run the CI tool using `cargo ci`.
 # This is not enabled by default, you need to copy this file to `config.toml`.
 [alias]

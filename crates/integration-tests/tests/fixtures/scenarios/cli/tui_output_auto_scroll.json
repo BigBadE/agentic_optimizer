@@ -1,0 +1,97 @@
+{
+  "name": "TUI Output Auto-Scroll",
+  "description": "Tests automatic scrolling to bottom when new output arrives",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "task_id": "scroll-task-1",
+          "description": "Task with lots of output"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "task_id": "scroll-task-1",
+          "text": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10\nLine 11\nLine 12\nLine 13\nLine 14\nLine 15\nLine 16\nLine 17\nLine 18\nLine 19\nLine 20"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "tab"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "focused_pane": "output"
+        }
+      }
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "task_id": "scroll-task-1",
+          "text": "\nLine 21\nLine 22\nLine 23\nLine 24\nLine 25"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "up"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "down"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 7,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_completed",
+          "task_id": "scroll-task-1",
+          "result": "Task completed with auto-scroll"
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

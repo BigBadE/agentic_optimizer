@@ -84,7 +84,7 @@ Extremely strict clippy lints (Cargo.toml lines 111-172):
 - Never use `println!()`/`eprintln!()` - use `tracing` macros
 - All public items need doc comments
 - Never use `#[allow]` outside test modules (test modules use `#[cfg_attr(test, allow(...))]`)
-- Do NOT use cargo clean, ever. Instead, delete specific profile folders, like target/debug, on ICE.
+- Do NOT use `cargo clean`, ever. On ICE (Internal Compiler Error), delete only incremental compilation caches: `target/debug/incremental` or `target/release/incremental`, NOT the entire profile folder.
 
 ### Rust Edition 2024
 
@@ -177,7 +177,7 @@ let value = result.map_err(|err| RoutingError::ExecutionFailed(err.to_string()))
 
 ## Verification Before Completion
 
-**CRITICAL - Run before marking any task complete:**
+**Fast verification (recommended for development):**
 
 ```bash
 ./scripts/verify.sh
@@ -188,11 +188,55 @@ This script:
 2. Runs clippy with warnings as errors
 3. Runs all tests (workspace, lib, bins, tests)
 
-**Optional flags:**
+**Full verification with coverage (run before commits):**
+
+```bash
+./scripts/commit.sh
+```
+
+This script runs everything from `verify.sh` plus:
+1. Coverage instrumentation with `cargo llvm-cov`
+2. Generates coverage report (`benchmarks/data/coverage/latest.info`)
+3. Stages coverage report for commit
+4. Runs `cargo sweep` to clean old build artifacts
+
+**Optional flags (both scripts):**
 - `--no-cloud` - Disable cloud provider tests
 - `--ollama` - Run Ollama-specific tests
 
 **Must pass with zero errors.** Never use `#[allow]` to silence warnings.
+
+## Running Tests
+
+**IMPORTANT: Never use `cargo test` directly.** Always use one of the following:
+
+**For all tests (recommended):**
+```bash
+./scripts/verify.sh
+```
+
+**For specific tests (use nextest):**
+```bash
+cargo nextest run -p <package> <test_name>
+```
+
+Examples:
+```bash
+# Run specific test in a package
+cargo nextest run -p merlin-cli test_prompt_command_shows_context
+
+# Run all tests in a package
+cargo nextest run -p merlin-agent
+
+# Run with timeout
+cargo nextest run -p merlin-cli --test-threads=4
+```
+
+**Why nextest over cargo test:**
+- Respects build cache and profiles correctly
+- Parallel execution with better isolation
+- Cleaner output and better timeout handling
+- Avoids unnecessary rebuilds of dependency tree
 
 ## Documentation Standards
 

@@ -20,8 +20,11 @@
 )]
 
 use integration_tests::ScenarioRunner;
+use num_cpus::get as get_cpu_count;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::{env, fs};
+use tokio::{spawn, sync::Semaphore};
 use tracing_subscriber::fmt;
 use tracing_subscriber::{
     EnvFilter, layer::SubscriberExt as _, registry, util::SubscriberInitExt as _,
@@ -103,27 +106,46 @@ async fn run_all_scenarios() {
     }
     println!();
 
+    // Run scenarios in parallel with a concurrency limit
+    let cpu_count = get_cpu_count();
+    let semaphore = Arc::new(Semaphore::new(cpu_count));
+    let mut tasks = Vec::new();
+
+    for scenario_name in scenarios {
+        let sem = Arc::clone(&semaphore);
+        let task = spawn(async move {
+            let _permit = sem.acquire().await.expect("Failed to acquire semaphore");
+
+            let result = match ScenarioRunner::load(&scenario_name) {
+                Ok(runner) => match runner.run().await {
+                    Ok(()) => Ok(()),
+                    Err(error) => Err(error.to_string()),
+                },
+                Err(error) => Err(format!("Failed to load: {error:?}")),
+            };
+
+            (scenario_name, result)
+        });
+        tasks.push(task);
+    }
+
+    // Collect results
     let mut passed = 0;
     let mut failed = Vec::new();
 
-    for scenario_name in &scenarios {
-        println!("{}", "=".repeat(60));
-        println!("Running: {scenario_name}");
-
-        match ScenarioRunner::load(scenario_name) {
-            Ok(runner) => match runner.run().await {
-                Ok(()) => {
-                    passed += 1;
-                    println!("✓ {scenario_name} PASSED");
-                }
-                Err(error) => {
-                    failed.push((scenario_name.clone(), error.to_string()));
-                    println!("✗ {scenario_name} FAILED: {error:?}");
-                }
-            },
-            Err(error) => {
-                failed.push((scenario_name.clone(), format!("Failed to load: {error:?}")));
-                println!("✗ {scenario_name} FAILED TO LOAD: {error:?}");
+    for task in tasks {
+        match task.await {
+            Ok((scenario_name, Ok(()))) => {
+                passed += 1;
+                println!("✓ {scenario_name} PASSED");
+            }
+            Ok((scenario_name, Err(error))) => {
+                failed.push((scenario_name.clone(), error.clone()));
+                println!("✗ {scenario_name} FAILED: {error}");
+            }
+            Err(join_error) => {
+                failed.push(("unknown".to_string(), format!("Join error: {join_error:?}")));
+                println!("✗ Task join failed: {join_error:?}");
             }
         }
     }

@@ -1,0 +1,62 @@
+{
+  "name": "TUI Per-Task Scroll Preservation",
+  "description": "Tests that scroll position is preserved when switching between tasks",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Task 1 with output"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\nLine 6\nLine 7\nLine 8\nLine 9\nLine 10"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Task 2"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 2
+        }
+      }
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 100
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

@@ -1,0 +1,32 @@
+{
+  "name": "TUI Conversation Collapse",
+  "description": "Tests conversation thread expansion and collapse toggle",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "user_input",
+        "data": {
+          "text": "test conversation",
+          "submit": false
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "escape"
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

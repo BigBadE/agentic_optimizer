@@ -468,10 +468,10 @@ async fn test_batch_processing_timeout() {
     // Initialize vector search manager with a timeout
     let mut manager = VectorSearchManager::new(project_root.clone());
 
-    // Set a reasonable timeout - should complete in 120 seconds if working correctly
+    // Set a reasonable timeout - should complete in 10 seconds if working correctly
     // This needs to be long enough to allow model pulling on first run
     // If it hangs after 10 files, this will catch it
-    let result = timeout(Duration::from_secs(120), manager.initialize()).await;
+    let result = timeout(Duration::from_secs(10), manager.initialize()).await;
 
     match result {
         Ok(Ok(())) => {

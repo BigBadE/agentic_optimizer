@@ -1,0 +1,108 @@
+{
+  "name": "TUI Task Retry Event",
+  "description": "Tests TaskRetrying event with multiple retry attempts",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Connect to remote service"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Attempting connection..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_retrying",
+          "retry_count": 1,
+          "error": "Connection refused"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Retrying with backoff..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_retrying",
+          "retry_count": 2,
+          "error": "Timeout"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Final attempt..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 7,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_completed",
+          "result": "Connection established successfully"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 8,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 100
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    }
+  ]
+}

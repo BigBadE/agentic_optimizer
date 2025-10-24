@@ -1,0 +1,50 @@
+{
+  "name": "TUI Task Deletion Confirmation",
+  "description": "Tests double-backspace delete confirmation flow with pending_delete_task_id tracking",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Task to delete"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "Ctrl+t"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "focused_pane": "tasks"
+        }
+      }
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 100
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

@@ -1,0 +1,99 @@
+{
+  "name": "TUI System Messages",
+  "description": "Tests SystemMessage events at different severity levels",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "system_message",
+          "level": "info",
+          "message": "System initialized successfully"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 50
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "system_message",
+          "level": "warning",
+          "message": "Cache size approaching limit (85% full)"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 50
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "system_message",
+          "level": "success",
+          "message": "Configuration saved to disk"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 50
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 7,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "system_message",
+          "level": "error",
+          "message": "Failed to connect to embedding service"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 8,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 100
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

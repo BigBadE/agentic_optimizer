@@ -1,0 +1,40 @@
+{
+  "name": "TUI Load Tasks Workflow",
+  "description": "Tests task state initialization for load scenarios",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 50
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 0
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Loaded task from disk"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    }
+  ]
+}

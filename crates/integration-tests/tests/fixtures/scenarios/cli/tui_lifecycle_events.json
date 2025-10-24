@@ -1,0 +1,152 @@
+{
+  "name": "TUI Task Lifecycle Events",
+  "description": "Tests complete task lifecycle: started -> progress -> output -> retry -> completed",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "task_id": "lifecycle-1",
+          "description": "Task with full lifecycle"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_progress",
+          "task_id": "lifecycle-1",
+          "progress": 25
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "task_id": "lifecycle-1",
+          "text": "Processing data..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_progress",
+          "task_id": "lifecycle-1",
+          "progress": 50
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "task_id": "lifecycle-1",
+          "text": "Validating results..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_failed",
+          "task_id": "lifecycle-1",
+          "error": "Validation failed"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 7,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_retrying",
+          "task_id": "lifecycle-1",
+          "retry_count": 1,
+          "error": "Validation failed"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 8,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_progress",
+          "task_id": "lifecycle-1",
+          "progress": 75
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 9,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "task_id": "lifecycle-1",
+          "text": "Retry successful"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 10,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_progress",
+          "task_id": "lifecycle-1",
+          "progress": 100
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 11,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_completed",
+          "task_id": "lifecycle-1",
+          "result": "Task completed successfully after retry"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    }
+  ]
+}

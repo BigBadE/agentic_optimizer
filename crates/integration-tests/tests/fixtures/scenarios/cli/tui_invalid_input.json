@@ -1,0 +1,65 @@
+{
+  "name": "TUI Invalid Input Handling",
+  "description": "Tests graceful handling of edge case inputs including Unicode",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "user_input",
+        "data": {
+          "text": "Hello World",
+          "submit": false
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "input_text": "Hello World"
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "user_input",
+        "data": {
+          "text": "Hello 世界",
+          "submit": false
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "input_text": "Hello 世界"
+        }
+      }
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "backspace"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "backspace"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "input_text": "Hello "
+        }
+      }
+    }
+  ]
+}

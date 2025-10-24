@@ -33,6 +33,7 @@ tracing-subscriber = { workspace = true }
 
 # Testing
 tempfile = { workspace = true }
+num_cpus = "1.16"
 
 [lib]
 name = "integration_tests"

@@ -77,6 +77,7 @@ async fn test_prompt_command_shows_context() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("prompt")
         .arg("show me the add function")
         .assert()
@@ -90,6 +91,7 @@ async fn test_prompt_command_with_max_files() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("prompt")
         .arg("analyze the code")
         .arg("--max-files")
@@ -105,6 +107,7 @@ async fn test_prompt_command_with_specific_files() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("prompt")
         .arg("what does this file do")
         .arg("-f")
@@ -120,6 +123,7 @@ async fn test_prompt_command_empty_query() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("prompt")
         .arg("")
         .assert()
@@ -131,7 +135,10 @@ async fn test_prompt_command_in_empty_directory() {
     let temp = TempDir::new().expect("Failed to create temp dir");
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
-    cmd.current_dir(temp.path()).arg("prompt").arg("test query");
+    cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
+        .arg("prompt")
+        .arg("test query");
 
     // Empty directory may fail due to no language backend available - this is expected
     let output = cmd.output().expect("Failed to execute");
@@ -146,6 +153,7 @@ async fn test_query_command_requires_api_key() {
     // Without API key, should still run but may fail with API error
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("query")
         .arg("what is the purpose of this code?")
         .env_remove("OPENROUTER_API_KEY");
@@ -163,6 +171,7 @@ async fn test_query_command_with_project_config() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("query")
         .arg("explain the add function")
         .env_remove("OPENROUTER_API_KEY");
@@ -179,6 +188,7 @@ async fn test_query_command_with_specific_files() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("query")
         .arg("what does this do?")
         .arg("-f")
@@ -196,6 +206,7 @@ async fn test_query_command_with_max_files() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("query")
         .arg("analyze code")
         .arg("--max-files")
@@ -213,6 +224,7 @@ async fn test_chat_command_basic_invocation() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("chat")
         .env_remove("OPENROUTER_API_KEY")
         .write_stdin("exit\n");
@@ -229,6 +241,7 @@ async fn test_chat_command_with_custom_model() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("chat")
         .arg("--model")
         .arg("anthropic/claude-3.5-sonnet")
@@ -247,6 +260,7 @@ async fn test_interactive_mode_with_validation_disabled() {
     // Test non-interactive mode (no subcommand) with validation disabled
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("--validation")
         .arg("disabled")
         .arg("--help")
@@ -261,6 +275,7 @@ async fn test_prompt_command_with_nonexistent_file() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("prompt")
         .arg("test query")
         .arg("-f")
@@ -279,6 +294,7 @@ async fn test_prompt_command_large_query() {
     let large_query = "a".repeat(1000);
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("prompt")
         .arg(&large_query)
         .assert()
@@ -294,6 +310,7 @@ async fn test_config_loading_precedence() {
     // Config command should show project config
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("config")
         .arg("--full")
         .assert()
@@ -321,6 +338,7 @@ async fn test_multiple_source_files_in_project() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("prompt")
         .arg("show me all the functions")
         .assert()
@@ -341,6 +359,7 @@ async fn test_prompt_with_tests_directory() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("prompt")
         .arg("show me the tests")
         .assert()
@@ -360,6 +379,7 @@ async fn test_context_building_with_dependencies() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("prompt")
         .arg("what dependencies does this project have")
         .assert()
@@ -386,6 +406,7 @@ async fn test_error_handling_invalid_rust_syntax() {
 
     let mut cmd = Command::cargo_bin("merlin").expect("Binary not found");
     cmd.current_dir(temp.path())
+        .env("MERLIN_SKIP_EMBEDDINGS", "1")
         .arg("prompt")
         .arg("analyze this code");
 

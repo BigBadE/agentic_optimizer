@@ -1,0 +1,149 @@
+{
+  "name": "TUI Extended Task Navigation",
+  "description": "Tests comprehensive task navigation with Home, End, Page Up, Page Down",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "task_id": "nav-1",
+          "description": "Task 1"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "task_id": "nav-2",
+          "description": "Task 2"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 2
+        }
+      }
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "task_id": "nav-3",
+          "description": "Task 3"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 3
+        }
+      }
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "task_id": "nav-4",
+          "description": "Task 4"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 4
+        }
+      }
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "Ctrl+t"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "focused_pane": "tasks"
+        }
+      }
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "home"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 7,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "end"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 8,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "pageup"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 9,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "pagedown"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 10,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "left"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 11,
+      "action": {
+        "type": "key_press",
+        "data": {
+          "key": "right"
+        }
+      },
+      "expectations": {}
+    }
+  ]
+}

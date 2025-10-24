@@ -143,4 +143,68 @@ impl<B: Backend> TuiApp<B> {
     pub fn get_thread_context(&self) -> Vec<(TaskId, String, String)> {
         super::conversation::get_thread_context(self.state.active_task_id, &self.task_manager)
     }
+
+    /// Gets the current theme name
+    ///
+    /// # Testing Only
+    /// Use this to verify theme cycling.
+    pub fn get_theme_name(&self) -> String {
+        format!("{:?}", self.renderer.theme())
+    }
+
+    /// Gets the currently focused pane
+    ///
+    /// # Testing Only
+    /// Use this to verify focus state.
+    pub fn get_focused_pane(&self) -> FocusedPane {
+        self.focused_pane
+    }
+
+    /// Gets the set of expanded conversation IDs
+    ///
+    /// # Testing Only
+    /// Use this to verify conversation expansion state.
+    pub fn get_expanded_conversations(&self) -> Vec<TaskId> {
+        self.state.expanded_conversations.iter().copied().collect()
+    }
+
+    /// Gets the set of expanded step IDs
+    ///
+    /// # Testing Only
+    /// Use this to verify step expansion state.
+    pub fn get_expanded_steps(&self) -> Vec<TaskId> {
+        self.state.expanded_steps.iter().copied().collect()
+    }
+
+    /// Gets the output scroll offset
+    ///
+    /// # Testing Only
+    /// Use this to verify scrolling behavior.
+    pub fn get_output_scroll(&self) -> u16 {
+        self.state.output_scroll_offset
+    }
+
+    /// Gets the task list scroll offset
+    ///
+    /// # Testing Only
+    /// Use this to verify task list scrolling.
+    pub fn get_task_list_scroll(&self) -> usize {
+        self.state.task_list_scroll_offset
+    }
+
+    /// Gets the processing status message
+    ///
+    /// # Testing Only
+    /// Use this to verify status display.
+    pub fn get_processing_status(&self) -> Option<String> {
+        self.state.processing_status.clone()
+    }
+
+    /// Gets the pending delete task ID
+    ///
+    /// # Testing Only
+    /// Use this to verify delete confirmation flow.
+    pub fn get_pending_delete_task_id(&self) -> Option<TaskId> {
+        self.state.pending_delete_task_id
+    }
 }

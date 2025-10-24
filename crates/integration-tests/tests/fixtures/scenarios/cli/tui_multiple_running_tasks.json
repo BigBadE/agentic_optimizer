@@ -1,0 +1,184 @@
+{
+  "name": "TUI Multiple Running Tasks",
+  "description": "Tests handling of multiple concurrent tasks with interleaved events",
+  "setup": {
+    "workspace_files": [],
+    "env_vars": {},
+    "terminal_size": [80, 24]
+  },
+  "steps": [
+    {
+      "step": 1,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Task A: Fetch data"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 1
+        }
+      }
+    },
+    {
+      "step": 2,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Task B: Process logs"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 2
+        }
+      }
+    },
+    {
+      "step": 3,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_started",
+          "description": "Task C: Build project"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 3
+        }
+      }
+    },
+    {
+      "step": 4,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Task A: Connecting to API..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 5,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Task B: Reading log files..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 6,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Task C: Running cargo build..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 7,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_progress",
+          "progress": 33
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 8,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Task A: Downloaded 1MB"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 9,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_completed",
+          "result": "Task B completed: 150 log entries processed"
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 3
+        }
+      }
+    },
+    {
+      "step": 10,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Task C: Compiling 50 crates..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 11,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_completed",
+          "result": "Task A completed: Data fetched successfully"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 12,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_output",
+          "text": "Task C: Linking..."
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 13,
+      "action": {
+        "type": "send_ui_event",
+        "data": {
+          "type": "task_completed",
+          "result": "Task C completed: Build successful"
+        }
+      },
+      "expectations": {}
+    },
+    {
+      "step": 14,
+      "action": {
+        "type": "wait",
+        "data": {
+          "duration_ms": 100
+        }
+      },
+      "expectations": {
+        "ui_state": {
+          "task_count": 3
+        }
+      }
+    }
+  ]
+}

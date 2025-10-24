@@ -208,6 +208,21 @@ pub struct UiEventData {
     /// Progress percentage (for `TaskProgress`)
     #[serde(default)]
     pub progress: Option<u32>,
+    /// Error message (for `TaskFailed`, `TaskRetrying`)
+    #[serde(default)]
+    pub error: Option<String>,
+    /// Retry count (for `TaskRetrying`)
+    #[serde(default)]
+    pub retry_count: Option<u32>,
+    /// Message level (for `SystemMessage`)
+    #[serde(default)]
+    pub level: Option<String>,
+    /// Message text (for `SystemMessage`)
+    #[serde(default)]
+    pub message: Option<String>,
+    /// Result data (for `TaskCompleted`)
+    #[serde(default)]
+    pub result: Option<String>,
 }
 
 /// Expected outcomes after a step
@@ -239,6 +254,30 @@ pub struct UiExpectations {
     /// Expected focused element
     #[serde(default)]
     pub focused: Option<FocusedElement>,
+    /// Expected theme name
+    #[serde(default)]
+    pub theme: Option<String>,
+    /// Expected focused pane
+    #[serde(default)]
+    pub focused_pane: Option<String>,
+    /// Expected expanded conversation IDs
+    #[serde(default)]
+    pub expanded_conversations: Option<Vec<String>>,
+    /// Expected expanded step IDs
+    #[serde(default)]
+    pub expanded_steps: Option<Vec<String>>,
+    /// Expected output scroll offset
+    #[serde(default)]
+    pub output_scroll: Option<u16>,
+    /// Expected task list scroll offset
+    #[serde(default)]
+    pub task_list_scroll: Option<usize>,
+    /// Expected processing status message
+    #[serde(default)]
+    pub processing_status: Option<String>,
+    /// Expected pending delete task ID
+    #[serde(default)]
+    pub pending_delete_task_id: Option<String>,
 }
 
 /// Focusable UI elements

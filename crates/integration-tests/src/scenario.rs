@@ -30,6 +30,21 @@ use tokio::time::{Instant, sleep, timeout};
 /// Shared task results storage
 type TaskResults = Arc<TokioMutex<HashMap<String, TaskResult>>>;
 
+/// Extracted UI state data for verification without holding TUI app reference
+struct UiStateData {
+    expectations: UiExpectations,
+    task_count: usize,
+    input_text: String,
+    theme: String,
+    focused_pane: String,
+    expanded_conversations: Vec<String>,
+    expanded_steps: Vec<String>,
+    output_scroll: u16,
+    task_list_scroll: usize,
+    processing_status: Option<String>,
+    pending_delete_task_id: Option<String>,
+}
+
 /// Scenario runner that executes E2E test scenarios
 pub struct ScenarioRunner {
     scenario: Scenario,
@@ -423,11 +438,64 @@ impl ScenarioRunner {
         Ok(())
     }
 
+    /// Create a task completed event for testing
+    fn create_task_completed_event(task_id: TaskId, data: &UiEventData) -> UiEvent {
+        use merlin_core::{Response, TokenUsage, ValidationResult};
+
+        let result = TaskResult {
+            task_id,
+            response: Response {
+                text: data.result.clone().unwrap_or_else(|| "Success".to_owned()),
+                confidence: 1.0,
+                tokens_used: TokenUsage {
+                    input: 100,
+                    output: 50,
+                    cache_read: 0,
+                    cache_write: 0,
+                },
+                provider: "test-provider".to_owned(),
+                latency_ms: 1000,
+            },
+            tier_used: "test-tier".to_owned(),
+            tokens_used: TokenUsage {
+                input: 100,
+                output: 50,
+                cache_read: 0,
+                cache_write: 0,
+            },
+            validation: ValidationResult::default(),
+            duration_ms: 1000,
+            task_list: None,
+        };
+        UiEvent::TaskCompleted {
+            task_id,
+            result: Box::new(result),
+        }
+    }
+
+    /// Create a system message event for testing
+    fn create_system_message_event(data: &UiEventData) -> UiEvent {
+        use merlin_core::ui::MessageLevel;
+
+        let level = match data.level.as_deref() {
+            Some("warning") => MessageLevel::Warning,
+            Some("error") => MessageLevel::Error,
+            Some("success") => MessageLevel::Success,
+            _ => MessageLevel::Info,
+        };
+        let message = data
+            .message
+            .clone()
+            .unwrap_or_else(|| "Test message".to_owned());
+        UiEvent::SystemMessage { level, message }
+    }
+
     /// Send a UI event directly to the TUI
     fn send_ui_event(&self, data: &UiEventData) {
+        let task_id = TaskId::default();
+
         let event = match data.event_type.as_str() {
             "task_started" => {
-                let task_id = TaskId::default();
                 let description = data
                     .description
                     .clone()
@@ -435,16 +503,14 @@ impl ScenarioRunner {
                 UiEvent::TaskStarted {
                     task_id,
                     description,
-                    parent_id: None,
+                    parent_id: data.parent_id.as_ref().map(|_| TaskId::default()),
                 }
             }
             "task_output" => {
-                let task_id = TaskId::default();
                 let output = data.text.clone().unwrap_or_else(|| "Output".to_owned());
                 UiEvent::TaskOutput { task_id, output }
             }
             "task_progress" => {
-                let task_id = TaskId::default();
                 let current = u64::from(data.progress.unwrap_or(50));
                 let progress = TaskProgress {
                     stage: "test".to_owned(),
@@ -454,6 +520,27 @@ impl ScenarioRunner {
                 };
                 UiEvent::TaskProgress { task_id, progress }
             }
+            "task_completed" => Self::create_task_completed_event(task_id, data),
+            "task_failed" => {
+                let error = data
+                    .error
+                    .clone()
+                    .unwrap_or_else(|| "Test error".to_owned());
+                UiEvent::TaskFailed { task_id, error }
+            }
+            "task_retrying" => {
+                let retry_count = data.retry_count.unwrap_or(1);
+                let error = data
+                    .error
+                    .clone()
+                    .unwrap_or_else(|| "Test error".to_owned());
+                UiEvent::TaskRetrying {
+                    task_id,
+                    retry_count,
+                    error,
+                }
+            }
+            "system_message" => Self::create_system_message_event(data),
             _ => {
                 tracing::warn!("Unsupported UI event type for testing: {}", data.event_type);
                 return;
@@ -474,18 +561,37 @@ impl ScenarioRunner {
     /// # Errors
     /// Returns error if any expectation is not met
     async fn verify_expectations(&self, expectations: &StepExpectations) -> Result<()> {
+        use merlin_cli::ui::renderer::FocusedPane;
+
         // Extract UI data synchronously before any await points
-        let ui_data = expectations.ui_state.as_ref().map(|ui_exp| {
-            self.tui_app.as_ref().map_or_else(
-                || (ui_exp.clone(), 0, String::new()),
-                |app| {
-                    (
-                        ui_exp.clone(),
-                        app.task_manager().iter_tasks().count(),
-                        app.get_input_text(),
-                    )
+        let ui_data = expectations.ui_state.as_ref().and_then(|ui_exp| {
+            self.tui_app.as_ref().map(|app| UiStateData {
+                expectations: ui_exp.clone(),
+                task_count: app.task_manager().iter_tasks().count(),
+                input_text: app.get_input_text(),
+                theme: app.get_theme_name(),
+                focused_pane: match app.get_focused_pane() {
+                    FocusedPane::Input => "input".to_owned(),
+                    FocusedPane::Output => "output".to_owned(),
+                    FocusedPane::Tasks => "tasks".to_owned(),
                 },
-            )
+                expanded_conversations: app
+                    .get_expanded_conversations()
+                    .iter()
+                    .map(|id| format!("{id:?}"))
+                    .collect(),
+                expanded_steps: app
+                    .get_expanded_steps()
+                    .iter()
+                    .map(|id| format!("{id:?}"))
+                    .collect(),
+                output_scroll: app.get_output_scroll(),
+                task_list_scroll: app.get_task_list_scroll(),
+                processing_status: app.get_processing_status(),
+                pending_delete_task_id: app
+                    .get_pending_delete_task_id()
+                    .map(|id| format!("{id:?}")),
+            })
         });
 
         // Extract data needed for async operations before any await points
@@ -510,15 +616,15 @@ impl ScenarioRunner {
     /// # Errors
     /// Returns error if any expectation is not met
     async fn verify_expectations_impl(
-        ui_data: Option<(UiExpectations, usize, String)>,
+        ui_data: Option<UiStateData>,
         task_exp_opt: Option<TaskExpectations>,
         task_results: TaskResults,
         event_exps: Vec<EventExpectation>,
         collected_events: Arc<TokioMutex<Vec<UiEvent>>>,
     ) -> Result<()> {
         // Verify UI state with extracted data
-        if let Some((ui_exp, task_count, input_text)) = ui_data {
-            Self::verify_ui_state_with_data(&ui_exp, task_count, &input_text);
+        if let Some(ref data) = ui_data {
+            Self::verify_ui_state_with_data(data);
         }
 
         // Verify task state
@@ -534,32 +640,101 @@ impl ScenarioRunner {
         Ok(())
     }
 
+    /// Verify basic UI state fields
+    ///
+    /// # Panics
+    /// Panics if expectations don't match actual UI state
+    fn verify_basic_ui_state(data: &UiStateData, expectations: &UiExpectations) {
+        if let Some(expected_count) = expectations.task_count {
+            assert_eq!(
+                data.task_count, expected_count,
+                "Expected {expected_count} tasks, found {}",
+                data.task_count
+            );
+        }
+        if let Some(ref expected_text) = expectations.input_text {
+            assert!(
+                data.input_text.contains(expected_text),
+                "Expected input to contain '{expected_text}', got: '{}'",
+                data.input_text
+            );
+        }
+        if let Some(ref expected_theme) = expectations.theme {
+            assert_eq!(
+                &data.theme, expected_theme,
+                "Expected theme '{expected_theme}', got '{}'",
+                data.theme
+            );
+        }
+        if let Some(ref expected_pane) = expectations.focused_pane {
+            assert_eq!(
+                &data.focused_pane, expected_pane,
+                "Expected focused pane '{expected_pane}', got '{}'",
+                data.focused_pane
+            );
+        }
+    }
+
+    /// Verify expansion and scroll state
+    ///
+    /// # Panics
+    /// Panics if expectations don't match actual UI state
+    fn verify_expansion_and_scroll(data: &UiStateData, expectations: &UiExpectations) {
+        if let Some(ref expected_convs) = expectations.expanded_conversations {
+            assert_eq!(
+                &data.expanded_conversations, expected_convs,
+                "Expected expanded conversations {:?}, got {:?}",
+                expected_convs, data.expanded_conversations
+            );
+        }
+        if let Some(ref expected_steps) = expectations.expanded_steps {
+            assert_eq!(
+                &data.expanded_steps, expected_steps,
+                "Expected expanded steps {:?}, got {:?}",
+                expected_steps, data.expanded_steps
+            );
+        }
+        if let Some(expected_scroll) = expectations.output_scroll {
+            assert_eq!(
+                data.output_scroll, expected_scroll,
+                "Expected output scroll {expected_scroll}, got {}",
+                data.output_scroll
+            );
+        }
+        if let Some(expected_scroll) = expectations.task_list_scroll {
+            assert_eq!(
+                data.task_list_scroll, expected_scroll,
+                "Expected task list scroll {expected_scroll}, got {}",
+                data.task_list_scroll
+            );
+        }
+    }
+
     /// Verify UI state with extracted data (doesn't need TUI app reference)
     ///
     /// # Panics
-    /// Panics if task count doesn't match expected count or input text doesn't match
-    fn verify_ui_state_with_data(
-        expectations: &UiExpectations,
-        actual_task_count: usize,
-        actual_input_text: &str,
-    ) {
-        // Verify task count if specified
-        if let Some(expected_count) = expectations.task_count {
+    /// Panics if any expectation doesn't match
+    fn verify_ui_state_with_data(data: &UiStateData) {
+        let expectations = &data.expectations;
+        Self::verify_basic_ui_state(data, expectations);
+        Self::verify_expansion_and_scroll(data, expectations);
+
+        if let Some(ref expected_status) = expectations.processing_status {
             assert_eq!(
-                actual_task_count, expected_count,
-                "Expected {expected_count} tasks, found {actual_task_count}"
+                data.processing_status.as_deref(),
+                Some(expected_status.as_str()),
+                "Expected processing status '{expected_status}', got {:?}",
+                data.processing_status
             );
         }
-
-        // Verify input text if specified
-        if let Some(ref expected_text) = expectations.input_text {
-            assert!(
-                actual_input_text.contains(expected_text),
-                "Expected input to contain '{expected_text}', got: '{actual_input_text}'"
+        if let Some(ref expected_id) = expectations.pending_delete_task_id {
+            assert_eq!(
+                data.pending_delete_task_id.as_deref(),
+                Some(expected_id.as_str()),
+                "Expected pending delete task '{expected_id}', got {:?}",
+                data.pending_delete_task_id
             );
         }
-
-        // Verify snapshot if specified
         if expectations.snapshot.is_some() {
             tracing::debug!("Snapshot verification not yet implemented");
         }

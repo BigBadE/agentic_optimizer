@@ -8,6 +8,7 @@ use merlin_core::{Context, ModelProvider as _, Query};
 use merlin_languages::{Language, create_backend};
 use merlin_providers::OpenRouterProvider;
 use merlin_routing::RoutingConfig;
+use std::env;
 use std::path::{Path, PathBuf};
 use toml::to_string_pretty;
 
@@ -116,9 +117,11 @@ pub async fn handle_prompt(
         builder = builder.with_max_files(max);
     }
 
-    // Always enable Rust semantic analysis
-    let backend = create_backend(Language::Rust)?;
-    builder = builder.with_language_backend(backend);
+    // Enable Rust semantic analysis unless skipped
+    if env::var("MERLIN_SKIP_EMBEDDINGS").is_err() {
+        let backend = create_backend(Language::Rust)?;
+        builder = builder.with_language_backend(backend);
+    }
 
     let query = Query::new(query_text).with_files(files);
 

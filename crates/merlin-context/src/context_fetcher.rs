@@ -1,5 +1,6 @@
 use regex::Regex;
 use std::collections::HashSet;
+use std::env;
 use std::fmt::Write as _;
 use std::mem::replace;
 use std::path::{Path, PathBuf};
@@ -28,19 +29,29 @@ pub struct ContextFetcher {
 impl ContextFetcher {
     /// Create a new context fetcher
     pub fn new(project_root: PathBuf) -> Self {
-        // Try to create a language backend (Rust for now)
-        let mut builder = ContextBuilder::new(project_root.clone());
+        // Check if we should skip expensive operations (for tests)
+        let skip_embeddings = env::var("MERLIN_SKIP_EMBEDDINGS").is_ok();
 
-        if let Ok(backend) = create_backend(Language::Rust) {
-            builder = builder.with_language_backend(backend);
-            debug!("Language backend (Rust) initialized for context fetcher");
+        // Try to create a language backend (Rust for now) unless skipping
+        let context_builder = if skip_embeddings {
+            debug!("Skipping language backend initialization (MERLIN_SKIP_EMBEDDINGS set)");
+            None
         } else {
-            debug!("Failed to initialize language backend, will use vector search only");
-        }
+            let mut builder = ContextBuilder::new(project_root.clone());
+
+            if let Ok(backend) = create_backend(Language::Rust) {
+                builder = builder.with_language_backend(backend);
+                debug!("Language backend (Rust) initialized for context fetcher");
+            } else {
+                debug!("Failed to initialize language backend, will use vector search only");
+            }
+
+            Some(builder)
+        };
 
         Self {
             project_root,
-            context_builder: Some(builder),
+            context_builder,
             vector_manager: None,
             use_vector_search: false,
             progress_callback: None,
@@ -55,6 +66,12 @@ impl ContextFetcher {
     /// Enable vector search for semantic context retrieval
     #[must_use]
     pub fn with_vector_search(mut self, vector_manager: VectorSearchManager) -> Self {
+        // Skip vector search if env var is set
+        if env::var("MERLIN_SKIP_EMBEDDINGS").is_ok() {
+            debug!("Skipping vector search initialization (MERLIN_SKIP_EMBEDDINGS set)");
+            return self;
+        }
+
         self.vector_manager = Some(vector_manager);
         self.use_vector_search = true;
         self

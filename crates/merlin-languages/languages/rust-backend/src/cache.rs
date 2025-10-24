@@ -166,12 +166,20 @@ impl WorkspaceCache {
         let cache_path = Self::cache_path(project_root);
 
         if cache_path.exists() {
-            filesystem::remove_file(&cache_path)
-                .map_err(|error| CoreError::Other(format!("Failed to delete cache: {error}")))?;
-            tracing::info!("Cleared rust-analyzer cache");
+            match filesystem::remove_file(&cache_path) {
+                Ok(()) => {
+                    tracing::info!("Cleared rust-analyzer cache");
+                    Ok(())
+                }
+                Err(error) if error.kind() == std::io::ErrorKind::NotFound => {
+                    // File was already deleted (race condition) - treat as success
+                    Ok(())
+                }
+                Err(error) => Err(CoreError::Other(format!("Failed to delete cache: {error}"))),
+            }
+        } else {
+            Ok(())
         }
-
-        Ok(())
     }
 }
 

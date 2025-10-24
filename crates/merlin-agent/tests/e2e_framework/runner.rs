@@ -119,15 +119,15 @@ edition = "2021"
     /// # Errors
     /// Returns error if orchestrator creation fails
     fn create_orchestrator(
-        mock_provider: Arc<dyn ModelProvider>,
+        mock_provider: &Arc<dyn ModelProvider>,
         workspace_root: &Path,
     ) -> Result<RoutingOrchestrator, String> {
         // Create provider registry with mock provider
-        let provider_registry1 = ProviderRegistry::with_mock_provider(&mock_provider)
+        let provider_registry1 = ProviderRegistry::with_mock_provider(mock_provider)
             .map_err(|e| format!("Failed to create provider registry: {e}"))?;
 
         // Create a second identical registry for the orchestrator (they're cheap to clone patterns)
-        let provider_registry2 = ProviderRegistry::with_mock_provider(&mock_provider)
+        let provider_registry2 = ProviderRegistry::with_mock_provider(mock_provider)
             .map_err(|e| format!("Failed to create provider registry: {e}"))?;
 
         // Create router (same as production)
@@ -160,7 +160,7 @@ edition = "2021"
         let mock_provider_arc = Arc::new(mock_provider.clone()) as Arc<dyn ModelProvider>;
 
         // Create orchestrator (uses real production code)
-        let orchestrator = Self::create_orchestrator(mock_provider_arc, self.workspace.path())?;
+        let orchestrator = Self::create_orchestrator(&mock_provider_arc, self.workspace.path())?;
 
         // Create task and UI channel
         let task = Task::new(fixture.initial_query.clone());
@@ -270,8 +270,8 @@ edition = "2021"
 
         if failed > 0 {
             println!("\nFailed tests:");
-            for (name, passed) in results {
-                if !passed {
+            for (name, test_passed) in results {
+                if !test_passed {
                     println!("  ❌ {name}");
                 }
             }

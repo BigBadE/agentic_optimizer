@@ -41,7 +41,7 @@ pub struct MockResponse {
     pub use_once: bool,
     /// Whether this response should fail (for error testing)
     pub should_fail: bool,
-    /// Error message if should_fail is true
+    /// Error message if `should_fail` is true
     pub error_message: Option<String>,
 }
 
@@ -113,7 +113,7 @@ pub struct FileVerification {
     pub contains: Vec<String>,
     /// Content that should NOT be present
     pub not_contains: Vec<String>,
-    /// Exact content (if specified, contains/not_contains are ignored)
+    /// Exact content (if specified, `contains`/`not_contains` are ignored)
     pub exact_content: Option<String>,
     /// Whether file must exist
     pub must_exist: bool,
@@ -183,10 +183,10 @@ impl E2EFixture {
     /// Returns error if file cannot be read or parsed.
     pub fn load(path: impl AsRef<Path>) -> Result<Self, String> {
         let content = fs::read_to_string(path.as_ref())
-            .map_err(|e| format!("Failed to read fixture {:?}: {e}", path.as_ref()))?;
+            .map_err(|e| format!("Failed to read fixture {}: {e}", path.as_ref().display()))?;
 
         serde_json::from_str(&content)
-            .map_err(|e| format!("Failed to parse fixture {:?}: {e}", path.as_ref()))
+            .map_err(|e| format!("Failed to parse fixture {}: {e}", path.as_ref().display()))
     }
 
     /// Discover all fixture files in a directory.
@@ -196,7 +196,7 @@ impl E2EFixture {
     pub fn discover_fixtures(dir: impl AsRef<Path>) -> Result<Vec<Self>, String> {
         let mut fixtures = Vec::new();
         let entries = fs::read_dir(dir.as_ref())
-            .map_err(|e| format!("Failed to read directory {:?}: {e}", dir.as_ref()))?;
+            .map_err(|e| format!("Failed to read directory {}: {e}", dir.as_ref().display()))?;
 
         for entry in entries {
             let entry = entry.map_err(|e| format!("Failed to read entry: {e}"))?;
@@ -280,22 +280,20 @@ impl E2EFixture {
         if let (Some(min), Some(max)) = (
             self.expected_outcomes.min_tool_calls,
             self.expected_outcomes.max_tool_calls,
-        ) {
-            if min > max {
-                return Err(format!("min_tool_calls ({min}) > max_tool_calls ({max})"));
-            }
+        ) && min > max
+        {
+            return Err(format!("min_tool_calls ({min}) > max_tool_calls ({max})"));
         }
 
         // Validate provider call counts
         if let (Some(min), Some(max)) = (
             self.expected_outcomes.min_provider_calls,
             self.expected_outcomes.max_provider_calls,
-        ) {
-            if min > max {
-                return Err(format!(
-                    "min_provider_calls ({min}) > max_provider_calls ({max})"
-                ));
-            }
+        ) && min > max
+        {
+            return Err(format!(
+                "min_provider_calls ({min}) > max_provider_calls ({max})"
+            ));
         }
 
         Ok(())

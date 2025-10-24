@@ -53,12 +53,14 @@ impl StatefulMockProvider {
     }
 
     /// Add a mock response
+    #[allow(clippy::needless_pass_by_ref_mut, reason = "API consistency")]
     pub fn add_response(&mut self, response: MockResponse) {
         let mut state = self.state.lock().expect("Lock poisoned");
         state.responses.push(response);
     }
 
     /// Add multiple mock responses
+    #[allow(clippy::needless_pass_by_ref_mut, reason = "API consistency")]
     pub fn add_responses(&mut self, responses: Vec<MockResponse>) {
         let mut state = self.state.lock().expect("Lock poisoned");
         state.responses.extend(responses);
@@ -93,7 +95,7 @@ impl StatefulMockProvider {
     }
 
     /// Find a matching response for the given query
-    fn find_response(&self, query_text: &str, state: &mut ProviderState) -> Option<MockResponse> {
+    fn find_response(query_text: &str, state: &mut ProviderState) -> Option<MockResponse> {
         // Try to find a matching response
         for (idx, mock_response) in state.responses.iter().enumerate() {
             // Check if pattern matches
@@ -146,19 +148,17 @@ impl ModelProvider for StatefulMockProvider {
         let mut state = self.state.lock().expect("Lock poisoned");
 
         // Find matching response
-        let mock_response = self.find_response(&query.text, &mut state);
+        let mock_response = Self::find_response(&query.text, &mut state);
 
         if let Some(mock) = mock_response {
             // Check if this response should fail
             if mock.should_fail {
-                let error_msg = mock
-                    .error_message
-                    .unwrap_or_else(|| "Mock error".to_owned());
+                let error_msg = mock.error_message.unwrap_or_else(String::new);
 
                 // Record the error call
                 state.calls.push(CallRecord {
                     query: query.text.clone(),
-                    matched_pattern: mock.pattern.clone(),
+                    matched_pattern: mock.pattern,
                     response: error_msg.clone(),
                     timestamp: std::time::Instant::now(),
                     was_error: true,
@@ -195,8 +195,7 @@ impl ModelProvider for StatefulMockProvider {
                 state
                     .responses
                     .iter()
-                    .map(|r| &r.pattern)
-                    .cloned()
+                    .map(|r| r.pattern.clone())
                     .collect::<Vec<_>>()
                     .join(", "),
                 query.text
@@ -209,6 +208,7 @@ impl ModelProvider for StatefulMockProvider {
                 timestamp: std::time::Instant::now(),
                 was_error: true,
             });
+            drop(state);
 
             Err(RoutingError::Other(error_msg))
         }
@@ -278,7 +278,7 @@ mod tests {
         let mut provider = StatefulMockProvider::new("test");
         provider.add_response(MockResponse {
             pattern: "fail".to_owned(),
-            response: "".to_owned(),
+            response: String::new(),
             expected_tool_calls: vec![],
             use_once: false,
             should_fail: true,
@@ -289,7 +289,7 @@ mod tests {
         let context = Context::new("test");
 
         let result = provider.generate(&query, &context).await;
-        assert!(result.is_err());
+        result.unwrap_err();
 
         let history = provider.get_call_history();
         assert_eq!(history.len(), 1);

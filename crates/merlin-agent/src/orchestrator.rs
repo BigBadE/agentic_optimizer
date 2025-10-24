@@ -10,7 +10,7 @@ use merlin_core::{
 use merlin_routing::{
     LocalTaskAnalyzer, ModelRouter, ProviderRegistry, StrategyRouter, TaskAnalysis, TaskAnalyzer,
 };
-use merlin_tooling::{BashTool, ToolRegistry};
+use merlin_tooling::{BashTool, ListFilesTool, ReadFileTool, ToolRegistry, WriteFileTool};
 
 /// Parameters for task execution (internal)
 struct TaskExecutionParams {
@@ -219,9 +219,14 @@ impl RoutingOrchestrator {
     /// # Errors
     /// Returns error if executor creation fails.
     fn create_agent_executor(&self) -> Result<AgentExecutor> {
-        let tool_registry = ToolRegistry::default().with_tool(Arc::new(BashTool));
+        let workspace_root = self.workspace.root_path();
+        let tool_registry = ToolRegistry::default()
+            .with_tool(Arc::new(BashTool))
+            .with_tool(Arc::new(ReadFileTool::new(workspace_root)))
+            .with_tool(Arc::new(WriteFileTool::new(workspace_root)))
+            .with_tool(Arc::new(ListFilesTool::new(workspace_root)));
         let tool_registry = Arc::new(tool_registry);
-        let context_fetcher = ContextFetcher::new(self.workspace.root_path().clone());
+        let context_fetcher = ContextFetcher::new(workspace_root.clone());
 
         let mut executor = if let Some(ref registry) = self.provider_registry {
             // Use injected provider registry (for testing)

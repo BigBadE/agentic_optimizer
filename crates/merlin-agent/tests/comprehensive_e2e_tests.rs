@@ -6,14 +6,14 @@
 //! ## Test Coverage
 //!
 //! **Positive Tests:**
-//! - simple_calculator.json - Basic task list execution with file creation
-//! - file_read_write.json - File operations (read, modify, write)
+//! - `simple_calculator.json` - Basic task list execution with file creation
+//! - `file_read_write.json` - File operations (read, modify, write)
 //!
 //! **Negative Tests:**
-//! - negative_missing_response.json - Handling of missing mock responses
-//! - negative_provider_error.json - Handling of provider errors
-//! - negative_insufficient_responses.json - Detection of incomplete task lists
-//! - negative_excessive_calls.json - Detection of excessive provider calls
+//! - `negative_missing_response.json` - Handling of missing mock responses
+//! - `negative_provider_error.json` - Handling of provider errors
+//! - `negative_insufficient_responses.json` - Detection of incomplete task lists
+//! - `negative_excessive_calls.json` - Detection of excessive provider calls
 //!
 //! ## Framework Features
 //!
@@ -62,6 +62,8 @@
 
 mod e2e_framework;
 
+use std::fs;
+
 use e2e_framework::fixture::E2EFixture;
 use e2e_framework::runner::E2ERunner;
 
@@ -89,25 +91,21 @@ async fn test_simple_response() {
 }
 
 #[tokio::test]
-#[ignore] // TODO: Fix TypeScript runtime file functions
 async fn test_simple_calculator() {
     test_fixture("simple_calculator").await;
 }
 
 #[tokio::test]
-#[ignore] // TODO: Fix TypeScript runtime file functions
 async fn test_file_read_write() {
     test_fixture("file_read_write").await;
 }
 
 #[tokio::test]
-#[ignore] // TODO: Fix TypeScript runtime file functions
 async fn test_parallel_tasks() {
     test_fixture("parallel_tasks").await;
 }
 
 #[tokio::test]
-#[ignore] // TODO: Fix TypeScript runtime file functions
 async fn test_sequential_dependencies() {
     test_fixture("sequential_dependencies").await;
 }
@@ -198,12 +196,12 @@ async fn test_all_negative_fixtures() {
 
         // Some negative tests expect failure, others expect graceful handling
         // Check if the fixture expects all_tasks_completed = false
-        if !fixture.expected_outcomes.all_tasks_completed {
-            // This test expects failure or incomplete execution
-            println!("✅ {} (handled error correctly)\n", fixture.name);
-        } else {
+        if fixture.expected_outcomes.all_tasks_completed {
             result.unwrap_or_else(|e| panic!("Fixture {} failed unexpectedly: {e}", fixture.name));
             println!("✅ {}\n", fixture.name);
+        } else {
+            // This test expects failure or incomplete execution
+            println!("✅ {} (handled error correctly)\n", fixture.name);
         }
     }
 }
@@ -292,7 +290,7 @@ async fn test_single_fixture_debug() {
     }
 
     println!("\n--- Workspace Files ---");
-    for entry in std::fs::read_dir(&result.workspace_root).unwrap() {
+    for entry in fs::read_dir(&result.workspace_root).unwrap() {
         let entry = entry.unwrap();
         println!("  {}", entry.path().display());
     }

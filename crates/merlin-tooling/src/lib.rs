@@ -24,6 +24,8 @@
 mod bash;
 /// Dynamic context request tool for agents.
 pub mod context_request;
+/// File operation tools (read, write, list).
+mod file_ops;
 /// Tool registry for managing available tools.
 mod registry;
 /// TypeScript/JavaScript runtime using QuickJS.
@@ -37,6 +39,7 @@ pub use bash::BashTool;
 pub use context_request::{
     ContextFile, ContextRequestArgs, ContextRequestResult, ContextRequestTool, ContextTracker,
 };
+pub use file_ops::{ListFilesTool, ReadFileTool, WriteFileTool};
 pub use registry::ToolRegistry;
 pub use runtime::TypeScriptRuntime;
 pub use signatures::generate_typescript_signatures;

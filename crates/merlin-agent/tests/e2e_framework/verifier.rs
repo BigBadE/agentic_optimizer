@@ -97,12 +97,12 @@ impl<'a> E2EVerifier<'a> {
         let expected = self.fixture.expected_outcomes.all_tasks_completed;
         let actual = task_result.validation.passed;
 
-        if expected != actual {
+        if expected == actual {
+            result.add_success(format!("Task completion matches: {actual}"));
+        } else {
             result.add_failure(format!(
                 "Task completion mismatch: expected {expected}, got {actual}"
             ));
-        } else {
-            result.add_success(format!("Task completion matches: {actual}"));
         }
 
         result
@@ -128,12 +128,12 @@ impl<'a> E2EVerifier<'a> {
         // Check existence
         let exists = file_path.exists();
 
-        if file_verify.must_exist && !exists {
+        if !exists && file_verify.must_exist {
             result.add_failure(format!("File {} does not exist", file_verify.path));
             return result;
         }
 
-        if file_verify.must_not_exist && exists {
+        if exists && file_verify.must_not_exist {
             result.add_failure(format!("File {} exists but should not", file_verify.path));
             return result;
         }
@@ -219,7 +219,10 @@ impl<'a> E2EVerifier<'a> {
         if let Some(ref response_verify) = self.fixture.expected_outcomes.response {
             let response_text = &task_result.response.text;
 
-            result.merge(self.verify_response_patterns(response_text, response_verify));
+            result.merge(Self::verify_response_patterns(
+                response_text,
+                response_verify,
+            ));
         }
 
         result
@@ -227,7 +230,6 @@ impl<'a> E2EVerifier<'a> {
 
     /// Verify response patterns
     fn verify_response_patterns(
-        &self,
         response_text: &str,
         response_verify: &ResponseVerification,
     ) -> VerificationResult {
@@ -301,13 +303,13 @@ impl<'a> E2EVerifier<'a> {
         }
 
         // Verify call patterns
-        result.merge(self.verify_call_patterns(mock_provider.get_call_history()));
+        result.merge(self.verify_call_patterns(&mock_provider.get_call_history()));
 
         result
     }
 
     /// Verify call patterns match expected
-    fn verify_call_patterns(&self, calls: Vec<CallRecord>) -> VerificationResult {
+    fn verify_call_patterns(&self, calls: &[CallRecord]) -> VerificationResult {
         let mut result = VerificationResult::new();
 
         // Check that all expected patterns were called
@@ -353,12 +355,12 @@ impl<'a> E2EVerifier<'a> {
         let expected = self.fixture.expected_outcomes.validation_passed;
         let actual = task_result.validation.passed;
 
-        if expected != actual {
+        if expected == actual {
+            result.add_success(format!("Validation result matches: {actual}"));
+        } else {
             result.add_failure(format!(
                 "Validation result mismatch: expected {expected}, got {actual}"
             ));
-        } else {
-            result.add_success(format!("Validation result matches: {actual}"));
         }
 
         result

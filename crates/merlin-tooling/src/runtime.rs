@@ -215,6 +215,10 @@ impl TypeScriptRuntime {
     ///
     /// # Errors
     /// Returns error if registration fails
+    #[allow(
+        clippy::too_many_lines,
+        reason = "Tool registration requires handling each tool type"
+    )]
     fn register_tool_functions(
         context: &mut Context,
         tools: &HashMap<String, Arc<dyn Tool>>,
@@ -243,29 +247,47 @@ impl TypeScriptRuntime {
                         // Single argument - could be object or simple value
                         Self::js_value_to_json_static(&args[0], ctx)?
                     } else {
-                        // Multiple arguments - convert to named params for requestContext
-                        // This handles: requestContext(pattern, reason, max_files?)
-                        if tool_clone.name() == "requestContext" {
-                            let pattern = Self::js_value_to_json_static(&args[0], ctx)?;
-                            let reason = if args.len() > 1 {
-                                Self::js_value_to_json_static(&args[1], ctx)?
-                            } else {
-                                serde_json::json!("")
-                            };
-                            let max_files = if args.len() > 2 {
-                                Self::js_value_to_json_static(&args[2], ctx)?
-                            } else {
-                                serde_json::json!(5) // Default max_files
-                            };
+                        // Multiple arguments - convert to named params based on tool
+                        match tool_clone.name() {
+                            "requestContext" => {
+                                // requestContext(pattern, reason, max_files?)
+                                let pattern = Self::js_value_to_json_static(&args[0], ctx)?;
+                                let reason = if args.len() > 1 {
+                                    Self::js_value_to_json_static(&args[1], ctx)?
+                                } else {
+                                    serde_json::json!("")
+                                };
+                                let max_files = if args.len() > 2 {
+                                    Self::js_value_to_json_static(&args[2], ctx)?
+                                } else {
+                                    serde_json::json!(5) // Default max_files
+                                };
 
-                            serde_json::json!({
-                                "pattern": pattern,
-                                "reason": reason,
-                                "max_files": max_files
-                            })
-                        } else {
-                            // For other tools, take first argument as params
-                            Self::js_value_to_json_static(&args[0], ctx)?
+                                serde_json::json!({
+                                    "pattern": pattern,
+                                    "reason": reason,
+                                    "max_files": max_files
+                                })
+                            }
+                            "writeFile" => {
+                                // writeFile(path, content)
+                                if args.len() < 2 {
+                                    return Err(JsNativeError::error()
+                                        .with_message("writeFile requires 2 arguments: path and content")
+                                        .into());
+                                }
+                                let path = Self::js_value_to_json_static(&args[0], ctx)?;
+                                let file_content = Self::js_value_to_json_static(&args[1], ctx)?;
+
+                                serde_json::json!({
+                                    "path": path,
+                                    "content": file_content
+                                })
+                            }
+                            _ => {
+                                // For other tools, take first argument as params
+                                Self::js_value_to_json_static(&args[0], ctx)?
+                            }
                         }
                     };
 

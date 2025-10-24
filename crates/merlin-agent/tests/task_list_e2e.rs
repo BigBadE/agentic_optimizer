@@ -122,11 +122,11 @@ async fn drain_ui_channel(mut rx: mpsc::UnboundedReceiver<UiEvent>) {
 ///
 /// This is a thin wrapper that uses the exact same setup as production code
 fn create_test_orchestrator(
-    mock_provider: Arc<dyn ModelProvider>,
+    mock_provider: &Arc<dyn ModelProvider>,
     workspace_root: &Path,
 ) -> RoutingOrchestrator {
     // Create provider registry with mock provider
-    let provider_registry = ProviderRegistry::with_mock_provider(&mock_provider)
+    let provider_registry = ProviderRegistry::with_mock_provider(mock_provider)
         .expect("Failed to create provider registry");
 
     // Create router with mock provider (same as production)
@@ -211,13 +211,16 @@ async fn test_single_fixture_debug() {
     let fixture = TaskListFixture::load("tests/fixtures/task_lists/simple_implementation.json")
         .expect("Failed to load fixture");
 
-    println!("\n=== Testing fixture: {} ===", fixture.name);
-    println!("Query: {}", fixture.initial_query);
-    println!("Mock responses: {}", fixture.mock_responses.len());
+    let fixture_name = &fixture.name;
+    let initial_query = &fixture.initial_query;
+    let mock_responses_len = fixture.mock_responses.len();
+    println!("\n=== Testing fixture: {fixture_name} ===");
+    println!("Query: {initial_query}");
+    println!("Mock responses: {mock_responses_len}");
 
     // Create orchestrator with mock provider (thin wrapper around production code)
     let mock_provider = Arc::new(fixture.create_mock_provider()) as Arc<dyn ModelProvider>;
-    let orchestrator = create_test_orchestrator(mock_provider, &workspace_root);
+    let orchestrator = create_test_orchestrator(&mock_provider, &workspace_root);
 
     // Create task and UI channel
     let task = Task::new(fixture.initial_query.clone());
@@ -234,9 +237,11 @@ async fn test_single_fixture_debug() {
         .await
         .expect("Orchestrator execution failed");
 
+    let response_text = &task_result.response.text;
+    let validation_passed = task_result.validation.passed;
     println!("\n--- Result ---");
-    println!("Response: {}", task_result.response.text);
-    println!("Validation passed: {}", task_result.validation.passed);
+    println!("Response: {response_text}");
+    println!("Validation passed: {validation_passed}");
 
     // Step 3: Check files
     println!("\n--- Step 3: Checking files ---");
@@ -302,7 +307,7 @@ async fn test_all_fixtures_with_agent_execution() {
 
         // Create orchestrator with mock provider (thin wrapper)
         let mock_provider = Arc::new(fixture.create_mock_provider()) as Arc<dyn ModelProvider>;
-        let orchestrator = create_test_orchestrator(mock_provider, &workspace_root);
+        let orchestrator = create_test_orchestrator(&mock_provider, &workspace_root);
 
         // Create task and UI channel
         let task = Task::new(fixture.initial_query.clone());

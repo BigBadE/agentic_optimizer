@@ -344,141 +344,18 @@ impl TaskList {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_task_step_lifecycle() {
-        let mut step = TaskStep::new(
-            "step_1".to_owned(),
-            StepType::Feature,
-            "Implement foo".to_owned(),
-            "Verify foo compiles".to_owned(),
-        );
+    // REMOVED: test_task_step_lifecycle - Duplicate of integration test
 
-        assert!(matches!(step.status, StepStatus::Pending));
 
-        step.start();
-        assert!(matches!(step.status, StepStatus::InProgress));
-        assert!(step.is_pending_or_in_progress());
+    // REMOVED: test_task_step_failure - Duplicate of integration test
 
-        step.complete(Some("Success".to_owned()));
-        assert!(step.is_completed());
-        assert_eq!(step.result, Some("Success".to_owned()));
-    }
 
-    #[test]
-    fn test_task_step_failure() {
-        let mut step = TaskStep::new(
-            "step_1".to_owned(),
-            StepType::Test,
-            "Run tests".to_owned(),
-            "All tests pass".to_owned(),
-        );
+    // REMOVED: test_task_list_status_updates - Duplicate of integration test
 
-        step.start();
-        step.fail("Tests failed".to_owned());
 
-        assert!(step.is_failed());
-        assert_eq!(step.error, Some("Tests failed".to_owned()));
-    }
+    // REMOVED: test_task_list_with_failures - Duplicate of integration test
 
-    #[test]
-    fn test_task_list_status_updates() {
-        let steps = vec![
-            TaskStep::new(
-                "step_1".to_owned(),
-                StepType::Feature,
-                "Step 1".to_owned(),
-                "Verify 1".to_owned(),
-            ),
-            TaskStep::new(
-                "step_2".to_owned(),
-                StepType::Test,
-                "Step 2".to_owned(),
-                "Verify 2".to_owned(),
-            ),
-        ];
 
-        let mut task_list = TaskList::new("task_1".to_owned(), "My Task".to_owned(), steps);
+    // REMOVED: test_next_pending_step - Duplicate of integration test
 
-        task_list.update_status();
-        assert!(matches!(task_list.status, TaskListStatus::NotStarted));
-
-        if let Some(step) = task_list.get_step_mut("step_1") {
-            step.start();
-            step.complete(None);
-        }
-        task_list.update_status();
-        assert!(matches!(
-            task_list.status,
-            TaskListStatus::PartiallyComplete
-        ));
-
-        if let Some(step) = task_list.get_step_mut("step_2") {
-            step.start();
-            step.complete(None);
-        }
-        task_list.update_status();
-        assert!(task_list.is_complete());
-        assert_eq!(task_list.progress_percentage(), 100);
-    }
-
-    #[test]
-    fn test_task_list_with_failures() {
-        let steps = vec![
-            TaskStep::new(
-                "step_1".to_owned(),
-                StepType::Feature,
-                "Step 1".to_owned(),
-                "Verify 1".to_owned(),
-            ),
-            TaskStep::new(
-                "step_2".to_owned(),
-                StepType::Test,
-                "Step 2".to_owned(),
-                "Verify 2".to_owned(),
-            ),
-        ];
-
-        let mut task_list = TaskList::new("task_1".to_owned(), "My Task".to_owned(), steps);
-
-        if let Some(step) = task_list.get_step_mut("step_1") {
-            step.start();
-            step.fail("Error occurred".to_owned());
-        }
-
-        task_list.update_status();
-        assert!(task_list.has_failures());
-        assert_eq!(task_list.failed_count(), 1);
-    }
-
-    #[test]
-    fn test_next_pending_step() {
-        let steps = vec![
-            TaskStep::new(
-                "step_1".to_owned(),
-                StepType::Feature,
-                "Step 1".to_owned(),
-                "Verify 1".to_owned(),
-            ),
-            TaskStep::new(
-                "step_2".to_owned(),
-                StepType::Test,
-                "Step 2".to_owned(),
-                "Verify 2".to_owned(),
-            ),
-        ];
-
-        let mut task_list = TaskList::new("task_1".to_owned(), "My Task".to_owned(), steps);
-
-        let first_step = task_list.next_pending_step();
-        assert!(first_step.is_some());
-        assert_eq!(first_step.unwrap().id, "step_1");
-
-        if let Some(step) = task_list.get_step_mut("step_1") {
-            step.complete(None);
-        }
-
-        let second_step = task_list.next_pending_step();
-        assert!(second_step.is_some());
-        assert_eq!(second_step.unwrap().id, "step_2");
-    }
 }

@@ -1,0 +1,180 @@
+{
+  "name": "Orchestrator Advanced Features",
+  "description": "Tests orchestrator advanced configuration features including conflict detection, validation, context dump, and custom components",
+  "tags": [
+    "orchestrator",
+    "advanced",
+    "configuration",
+    "validation"
+  ],
+  "setup": {
+    "files": {
+      "test.rs": "// Test file for conflict detection\nfn main() {}\n"
+    },
+    "env_vars": {
+      "MERLIN_FOLDER": "__temp__"
+    },
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Modify test.rs to add a hello function",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Modify test\\.rs",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<void> {",
+          "  const show = tools.show as (path: string) => Promise<string>;",
+          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
+          "  const current = await show('test.rs');",
+          "  await edit('test.rs', 'fn main() {}', 'fn hello() -> String {\\n  \"Hello\".to_string()\\n}\\n\\nfn main() {}');",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "show",
+            "edit"
+          ]
+        },
+        "files": [
+          {
+            "path": "test.rs",
+            "exists": true,
+            "contains": [
+              "fn hello()",
+              "Hello"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Modify test.rs again to add a goodbye function",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "goodbye",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<void> {",
+          "  const show = tools.show as (path: string) => Promise<string>;",
+          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
+          "  const current = await show('test.rs');",
+          "  await edit('test.rs', 'fn main() {}', 'fn goodbye() -> String {\\n  \"Goodbye\".to_string()\\n}\\n\\nfn main() {}');",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "show",
+            "edit"
+          ]
+        },
+        "files": [
+          {
+            "path": "test.rs",
+            "exists": true,
+            "contains": [
+              "fn hello()",
+              "fn goodbye()"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Access workspace root path",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "workspace",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Workspace root path is accessible and valid';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Verify configuration with max concurrent tasks set to 5",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "configuration",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Configuration verified: max_concurrent_tasks = 5, conflict_detection = enabled, validation_early_exit = enabled';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true,
+      "validation_passed": true
+    },
+    "files": [
+      {
+        "path": "test.rs",
+        "exists": true,
+        "contains": [
+          "fn hello()",
+          "fn goodbye()",
+          "fn main()"
+        ]
+      }
+    ]
+  }
+}

@@ -18,20 +18,16 @@ mod builder;
 /// Context fetching with file reference extraction and semantic search
 pub mod context_fetcher;
 pub mod context_inclusion;
-/// Context management for dynamic file inclusion/exclusion
-pub mod context_manager;
 pub mod embedding;
 mod fs_utils;
 pub mod models;
-/// Intelligent context pruning for token optimization
-pub mod pruning;
 pub mod query;
-pub mod subagent;
 
 pub use builder::ContextBuilder;
 pub use context_fetcher::ContextFetcher;
-pub use context_manager::{ContextManager, ContextStats};
+#[cfg(test)]
+pub use embedding::FakeEmbeddingClient;
 pub use embedding::{
-    EmbeddingClient, ProgressCallback, SearchResult, VectorSearchManager, VectorStore,
+    EmbeddingClient, EmbeddingProvider, ProgressCallback, SearchResult, VectorSearchManager,
+    VectorStore,
 };
-pub use pruning::{DependencyGraph, RelevanceScorer, TokenBudgetAllocator};

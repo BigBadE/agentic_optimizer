@@ -284,6 +284,34 @@ impl TypeScriptRuntime {
                                     "content": file_content
                                 })
                             }
+                            "editFile" => {
+                                // editFile(path, old_string, new_string, options?)
+                                if args.len() < 3 {
+                                    return Err(JsNativeError::error()
+                                        .with_message("editFile requires at least 3 arguments: path, old_string, new_string")
+                                        .into());
+                                }
+                                let path = Self::js_value_to_json_static(&args[0], ctx)?;
+                                let old_string = Self::js_value_to_json_static(&args[1], ctx)?;
+                                let new_string = Self::js_value_to_json_static(&args[2], ctx)?;
+
+                                let replace_all = if args.len() > 3 {
+                                    // Check if 4th arg is object with replace_all property
+                                    let opts = Self::js_value_to_json_static(&args[3], ctx)?;
+                                    opts.get("replace_all")
+                                        .and_then(Value::as_bool)
+                                        .unwrap_or(false)
+                                } else {
+                                    false
+                                };
+
+                                serde_json::json!({
+                                    "path": path,
+                                    "old_string": old_string,
+                                    "new_string": new_string,
+                                    "replace_all": replace_all
+                                })
+                            }
                             _ => {
                                 // For other tools, take first argument as params
                                 Self::js_value_to_json_static(&args[0], ctx)?

@@ -162,13 +162,16 @@ mod tests {
     }
 
     #[tokio::test]
-    #[ignore = "Requires Ollama running locally"]
     async fn test_custom_model_registry() -> Result<()> {
-        let mut config = RoutingConfig::default();
-        config.tiers.groq_enabled = false;
-        config.tiers.premium_enabled = false;
+        use merlin_core::ModelProvider;
+        use merlin_providers::MockProvider;
+        use std::sync::Arc;
 
-        let provider_registry = ProviderRegistry::new(config)?;
+        // Create mock provider for testing
+        let mock_provider: Arc<dyn ModelProvider> =
+            Arc::new(MockProvider::new("test").with_default_response("Mock response for testing"));
+
+        let provider_registry = ProviderRegistry::with_mock_provider(&mock_provider)?;
         let mut model_registry = ModelRegistry::new();
 
         // Register local models only

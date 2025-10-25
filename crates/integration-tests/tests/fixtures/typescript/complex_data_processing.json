@@ -1,0 +1,218 @@
+{
+  "name": "TypeScript Complex Data Processing",
+  "description": "Tests complex data structures, nested operations, data transformation pipelines, and JSON manipulation",
+  "tags": [
+    "typescript",
+    "complex",
+    "data-processing"
+  ],
+  "setup": {
+    "files": {},
+    "env_vars": {},
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Process nested data structures",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Process nested data structures",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const data = {",
+          "    users: [",
+          "      { name: 'Alice', scores: [90, 85, 92] },",
+          "      { name: 'Bob', scores: [78, 82, 88] },",
+          "      { name: 'Charlie', scores: [95, 98, 94] }",
+          "    ]",
+          "  };",
+          "  ",
+          "  const averages = data.users.map(user => ({",
+          "    name: user.name,",
+          "    average: user.scores.reduce((a, b) => a + b, 0) / user.scores.length",
+          "  }));",
+          "  ",
+          "  return averages;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_type": "array",
+          "array_length": 3,
+          "return_value_contains": {
+            "0": {
+              "name": "Alice"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Execute complex workflow with filtering and aggregation",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Execute complex workflow with filtering and aggregation",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  // Simulate a data processing pipeline",
+          "  const rawData = [",
+          "    { id: 1, value: 100, category: 'A' },",
+          "    { id: 2, value: 200, category: 'B' },",
+          "    { id: 3, value: 150, category: 'A' },",
+          "    { id: 4, value: 300, category: 'C' },",
+          "    { id: 5, value: 250, category: 'B' }",
+          "  ];",
+          "  ",
+          "  // Filter, transform, and aggregate",
+          "  const categoryA = rawData.filter(item => item.category === 'A');",
+          "  const totalA = categoryA.reduce((sum, item) => sum + item.value, 0);",
+          "  ",
+          "  const allCategories = [...new Set(rawData.map(item => item.category))];",
+          "  const summary = allCategories.map(cat => {",
+          "    const items = rawData.filter(item => item.category === cat);",
+          "    const total = items.reduce((sum, item) => sum + item.value, 0);",
+          "    const average = total / items.length;",
+          "    return { category: cat, count: items.length, total, average };",
+          "  });",
+          "  ",
+          "  return { totalA, summary };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_contains": {
+            "totalA": 250
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Manipulate JSON configuration",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Manipulate JSON configuration",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const config = {",
+          "    'name': 'MyApp',",
+          "    'version': '1.0.0',",
+          "    'dependencies': {",
+          "      'react': '^18.0.0',",
+          "      'typescript': '^5.0.0'",
+          "    }",
+          "  };",
+          "  ",
+          "  // Update version",
+          "  config.version = '1.1.0';",
+          "  ",
+          "  // Add new dependency",
+          "  config.dependencies['axios'] = '^1.0.0';",
+          "  ",
+          "  // Add metadata",
+          "  config.metadata = {",
+          "    updated: '2025-10-12',",
+          "    author: 'AI Agent'",
+          "  };",
+          "  ",
+          "  return config;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_contains": {
+            "version": "1.1.0",
+            "dependencies": {
+              "axios": "^1.0.0"
+            },
+            "metadata": {
+              "author": "AI Agent"
+            }
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Use Math functions and constants",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Use Math functions and constants",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const numbers = [1, 2, 3, 4, 5, 6, 7, 8, 9, 10];",
+          "  ",
+          "  return {",
+          "    sum: numbers.reduce((a, b) => a + b, 0),",
+          "    max: Math.max(...numbers),",
+          "    min: Math.min(...numbers),",
+          "    sqrt: Math.sqrt(16),",
+          "    random: Math.floor(Math.random() * 100) >= 0,",
+          "    pi: Math.PI",
+          "  };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_contains": {
+            "sum": 55,
+            "max": 10,
+            "min": 1,
+            "sqrt": 4,
+            "random": true
+          }
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "validation_passed": true
+    }
+  }
+}

@@ -16,10 +16,9 @@
 
 use anyhow::Result;
 use clap::Parser as _;
-use cli::{Cli, Commands};
+use cli::Cli;
 
 mod cli;
-mod config;
 mod handlers;
 mod interactive;
 mod ui;
@@ -29,38 +28,9 @@ mod utils;
 async fn main() -> Result<()> {
     let cli = Cli::parse();
 
-    match cli.command {
-        Some(Commands::Chat { project, model }) => {
-            handlers::handle_chat(project, model)?;
-        }
-        Some(Commands::Query {
-            query,
-            project,
-            files,
-            max_files,
-        }) => {
-            handlers::handle_query(query, project, files, max_files).await?;
-        }
-        Some(Commands::Prompt {
-            query,
-            project,
-            files,
-            max_files,
-        }) => {
-            handlers::handle_prompt(query, project, files, max_files).await?;
-        }
-        Some(Commands::Config { full }) => {
-            handlers::handle_config(full)?;
-        }
-        Some(Commands::Metrics { daily }) => {
-            handlers::handle_metrics(daily);
-        }
-        None => {
-            // No subcommand - start interactive agent session
-            handlers::handle_interactive(cli.project, cli.validation, cli.local, cli.context_dump)
-                .await?;
-        }
-    }
+    // Always start interactive agent session
+    handlers::handle_interactive(cli.project, cli.validation, cli.local, cli.context_dump).await?;
+
     Ok(())
 }
 

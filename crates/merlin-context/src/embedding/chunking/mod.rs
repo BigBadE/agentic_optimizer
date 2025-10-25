@@ -65,14 +65,6 @@ impl FileChunk {
             end_line,
         }
     }
-
-    /// Get a display name for this chunk
-    pub fn display_name(&self) -> String {
-        format!(
-            "{}:{}-{} ({})",
-            self.file_path, self.start_line, self.end_line, self.identifier
-        )
-    }
 }
 
 /// Chunk a file based on its extension

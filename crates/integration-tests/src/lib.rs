@@ -1,32 +1,20 @@
-//! Integration test framework for Merlin
+//! Unified integration test framework.
 //!
-//! Provides unified E2E testing combining:
-//! - TUI interaction testing (via `InputEventSource`)
-//! - Agent execution testing (via `MockProvider`)
-//! - Orchestrator flow testing
-//! - Full stack integration scenarios
+//! This crate provides a single unified testing system that can verify:
+//! - TypeScript execution and tool calls
+//! - File operations
+//! - UI state and rendering
+//! - Task execution and dependencies
+//!
+//! All tests use the same fixture format with optional verification layers.
 
-#![cfg_attr(
-    test,
-    allow(
-        dead_code,
-        clippy::expect_used,
-        clippy::unwrap_used,
-        clippy::panic,
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        clippy::print_stdout,
-        clippy::print_stderr,
-        reason = "Allow for tests"
-    )
-)]
+mod fixture;
+mod runner;
+mod verifier;
 
-pub mod scenario;
-pub mod tui_helpers;
-pub mod types;
-
-pub use scenario::ScenarioRunner;
-pub use types::{Scenario, ScenarioStep, StepAction, StepExpectations};
-
-// Re-export for type definitions
-pub use serde_json;
+pub use fixture::{
+    EventType, ExecutionVerify, FileVerify, FinalVerify, LlmResponseEvent, SetupConfig,
+    StateVerify, TestEvent, TestFixture, TriggerConfig, UiVerify, UserInputEvent, VerifyConfig,
+};
+pub use runner::{PatternMockProvider, UnifiedTestRunner};
+pub use verifier::{UnifiedVerifier, VerificationResult};

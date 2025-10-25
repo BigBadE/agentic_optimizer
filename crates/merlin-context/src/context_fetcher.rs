@@ -7,7 +7,7 @@ use std::path::{Path, PathBuf};
 use tokio::fs::read_to_string;
 use tracing::{debug, info};
 
-use crate::{ContextBuilder, ProgressCallback, VectorSearchManager};
+use crate::{ContextBuilder, ProgressCallback};
 use merlin_core::{Context, FileContext, Query};
 use merlin_core::{Result, RoutingError};
 use merlin_languages::{Language, create_backend};
@@ -18,10 +18,6 @@ pub struct ContextFetcher {
     project_root: PathBuf,
     /// Context builder for file scanning and analysis
     context_builder: Option<ContextBuilder>,
-    /// Vector search manager for semantic search
-    vector_manager: Option<VectorSearchManager>,
-    /// Whether to use vector search for context enrichment
-    use_vector_search: bool,
     /// Optional progress callback for embedding operations
     progress_callback: Option<ProgressCallback>,
 }
@@ -52,8 +48,6 @@ impl ContextFetcher {
         Self {
             project_root,
             context_builder,
-            vector_manager: None,
-            use_vector_search: false,
             progress_callback: None,
         }
     }
@@ -61,27 +55,6 @@ impl ContextFetcher {
     /// Get the project root path
     pub fn project_root(&self) -> &PathBuf {
         &self.project_root
-    }
-
-    /// Enable vector search for semantic context retrieval
-    #[must_use]
-    pub fn with_vector_search(mut self, vector_manager: VectorSearchManager) -> Self {
-        // Skip vector search if env var is set
-        if env::var("MERLIN_SKIP_EMBEDDINGS").is_ok() {
-            debug!("Skipping vector search initialization (MERLIN_SKIP_EMBEDDINGS set)");
-            return self;
-        }
-
-        self.vector_manager = Some(vector_manager);
-        self.use_vector_search = true;
-        self
-    }
-
-    /// Disable `ContextBuilder` for testing (uses fallback mode only)
-    #[must_use]
-    pub fn without_context_builder(mut self) -> Self {
-        self.context_builder = None;
-        self
     }
 
     /// Set a progress callback for embedding operations
@@ -101,7 +74,7 @@ impl ContextFetcher {
     ///
     /// # Panics
     /// Panics if regex compilation fails (should never happen with valid patterns)
-    pub fn extract_file_references(&self, text: &str) -> Vec<PathBuf> {
+    fn extract_file_references(&self, text: &str) -> Vec<PathBuf> {
         let mut files = HashSet::new();
 
         // Pattern 1: Explicit file paths (with extension)
@@ -277,94 +250,5 @@ impl ContextFetcher {
         }
 
         Ok(context)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tempfile::TempDir;
-    use tokio::fs;
-
-    async fn create_test_project() -> (TempDir, PathBuf) {
-        let temp_dir =
-            TempDir::with_prefix("context_fetcher_test").expect("Failed to create temp dir");
-        let project_root = temp_dir.path().to_path_buf();
-
-        // Create test file structure
-        fs::create_dir_all(project_root.join("src")).await.unwrap();
-        fs::write(
-            project_root.join("src/main.rs"),
-            "fn main() { println!(\"Hello\"); }",
-        )
-        .await
-        .unwrap();
-        fs::write(project_root.join("src/lib.rs"), "pub mod utils;")
-            .await
-            .unwrap();
-        fs::create_dir_all(project_root.join("src/utils"))
-            .await
-            .unwrap();
-        fs::write(project_root.join("src/utils/mod.rs"), "pub fn helper() {}")
-            .await
-            .unwrap();
-
-        (temp_dir, project_root)
-    }
-
-    #[tokio::test]
-    async fn test_extract_file_references() {
-        let (_temp, project_root) = create_test_project().await;
-        let fetcher = ContextFetcher::new(project_root);
-
-        let text = "Please check src/main.rs and update lib.rs in the source directory";
-        let files = fetcher.extract_file_references(text);
-
-        assert!(files.iter().any(|path| path.ends_with("src/main.rs")));
-    }
-
-    #[tokio::test]
-    async fn test_resolve_module_path() {
-        let (_temp, project_root) = create_test_project().await;
-        let fetcher = ContextFetcher::new(project_root);
-
-        let module_path = fetcher.resolve_module_path("utils");
-        assert!(module_path.is_some());
-        assert!(module_path.unwrap().ends_with("utils/mod.rs"));
-    }
-
-    #[tokio::test]
-    async fn test_build_context_for_query() {
-        let (_temp, project_root) = create_test_project().await;
-        let mut fetcher = ContextFetcher::new(project_root).without_context_builder();
-
-        let query = Query::new("Check src/main.rs for errors");
-        let context = fetcher.build_context_for_query(&query).await.unwrap();
-
-        // Fallback mode is used, so check files or system prompt
-        assert!(!context.files.is_empty() || !context.system_prompt.is_empty());
-    }
-
-    #[tokio::test]
-    async fn test_build_context_from_conversation() {
-        let (_temp, project_root) = create_test_project().await;
-        let mut fetcher = ContextFetcher::new(project_root).without_context_builder();
-
-        let messages = vec![
-            ("user".to_owned(), "I need to fix src/main.rs".to_owned()),
-            (
-                "assistant".to_owned(),
-                "Sure, let me check that file".to_owned(),
-            ),
-        ];
-        let query = Query::new("Now update src/lib.rs too");
-
-        let context = fetcher
-            .build_context_from_conversation(&messages, &query)
-            .await
-            .unwrap();
-
-        // Should have conversation history in system prompt
-        assert!(context.system_prompt.contains("Previous Conversation"));
     }
 }

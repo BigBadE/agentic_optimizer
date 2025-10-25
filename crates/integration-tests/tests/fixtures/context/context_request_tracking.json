@@ -1,0 +1,164 @@
+{
+  "name": "Context Request Tracking",
+  "description": "Tests context tracker integration: tracking multiple requests, deduplication of same file requests, and clearing tracked files",
+  "tags": [
+    "context",
+    "tracking",
+    "tools"
+  ],
+  "setup": {
+    "files": {
+      "src/lib.rs": "//! Main library\npub mod executor;\n",
+      "src/executor.rs": "//! Executor module\npub struct Executor;\n",
+      "src/parser.rs": "//! Parser module\npub struct Parser;\n"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Request first file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Request first file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await requestContext('src/lib.rs', 'First request');",
+          "  return `First file requested: ${result.success}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "requestContext"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Request second file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Request second file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await requestContext('src/executor.rs', 'Second request');",
+          "  return `Second file requested: ${result.success}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "requestContext"
+          ]
+        },
+        "state": {
+          "conversation_count": 4
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Request lib.rs again",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "lib.rs again",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await requestContext('src/lib.rs', 'Requesting same file again');",
+          "  return `Duplicate request: ${result.success}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "requestContext"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Request third unique file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "third unique file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await requestContext('src/parser.rs', 'Third unique request');",
+          "  return `Third file requested: ${result.success}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "requestContext"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "src/lib.rs",
+        "exists": true
+      },
+      {
+        "path": "src/executor.rs",
+        "exists": true
+      },
+      {
+        "path": "src/parser.rs",
+        "exists": true
+      }
+    ]
+  }
+}

@@ -24,6 +24,10 @@
 mod bash;
 /// Dynamic context request tool for agents.
 pub mod context_request;
+/// File deletion tool.
+mod delete_tool;
+/// File editing tool for find-and-replace operations.
+mod edit_tool;
 /// File operation tools (read, write, list).
 mod file_ops;
 /// Tool registry for managing available tools.
@@ -39,6 +43,8 @@ pub use bash::BashTool;
 pub use context_request::{
     ContextFile, ContextRequestArgs, ContextRequestResult, ContextRequestTool, ContextTracker,
 };
+pub use delete_tool::DeleteFileTool;
+pub use edit_tool::EditFileTool;
 pub use file_ops::{ListFilesTool, ReadFileTool, WriteFileTool};
 pub use registry::ToolRegistry;
 pub use runtime::TypeScriptRuntime;

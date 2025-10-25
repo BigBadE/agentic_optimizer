@@ -10,7 +10,9 @@ use merlin_core::{
 use merlin_routing::{
     LocalTaskAnalyzer, ModelRouter, ProviderRegistry, StrategyRouter, TaskAnalysis, TaskAnalyzer,
 };
-use merlin_tooling::{BashTool, ListFilesTool, ReadFileTool, ToolRegistry, WriteFileTool};
+use merlin_tooling::{
+    BashTool, ContextRequestTool, ListFilesTool, ReadFileTool, ToolRegistry, WriteFileTool,
+};
 
 /// Parameters for task execution (internal)
 struct TaskExecutionParams {
@@ -224,7 +226,8 @@ impl RoutingOrchestrator {
             .with_tool(Arc::new(BashTool))
             .with_tool(Arc::new(ReadFileTool::new(workspace_root)))
             .with_tool(Arc::new(WriteFileTool::new(workspace_root)))
-            .with_tool(Arc::new(ListFilesTool::new(workspace_root)));
+            .with_tool(Arc::new(ListFilesTool::new(workspace_root)))
+            .with_tool(Arc::new(ContextRequestTool::new(workspace_root.clone())));
         let tool_registry = Arc::new(tool_registry);
         let context_fetcher = ContextFetcher::new(workspace_root.clone());
 

@@ -1,0 +1,77 @@
+{
+  "name": "Mock Provider with UI Event Streaming",
+  "description": "Tests mock provider execution with UI event channel verification",
+  "tags": [
+    "agent",
+    "mock-provider",
+    "ui-events"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test streaming response",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Test streaming response",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'This is a test response from the mock provider';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": []
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Another test",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Another test",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Mock response number 2';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

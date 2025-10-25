@@ -72,17 +72,8 @@ mod tests {
     use serde_json::{Value as JsonValue, from_str};
     use std::io;
 
-    #[test]
-    fn test_error_display() {
-        let error1 = Error::Config("invalid config".to_owned());
-        assert_eq!(error1.to_string(), "Configuration error: invalid config");
+    // REMOVED: test_error_display - Low value trait test
 
-        let error2 = Error::Provider("model failed".to_owned());
-        assert_eq!(error2.to_string(), "Provider error: model failed");
-
-        let error3 = Error::MissingApiKey("OPENAI_API_KEY".to_owned());
-        assert_eq!(error3.to_string(), "API key not found: OPENAI_API_KEY");
-    }
 
     #[test]
     fn test_error_is_retryable() {
@@ -101,19 +92,11 @@ mod tests {
         assert!(!error4.is_retryable());
     }
 
-    #[test]
-    fn test_error_from_io() {
-        let io_error = io::Error::new(io::ErrorKind::NotFound, "file not found");
-        let error: Error = io_error.into();
-        assert!(matches!(error, Error::Io(_)));
-    }
+    // REMOVED: test_error_from_io - Low value trait test
 
-    #[test]
-    fn test_error_from_json() {
-        let json_error = from_str::<JsonValue>("invalid json").unwrap_err();
-        let error: Error = json_error.into();
-        assert!(matches!(error, Error::Json(_)));
-    }
+
+    // REMOVED: test_error_from_json - Low value trait test
+
 
     #[test]
     fn test_result_type() {

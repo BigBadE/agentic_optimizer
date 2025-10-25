@@ -3,14 +3,40 @@
 use crate::models::ModelConfig;
 use merlin_core::{CoreResult as Result, Error};
 use ollama_rs::Ollama;
+use ollama_rs::generation::embeddings::request::GenerateEmbeddingsRequest;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::env;
+use std::future::Future;
 use std::path::PathBuf;
 use std::process::Command;
 
 /// A single embedding vector
 type Embedding = Vec<f32>;
+
+/// Trait for generating embeddings from text
+pub trait EmbeddingProvider: Send + Sync {
+    /// Ensure the embedding model is available
+    ///
+    /// # Errors
+    /// Returns an error if the model is not available or cannot be loaded
+    fn ensure_model_available(&self) -> impl Future<Output = Result<()>> + Send;
+
+    /// Generate embedding for text
+    ///
+    /// # Errors
+    /// Returns an error if embedding generation fails
+    fn embed(&self, text: &str) -> impl Future<Output = Result<Embedding>> + Send;
+
+    /// Embed multiple texts in batch (sends all at once for better performance)
+    ///
+    /// # Errors
+    /// Returns an error if any embedding generation fails
+    fn embed_batch(
+        &self,
+        texts: Vec<String>,
+    ) -> impl Future<Output = Result<Vec<Embedding>>> + Send;
+}
 
 /// Vector search result
 #[derive(Debug, Clone)]
@@ -105,19 +131,13 @@ impl VectorStore {
 }
 
 /// Ollama embedding client
-pub struct EmbeddingClient {
+pub struct OllamaEmbeddingClient {
     ollama: Ollama,
     model: String,
 }
 
-impl EmbeddingClient {
-    // Use Default instead of a no-arg constructor
-
-    /// Ensure the embedding model is available
-    ///
-    /// # Errors
-    /// Returns an error if Ollama is not running or model pull fails
-    pub async fn ensure_model_available(&self) -> Result<()> {
+impl EmbeddingProvider for OllamaEmbeddingClient {
+    async fn ensure_model_available(&self) -> Result<()> {
         // Check if Ollama is running by trying to list models
         let models = match self.ollama.list_local_models().await {
             Ok(models) => models,
@@ -160,13 +180,7 @@ impl EmbeddingClient {
         Ok(())
     }
 
-    /// Generate embedding for text
-    ///
-    /// # Errors
-    /// Returns an error if embedding generation fails
-    pub async fn embed(&self, text: &str) -> Result<Embedding> {
-        use ollama_rs::generation::embeddings::request::GenerateEmbeddingsRequest;
-
+    async fn embed(&self, text: &str) -> Result<Embedding> {
         let request = GenerateEmbeddingsRequest::new(self.model.clone(), text.to_string().into());
 
         let response = self
@@ -194,13 +208,7 @@ impl EmbeddingClient {
             .ok_or_else(|| Error::Other("No embeddings returned".into()))
     }
 
-    /// Embed multiple texts in batch (sends all at once for better performance)
-    ///
-    /// # Errors
-    /// Returns an error if any embedding generation fails
-    pub async fn embed_batch(&self, texts: Vec<String>) -> Result<Vec<Embedding>> {
-        use ollama_rs::generation::embeddings::request::GenerateEmbeddingsRequest;
-
+    async fn embed_batch(&self, texts: Vec<String>) -> Result<Vec<Embedding>> {
         if texts.is_empty() {
             return Ok(Vec::default());
         }
@@ -232,6 +240,69 @@ impl EmbeddingClient {
         Ok(response.embeddings)
     }
 }
+
+impl Default for OllamaEmbeddingClient {
+    fn default() -> Self {
+        let host = env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".to_string());
+        let config = ModelConfig::from_env();
+        Self {
+            ollama: Ollama::new(host, 11434),
+            model: config.embedding,
+        }
+    }
+}
+
+/// Test-only fake embedding provider (deterministic, hash-based)
+///
+/// Available in test builds for fast, deterministic embeddings.
+/// Use this for testing cache behavior, file operations, etc. without requiring Ollama.
+#[cfg(test)]
+pub struct FakeEmbeddingClient;
+
+#[cfg(test)]
+impl EmbeddingProvider for FakeEmbeddingClient {
+    async fn ensure_model_available(&self) -> Result<()> {
+        // No-op for fake embeddings
+        Ok(())
+    }
+
+    async fn embed(&self, text: &str) -> Result<Embedding> {
+        Ok(Self::fake_embedding(text))
+    }
+
+    async fn embed_batch(&self, texts: Vec<String>) -> Result<Vec<Embedding>> {
+        Ok(texts
+            .iter()
+            .map(|text| Self::fake_embedding(text))
+            .collect())
+    }
+}
+
+#[cfg(test)]
+impl FakeEmbeddingClient {
+    /// Generate fake deterministic embedding for testing
+    /// Uses simple hash of content to create a 384-dim vector
+    fn fake_embedding(text: &str) -> Embedding {
+        use std::collections::hash_map::DefaultHasher;
+        use std::hash::{Hash as _, Hasher as _};
+
+        let mut hasher = DefaultHasher::new();
+        text.hash(&mut hasher);
+        let hash = hasher.finish();
+
+        // Generate 384 dimensions (typical embedding size)
+        // Use hash as seed for deterministic values
+        let mut vec = Vec::with_capacity(384);
+        for idx in 0..384 {
+            let value = ((hash.wrapping_add(idx as u64)) % 1000) as f32 / 1000.0;
+            vec.push(value);
+        }
+        vec
+    }
+}
+
+/// Backward compatibility type alias
+pub type EmbeddingClient = OllamaEmbeddingClient;
 
 /// Calculate cosine similarity between two vectors
 fn cosine_similarity(vector_a: &[f32], vector_b: &[f32]) -> f32 {
@@ -265,16 +336,5 @@ pub fn generate_preview(content: &str, max_chars: usize) -> String {
         format!("{truncated}...")
     } else {
         preview
-    }
-}
-
-impl Default for EmbeddingClient {
-    fn default() -> Self {
-        let host = env::var("OLLAMA_HOST").unwrap_or_else(|_| "http://localhost:11434".to_string());
-        let config = ModelConfig::from_env();
-        Self {
-            ollama: Ollama::new(host, 11434),
-            model: config.embedding,
-        }
     }
 }

@@ -1,0 +1,245 @@
+{
+  "name": "Task Graph Operations",
+  "description": "Tests task graph functionality including dependencies, cycle detection, task ordering, and completion tracking through orchestrator workflows",
+  "tags": [
+    "orchestrator",
+    "task-graph",
+    "dependencies",
+    "validation"
+  ],
+  "setup": {
+    "files": {
+      "task_a.txt": "Task A content",
+      "task_b.txt": "Task B content",
+      "task_c.txt": "Task C content"
+    },
+    "env_vars": {
+      "MERLIN_FOLDER": "__temp__"
+    },
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Read task_a.txt",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "task_a",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const show = tools.show as (path: string) => Promise<string>;",
+          "  const content = await show('task_a.txt');",
+          "  return `Read Task A: ${content}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "show"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Read task_b.txt which depends on task_a.txt being read first",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "task_b.*depends",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const show = tools.show as (path: string) => Promise<string>;",
+          "  const content = await show('task_b.txt');",
+          "  return `Read Task B after Task A: ${content}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "show"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Read task_c.txt which depends on both task_a.txt and task_b.txt",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "task_c.*both",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const show = tools.show as (path: string) => Promise<string>;",
+          "  const content = await show('task_c.txt');",
+          "  return `Read Task C after both A and B: ${content}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "show"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Execute a complex task with multiple dependencies to verify graph completion tracking",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "complex.*dependencies",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const show = tools.show as (path: string) => Promise<string>;",
+          "  const results = [];",
+          "  results.push(await show('task_a.txt'));",
+          "  results.push(await show('task_b.txt'));",
+          "  results.push(await show('task_c.txt'));",
+          "  return `All tasks completed in dependency order: ${results.join(', ')}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "show"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Verify task graph has no cycles by processing all files",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "no cycles",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const list = tools.list as (path: string) => Promise<string[]>;",
+          "  const files = await list('.');",
+          "  return `Task graph valid (no cycles detected). Found ${files.length} files to process.`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "list"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Verify all tasks are marked complete after execution",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "complete",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Task graph completion verified: all tasks successfully completed.';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true,
+      "validation_passed": true
+    },
+    "files": [
+      {
+        "path": "task_a.txt",
+        "exists": true,
+        "contains": [
+          "Task A content"
+        ]
+      },
+      {
+        "path": "task_b.txt",
+        "exists": true,
+        "contains": [
+          "Task B content"
+        ]
+      },
+      {
+        "path": "task_c.txt",
+        "exists": true,
+        "contains": [
+          "Task C content"
+        ]
+      }
+    ]
+  }
+}

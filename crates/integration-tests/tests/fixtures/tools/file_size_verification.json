@@ -1,0 +1,193 @@
+{
+  "name": "File Size Verification",
+  "description": "Tests file size constraints (size_gt, size_lt) in verification system",
+  "tags": ["tools", "file-ops", "size-verification"],
+
+  "setup": {
+    "files": {
+      "small.txt": "tiny",
+      "medium.txt": "This file contains some medium-length content with multiple words and sentences.",
+      "large.txt": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo."
+    },
+    "terminal_size": [80, 24]
+  },
+
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create a file with exactly 100 characters",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create a file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const content = 'a'.repeat(100);",
+          "  await writeFile('exactly100.txt', content);",
+          "  return `Created file with ${content.length} characters`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": ["writeFile"]
+        },
+        "files": [
+          {
+            "path": "exactly100.txt",
+            "exists": true,
+            "size_gt": 99,
+            "size_lt": 101
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create a small file (under 50 chars)",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "small file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('tiny.txt', 'Small content');",
+          "  return 'Created small file';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "tiny.txt",
+            "exists": true,
+            "size_lt": 50
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create a large file (over 500 chars)",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "large file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const bigContent = 'This is a really long file.\\n'.repeat(25);",
+          "  await writeFile('big.txt', bigContent);",
+          "  return `Created file with ${bigContent.length} characters`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "big.txt",
+            "exists": true,
+            "size_gt": 500
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Read and verify the setup files",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "verify the setup files",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const small = await readFile('small.txt');",
+          "  const medium = await readFile('medium.txt');",
+          "  const large = await readFile('large.txt');",
+          "  return `Read ${small.length}, ${medium.length}, ${large.length} chars`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": ["readFile"]
+        }
+      }
+    }
+  ],
+
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "small.txt",
+        "exists": true,
+        "size_lt": 10
+      },
+      {
+        "path": "medium.txt",
+        "exists": true,
+        "size_gt": 50,
+        "size_lt": 150
+      },
+      {
+        "path": "large.txt",
+        "exists": true,
+        "size_gt": 500
+      },
+      {
+        "path": "exactly100.txt",
+        "exists": true,
+        "size_gt": 99,
+        "size_lt": 101
+      },
+      {
+        "path": "tiny.txt",
+        "exists": true,
+        "size_lt": 50
+      },
+      {
+        "path": "big.txt",
+        "exists": true,
+        "size_gt": 500
+      }
+    ]
+  }
+}

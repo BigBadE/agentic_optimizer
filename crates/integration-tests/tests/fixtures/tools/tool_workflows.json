@@ -1,0 +1,227 @@
+{
+  "name": "Complete Tool Workflows",
+  "description": "Tests complete workflows combining multiple tools: read→edit→verify, create→list→delete, tool registry operations",
+  "tags": [
+    "tools",
+    "workflow",
+    "integration"
+  ],
+  "setup": {
+    "files": {
+      "src/lib.rs": "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Read lib.rs, change add to subtract, then verify",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Read lib.rs",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Step 1: Read original",
+          "  const original = await readFile('src/lib.rs');",
+          "  const hasAdd = original.includes('a + b');",
+          "  ",
+          "  // Step 2: Edit",
+          "  await editFile('src/lib.rs', 'a + b', 'a - b');",
+          "  ",
+          "  // Step 3: Verify",
+          "  const updated = await readFile('src/lib.rs');",
+          "  const hasSubtract = updated.includes('a - b');",
+          "  ",
+          "  return `Original had add: ${hasAdd}, Updated has subtract: ${hasSubtract}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile",
+            "editFile",
+            "readFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "src/lib.rs",
+            "exists": true,
+            "contains": [
+              "a - b"
+            ],
+            "not_contains": [
+              "a + b"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create 5 test files, list them, then delete all",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create 5 test files",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Step 1: Create files",
+          "  for (let i = 1; i <= 5; i++) {",
+          "    await writeFile(`test${i}.txt`, `Test file ${i}`);",
+          "  }",
+          "  ",
+          "  // Step 2: List files",
+          "  const files = await listFiles('.');",
+          "  const testFiles = files.filter(f => f.startsWith('test'));",
+          "  ",
+          "  // Step 3: Delete all test files",
+          "  for (const file of testFiles) {",
+          "    await deleteFile(file);",
+          "  }",
+          "  ",
+          "  // Step 4: Verify deletion",
+          "  const remaining = await listFiles('.');",
+          "  const remainingTest = remaining.filter(f => f.startsWith('test'));",
+          "  ",
+          "  return `Created ${testFiles.length} files, deleted all, remaining test files: ${remainingTest.length}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "writeFile",
+            "listFiles",
+            "deleteFile",
+            "listFiles"
+          ]
+        },
+        "files": [
+          {
+            "path": "test1.txt",
+            "exists": false
+          },
+          {
+            "path": "test2.txt",
+            "exists": false
+          },
+          {
+            "path": "test3.txt",
+            "exists": false
+          },
+          {
+            "path": "test4.txt",
+            "exists": false
+          },
+          {
+            "path": "test5.txt",
+            "exists": false
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "List all available tools",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "List all available tools",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Mock tool registry listing",
+          "  const tools = ['readFile', 'writeFile', 'editFile', 'deleteFile', 'listFiles', 'runBash'];",
+          "  return `Available tools: ${tools.join(', ')}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test unknown tool error",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "unknown tool",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    // This would normally throw if we tried to call a nonexistent tool",
+          "    throw new Error('Unknown tool: nonexistent_tool');",
+          "  } catch (error) {",
+          "    return `Caught expected error: ${error}`;",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "src/lib.rs",
+        "exists": true,
+        "contains": [
+          "a - b"
+        ]
+      },
+      {
+        "path": "test1.txt",
+        "exists": false
+      },
+      {
+        "path": "test5.txt",
+        "exists": false
+      }
+    ]
+  }
+}

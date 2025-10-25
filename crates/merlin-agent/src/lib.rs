@@ -62,7 +62,7 @@ pub mod validator;
 
 pub use agent::{
     AgentExecutor, AgentExecutorWrapper, CommandResult, CommandRunner, ContextFetcher,
-    ContextManager, ContextStats, ConversationManager, ConversationMessage, ConversationSummary,
+    ContextManager, ConversationManager, ConversationMessage, ConversationSummary,
     CoordinatorStats, RealAgentExecutorWrapper, SelfAssessor, StepTracker, TaskCoordinator,
     TaskListExecutor, TaskListResult, TaskProgress as AgentTaskProgress, TaskStatus,
 };

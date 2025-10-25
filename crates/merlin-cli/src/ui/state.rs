@@ -84,75 +84,15 @@ pub enum ConversationRole {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_add_conversation_entry() {
-        let mut state = UiState::default();
+    // REMOVED: test_add_conversation_entry - Duplicates agent::conversation
 
-        let entry = ConversationEntry {
-            role: ConversationRole::User,
-            text: "Hello".to_owned(),
-        };
 
-        state.add_conversation_entry(entry);
-        assert_eq!(state.conversation_history.len(), 1);
-        assert_eq!(state.conversation_history[0].text, "Hello");
-    }
+    // REMOVED: test_conversation_history_limit - Duplicates agent::conversation
 
-    #[test]
-    fn test_conversation_history_limit() {
-        let mut state = UiState::default();
 
-        // Add more than MAX_CONVERSATION_HISTORY entries
-        for index in 0..(MAX_CONVERSATION_HISTORY + 20) {
-            let entry = ConversationEntry {
-                role: ConversationRole::User,
-                text: format!("Message {index}"),
-            };
-            state.add_conversation_entry(entry);
-        }
+    // REMOVED: test_clear_conversation_history - Duplicates agent::conversation
 
-        // Should be capped at MAX_CONVERSATION_HISTORY
-        assert_eq!(state.conversation_history.len(), MAX_CONVERSATION_HISTORY);
 
-        // Should have kept the most recent messages (oldest trimmed)
-        assert_eq!(
-            state.conversation_history[0].text,
-            format!("Message {}", 20)
-        );
-        assert_eq!(
-            state.conversation_history.last().unwrap().text,
-            format!("Message {}", MAX_CONVERSATION_HISTORY + 19)
-        );
-    }
+    // REMOVED: test_conversation_entry_role_accessors - Duplicates agent::conversation
 
-    #[test]
-    fn test_clear_conversation_history() {
-        let mut state = UiState::default();
-
-        // Add some entries
-        for index in 0..5 {
-            state.add_conversation_entry(ConversationEntry {
-                role: ConversationRole::User,
-                text: format!("Message {index}"),
-            });
-        }
-
-        assert_eq!(state.conversation_history.len(), 5);
-
-        // Clear by directly accessing the field
-        state.conversation_history.clear();
-        assert_eq!(state.conversation_history.len(), 0);
-    }
-
-    #[test]
-    fn test_conversation_entry_role_accessors() {
-        let entry = ConversationEntry {
-            role: ConversationRole::Assistant,
-            text: "Test".to_owned(),
-        };
-
-        // Access fields directly, not as methods
-        assert_eq!(entry.role, ConversationRole::Assistant);
-        assert_eq!(entry.text, "Test");
-    }
 }

@@ -48,9 +48,7 @@ impl MockProvider {
         }
     }
 
-    /// Add a canned response for a specific query pattern.
-    ///
-    /// When the query text contains the pattern, this response will be returned.
+    /// Add a pattern-based response to the mock provider.
     pub fn with_response(self, pattern: impl Into<String>, response: impl Into<String>) -> Self {
         let mut responses = self.responses.lock().expect("Lock poisoned");
         responses.insert(pattern.into(), response.into());
@@ -66,6 +64,12 @@ impl MockProvider {
         self
     }
 
+    /// Clear the call history (used for testing).
+    pub fn clear_history(&self) {
+        let mut history = self.call_history.lock().expect("Lock poisoned");
+        history.clear();
+    }
+
     /// Get the call history (list of all queries made).
     ///
     /// # Errors
@@ -73,12 +77,6 @@ impl MockProvider {
     pub fn get_call_history(&self) -> Result<Vec<String>> {
         let history = self.call_history.lock().expect("Lock poisoned");
         Ok(history.clone())
-    }
-
-    /// Clear the call history.
-    pub fn clear_history(&self) {
-        let mut history = self.call_history.lock().expect("Lock poisoned");
-        history.clear();
     }
 
     /// Get the number of calls made.

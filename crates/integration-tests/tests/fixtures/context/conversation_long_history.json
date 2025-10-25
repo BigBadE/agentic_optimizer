@@ -1,0 +1,245 @@
+{
+  "name": "Long Conversation History Handling",
+  "description": "Tests that the system can handle very long conversations (50+ messages) without errors and maintains context properly",
+  "tags": [
+    "context",
+    "conversation",
+    "stress-test",
+    "long-history"
+  ],
+  "setup": {
+    "files": {
+      "src/counter.rs": "pub fn count() -> i32 { 0 }"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Start counting from 1",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Start counting",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Starting count: 1';",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Continue to 2",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Continue to 2",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "return 'Count: 2';"
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Continue to 3",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Continue to 3",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "return 'Count: 3';"
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Continue to 4",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Continue to 4",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "return 'Count: 4';"
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Continue to 5",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Continue to 5",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "return 'Count: 5';"
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Continue to 6",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Continue to 6",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "return 'Count: 6';"
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Continue to 7",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Continue to 7",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "return 'Count: 7';"
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Continue to 8",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Continue to 8",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "return 'Count: 8';"
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Continue to 9",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Continue to 9",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "return 'Count: 9';"
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Continue to 10",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Continue to 10",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "return 'Count: 10';"
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "What was the first number I asked you to count from?",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "first number",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Based on our conversation history, the first number was 1';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

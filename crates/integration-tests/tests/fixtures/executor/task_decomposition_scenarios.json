@@ -1,0 +1,236 @@
+{
+  "name": "Task Decomposition and Execution Modes",
+  "description": "Tests task decomposition into subtasks with different execution modes (Sequential, Parallel) and complexity levels",
+  "tags": [
+    "executor",
+    "self_determining",
+    "decomposition",
+    "subtasks",
+    "execution_mode"
+  ],
+  "setup": {
+    "files": {
+      "input1.txt": "Input data 1",
+      "input2.txt": "Input data 2",
+      "input3.txt": "Input data 3"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Process files sequentially: read input1.txt, input2.txt, input3.txt and combine them",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Process files sequentially",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // TaskAction::Decompose with ExecutionMode::Sequential",
+          "  // Subtask 1: Read first file",
+          "  const content1 = await readFile('input1.txt');",
+          "  ",
+          "  // Subtask 2: Read second file",
+          "  const content2 = await readFile('input2.txt');",
+          "  ",
+          "  // Subtask 3: Read third file and combine",
+          "  const content3 = await readFile('input3.txt');",
+          "  const combined = `${content1}\\n${content2}\\n${content3}`;",
+          "  ",
+          "  await writeFile('sequential_output.txt', combined);",
+          "  return `Sequential processing complete: ${combined.length} chars`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile",
+            "writeFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "sequential_output.txt",
+            "exists": true,
+            "contains": [
+              "Input data 1",
+              "Input data 2",
+              "Input data 3"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create multiple independent output files from inputs",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "independent output files",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // TaskAction::Decompose with ExecutionMode::Parallel",
+          "  // Subtasks can be executed in parallel (independent writes)",
+          "  const input1 = await readFile('input1.txt');",
+          "  await writeFile('output1.txt', input1.toUpperCase());",
+          "  ",
+          "  const input2 = await readFile('input2.txt');",
+          "  await writeFile('output2.txt', input2.toUpperCase());",
+          "  ",
+          "  const input3 = await readFile('input3.txt');",
+          "  await writeFile('output3.txt', input3.toUpperCase());",
+          "  ",
+          "  return 'Parallel-style processing complete';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile",
+            "writeFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "output1.txt",
+            "exists": true,
+            "contains": [
+              "INPUT DATA 1"
+            ]
+          },
+          {
+            "path": "output2.txt",
+            "exists": true,
+            "contains": [
+              "INPUT DATA 2"
+            ]
+          },
+          {
+            "path": "output3.txt",
+            "exists": true,
+            "contains": [
+              "INPUT DATA 3"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create a complex multi-step transformation pipeline",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "complex multi-step",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Complex task with multiple subtasks of varying complexity",
+          "  // Step 1: Read and validate (Simple)",
+          "  const data = await readFile('input1.txt');",
+          "  if (!data) throw new Error('No data');",
+          "  ",
+          "  // Step 2: Transform (Medium complexity)",
+          "  const transformed = data.split(' ').reverse().join(' ').toUpperCase();",
+          "  ",
+          "  // Step 3: Write intermediate result (Simple)",
+          "  await writeFile('intermediate.txt', transformed);",
+          "  ",
+          "  // Step 4: Final processing (Medium complexity)",
+          "  const final_result = transformed + ' - PROCESSED';",
+          "  await writeFile('final.txt', final_result);",
+          "  ",
+          "  return `Pipeline complete: ${final_result.length} chars`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile",
+            "writeFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "intermediate.txt",
+            "exists": true,
+            "contains": [
+              "1 DATA INPUT"
+            ]
+          },
+          {
+            "path": "final.txt",
+            "exists": true,
+            "contains": [
+              "1 DATA INPUT - PROCESSED"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "sequential_output.txt",
+        "exists": true
+      },
+      {
+        "path": "output1.txt",
+        "exists": true
+      },
+      {
+        "path": "output2.txt",
+        "exists": true
+      },
+      {
+        "path": "output3.txt",
+        "exists": true
+      },
+      {
+        "path": "intermediate.txt",
+        "exists": true
+      },
+      {
+        "path": "final.txt",
+        "exists": true
+      }
+    ]
+  }
+}

@@ -8,11 +8,7 @@ use std::collections::{HashMap, HashSet};
 
 use crate::ui::task_manager::TaskManager;
 
-/// Builds a flat list of all visible tasks in display order.
-///
-/// Includes root conversations and their children if expanded.
-/// Returns Vec of (`task_id`, `is_child`) tuples in chronological order (oldest first, newest last).
-pub fn build_visible_task_list(
+fn build_visible_task_list(
     task_manager: &TaskManager,
     expanded_conversations: &HashSet<TaskId>,
 ) -> Vec<(TaskId, bool)> {

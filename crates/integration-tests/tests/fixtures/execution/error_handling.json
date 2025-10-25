@@ -1,0 +1,78 @@
+{
+  "name": "Error Handling",
+  "description": "Tests proper error handling when file operations fail",
+  "tags": [
+    "error_handling",
+    "file_ops"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Try to read nonexistent file and handle the error gracefully",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "read nonexistent file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    const content = await readFile('does_not_exist.txt');",
+          "    return `File content: ${content}`;",
+          "  } catch (error) {",
+          "    await writeFile('error_log.txt', `Error: ${error}`);",
+          "    return 'Handled error gracefully - see error_log.txt';",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile",
+            "writeFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "error_log.txt",
+            "exists": true,
+            "contains": [
+              "Error"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "error_log.txt",
+        "exists": true
+      },
+      {
+        "path": "does_not_exist.txt",
+        "exists": false
+      }
+    ]
+  }
+}

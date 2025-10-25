@@ -1,0 +1,72 @@
+{
+  "name": "Task Tree Display",
+  "description": "Tests that tasks are displayed correctly in the TUI task pane",
+  "tags": [
+    "tui",
+    "tasks",
+    "display"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Show me a task tree",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Show me a task tree",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<TaskList> {",
+          "  return {",
+          "    id: 'parent',",
+          "    title: 'Parent Task',",
+          "    steps: [",
+          "      {",
+          "        id: 'child1',",
+          "        step_type: 'Feature',",
+          "        description: 'First child task',",
+          "        verification: 'Complete'",
+          "      },",
+          "      {",
+          "        id: 'child2',",
+          "        step_type: 'Test',",
+          "        description: 'Second child task',",
+          "        verification: 'Complete',",
+          "        depends_on: ['child1']",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "return_type": "TaskList"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "tab"
+      },
+      "verify": {}
+    }
+  ],
+  "final_verify": {}
+}

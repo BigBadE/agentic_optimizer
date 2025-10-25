@@ -1,0 +1,277 @@
+{
+  "name": "Context Request Pattern Matching",
+  "description": "Tests context request tool with various patterns: exact paths, glob patterns (all rust, markdown), directory-specific patterns, max_files limits, and no-match scenarios",
+  "tags": [
+    "context",
+    "patterns",
+    "glob",
+    "tools"
+  ],
+  "setup": {
+    "files": {
+      "src/lib.rs": "//! Main library\npub mod executor;\npub mod parser;\n",
+      "src/executor.rs": "//! Executor module\npub struct Executor;\n",
+      "src/parser.rs": "//! Parser module\npub struct Parser;\n",
+      "src/utils.rs": "//! Utility functions\npub fn helper() {}\n",
+      "tests/integration.rs": "#[test]\nfn test_integration() {}\n",
+      "docs/README.md": "# Project Documentation",
+      "docs/DESIGN.md": "# Design Document\n\nArchitecture details...",
+      "Cargo.toml": "[package]\nname = \"test-project\"\nversion = \"0.1.0\"\n"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Show me src/lib.rs",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Show me src/lib.rs",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await requestContext('src/lib.rs', 'Need to see library structure');",
+          "  if (result.success && result.files.length > 0) {",
+          "    return `Found library file with content: ${result.files[0].content}`;",
+          "  }",
+          "  return 'File not found';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "requestContext"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Get all Rust files",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Get all Rust files",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await requestContext('**/*.rs', 'Need all Rust files', 10);",
+          "  if (result.success) {",
+          "    const allRust = result.files.every(f => f.path.endsWith('.rs'));",
+          "    return `Found ${result.files.length} files, all Rust: ${allRust}`;",
+          "  }",
+          "  return 'No files found';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "requestContext"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Get markdown docs",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Get markdown docs",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await requestContext('**/*.md', 'Need documentation files', 5);",
+          "  const hasReadme = result.files.some(f => f.path.includes('README.md'));",
+          "  return `Found ${result.files.length} markdown files, has README: ${hasReadme}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "requestContext"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Get only src directory files",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "only src directory",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await requestContext('src/**/*.rs', 'Need source files only', 10);",
+          "  if (result.success) {",
+          "    const allFromSrc = result.files.every(f => f.path.includes('src'));",
+          "    return `Found ${result.files.length} files, all from src: ${allFromSrc}`;",
+          "  }",
+          "  return 'No files found';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "requestContext"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test max_files limit of 2",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "max_files limit of 2",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await requestContext('**/*.rs', 'Testing max_files limit', 2);",
+          "  return `Found ${result.files.length} files (max 2 limit)`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "requestContext"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Try to find .xyz files",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "find .xyz files",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    const result = await requestContext('**/*.xyz', 'Looking for non-existent file type');",
+          "    return `Result: success=${result.success}, files=${result.files.length}`;",
+          "  } catch (error) {",
+          "    return `Error: No files found`;",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "requestContext"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Try nonexistent file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Try nonexistent file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await requestContext('nonexistent.rs', 'Looking for file that does not exist');",
+          "  return `Result: success=${result.success}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "requestContext"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "src/lib.rs",
+        "exists": true,
+        "contains": [
+          "Main library"
+        ]
+      },
+      {
+        "path": "src/executor.rs",
+        "exists": true
+      },
+      {
+        "path": "docs/README.md",
+        "exists": true
+      }
+    ]
+  }
+}

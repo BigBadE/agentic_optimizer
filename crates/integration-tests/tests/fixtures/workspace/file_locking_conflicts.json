@@ -1,0 +1,205 @@
+{
+  "name": "File Locking and Conflict Detection",
+  "description": "Tests FileLockManager concurrent access prevention and conflict detection between parallel tasks",
+  "tags": [
+    "workspace",
+    "locking",
+    "conflicts",
+    "concurrent"
+  ],
+  "setup": {
+    "files": {
+      "Cargo.toml": "[package]\nname = \"test-project\"\nversion = \"0.1.0\"\nedition = \"2021\"",
+      "src/lib.rs": "pub fn hello() -> String { String::from(\"hello\") }",
+      "src/utils.rs": "pub fn utils() {}"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test acquiring lock on file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "acquiring lock",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // First task locks src/lib.rs",
+          "  await writeFile('src/lib.rs', '// Locked for modification');",
+          "  return 'Lock acquired and file modified';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "src/lib.rs",
+            "exists": true,
+            "contains": [
+              "Locked for modification"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test independent files can be modified in parallel",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "independent files",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Task 1 modifies lib.rs",
+          "  await writeFile('src/lib.rs', '// Task 1 changes');",
+          "  ",
+          "  // Task 2 modifies utils.rs (different file, should work)",
+          "  await writeFile('src/utils.rs', '// Task 2 changes');",
+          "  ",
+          "  return 'Both independent files modified successfully';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "src/lib.rs",
+            "exists": true,
+            "contains": [
+              "Task 1 changes"
+            ]
+          },
+          {
+            "path": "src/utils.rs",
+            "exists": true,
+            "contains": [
+              "Task 2 changes"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test releasing locks after task completion",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "releasing locks",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Simulate task completion and lock release",
+          "  await writeFile('src/lib.rs', '// First modification');",
+          "  // Lock should be released after task completes",
+          "  ",
+          "  // Subsequent task should be able to acquire lock",
+          "  await writeFile('src/lib.rs', '// Second modification after release');",
+          "  ",
+          "  return 'Lock released and reacquired successfully';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "src/lib.rs",
+            "exists": true,
+            "contains": [
+              "Second modification after release"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test conflict detection identifies overlapping files",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "conflict detection",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Verify conflict detection works by attempting sequential access",
+          "  await writeFile('src/lib.rs', '// Access 1');",
+          "  await writeFile('src/lib.rs', '// Access 2');",
+          "  ",
+          "  // If both succeed, conflict detection allowed sequential access",
+          "  return 'Sequential access to same file allowed after lock release';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "src/lib.rs",
+            "exists": true,
+            "contains": [
+              "Access 2"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "src/lib.rs",
+        "exists": true
+      },
+      {
+        "path": "src/utils.rs",
+        "exists": true
+      }
+    ]
+  }
+}

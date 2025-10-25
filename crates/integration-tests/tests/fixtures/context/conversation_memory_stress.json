@@ -1,0 +1,375 @@
+{
+  "name": "Conversation Memory and Context Stress Testing",
+  "description": "Tests large conversation history handling, context accumulation across many turns, and ability to reference earlier conversation context",
+  "tags": [
+    "context",
+    "conversation",
+    "memory",
+    "stress"
+  ],
+  "setup": {
+    "files": {
+      "counter.txt": "0",
+      "log.txt": "Initial log\n"
+    },
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Read counter.txt and increment it by 1",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "increment",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const counter = await readFile('counter.txt');",
+          "  const newValue = parseInt(counter) + 1;",
+          "  await writeFile('counter.txt', newValue.toString());",
+          "  return `Counter incremented to ${newValue}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "counter.txt",
+            "contains": [
+              "1"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Do it again",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Do it again",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const counter = await readFile('counter.txt');",
+          "  const newValue = parseInt(counter) + 1;",
+          "  await writeFile('counter.txt', newValue.toString());",
+          "  return `Counter incremented to ${newValue}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "counter.txt",
+            "contains": [
+              "2"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Keep going",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Keep going",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const counter = await readFile('counter.txt');",
+          "  const newValue = parseInt(counter) + 1;",
+          "  await writeFile('counter.txt', newValue.toString());",
+          "  return `Counter incremented to ${newValue}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "counter.txt",
+            "contains": [
+              "3"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Two more times",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Two more",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  let counter = await readFile('counter.txt');",
+          "  let value = parseInt(counter) + 1;",
+          "  await writeFile('counter.txt', value.toString());",
+          "  counter = await readFile('counter.txt');",
+          "  value = parseInt(counter) + 1;",
+          "  await writeFile('counter.txt', value.toString());",
+          "  return `Counter incremented twice to ${value}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "counter.txt",
+            "contains": [
+              "5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "What's the current value?",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "current value",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const counter = await readFile('counter.txt');",
+          "  return `Current counter value is ${counter}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Log all the values we've used in this conversation to log.txt",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Log all the values",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const log = await readFile('log.txt');",
+          "  const entry = '\\nConversation log:\\n- Started at 0\\n- Incremented to 1\\n- Incremented to 2\\n- Incremented to 3\\n- Incremented twice to 5\\n- Current value: 5\\n';",
+          "  await writeFile('log.txt', log + entry);",
+          "  return 'Logged all conversation values';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "log.txt",
+            "contains": [
+              "Conversation log",
+              "Started at 0",
+              "Current value: 5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Add more context about our entire conversation history",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "entire conversation history",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const log = await readFile('log.txt');",
+          "  const summary = '\\nConversation summary:\\n- Total turns: 8\\n- File operations: multiple increments and reads\\n- Pattern: User requested increments, then status check, then logging\\n';",
+          "  await writeFile('log.txt', log + summary);",
+          "  return 'Added conversation history summary';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "log.txt",
+            "contains": [
+              "Conversation summary",
+              "Total turns: 8",
+              "Pattern: User requested"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "What was the very first thing I asked you to do?",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "very first thing",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'The first thing you asked was to read counter.txt and increment it by 1';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Reset the counter back to the original value from the beginning of our conversation",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Reset the counter",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('counter.txt', '0');",
+          "  return 'Reset counter to original value of 0';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        },
+        "files": [
+          {
+            "path": "counter.txt",
+            "contains": [
+              "0"
+            ],
+            "not_contains": [
+              "5"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "counter.txt",
+        "exists": true,
+        "exact_content": "0"
+      },
+      {
+        "path": "log.txt",
+        "exists": true,
+        "contains": [
+          "Initial log",
+          "Conversation log",
+          "Started at 0",
+          "Current value: 5",
+          "Conversation summary",
+          "Total turns: 8"
+        ]
+      }
+    ]
+  }
+}

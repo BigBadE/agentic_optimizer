@@ -1,0 +1,147 @@
+{
+  "name": "Conversation Context Building",
+  "description": "Tests context fetcher with various conversation patterns - single turn, multi-turn, empty, and file references",
+  "tags": [
+    "context",
+    "conversation",
+    "history"
+  ],
+  "setup": {
+    "files": {
+      "src/main.rs": "fn main() { println!(\"Hello\"); }",
+      "src/lib.rs": "pub mod utils;"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Fix the bug in src/main.rs",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Fix the bug",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const content = await readFile('src/main.rs');",
+          "  await writeFile('src/main.rs', 'fn main() { println!(\"Fixed\"); }');",
+          "  return 'I have fixed the bug in the main function';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile",
+            "writeFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "src/main.rs",
+            "exists": true,
+            "contains": [
+              "Fixed"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Now add error handling",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "add error handling",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const content = await readFile('src/main.rs');",
+          "  await writeFile('src/main.rs', 'fn main() -> Result<(), Box<dyn std::error::Error>> {\\n  println!(\"Fixed\");\\n  Ok(())\\n}');",
+          "  return 'Added error handling to main function';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile",
+            "writeFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "src/main.rs",
+            "exists": true,
+            "contains": [
+              "Result<",
+              "Ok(())"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Make sure it handles all edge cases",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "edge cases",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'I have reviewed the code from our previous conversation and ensured all edge cases are handled';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "src/main.rs",
+        "exists": true,
+        "contains": [
+          "Result<"
+        ]
+      }
+    ]
+  }
+}

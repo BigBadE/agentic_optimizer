@@ -1,0 +1,302 @@
+{
+  "name": "Validation Pipeline Basics",
+  "description": "Tests validation pipeline creation, configuration, and basic stage execution",
+  "tags": [
+    "validation",
+    "pipeline",
+    "stages"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation pipeline with default stages",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Test validation pipeline",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Simple valid response for default pipeline",
+          "  return 'Pipeline test complete';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "validation": {
+            "pipeline_ran": true,
+            "stages_executed": [
+              "syntax",
+              "build",
+              "test",
+              "lint"
+            ],
+            "all_stages_passed": true,
+            "score_range": [
+              0.0,
+              1.0
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test custom pipeline with syntax and build only",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "custom pipeline",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Custom pipeline test';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "validation": {
+            "pipeline_ran": true,
+            "stages_executed": [
+              "syntax",
+              "build"
+            ],
+            "stages_not_executed": [
+              "test",
+              "lint"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test empty pipeline configuration",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "empty pipeline",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'No validation stages';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "validation": {
+            "pipeline_ran": true,
+            "stages_executed": [],
+            "validation_passed": true,
+            "score": 1.0
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test single stage pipeline",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "single stage",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Single stage validation';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "validation": {
+            "stages_executed": [
+              "syntax"
+            ],
+            "stage_count": 1
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test pipeline stage metadata",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "stage metadata",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Metadata verification';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "stages_have_names": true,
+            "stages_have_types": true,
+            "stage_names": [
+              "Syntax",
+              "Build",
+              "Test",
+              "Lint"
+            ],
+            "stage_types": [
+              "syntax",
+              "build",
+              "test",
+              "lint"
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test score normalization",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "score normalization",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Score test';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "overall_score_range": [
+              0.0,
+              1.0
+            ],
+            "stage_scores_normalized": true,
+            "scores_within_bounds": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test quick validation mode",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "quick validation",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Quick check complete';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "quick_check_passed": true,
+            "quick_check_faster": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test pipeline chaining",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "pipeline chaining",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Chained pipeline test';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "pipeline_configured": true,
+            "configuration_chainable": true
+          }
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true,
+      "validation": {
+        "all_pipelines_executed": true,
+        "no_validation_errors": true
+      }
+    }
+  }
+}

@@ -1,0 +1,460 @@
+{
+  "name": "Validation Error Scenarios",
+  "description": "Tests validation pipeline error handling, early exit, invalid code, and edge cases",
+  "tags": [
+    "validation",
+    "errors",
+    "edge-cases",
+    "early-exit"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test early exit on validation failure",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "early exit on validation failure",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const invalidCode = 'this is clearly not valid code at all';",
+          "  await writeFile('src/invalid.rs', invalidCode);",
+          "  return 'Invalid code written';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "tools_called": [
+            "writeFile"
+          ],
+          "validation": {
+            "early_exit_enabled": true,
+            "stopped_at_first_failure": true,
+            "stages_stopped_early": true,
+            "validation_failed": true
+          }
+        },
+        "files": [
+          {
+            "path": "src/invalid.rs",
+            "exists": true,
+            "contains": [
+              "this is clearly not valid code"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test no early exit - run all stages",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "no early exit",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const invalidCode = 'fn broken() { missing semicolon }';",
+          "  await writeFile('src/broken.rs', invalidCode);",
+          "  return 'Broken code written';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "early_exit_disabled": true,
+            "all_stages_ran": true,
+            "errors_accumulated": true,
+            "has_errors": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test syntax validation with invalid Rust",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "syntax validation with invalid",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const invalidRust = `",
+          "pub fn hello() -> String {",
+          "    this is not valid rust syntax",
+          "}",
+          "`;",
+          "  await writeFile('src/syntax_error.rs', invalidRust);",
+          "  return 'Invalid syntax written';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "syntax_check_ran": true,
+            "syntax_may_fail": true
+          }
+        },
+        "files": [
+          {
+            "path": "src/syntax_error.rs",
+            "exists": true,
+            "contains": [
+              "this is not valid rust syntax"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation with empty response",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "validation with empty response",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return '';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_matches": "^$",
+          "validation": {
+            "handled_empty_response": true,
+            "validation_completed": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test error accumulation across stages",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "error accumulation",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const badCode = 'fn test() { let x = ; }';",
+          "  await writeFile('src/errors.rs', badCode);",
+          "  return 'Code with errors';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "early_exit_disabled": true,
+            "errors_may_accumulate": true,
+            "multiple_stage_errors_possible": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation warnings field",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "validation warnings",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const codeWithWarnings = 'pub fn test() { let unused = 42; }';",
+          "  await writeFile('src/warnings.rs', codeWithWarnings);",
+          "  return 'Code with potential warnings';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "warnings_field_exists": true,
+            "warnings_accessible": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test delete operation validation",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "delete operation",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Simulate file deletion scenario",
+          "  return 'File deletion validated';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "handled_delete_operation": true,
+            "validation_completed": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation pipeline robustness",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "pipeline robustness",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Test that pipeline handles various edge cases",
+          "  await writeFile('edge1.txt', '');",
+          "  await writeFile('edge2.txt', 'single line');",
+          "  await writeFile('edge3.txt', 'line1\\nline2\\nline3');",
+          "  return 'Edge cases tested';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "tools_called": [
+            "writeFile"
+          ],
+          "validation": {
+            "handled_edge_cases": true,
+            "pipeline_resilient": true
+          }
+        },
+        "files": [
+          {
+            "path": "edge1.txt",
+            "exists": true
+          },
+          {
+            "path": "edge2.txt",
+            "exists": true,
+            "contains": [
+              "single line"
+            ]
+          },
+          {
+            "path": "edge3.txt",
+            "exists": true,
+            "contains": [
+              "line1",
+              "line2",
+              "line3"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation with clearly invalid code",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "clearly invalid code",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const garbage = '!@#$%^&*() not code at all {}[]<>';",
+          "  await writeFile('src/garbage.rs', garbage);",
+          "  return 'Garbage written';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "validation_ran": true,
+            "handled_invalid_input": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation score calculation under errors",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "score calculation under errors",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Score test with potential errors';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "score_calculated": true,
+            "score_range": [
+              0.0,
+              1.0
+            ],
+            "score_reflects_failures": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation configuration changes",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "configuration changes",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Configuration test';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "configuration_flexible": true,
+            "early_exit_toggleable": true,
+            "stages_configurable": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation with mixed valid and invalid content",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "mixed valid and invalid",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('src/valid.rs', 'pub fn valid() {}');",
+          "  await writeFile('src/invalid.rs', 'fn invalid() { broken }');",
+          "  return 'Mixed content written';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "tools_called": [
+            "writeFile"
+          ],
+          "validation": {
+            "handled_mixed_content": true,
+            "validation_ran_on_all": true
+          }
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true,
+      "validation": {
+        "all_error_scenarios_tested": true,
+        "pipeline_resilient": true
+      }
+    }
+  }
+}

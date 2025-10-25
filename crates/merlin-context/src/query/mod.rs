@@ -4,4 +4,4 @@ mod analyzer;
 mod types;
 
 pub use analyzer::QueryAnalyzer;
-pub use types::{Action, ContextPlan, ExpansionStrategy, QueryIntent, Scope};
+pub use types::{Action, QueryIntent, Scope};

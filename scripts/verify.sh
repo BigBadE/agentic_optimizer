@@ -46,7 +46,7 @@ ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 export MERLIN_FOLDER="${ROOT_DIR}/target/.merlin"
 
 # Run main tests
-cargo nextest run
+cargo nextest run --run-ignored all
 
 # Optionally run Ollama-specific tests by name filter
 if [ "$RUN_OLLAMA" = true ]; then

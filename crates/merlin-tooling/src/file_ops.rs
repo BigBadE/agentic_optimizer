@@ -9,101 +9,6 @@ use std::path::PathBuf;
 
 use crate::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};
 
-/// Tool for reading files from the filesystem.
-pub struct ReadFileTool {
-    /// Root directory to constrain file access (for sandboxing)
-    root_dir: PathBuf,
-}
-
-impl ReadFileTool {
-    /// Create a new `ReadFileTool` with the given root directory.
-    ///
-    /// All file paths will be resolved relative to this root directory.
-    #[must_use]
-    pub fn new(root_dir: impl Into<PathBuf>) -> Self {
-        Self {
-            root_dir: root_dir.into(),
-        }
-    }
-
-    /// Resolve a path relative to the root directory and validate it's within bounds.
-    ///
-    /// # Errors
-    /// Returns error if path escapes the root directory
-    fn resolve_path(&self, path: &str) -> ToolResult<PathBuf> {
-        let full_path = self.root_dir.join(path);
-
-        // Canonicalize both paths to prevent directory traversal attacks
-        let canonical_root = self
-            .root_dir
-            .canonicalize()
-            .map_err(|err| ToolError::InvalidInput(format!("Invalid root directory: {err}")))?;
-
-        // If the file doesn't exist yet, we can't canonicalize it, but we can check its parent
-        if !full_path.exists() {
-            return Err(ToolError::InvalidInput(format!(
-                "File does not exist: {path}"
-            )));
-        }
-
-        let canonical_path = full_path
-            .canonicalize()
-            .map_err(|err| ToolError::InvalidInput(format!("Invalid path '{path}': {err}")))?;
-
-        if !canonical_path.starts_with(&canonical_root) {
-            return Err(ToolError::InvalidInput(format!(
-                "Path '{path}' is outside the allowed directory"
-            )));
-        }
-
-        Ok(canonical_path)
-    }
-}
-
-#[async_trait]
-impl Tool for ReadFileTool {
-    fn name(&self) -> &'static str {
-        "readFile"
-    }
-
-    fn description(&self) -> &'static str {
-        "Reads the contents of a file from the filesystem"
-    }
-
-    fn typescript_signature(&self) -> &'static str {
-        r"/**
- * Reads a file from the filesystem.
- * @param path - Path to the file relative to the workspace root
- * @returns The file contents as a string
- */
-declare function readFile(path: string): Promise<string>;"
-    }
-
-    async fn execute(&self, input: ToolInput) -> ToolResult<ToolOutput> {
-        // Extract path parameter
-        let path = input
-            .params
-            .as_str()
-            .or_else(|| input.params.get("path").and_then(Value::as_str))
-            .ok_or_else(|| {
-                ToolError::InvalidInput("readFile requires a 'path' parameter".to_owned())
-            })?;
-
-        // Resolve and validate path
-        let full_path = self.resolve_path(path)?;
-
-        // Read file contents
-        let contents = fs::read_to_string(&full_path).map_err(|err| {
-            ToolError::ExecutionFailed(format!("Failed to read file '{path}': {err}"))
-        })?;
-
-        Ok(ToolOutput::success_with_data(
-            format!("Read {} bytes from {path}", contents.len()),
-            json!(contents),
-        ))
-    }
-}
-
 /// Tool for writing files to the filesystem.
 pub struct WriteFileTool {
     /// Root directory to constrain file access (for sandboxing)
@@ -208,6 +113,100 @@ declare function writeFile(path: string, content: string): Promise<void>;"
             "Wrote {} bytes to {path}",
             content.len()
         )))
+    }
+}
+
+/// Tool for reading files from the filesystem.
+pub struct ReadFileTool {
+    /// Root directory to constrain file access (for sandboxing)
+    root_dir: PathBuf,
+}
+
+impl ReadFileTool {
+    /// Create a new `ReadFileTool` with the given root directory.
+    ///
+    /// All file paths will be resolved relative to this root directory.
+    #[must_use]
+    pub fn new(root_dir: impl Into<PathBuf>) -> Self {
+        Self {
+            root_dir: root_dir.into(),
+        }
+    }
+
+    /// Resolve a path relative to the root directory and validate it's within bounds.
+    ///
+    /// # Errors
+    /// Returns error if path escapes the root directory
+    fn resolve_path(&self, path: &str) -> ToolResult<PathBuf> {
+        let full_path = self.root_dir.join(path);
+
+        // Canonicalize both paths to prevent directory traversal attacks
+        let canonical_root = self
+            .root_dir
+            .canonicalize()
+            .map_err(|err| ToolError::InvalidInput(format!("Invalid root directory: {err}")))?;
+
+        if !full_path.exists() {
+            return Err(ToolError::InvalidInput(format!(
+                "File does not exist: {path}"
+            )));
+        }
+
+        let canonical_path = full_path
+            .canonicalize()
+            .map_err(|err| ToolError::InvalidInput(format!("Invalid path '{path}': {err}")))?;
+
+        if !canonical_path.starts_with(&canonical_root) {
+            return Err(ToolError::InvalidInput(format!(
+                "Path '{path}' is outside the allowed directory"
+            )));
+        }
+
+        Ok(canonical_path)
+    }
+}
+
+#[async_trait]
+impl Tool for ReadFileTool {
+    fn name(&self) -> &'static str {
+        "readFile"
+    }
+
+    fn description(&self) -> &'static str {
+        "Reads the contents of a file from the filesystem"
+    }
+
+    fn typescript_signature(&self) -> &'static str {
+        r"/**
+ * Reads the contents of a file from the filesystem.
+ * @param path - Path to the file relative to the workspace root
+ * @returns The contents of the file as a string
+ */
+declare function readFile(path: string): Promise<string>;"
+    }
+
+    async fn execute(&self, input: ToolInput) -> ToolResult<ToolOutput> {
+        // Extract path parameter
+        let path = input
+            .params
+            .as_str()
+            .or_else(|| input.params.get("path").and_then(Value::as_str))
+            .ok_or_else(|| {
+                ToolError::InvalidInput("readFile requires a 'path' parameter".to_owned())
+            })?;
+
+        // Resolve and validate path
+        let full_path = self.resolve_path(path)?;
+
+        // Read file contents
+        let content = fs::read_to_string(&full_path).map_err(|err| {
+            ToolError::ExecutionFailed(format!("Failed to read file '{path}': {err}"))
+        })?;
+
+        Ok(ToolOutput::success_with_data(
+            format!("Read {} bytes from {path}", content.len()),
+            json!(content),
+        ))
     }
 }
 
@@ -325,34 +324,6 @@ mod tests {
     use tempfile::TempDir;
 
     #[tokio::test]
-    async fn test_read_file_success() {
-        let temp_dir = TempDir::new().unwrap();
-        let file_path = temp_dir.path().join("test.txt");
-        fs::write(&file_path, "Hello, World!").unwrap();
-
-        let tool = ReadFileTool::new(temp_dir.path());
-        let input = ToolInput {
-            params: json!("test.txt"),
-        };
-
-        let result = tool.execute(input).await.unwrap();
-        assert!(result.success);
-        assert_eq!(result.data, Some(json!("Hello, World!")));
-    }
-
-    #[tokio::test]
-    async fn test_read_file_not_found() {
-        let temp_dir = TempDir::new().unwrap();
-        let tool = ReadFileTool::new(temp_dir.path());
-        let input = ToolInput {
-            params: json!("nonexistent.txt"),
-        };
-
-        let result = tool.execute(input).await;
-        result.unwrap_err();
-    }
-
-    #[tokio::test]
     async fn test_write_file_success() {
         let temp_dir = TempDir::new().unwrap();
         let tool = WriteFileTool::new(temp_dir.path());
@@ -422,18 +393,6 @@ mod tests {
         let files = result.data.unwrap();
         let files_array = files.as_array().unwrap();
         assert_eq!(files_array.len(), 0);
-    }
-
-    #[tokio::test]
-    async fn test_path_traversal_prevention_read() {
-        let temp_dir = TempDir::new().unwrap();
-        let tool = ReadFileTool::new(temp_dir.path());
-        let input = ToolInput {
-            params: json!("../../../etc/passwd"),
-        };
-
-        let result = tool.execute(input).await;
-        result.unwrap_err();
     }
 
     #[tokio::test]

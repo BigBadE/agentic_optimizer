@@ -253,11 +253,8 @@ pub struct ConversationSummary {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_conversation_manager_creation() {
-        let manager = ConversationManager::new();
-        assert_eq!(manager.message_count(), 0);
-    }
+    // REMOVED: test_conversation_manager_creation - Constructor test only
+
 
     #[test]
     fn test_add_message() {

@@ -1,4 +1,4 @@
-use clap::{Parser, Subcommand, ValueEnum};
+use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
 
 #[derive(ValueEnum, Clone, Copy, Debug)]
@@ -12,75 +12,18 @@ pub enum Validation {
 #[command(about = "Intelligent AI coding assistant with multi-model routing", long_about = None)]
 pub struct Cli {
     /// Project root directory
-    #[arg(short, long, default_value = ".", global = true)]
+    #[arg(short, long, default_value = ".")]
     pub project: PathBuf,
 
     /// Use only local models (Ollama), disable remote tiers
-    #[arg(long, global = true)]
+    #[arg(long)]
     pub local: bool,
 
     /// Validation mode (enabled/disabled)
-    #[arg(long, value_enum, default_value = "enabled", global = true)]
+    #[arg(long, value_enum, default_value = "enabled")]
     pub validation: Validation,
 
     /// Dump full context to debug.log before each model call
-    #[arg(long, global = true)]
+    #[arg(long)]
     pub context_dump: bool,
-
-    #[command(subcommand)]
-    pub command: Option<Commands>,
-}
-
-#[derive(Subcommand)]
-pub enum Commands {
-    #[command(about = "Start interactive chat session")]
-    Chat {
-        #[arg(short, long, default_value = ".", help = "Project root directory")]
-        project: PathBuf,
-
-        #[arg(long, help = "Model to use (overrides config)")]
-        model: Option<String>,
-    },
-
-    #[command(about = "Ask a question or request code changes")]
-    Query {
-        #[arg(help = "The query to send to the agent")]
-        query: String,
-
-        #[arg(short, long, default_value = ".", help = "Project root directory")]
-        project: PathBuf,
-
-        #[arg(short, long, help = "Specific files to include in context")]
-        files: Vec<PathBuf>,
-
-        #[arg(long, help = "Maximum number of files to include")]
-        max_files: Option<usize>,
-    },
-
-    #[command(about = "Show relevant files for a prompt without sending to LLM")]
-    Prompt {
-        #[arg(help = "The prompt/query to analyze")]
-        query: String,
-
-        #[arg(short, long, default_value = ".", help = "Project root directory")]
-        project: PathBuf,
-
-        #[arg(short, long, help = "Specific files to include in context")]
-        files: Vec<PathBuf>,
-
-        #[arg(long, help = "Maximum number of files to include")]
-        max_files: Option<usize>,
-    },
-
-    #[command(about = "Show configuration")]
-    Config {
-        #[arg(long, help = "Show full configuration including defaults")]
-        full: bool,
-    },
-
-    #[command(about = "Show metrics and cost tracking")]
-    Metrics {
-        #[arg(long, help = "Show daily metrics")]
-        daily: bool,
-    },
 }

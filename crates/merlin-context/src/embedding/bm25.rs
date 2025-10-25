@@ -88,8 +88,6 @@ impl BM25Index {
             .collect()
     }
 
-    // Use Default instead of a no-arg constructor
-
     /// Add a document to the index
     pub fn add_document(&mut self, path: PathBuf, content: &str) {
         let terms = Self::tokenize(content);

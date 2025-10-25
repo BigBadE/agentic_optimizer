@@ -1,0 +1,156 @@
+{
+  "name": "Comprehensive State Verification",
+  "description": "Tests all State verification fields: conversation_count, selected_task, vector_cache_status",
+  "tags": [
+    "tui",
+    "state",
+    "verification",
+    "comprehensive"
+  ],
+  "setup": {
+    "files": {
+      "src/lib.rs": "pub fn hello() { println!(\"Hello\"); }"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "First message",
+        "submit": true
+      },
+      "verify": {
+        "state": {
+          "conversation_count": 1
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "First message",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Response to first message';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_matches": "Response to first message"
+        },
+        "state": {
+          "conversation_count": 2
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Second message",
+        "submit": true
+      },
+      "verify": {
+        "state": {
+          "conversation_count": 3
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Second message",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const content = await readFile('src/lib.rs');",
+          "  return `Read ${content.length} chars`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile"
+          ]
+        },
+        "state": {
+          "conversation_count": 4
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Third message",
+        "submit": true
+      },
+      "verify": {
+        "state": {
+          "conversation_count": 5
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Third message",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('output.txt', 'test');",
+          "  return 'Written';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "state": {
+          "conversation_count": 6
+        },
+        "files": [
+          {
+            "path": "output.txt",
+            "exists": true
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "state": {
+      "conversation_count": 6
+    },
+    "files": [
+      {
+        "path": "src/lib.rs",
+        "exists": true
+      },
+      {
+        "path": "output.txt",
+        "exists": true,
+        "contains": [
+          "test"
+        ]
+      }
+    ]
+  }
+}

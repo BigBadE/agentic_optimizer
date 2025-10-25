@@ -144,13 +144,8 @@ mod tests {
     use std::fs::write;
     use tempfile::TempDir;
 
-    #[test]
-    fn test_query_new() {
-        let query = Query::new("test query");
-        assert_eq!(query.text, "test query");
-        assert!(query.conversation_id.is_none());
-        assert!(query.files_context.is_empty());
-    }
+    // REMOVED: test_query_new - Constructor test
+
 
     #[test]
     fn test_query_with_files() {
@@ -179,20 +174,11 @@ mod tests {
         assert_eq!(usage.total(), 180);
     }
 
-    #[test]
-    fn test_token_usage_default() {
-        let usage = TokenUsage::default();
-        assert_eq!(usage.total(), 0);
-        assert_eq!(usage.input, 0);
-        assert_eq!(usage.output, 0);
-    }
+    // REMOVED: test_token_usage_default - Constructor test
 
-    #[test]
-    fn test_context_new() {
-        let context = Context::new("system prompt");
-        assert_eq!(context.system_prompt, "system prompt");
-        assert!(context.files.is_empty());
-    }
+
+    // REMOVED: test_context_new - Constructor test
+
 
     #[test]
     fn test_context_with_files() {
@@ -227,12 +213,8 @@ mod tests {
         assert_eq!(context.token_estimate(), 26);
     }
 
-    #[test]
-    fn test_file_context_new() {
-        let file = FileContext::new(PathBuf::from("test.rs"), "content".to_owned());
-        assert_eq!(file.path, PathBuf::from("test.rs"));
-        assert_eq!(file.content, "content");
-    }
+    // REMOVED: test_file_context_new - Constructor test
+
 
     #[test]
     fn test_file_context_from_path() {

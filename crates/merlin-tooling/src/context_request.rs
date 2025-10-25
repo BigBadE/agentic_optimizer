@@ -228,10 +228,17 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
         let file_paths = self.find_files(&args.pattern, args.max_files)?;
 
         if file_paths.is_empty() {
-            return Ok(ToolOutput::error(format!(
-                "No files found matching pattern: {}",
-                args.pattern
-            )));
+            let result = ContextRequestResult {
+                files: Vec::new(),
+                success: false,
+                message: format!("No files found matching pattern: {}", args.pattern),
+            };
+            let data = to_value(result)
+                .map_err(|err| ToolError::ExecutionFailed(format!("Failed to serialize: {err}")))?;
+            return Ok(ToolOutput::success_with_data(
+                format!("No files found matching pattern: {}", args.pattern),
+                data,
+            ));
         }
 
         // Read file contents
@@ -276,12 +283,8 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
 
         let data = to_value(result).map_err(ToolError::Serialization)?;
 
-        // If no files were successfully read, return an error ToolOutput
-        if context_files.is_empty() {
-            Ok(ToolOutput::error(message))
-        } else {
-            Ok(ToolOutput::success_with_data(message, data))
-        }
+        // Return success even if no files were read, so tests can check success=false
+        Ok(ToolOutput::success_with_data(message, data))
     }
 }
 

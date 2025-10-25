@@ -1,0 +1,284 @@
+{
+  "name": "Orchestrator Conflict Detection",
+  "description": "Tests conflict-aware task execution, file lock detection, and parallel task coordination with the orchestrator",
+  "tags": [
+    "orchestrator",
+    "conflict-detection",
+    "concurrency",
+    "file-locks"
+  ],
+  "setup": {
+    "files": {
+      "shared.rs": "// Shared file that multiple tasks will access\nfn main() {}\n",
+      "file_a.rs": "// File A - independent\nfn func_a() {}\n",
+      "file_b.rs": "// File B - independent\nfn func_b() {}\n"
+    },
+    "env_vars": {
+      "MERLIN_FOLDER": "__temp__"
+    },
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Modify shared.rs to add function hello",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "shared\\.rs.*hello",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<void> {",
+          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
+          "  await edit('shared.rs', 'fn main() {}', 'fn hello() -> String {\\n  \"Hello\".to_string()\\n}\\n\\nfn main() {}');",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "edit"
+          ]
+        },
+        "files": [
+          {
+            "path": "shared.rs",
+            "exists": true,
+            "contains": [
+              "fn hello()"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Modify shared.rs again to add function goodbye (should detect conflict if previous task still running)",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "shared\\.rs.*goodbye",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<void> {",
+          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
+          "  await edit('shared.rs', 'fn main() {}', 'fn goodbye() -> String {\\n  \"Goodbye\".to_string()\\n}\\n\\nfn main() {}');",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "edit"
+          ]
+        },
+        "files": [
+          {
+            "path": "shared.rs",
+            "exists": true,
+            "contains": [
+              "fn goodbye()"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Modify file_a.rs (should run in parallel - different file)",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "file_a\\.rs",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<void> {",
+          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
+          "  await edit('file_a.rs', 'fn func_a() {}', 'fn func_a() -> String {\\n  \"A\".to_string()\\n}');",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "edit"
+          ]
+        },
+        "files": [
+          {
+            "path": "file_a.rs",
+            "exists": true,
+            "contains": [
+              "fn func_a() -> String"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Modify file_b.rs (should also run in parallel - different file from both shared.rs and file_a.rs)",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "file_b\\.rs",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<void> {",
+          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
+          "  await edit('file_b.rs', 'fn func_b() {}', 'fn func_b() -> String {\\n  \"B\".to_string()\\n}');",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "edit"
+          ]
+        },
+        "files": [
+          {
+            "path": "file_b.rs",
+            "exists": true,
+            "contains": [
+              "fn func_b() -> String"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Verify conflict detection is working by reading all files",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "conflict detection",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const show = tools.show as (path: string) => Promise<string>;",
+          "  const shared = await show('shared.rs');",
+          "  const fileA = await show('file_a.rs');",
+          "  const fileB = await show('file_b.rs');",
+          "  return `Conflict detection verified. Files processed correctly:\\nshared.rs: ${shared.includes('fn hello()') && shared.includes('fn goodbye()')}\\nfile_a.rs: ${fileA.includes('func_a() -> String')}\\nfile_b.rs: ${fileB.includes('func_b() -> String')}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "show"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test concurrent file operations on different files",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "concurrent",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const list = tools.list as (path: string) => Promise<string[]>;",
+          "  const files = await list('.');",
+          "  const rsFiles = files.filter(f => f.endsWith('.rs'));",
+          "  return `Concurrent operations completed. Found ${rsFiles.length} Rust files. All operations executed without conflicts.`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "list"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true,
+      "validation_passed": true
+    },
+    "files": [
+      {
+        "path": "shared.rs",
+        "exists": true,
+        "contains": [
+          "fn hello()",
+          "fn goodbye()",
+          "fn main()"
+        ]
+      },
+      {
+        "path": "file_a.rs",
+        "exists": true,
+        "contains": [
+          "fn func_a() -> String"
+        ]
+      },
+      {
+        "path": "file_b.rs",
+        "exists": true,
+        "contains": [
+          "fn func_b() -> String"
+        ]
+      }
+    ]
+  }
+}

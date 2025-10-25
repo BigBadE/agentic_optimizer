@@ -1,0 +1,413 @@
+{
+  "name": "Validation Stages Detailed Testing",
+  "description": "Tests individual validation stages with various code samples and scenarios",
+  "tags": [
+    "validation",
+    "stages",
+    "syntax",
+    "build",
+    "test",
+    "lint"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test syntax validation with valid Rust code",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "syntax validation with valid",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const validRust = `",
+          "pub fn hello() -> String {",
+          "    String::from(\\\"Hello, world!\\\")",
+          "}",
+          "`;",
+          "  await writeFile('src/hello.rs', validRust);",
+          "  return 'Valid Rust code written';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "writeFile"
+          ],
+          "validation": {
+            "syntax_stage_passed": true,
+            "syntax_errors": []
+          }
+        },
+        "files": [
+          {
+            "path": "src/hello.rs",
+            "exists": true,
+            "contains": [
+              "pub fn hello",
+              "String::from"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test build validation stage basic operation",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "build validation stage",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Build stage test';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "build_stage_executed": true,
+            "build_quick_check_passed": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test test validation stage",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "test validation stage",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Test stage verification';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "test_stage_executed": true,
+            "test_quick_check_passed": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test lint validation stage",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "lint validation stage",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Lint stage test';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "lint_stage_executed": true,
+            "lint_quick_check_passed": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation stages can run independently",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "stages can run independently",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Independent stage execution';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "syntax_independent": true,
+            "build_independent": true,
+            "test_independent": true,
+            "lint_independent": true,
+            "all_stages_runnable": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation with file changes",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "validation with file changes",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('src/test.rs', 'pub fn test() {}');",
+          "  return 'File changes validated';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "tools_called": [
+            "writeFile"
+          ],
+          "validation": {
+            "pipeline_ran": true,
+            "file_changes_validated": true
+          }
+        },
+        "files": [
+          {
+            "path": "src/test.rs",
+            "exists": true,
+            "contains": [
+              "pub fn test"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation with multiple file changes",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "multiple file changes",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('src/module1.rs', 'pub fn func1() {}');",
+          "  await writeFile('src/module2.rs', 'pub fn func2() {}');",
+          "  await writeFile('src/module3.rs', 'pub fn func3() {}');",
+          "  return 'Multiple files created';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "tools_called": [
+            "writeFile"
+          ],
+          "validation": {
+            "multiple_files_validated": true,
+            "validation_passed": true
+          }
+        },
+        "files": [
+          {
+            "path": "src/module1.rs",
+            "exists": true
+          },
+          {
+            "path": "src/module2.rs",
+            "exists": true
+          },
+          {
+            "path": "src/module3.rs",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation result structure",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "validation result structure",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Structure test';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "result_has_stages": true,
+            "result_has_passed_field": true,
+            "result_has_score": true,
+            "result_has_errors": true,
+            "result_has_warnings": true,
+            "stage_results_valid": true,
+            "stage_types_correct": true,
+            "scores_normalized": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test validation stage ordering",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "stage ordering",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Stage order test';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "stages_in_order": true,
+            "expected_order": [
+              "syntax",
+              "build",
+              "test",
+              "lint"
+            ],
+            "ordering_preserved": true
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test quick check functionality",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "quick check functionality",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Quick checks complete';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "validation": {
+            "syntax_quick_check": true,
+            "build_quick_check": true,
+            "test_quick_check": true,
+            "lint_quick_check": true,
+            "all_quick_checks_passed": true
+          }
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true,
+      "validation": {
+        "all_stages_tested": true,
+        "all_validations_passed": true
+      }
+    },
+    "files": [
+      {
+        "path": "src/hello.rs",
+        "exists": true
+      },
+      {
+        "path": "src/test.rs",
+        "exists": true
+      },
+      {
+        "path": "src/module1.rs",
+        "exists": true
+      },
+      {
+        "path": "src/module2.rs",
+        "exists": true
+      },
+      {
+        "path": "src/module3.rs",
+        "exists": true
+      }
+    ]
+  }
+}

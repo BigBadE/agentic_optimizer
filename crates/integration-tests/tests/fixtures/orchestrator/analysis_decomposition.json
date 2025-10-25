@@ -1,0 +1,291 @@
+{
+  "name": "Orchestrator Analysis and Decomposition",
+  "description": "Tests orchestrator request analysis, task decomposition, workspace operations, and configuration handling",
+  "tags": [
+    "orchestrator",
+    "analysis",
+    "decomposition",
+    "workspace"
+  ],
+  "setup": {
+    "files": {
+      "sample.txt": "Sample file for workspace operations"
+    },
+    "env_vars": {
+      "MERLIN_FOLDER": "__temp__"
+    },
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Add a comment to the code",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Add a comment",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Simple request analyzed: Adding comment is a basic operation requiring minimal complexity.';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Refactor the entire codebase to use async/await",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Refactor.*async/await",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Complex request analyzed: Refactoring entire codebase requires decomposition into multiple subtasks:\\n1. Identify all synchronous functions\\n2. Convert to async\\n3. Update call sites\\n4. Run tests\\n5. Validate compilation';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Read a non-existent file to test workspace error handling",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "non-existent",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const show = tools.show as (path: string) => Promise<string>;",
+          "  try {",
+          "    await show('nonexistent.txt');",
+          "    return 'File found unexpectedly';",
+          "  } catch (err) {",
+          "    return 'Workspace correctly handles missing files: file not found';",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "show"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Verify workspace state with existing file",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "workspace state",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const show = tools.show as (path: string) => Promise<string>;",
+          "  const content = await show('sample.txt');",
+          "  return `Workspace state verified. Root path accessible. File content: ${content}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "show"
+          ]
+        },
+        "files": [
+          {
+            "path": "sample.txt",
+            "exists": true,
+            "contains": [
+              "Sample file"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test orchestrator with custom configuration: max_concurrent_tasks=4, conflict_detection=enabled, validation_early_exit=true",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "custom configuration",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Orchestrator configuration applied:\\n- max_concurrent_tasks: 4\\n- conflict_detection: enabled\\n- validation_early_exit: true\\nConfiguration successfully validated.';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Analyze a simple task for decomposition",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "simple task.*decomposition",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Task analysis complete: Simple task does not require decomposition. Single atomic operation identified.';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test workspace root path canonicalization",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "canonicalization",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const list = tools.list as (path: string) => Promise<string[]>;",
+          "  const files = await list('.');",
+          "  return `Workspace root path canonicalized successfully. Found ${files.length} files in workspace.`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "list"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Perform final verification of all orchestrator analysis features",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "final verification",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const show = tools.show as (path: string) => Promise<string>;",
+          "  const list = tools.list as (path: string) => Promise<string[]>;",
+          "  const files = await list('.');",
+          "  const sampleContent = await show('sample.txt');",
+          "  return `Orchestrator analysis verification complete:\\n- Request analysis: ✓\\n- Task decomposition: ✓\\n- Workspace operations: ✓\\n- Configuration handling: ✓\\n- Files in workspace: ${files.length}\\n- Sample content verified: ${sampleContent.includes('Sample file')}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "list",
+            "show"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true,
+      "validation_passed": true
+    },
+    "files": [
+      {
+        "path": "sample.txt",
+        "exists": true,
+        "contains": [
+          "Sample file"
+        ]
+      }
+    ]
+  }
+}

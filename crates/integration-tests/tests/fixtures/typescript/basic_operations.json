@@ -1,0 +1,450 @@
+{
+  "name": "TypeScript Basic Operations",
+  "description": "Tests basic TypeScript operations including arithmetic, arrays, objects, strings, and control flow",
+  "tags": [
+    "typescript",
+    "basic",
+    "operations"
+  ],
+  "setup": {
+    "files": {},
+    "env_vars": {},
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Calculate basic arithmetic operations",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Calculate basic arithmetic operations",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const x = 10;",
+          "  const y = 20;",
+          "  const sum = x + y;",
+          "  const product = x * y;",
+          "  return { sum, product, average: (x + y) / 2 };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_type": "object",
+          "return_value_contains": {
+            "sum": 30,
+            "product": 200,
+            "average": 15
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Perform array operations",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Perform array operations",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const numbers = [1, 2, 3, 4, 5];",
+          "  const doubled = numbers.map(n => n * 2);",
+          "  const evens = numbers.filter(n => n % 2 === 0);",
+          "  const sum = numbers.reduce((acc, n) => acc + n, 0);",
+          "  return { doubled, evens, sum };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_contains": {
+            "doubled": [
+              2,
+              4,
+              6,
+              8,
+              10
+            ],
+            "evens": [
+              2,
+              4
+            ],
+            "sum": 15
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test control flow with loops and conditions",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Test control flow with loops and conditions",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  let result = [];",
+          "  for (let i = 0; i < 5; i++) {",
+          "    if (i % 2 === 0) {",
+          "      result.push(i * 2);",
+          "    } else {",
+          "      result.push(i);",
+          "    }",
+          "  }",
+          "  return result;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_matches": [
+            0,
+            1,
+            4,
+            3,
+            8
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Calculate fibonacci sequence",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Calculate fibonacci sequence",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  function fibonacci(n) {",
+          "    if (n <= 1) return n;",
+          "    return fibonacci(n - 1) + fibonacci(n - 2);",
+          "  }",
+          "  ",
+          "  const results = [];",
+          "  for (let i = 0; i < 10; i++) {",
+          "    results.push(fibonacci(i));",
+          "  }",
+          "  return results;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_matches": [
+            0,
+            1,
+            1,
+            2,
+            3,
+            5,
+            8,
+            13,
+            21,
+            34
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Manipulate objects with spread operator",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Manipulate objects with spread operator",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const person = {",
+          "    name: 'Alice',",
+          "    age: 30,",
+          "    city: 'New York'",
+          "  };",
+          "  ",
+          "  const updated = {",
+          "    ...person,",
+          "    age: 31,",
+          "    country: 'USA'",
+          "  };",
+          "  ",
+          "  return updated;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_contains": {
+            "name": "Alice",
+            "age": 31,
+            "city": "New York",
+            "country": "USA"
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Perform string operations",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Perform string operations",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const text = 'Hello, World!';",
+          "  return {",
+          "    upper: text.toUpperCase(),",
+          "    lower: text.toLowerCase(),",
+          "    length: text.length,",
+          "    words: text.split(', '),",
+          "    replaced: text.replace('World', 'TypeScript')",
+          "  };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_contains": {
+            "upper": "HELLO, WORLD!",
+            "lower": "hello, world!",
+            "length": 13,
+            "words": [
+              "Hello",
+              "World!"
+            ],
+            "replaced": "Hello, TypeScript!"
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Use template literals",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Use template literals",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const name = 'Alice';",
+          "  const age = 30;",
+          "  const greeting = `Hello, ${name}! You are ${age} years old.`;",
+          "  const multiline = `",
+          "    Line 1",
+          "    Line 2",
+          "    Line 3",
+          "  `.trim();",
+          "  ",
+          "  return { greeting, multiline, lines: multiline.split('\\n').length };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_contains": {
+            "greeting": "Hello, Alice! You are 30 years old.",
+            "lines": 3
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test destructuring syntax",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Test destructuring syntax",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const person = { name: 'Bob', age: 25, city: 'NYC' };",
+          "  const { name, age } = person;",
+          "  ",
+          "  const numbers = [10, 20, 30, 40];",
+          "  const [first, second, ...rest] = numbers;",
+          "  ",
+          "  return { name, age, first, second, rest };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_contains": {
+            "name": "Bob",
+            "age": 25,
+            "first": 10,
+            "second": 20,
+            "rest": [
+              30,
+              40
+            ]
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test arrow functions and closures",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Test arrow functions and closures",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const makeCounter = () => {",
+          "    let count = 0;",
+          "    return () => ++count;",
+          "  };",
+          "  ",
+          "  const counter = makeCounter();",
+          "  const results = [];",
+          "  for (let i = 0; i < 5; i++) {",
+          "    results.push(counter());",
+          "  }",
+          "  ",
+          "  return results;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_matches": [
+            1,
+            2,
+            3,
+            4,
+            5
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test Set for unique values",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Test Set for unique values",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const numbers = [1, 2, 2, 3, 3, 3, 4, 4, 4, 4];",
+          "  const unique = [...new Set(numbers)];",
+          "  ",
+          "  const words = ['apple', 'banana', 'apple', 'cherry', 'banana'];",
+          "  const uniqueWords = [...new Set(words)];",
+          "  ",
+          "  return { unique, uniqueWords, count: unique.length };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "return_value_contains": {
+            "unique": [
+              1,
+              2,
+              3,
+              4
+            ],
+            "uniqueWords": [
+              "apple",
+              "banana",
+              "cherry"
+            ],
+            "count": 4
+          }
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "validation_passed": true
+    }
+  }
+}

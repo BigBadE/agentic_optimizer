@@ -1,0 +1,81 @@
+{
+  "name": "TypeScript File Tool Operations",
+  "description": "Tests TypeScript code using file operation tools (writeFile, readFile, listFiles)",
+  "tags": [
+    "typescript",
+    "tools",
+    "file-operations"
+  ],
+  "setup": {
+    "files": {},
+    "env_vars": {},
+    "terminal_size": [
+      80,
+      24
+    ],
+    "tools": [
+      "WriteFileTool",
+      "ReadFileTool",
+      "ListFilesTool"
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Write a test file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Write a test file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "function agent_code() {",
+          "  const content = 'Hello from TypeScript!';",
+          "  const filename = 'test.txt';",
+          "  ",
+          "  writeFile(filename, content);",
+          "  ",
+          "  return { message: 'File written', filename, content };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "writeFile"
+          ],
+          "return_value_contains": {
+            "message": "File written",
+            "filename": "test.txt",
+            "content": "Hello from TypeScript!"
+          }
+        },
+        "files": [
+          {
+            "path": "test.txt",
+            "exists": true,
+            "content_matches": "Hello from TypeScript!"
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "validation_passed": true
+    },
+    "files": [
+      {
+        "path": "test.txt",
+        "exists": true
+      }
+    ]
+  }
+}

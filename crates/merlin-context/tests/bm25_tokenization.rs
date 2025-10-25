@@ -66,17 +66,28 @@ fn test_tokenization_debug() {
     }
 }
 
-/// Bigrams should improve phrase matching quality.
+/// Bigrams should improve phrase matching quality by ranking exact phrases higher.
 #[test]
-fn test_bigram_generation() {
+fn test_bigram_phrase_ranking() {
     let mut index = BM25Index::default();
 
-    index.add_document("test.rs".into(), "authentication service implementation");
+    // Document with phrase together vs split
+    index.add_document("file1.rs".into(), "authentication service implementation");
+    index.add_document("file2.rs".into(), "authentication code and service layer");
     index.finalize();
 
-    // Bigrams should help match phrases
+    // Search for exact phrase - should rank file with adjacent words higher
     let results = index.search("authentication service", 5);
-    assert!(!results.is_empty(), "Should find document with bigram");
+    assert!(!results.is_empty(), "Should find documents");
+
+    // file1 has "authentication service" together, should rank higher than file2
+    if results.len() >= 2 {
+        assert_eq!(
+            results[0].0.to_string_lossy(),
+            "file1.rs",
+            "Document with adjacent phrase should rank higher. Results: {results:?}"
+        );
+    }
 }
 
 /// Mixed special and regular tokens should be searchable together.

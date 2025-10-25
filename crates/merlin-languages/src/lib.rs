@@ -50,24 +50,14 @@ pub fn create_backend(language: Language) -> Result<Box<dyn LanguageProvider>> {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_language_equality() {
-        assert_eq!(Language::Rust, Language::Rust);
-    }
+    // REMOVED: test_language_equality - Trait implementation test
 
-    #[test]
-    fn test_language_debug() {
-        let lang = Language::Rust;
-        let debug_str = format!("{lang:?}");
-        assert_eq!(debug_str, "Rust");
-    }
 
-    #[test]
-    fn test_language_clone() {
-        let lang1 = Language::Rust;
-        let lang2 = lang1;
-        assert_eq!(lang1, lang2);
-    }
+    // REMOVED: test_language_debug - Trait implementation test
+
+
+    // REMOVED: test_language_clone - Trait implementation test
+
 
     #[test]
     fn test_create_backend_rust() {

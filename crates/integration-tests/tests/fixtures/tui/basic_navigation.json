@@ -1,0 +1,48 @@
+{
+  "name": "Basic TUI Navigation",
+  "description": "Tests keyboard navigation between input, tasks, and output panes",
+  "tags": [
+    "tui",
+    "navigation",
+    "keyboard"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test input field",
+        "submit": false
+      },
+      "verify": {}
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "tab"
+      },
+      "verify": {}
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "tab"
+      },
+      "verify": {}
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "tab"
+      },
+      "verify": {}
+    }
+  ],
+  "final_verify": {}
+}

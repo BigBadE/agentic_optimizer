@@ -22,4 +22,7 @@ metrics.json
 # Cache files
 .agentic_cache/
 
+# Coverage reports
+benchmarks/data/coverage/html/
+
 # Benchmark results

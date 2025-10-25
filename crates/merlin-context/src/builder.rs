@@ -564,31 +564,6 @@ impl ContextBuilder {
         Ok(())
     }
 
-    /// Search for relevant context without building full context (for benchmarking)
-    ///
-    /// # Errors
-    /// Returns an error if search initialization or execution fails.
-    pub async fn search_context(&mut self, query: &str) -> Result<Vec<SearchResult>> {
-        if self.vector_manager.is_none() {
-            tracing::info!("Initializing vector search...");
-            let mut manager = VectorSearchManager::new(self.project_root.clone());
-
-            if let Some(callback) = self.progress_callback.clone() {
-                manager = manager.with_progress_callback(callback);
-            }
-
-            manager.initialize().await?;
-            self.vector_manager = Some(manager);
-        }
-
-        let Some(manager) = self.vector_manager.as_ref() else {
-            return Err(Error::Other("Vector manager should be initialized".into()));
-        };
-        let results = manager.search(query, 50).await?;
-
-        Ok(results)
-    }
-
     /// Performs hybrid search (BM25 + vector) for relevant code chunks.
     ///
     /// # Errors

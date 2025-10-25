@@ -1,7 +1,6 @@
 //! Utility functions for CLI operations
 
 use anyhow::{Context as _, Result};
-use merlin_core::{Response, TokenUsage};
 use merlin_routing::{MessageLevel, UiChannel, UiEvent};
 use std::env;
 use std::fs;
@@ -31,52 +30,6 @@ pub fn get_merlin_folder(project_root: &Path) -> Result<PathBuf> {
         })?;
     }
     Ok(path)
-}
-
-/// Calculate estimated cost based on token usage.
-pub fn calculate_cost(usage: &TokenUsage) -> f64 {
-    const INPUT_COST: f64 = 3.0 / 1_000_000.0;
-    const OUTPUT_COST: f64 = 15.0 / 1_000_000.0;
-    const CACHE_READ_COST: f64 = 0.3 / 1_000_000.0;
-    const CACHE_WRITE_COST: f64 = 3.75 / 1_000_000.0;
-
-    (usage.cache_write as f64).mul_add(
-        CACHE_WRITE_COST,
-        (usage.cache_read as f64).mul_add(
-            CACHE_READ_COST,
-            (usage.output as f64).mul_add(OUTPUT_COST, usage.input as f64 * INPUT_COST),
-        ),
-    )
-}
-
-/// Display response metrics
-pub fn display_response_metrics(response: &Response) {
-    tracing::info!("\n{sep}\n", sep = "=".repeat(80));
-    tracing::info!("{text}", text = response.text);
-    tracing::info!("{sep}", sep = "=".repeat(80));
-
-    tracing::info!("\nMetrics:");
-    tracing::info!("  Provider: {provider}", provider = response.provider);
-    tracing::info!(
-        "  Confidence: {confidence:.2}",
-        confidence = response.confidence
-    );
-    tracing::info!("  Latency: {latency}ms", latency = response.latency_ms);
-    tracing::info!("  Tokens:");
-    tracing::info!("    Input: {input}", input = response.tokens_used.input);
-    tracing::info!("    Output: {output}", output = response.tokens_used.output);
-    tracing::info!(
-        "    Cache Read: {cache_read}",
-        cache_read = response.tokens_used.cache_read
-    );
-    tracing::info!(
-        "    Cache Write: {cache_write}",
-        cache_write = response.tokens_used.cache_write
-    );
-    tracing::info!("    Total: {total}", total = response.tokens_used.total());
-
-    let actual_cost = calculate_cost(&response.tokens_used);
-    tracing::info!("  Cost: ${actual_cost:.4}");
 }
 
 /// Clean up old task files to prevent disk space waste
@@ -131,10 +84,56 @@ pub fn try_write_log(ui: &UiChannel, writer: &mut fs::File, message: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use filetime::{FileTime, set_file_mtime};
+    use merlin_core::{Response, TokenUsage};
     use std::fs;
-    use std::thread::sleep;
-    use std::time::Duration;
     use tempfile::TempDir;
+
+    /// Calculate estimated cost based on token usage.
+    fn calculate_cost(usage: &TokenUsage) -> f64 {
+        const INPUT_COST: f64 = 3.0 / 1_000_000.0;
+        const OUTPUT_COST: f64 = 15.0 / 1_000_000.0;
+        const CACHE_READ_COST: f64 = 0.3 / 1_000_000.0;
+        const CACHE_WRITE_COST: f64 = 3.75 / 1_000_000.0;
+
+        (usage.cache_write as f64).mul_add(
+            CACHE_WRITE_COST,
+            (usage.cache_read as f64).mul_add(
+                CACHE_READ_COST,
+                (usage.output as f64).mul_add(OUTPUT_COST, usage.input as f64 * INPUT_COST),
+            ),
+        )
+    }
+
+    /// Display response metrics
+    fn display_response_metrics(response: &Response) {
+        tracing::info!("\n{sep}\n", sep = "=".repeat(80));
+        tracing::info!("{text}", text = response.text);
+        tracing::info!("{sep}", sep = "=".repeat(80));
+
+        tracing::info!("\nMetrics:");
+        tracing::info!("  Provider: {provider}", provider = response.provider);
+        tracing::info!(
+            "  Confidence: {confidence:.2}",
+            confidence = response.confidence
+        );
+        tracing::info!("  Latency: {latency}ms", latency = response.latency_ms);
+        tracing::info!("  Tokens:");
+        tracing::info!("    Input: {input}", input = response.tokens_used.input);
+        tracing::info!("    Output: {output}", output = response.tokens_used.output);
+        tracing::info!(
+            "    Cache Read: {cache_read}",
+            cache_read = response.tokens_used.cache_read
+        );
+        tracing::info!(
+            "    Cache Write: {cache_write}",
+            cache_write = response.tokens_used.cache_write
+        );
+        tracing::info!("    Total: {total}", total = response.tokens_used.total());
+
+        let actual_cost = calculate_cost(&response.tokens_used);
+        tracing::info!("  Cost: ${actual_cost:.4}");
+    }
 
     #[test]
     fn test_calculate_cost_basic() {
@@ -252,10 +251,14 @@ mod tests {
         let tasks_dir = temp.path().join(".merlin").join("tasks");
         fs::create_dir_all(&tasks_dir).expect("Failed to create tasks dir");
 
+        // Create files with explicitly set timestamps (no sleep needed)
         for task_num in 0..OVER_LIMIT {
             let task_file = tasks_dir.join(format!("task_{task_num}.gz"));
             fs::write(&task_file, b"test").expect("Failed to write task file");
-            sleep(Duration::from_millis(10));
+
+            // Set mtime to task_num seconds ago (older files have lower numbers)
+            let mtime = FileTime::from_unix_time(1_000_000 + task_num as i64, 0);
+            set_file_mtime(&task_file, mtime).expect("Failed to set mtime");
         }
 
         let result = cleanup_old_tasks(temp.path().join(".merlin").as_path());
@@ -305,10 +308,14 @@ mod tests {
         let tasks_dir = temp.path().join(".merlin").join("tasks");
         fs::create_dir_all(&tasks_dir).expect("Failed to create tasks dir");
 
+        // Create gz files with explicit timestamps
         for file_num in 0..NUM_GZ_FILES {
             let file_path = tasks_dir.join(format!("task_{file_num}.gz"));
             fs::write(&file_path, b"gz data").expect("Failed to write gz file");
-            sleep(Duration::from_millis(5));
+
+            // Set mtime to file_num seconds in the future
+            let mtime = FileTime::from_unix_time(1_000_000 + file_num as i64, 0);
+            set_file_mtime(&file_path, mtime).expect("Failed to set mtime");
         }
 
         for file_num in 0..NUM_JSON_FILES {
@@ -351,21 +358,6 @@ mod tests {
         assert_eq!(json_count, NUM_JSON_FILES, "Should preserve all json files");
     }
 
-    #[test]
-    fn test_display_response_metrics() {
-        let response = Response {
-            text: "Test response".to_owned(),
-            confidence: 0.95,
-            tokens_used: TokenUsage {
-                input: 100,
-                output: 50,
-                cache_read: 0,
-                cache_write: 0,
-            },
-            provider: "test-provider".to_owned(),
-            latency_ms: 250,
-        };
+    // REMOVED: test_display_response_metrics - Display formatting test
 
-        display_response_metrics(&response);
-    }
 }

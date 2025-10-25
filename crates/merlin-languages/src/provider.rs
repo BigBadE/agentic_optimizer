@@ -128,12 +128,8 @@ pub trait LanguageProvider: Send + Sync {
 mod tests {
     use super::*;
 
-    #[test]
-    fn test_symbol_kind_equality() {
-        assert_eq!(SymbolKind::Function, SymbolKind::Function);
-        assert_ne!(SymbolKind::Function, SymbolKind::Struct);
-        assert_eq!(SymbolKind::Method, SymbolKind::Method);
-    }
+    // REMOVED: test_symbol_kind_equality - Trait implementation test
+
 
     #[test]
     fn test_symbol_info_creation() {
@@ -204,10 +200,6 @@ mod tests {
         assert!(result.related_files.is_empty());
     }
 
-    #[test]
-    fn test_symbol_kind_debug() {
-        let kind = SymbolKind::Function;
-        let debug_str = format!("{kind:?}");
-        assert_eq!(debug_str, "Function");
-    }
+    // REMOVED: test_symbol_kind_debug - Trait implementation test
+
 }

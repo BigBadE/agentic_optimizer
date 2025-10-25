@@ -1,0 +1,112 @@
+{
+  "name": "TypeScript Code Extraction",
+  "description": "Tests extraction of TypeScript code blocks from LLM responses with various formatting",
+  "tags": [
+    "typescript",
+    "extraction",
+    "parsing"
+  ],
+  "setup": {
+    "files": {},
+    "env_vars": {},
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Execute a simple task",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Execute a simple task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "return { done: true, result: \"Success\" };"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "return_type": "object"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Calculate something with explanation",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Calculate something with explanation",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "const x = 1 + 1;",
+          "return { done: true, result: `Result is ${x}` };"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "return_type": "object",
+          "return_value_contains": {
+            "done": true,
+            "result": "Result is 2"
+          }
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test multiple approaches",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Test multiple approaches",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "return { done: true, result: \"First\" };"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "return_type": "object",
+          "return_value_contains": {
+            "done": true,
+            "result": "First"
+          }
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

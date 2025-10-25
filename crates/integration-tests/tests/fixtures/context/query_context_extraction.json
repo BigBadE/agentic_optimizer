@@ -1,0 +1,233 @@
+{
+  "name": "Query Context Extraction and Building",
+  "description": "Tests context building from queries with varying complexity: empty queries, simple file requests, complex multi-file queries, and path resolution",
+  "tags": [
+    "context",
+    "query",
+    "paths",
+    "empty"
+  ],
+  "setup": {
+    "files": {
+      "src/main.rs": "fn main() {\n    println!(\"Hello, world!\");\n}",
+      "src/lib.rs": "pub mod analyzer;\n\npub fn process() {\n    println!(\"Processing\");\n}",
+      "src/analyzer.rs": "pub struct Analyzer {\n    name: String,\n}\n\nimpl Analyzer {\n    pub fn analyze(&self) -> Result<(), String> {\n        Ok(())\n    }\n}",
+      "tests/test_main.rs": "#[test]\nfn test_main() {\n    assert!(true);\n}"
+    },
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "^$",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Received empty query, nothing to process';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Please analyze src/main.rs for bugs",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "analyze src/main.rs",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const content = await readFile('src/main.rs');",
+          "  const hasPrintln = content.includes('println!');",
+          "  const hasMain = content.includes('fn main()');",
+          "  if (hasMain && hasPrintln) {",
+          "    return 'No obvious bugs found in main.rs';",
+          "  }",
+          "  return 'Found potential issues in main.rs';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Review src/lib.rs and src/analyzer.rs together",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Review src/lib.rs",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const libContent = await readFile('src/lib.rs');",
+          "  const analyzerContent = await readFile('src/analyzer.rs');",
+          "  const libHasAnalyzer = libContent.includes('pub mod analyzer');",
+          "  const analyzerHasStruct = analyzerContent.includes('pub struct Analyzer');",
+          "  return `Library declares analyzer module: ${libHasAnalyzer}, analyzer defines struct: ${analyzerHasStruct}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "The bug is in crate::analyzer - check the Result handling",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "crate::analyzer",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const analyzerContent = await readFile('src/analyzer.rs');",
+          "  const hasResult = analyzerContent.includes('Result<');",
+          "  const hasOk = analyzerContent.includes('Ok(())');",
+          "  if (hasResult && hasOk) {",
+          "    return 'Analyzer Result handling looks correct';",
+          "  }",
+          "  return 'Found issues with Result handling';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Add error handling to src/analyzer.rs analyze method",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Add error handling",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const current = await readFile('src/analyzer.rs');",
+          "  const updated = current.replace(",
+          "    'Ok(())',",
+          "    'if self.name.is_empty() {\\n            Err(\"Name cannot be empty\".to_string())\\n        } else {\\n            Ok(())\\n        }'",
+          "  );",
+          "  await writeFile('src/analyzer.rs', updated);",
+          "  return 'Added validation to analyze method';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile",
+            "writeFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "src/analyzer.rs",
+            "exists": true,
+            "contains": [
+              "Err(",
+              "Name cannot be empty"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "src/analyzer.rs",
+        "exists": true,
+        "contains": [
+          "Err(",
+          "Name cannot be empty"
+        ]
+      },
+      {
+        "path": "src/main.rs",
+        "exists": true,
+        "contains": [
+          "fn main()"
+        ]
+      },
+      {
+        "path": "src/lib.rs",
+        "exists": true,
+        "contains": [
+          "pub mod analyzer"
+        ]
+      }
+    ]
+  }
+}

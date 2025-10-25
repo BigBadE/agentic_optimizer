@@ -1,0 +1,184 @@
+{
+  "name": "Comprehensive UI Verification",
+  "description": "Tests all UI verification fields: input_text, cursor_position, focused_pane, input_cleared, focus_changed, tasks_displayed, task_status, task_tree_expanded, output_contains, task_created, all_tasks_completed",
+  "tags": [
+    "tui",
+    "ui",
+    "verification",
+    "comprehensive"
+  ],
+  "setup": {
+    "files": {
+      "test.txt": "Initial content"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "First input without submit",
+        "submit": false
+      },
+      "verify": {
+        "ui": {
+          "input_text": "First input without submit",
+          "cursor_position": 26,
+          "focused_pane": "input"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Second input with submit",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "input_cleared": true,
+          "focus_changed": true,
+          "focused_pane": "output"
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Second input",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const content = await readFile('test.txt');",
+          "  return `Read file: ${content}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile"
+          ]
+        },
+        "ui": {
+          "output_contains": [
+            "Read file",
+            "Initial content"
+          ],
+          "tasks_displayed": 1,
+          "task_status": "completed",
+          "task_created": true
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create a new file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create a new file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('output.txt', 'New content');",
+          "  return 'File created successfully';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "writeFile"
+          ]
+        },
+        "ui": {
+          "output_contains": [
+            "created successfully"
+          ],
+          "tasks_displayed": 2
+        },
+        "files": [
+          {
+            "path": "output.txt",
+            "exists": true,
+            "contains": [
+              "New content"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Third task",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Third task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Task three completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "ui": {
+          "output_contains": [
+            "Task three completed"
+          ],
+          "tasks_displayed": 3
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true,
+      "tasks_displayed": 3,
+      "task_status": "completed"
+    },
+    "files": [
+      {
+        "path": "test.txt",
+        "exists": true,
+        "contains": [
+          "Initial content"
+        ]
+      },
+      {
+        "path": "output.txt",
+        "exists": true,
+        "contains": [
+          "New content"
+        ]
+      }
+    ]
+  }
+}

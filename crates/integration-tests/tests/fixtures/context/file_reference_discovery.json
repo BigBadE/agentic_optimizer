@@ -1,0 +1,290 @@
+{
+  "name": "File Reference Discovery and Context Building",
+  "description": "Tests that the agent can discover and work with files mentioned in various formats: inline mentions, code blocks, paths, module paths, and multiple file extensions",
+  "tags": [
+    "context",
+    "file_discovery",
+    "paths",
+    "modules"
+  ],
+  "setup": {
+    "files": {
+      "src/main.rs": "mod utils;\nuse utils::helper;\n\nfn main() {\n    println!(\"Hello from main!\");\n    helper::do_work();\n}",
+      "src/lib.rs": "pub mod utils;\n\npub fn public_function() {\n    println!(\"Public API\");\n}",
+      "src/utils/mod.rs": "pub mod helper;",
+      "src/utils/helper.rs": "pub fn do_work() {\n    println!(\"Doing work\");\n}\n\npub fn calculate(x: i32, y: i32) -> i32 {\n    x + y\n}",
+      "tests/integration_test.rs": "#[test]\nfn test_example() {\n    assert_eq!(2 + 2, 4);\n}",
+      "config.toml": "key = \"value\"\n[section]\nfoo = \"bar\"",
+      "README.md": "# Project\n\nThis is a test project.",
+      "data.json": "{\"test\": true, \"value\": 42}"
+    },
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Please check src/main.rs and src/lib.rs to understand the structure",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "check src/main.rs",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const mainContent = await readFile('src/main.rs');",
+          "  const libContent = await readFile('src/lib.rs');",
+          "  const hasUtils = mainContent.includes('utils');",
+          "  const hasPublic = libContent.includes('public_function');",
+          "  return `Main file uses utils: ${hasUtils}, Lib has public API: ${hasPublic}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "The issue is in `src/main.rs` on line 5. Also check src/utils/helper.rs",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "issue is in",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const mainContent = await readFile('src/main.rs');",
+          "  const helperContent = await readFile('src/utils/helper.rs');",
+          "  const mainLines = mainContent.split('\\n').length;",
+          "  const helperFunctions = (helperContent.match(/pub fn/g) || []).length;",
+          "  return `Main has ${mainLines} lines, helper has ${helperFunctions} public functions`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Check config.toml, README.md and data.json for configuration",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "config.toml",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const config = await readFile('config.toml');",
+          "  const readme = await readFile('README.md');",
+          "  const data = await readFile('data.json');",
+          "  const hasToml = config.includes('[section]');",
+          "  const hasMd = readme.startsWith('# Project');",
+          "  const hasJson = data.includes('\"test\"');",
+          "  return `Found TOML: ${hasToml}, MD: ${hasMd}, JSON: ${hasJson}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "config.toml",
+            "exists": true,
+            "contains": [
+              "[section]"
+            ]
+          },
+          {
+            "path": "README.md",
+            "exists": true,
+            "contains": [
+              "# Project"
+            ]
+          },
+          {
+            "path": "data.json",
+            "exists": true,
+            "contains": [
+              "\"test\""
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Update all three files mentioned in the last request",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Update all three",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('config.toml', 'key = \"updated\"\\n[section]\\nfoo = \"baz\"');",
+          "  await writeFile('README.md', '# Project\\n\\nThis is an updated test project.');",
+          "  await writeFile('data.json', '{\"test\": true, \"value\": 100, \"updated\": true}');",
+          "  return 'Updated all three configuration files';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "writeFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "config.toml",
+            "exists": true,
+            "contains": [
+              "updated",
+              "baz"
+            ]
+          },
+          {
+            "path": "README.md",
+            "exists": true,
+            "contains": [
+              "updated test project"
+            ]
+          },
+          {
+            "path": "data.json",
+            "exists": true,
+            "contains": [
+              "\"updated\": true",
+              "\"value\": 100"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Check if nonexistent.rs or fake_file.txt exist",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "nonexistent.rs",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    await readFile('nonexistent.rs');",
+          "    return 'File exists unexpectedly';",
+          "  } catch (error) {",
+          "    try {",
+          "      await readFile('fake_file.txt');",
+          "      return 'Fake file exists unexpectedly';",
+          "    } catch (error2) {",
+          "      return 'Both files correctly do not exist';",
+          "    }",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "config.toml",
+        "exists": true,
+        "contains": [
+          "updated",
+          "baz"
+        ]
+      },
+      {
+        "path": "README.md",
+        "exists": true,
+        "contains": [
+          "updated test project"
+        ]
+      },
+      {
+        "path": "data.json",
+        "exists": true,
+        "contains": [
+          "\"updated\": true"
+        ]
+      },
+      {
+        "path": "nonexistent.rs",
+        "exists": false
+      },
+      {
+        "path": "fake_file.txt",
+        "exists": false
+      }
+    ]
+  }
+}

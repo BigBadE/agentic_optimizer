@@ -1,0 +1,263 @@
+{
+  "name": "Edit Tool Operations",
+  "description": "Tests text replacement: simple edits, replace_all, multiple matches errors, file structure preservation, unicode",
+  "tags": [
+    "tools",
+    "edit",
+    "replace"
+  ],
+  "setup": {
+    "files": {
+      "src/lib.rs": "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n",
+      "test.txt": "foo bar foo baz foo",
+      "multiline.txt": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n",
+      "unicode.txt": "Hello 世界 🌍\nRust 🦀 is great!\n"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Change add to multiply in lib.rs",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Change add to multiply",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await editFile('src/lib.rs', 'a + b', 'a * b');",
+          "  const content = await readFile('src/lib.rs');",
+          "  return `Updated lib.rs to multiply:\\n${content}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "editFile",
+            "readFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "src/lib.rs",
+            "exists": true,
+            "contains": [
+              "a * b"
+            ],
+            "not_contains": [
+              "a + b"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Replace all 'foo' with 'FOO' in test.txt",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Replace all 'foo'",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await editFile('test.txt', 'foo', 'FOO', { replace_all: true });",
+          "  const content = await readFile('test.txt');",
+          "  return `Replaced all occurrences: ${content}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "editFile",
+            "readFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "test.txt",
+            "exists": true,
+            "exact_content": "FOO bar FOO baz FOO"
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Try to replace 'FOO' without replace_all flag (should fail)",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "without replace_all",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    await editFile('test.txt', 'FOO', 'foo');",
+          "    return 'Unexpectedly succeeded';",
+          "  } catch (error) {",
+          "    return `Expected error: ${error}`;",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "editFile"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Edit line 3 of multiline.txt",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Edit line 3",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await editFile('multiline.txt', 'Line 3', 'Modified Line 3');",
+          "  const content = await readFile('multiline.txt');",
+          "  return `Updated multiline.txt:\\n${content}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "editFile",
+            "readFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "multiline.txt",
+            "exists": true,
+            "contains": [
+              "Line 1",
+              "Line 2",
+              "Modified Line 3",
+              "Line 4",
+              "Line 5"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Replace unicode in unicode.txt",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Replace unicode",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await editFile('unicode.txt', '世界', 'World');",
+          "  const content = await readFile('unicode.txt');",
+          "  return `Updated unicode file: ${content}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": [
+            "editFile",
+            "readFile"
+          ]
+        },
+        "files": [
+          {
+            "path": "unicode.txt",
+            "exists": true,
+            "contains": [
+              "World",
+              "🌍",
+              "🦀"
+            ],
+            "not_contains": [
+              "世界"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "src/lib.rs",
+        "contains": [
+          "a * b"
+        ]
+      },
+      {
+        "path": "test.txt",
+        "exact_content": "FOO bar FOO baz FOO"
+      },
+      {
+        "path": "multiline.txt",
+        "contains": [
+          "Modified Line 3"
+        ]
+      },
+      {
+        "path": "unicode.txt",
+        "contains": [
+          "World"
+        ],
+        "not_contains": [
+          "世界"
+        ]
+      }
+    ]
+  }
+}

@@ -19,19 +19,11 @@ uuid.workspace = true
 criterion = { version = "0.7", features = ["html_reports", "async_tokio"] }
 
 [[bench]]
-name = "cache_benchmarks"
-harness = false
-
-[[bench]]
 name = "routing_benchmarks"
 harness = false
 
 [[bench]]
 name = "integration_benchmarks"
-harness = false
-
-[[bench]]
-name = "metrics_benchmarks"
 harness = false
 
 [lints]

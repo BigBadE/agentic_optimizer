@@ -462,9 +462,7 @@ pub struct CoordinatorStats {
 mod tests {
     use super::*;
     use merlin_core::{Response, TokenUsage, ValidationResult};
-    use std::time::Duration;
     use tokio::spawn;
-    use tokio::time::sleep;
 
     /// Helper to create a test `TaskResult`
     fn create_test_result(task_id: TaskId) -> TaskResult {
@@ -1008,6 +1006,8 @@ mod tests {
 
     #[tokio::test]
     async fn test_cleanup_old_tasks() {
+        use std::time::{SystemTime, UNIX_EPOCH};
+
         let coordinator = TaskCoordinator::new();
 
         let task1 = Task::new("Task 1".to_owned());
@@ -1029,8 +1029,17 @@ mod tests {
             .map_err(|err| err.to_string())
             .expect("Failed to complete task1");
 
-        // Wait more than 1 second to ensure task1 is old enough
-        sleep(Duration::from_secs(1)).await;
+        // Manually set task1 to be old by backdating its timestamp
+        {
+            let mut state = coordinator.state.lock().await;
+            if let Some(execution) = state.active_tasks.get_mut(&task1_id) {
+                let now = SystemTime::now()
+                    .duration_since(UNIX_EPOCH)
+                    .map_or(0, |duration| duration.as_secs());
+                // Set timestamp to 2 seconds ago
+                execution.updated_at = now.saturating_sub(2);
+            }
+        }
 
         let task2 = Task::new("Task 2".to_owned());
         let task2_id = task2.id;
@@ -1040,9 +1049,9 @@ mod tests {
             .map_err(|err| err.to_string())
             .expect("Failed to register task2");
 
-        // Cleanup tasks older than 0 seconds (should remove task1 but not task2)
+        // Cleanup tasks older than 1 second (should remove task1 but not task2)
         let removed = coordinator
-            .cleanup_old_tasks(0)
+            .cleanup_old_tasks(1)
             .await
             .map_err(|err| err.to_string())
             .expect("Failed to cleanup");

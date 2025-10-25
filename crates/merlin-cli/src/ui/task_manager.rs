@@ -151,20 +151,6 @@ impl TaskManager {
         }
     }
 
-    /// Checks if a task is a descendant of another
-    pub fn is_descendant_of(&self, task_id: TaskId, ancestor_id: TaskId) -> bool {
-        let mut current_parent = self.get_parent_id(task_id);
-
-        while let Some(parent_id) = current_parent {
-            if parent_id == ancestor_id {
-                return true;
-            }
-            current_parent = self.get_parent_id(parent_id);
-        }
-
-        false
-    }
-
     /// Iterates over all tasks
     pub fn iter_tasks(&self) -> impl Iterator<Item = (TaskId, &TaskDisplay)> {
         self.tasks.iter().map(|(&id, task)| (id, task))
@@ -176,6 +162,19 @@ impl TaskManager {
     }
 
     // Private helper methods
+
+    fn is_descendant_of(&self, task_id: TaskId, ancestor_id: TaskId) -> bool {
+        let mut current_parent = self.get_parent_id(task_id);
+
+        while let Some(parent_id) = current_parent {
+            if parent_id == ancestor_id {
+                return true;
+            }
+            current_parent = self.get_parent_id(parent_id);
+        }
+
+        false
+    }
 
     fn insert_child_task(&mut self, task_id: TaskId, parent_id: TaskId) {
         if let Some(parent_pos) = self.task_order.iter().position(|&id| id == parent_id) {

@@ -1,5 +1,6 @@
 //! Vector search manager with persistent caching.
 
+use crate::embedding::client::EmbeddingProvider;
 use futures::stream::{FuturesUnordered, StreamExt as _};
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -98,7 +99,7 @@ impl VectorCache {
 }
 
 /// Vector search manager with caching and BM25 keyword search
-pub struct VectorSearchManager {
+pub struct VectorSearchManager<E: EmbeddingProvider = EmbeddingClient> {
     /// In-memory vector store
     store: VectorStore,
     /// BM25 keyword search index
@@ -108,7 +109,7 @@ pub struct VectorSearchManager {
     /// File content hashes for validation
     file_hashes: HashMap<PathBuf, u64>,
     /// Embedding client
-    client: EmbeddingClient,
+    client: E,
     /// Project root
     project_root: PathBuf,
     /// Cache file path
@@ -117,7 +118,7 @@ pub struct VectorSearchManager {
     progress_callback: Option<ProgressCallback>,
 }
 
-impl VectorSearchManager {
+impl<E: EmbeddingProvider> VectorSearchManager<E> {
     /// Compute hash of file content for cache validation
     fn compute_file_hash(content: &str) -> u64 {
         let mut hasher = DefaultHasher::new();
@@ -125,8 +126,8 @@ impl VectorSearchManager {
         hasher.finish()
     }
 
-    /// Create a new vector search manager
-    pub fn new(project_root: PathBuf) -> Self {
+    /// Create a new vector search manager with a custom embedding provider
+    pub fn with_provider(project_root: PathBuf, client: E) -> Self {
         let cache_path = Self::resolve_cache_path(&project_root);
 
         Self {
@@ -134,13 +135,22 @@ impl VectorSearchManager {
             bm25: BM25Index::default(),
             file_times: HashMap::default(),
             file_hashes: HashMap::default(),
-            client: EmbeddingClient::default(),
+            client,
             project_root,
             cache_path,
             progress_callback: None,
         }
     }
+}
 
+impl VectorSearchManager<EmbeddingClient> {
+    /// Create a new vector search manager with default Ollama client
+    pub fn new(project_root: PathBuf) -> Self {
+        Self::with_provider(project_root, EmbeddingClient::default())
+    }
+}
+
+impl<E: EmbeddingProvider> VectorSearchManager<E> {
     /// Set a progress callback for embedding operations
     #[must_use]
     pub fn with_progress_callback(mut self, callback: ProgressCallback) -> Self {
@@ -1060,8 +1070,6 @@ impl VectorSearchManager {
         FileChunkMap,
     ) {
         const CHUNK_BATCH_SIZE: usize = 50;
-
-        let client = EmbeddingClient::default();
         let mut all_chunk_results = Vec::new();
         let mut chunk_queue = Vec::new();
         let mut file_chunk_map: FileChunkMap = HashMap::new();
@@ -1091,7 +1099,7 @@ impl VectorSearchManager {
                 .map(|(_, chunk, _)| chunk.content.clone())
                 .collect();
 
-            let embeddings = match client.embed_batch(chunk_texts).await {
+            let embeddings = match self.client.embed_batch(chunk_texts).await {
                 Ok(embs) => embs,
                 Err(error) => {
                     warn!("Failed to embed batch: {error}");
@@ -1504,7 +1512,7 @@ impl VectorSearchManager {
     }
 }
 
-impl Drop for VectorSearchManager {
+impl<E: EmbeddingProvider> Drop for VectorSearchManager<E> {
     fn drop(&mut self) {
         if !self.store.is_empty() {
             if let Err(error) = self.save_cache_sync() {

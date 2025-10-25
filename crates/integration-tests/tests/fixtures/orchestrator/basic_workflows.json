@@ -1,0 +1,108 @@
+{
+  "name": "Orchestrator Basic Workflows",
+  "description": "Tests orchestrator creation, configuration, and basic task execution patterns",
+  "tags": [
+    "orchestrator",
+    "basic",
+    "configuration"
+  ],
+  "setup": {
+    "files": {},
+    "env_vars": {
+      "MERLIN_FOLDER": "__temp__"
+    },
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create a hello world function",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "hello world",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Created function: fn hello_world() { println!(\"Hello, World!\"); }';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": []
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Say hello",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Say hello",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Hello! I am ready to help you with your coding tasks.';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true,
+          "tools_called": []
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Continue the conversation with previous context",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Continue",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'I remember we were working on a hello world function. How can I help further?';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

@@ -1,0 +1,128 @@
+{
+  "name": "CLI Project Context Detection",
+  "description": "Tests CLI behavior in different project contexts: empty dirs, Rust projects, with/without Cargo.toml",
+  "tags": [
+    "cli",
+    "project",
+    "context"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "cli_exec",
+      "data": {
+        "args": [
+          "--help"
+        ],
+        "cwd": "temp_empty_dir",
+        "expect_success": true
+      },
+      "verify": {
+        "execution": {
+          "exit_code": 0
+        }
+      }
+    },
+    {
+      "type": "setup_project",
+      "data": {
+        "name": "rust_project_basic",
+        "files": {
+          "Cargo.toml": "[package]\nname = \"test-project\"\nversion = \"0.1.0\"\nedition = \"2021\"\n",
+          "src/main.rs": "fn main() {\n    println!(\"Hello, world!\");\n}\n"
+        }
+      }
+    },
+    {
+      "type": "cli_exec",
+      "data": {
+        "args": [
+          "--help"
+        ],
+        "cwd": "rust_project_basic",
+        "expect_success": true
+      },
+      "verify": {
+        "execution": {
+          "exit_code": 0
+        }
+      }
+    },
+    {
+      "type": "setup_project",
+      "data": {
+        "name": "cargo_only_project",
+        "files": {
+          "Cargo.toml": "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2021\"\n"
+        }
+      }
+    },
+    {
+      "type": "cli_exec",
+      "data": {
+        "args": [
+          "--help"
+        ],
+        "cwd": "cargo_only_project",
+        "expect_success": true
+      },
+      "verify": {
+        "execution": {
+          "exit_code": 0
+        }
+      }
+    },
+    {
+      "type": "setup_project",
+      "data": {
+        "name": "project_with_config",
+        "files": {
+          "Cargo.toml": "[package]\nname = \"test\"\nversion = \"0.1.0\"\nedition = \"2021\"",
+          "src/.gitkeep": "",
+          "config.toml": "[providers]\nhigh_model = \"test-model\""
+        }
+      }
+    },
+    {
+      "type": "cli_exec",
+      "data": {
+        "args": [
+          "config"
+        ],
+        "cwd": "project_with_config",
+        "expect_success": true
+      },
+      "verify": {
+        "execution": {
+          "exit_code": 0
+        }
+      }
+    },
+    {
+      "type": "cli_exec",
+      "data": {
+        "args": [
+          "--help"
+        ],
+        "cwd": "temp_non_utf8_safe",
+        "expect_success": true
+      },
+      "verify": {
+        "execution": {
+          "exit_code": 0
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_contexts_tested": true
+    }
+  }
+}

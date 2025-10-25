@@ -1,0 +1,249 @@
+{
+  "name": "Self-Determining Task Execution",
+  "description": "Tests self-determining execution where tasks decide their own approach, including simple tasks that skip assessment and complex tasks with decision confidence",
+  "tags": [
+    "executor",
+    "self_determining",
+    "confidence",
+    "simple_task",
+    "complex_task"
+  ],
+  "setup": {
+    "files": {
+      "data.json": "{\"value\": 42, \"name\": \"test\"}",
+      "config.txt": "mode=production\nverbose=true"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "hi",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "hi",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Simple task: should skip assessment and execute directly",
+          "  return 'Hello! How can I help you?';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "return_value_matches": "Hello! How can I help you\\?"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Analyze the JSON data and create a report with high confidence",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Analyze the JSON",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Task with high confidence decision",
+          "  const jsonContent = await readFile('data.json');",
+          "  const data = JSON.parse(jsonContent);",
+          "  ",
+          "  const report = `Analysis Report:",
+          "Value: ${data.value}",
+          "Name: ${data.name}",
+          "Confidence: 0.95`;",
+          "  ",
+          "  await writeFile('report.txt', report);",
+          "  return 'Analysis complete with high confidence (0.95)';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile",
+            "writeFile"
+          ],
+          "return_value_matches": ".*0\\.95.*"
+        },
+        "files": [
+          {
+            "path": "report.txt",
+            "exists": true,
+            "contains": [
+              "Value: 42",
+              "Name: test",
+              "Confidence: 0.95"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Parse config and determine if task needs more context",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Parse config",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Task that determines it needs context (confidence < 0.8)",
+          "  const configContent = await readFile('config.txt');",
+          "  const lines = configContent.split('\\n');",
+          "  ",
+          "  const config: Record<string, string> = {};",
+          "  for (const line of lines) {",
+          "    const [key, value] = line.split('=');",
+          "    if (key && value) {",
+          "      config[key] = value;",
+          "    }",
+          "  }",
+          "  ",
+          "  // Decision: need more context if mode is production",
+          "  if (config.mode === 'production') {",
+          "    await writeFile('context_needed.txt', 'Need production environment details. Confidence: 0.75');",
+          "    return 'Task needs more context (confidence: 0.75)';",
+          "  }",
+          "  ",
+          "  return 'Config parsed successfully';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile",
+            "writeFile"
+          ],
+          "return_value_matches": ".*0\\.75.*"
+        },
+        "files": [
+          {
+            "path": "context_needed.txt",
+            "exists": true,
+            "contains": [
+              "Need production environment details",
+              "Confidence: 0.75"
+            ]
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Execute task with moderate confidence and reasoning",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "moderate confidence",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Task decision with reasoning and moderate confidence",
+          "  const data = await readFile('data.json');",
+          "  const config = await readFile('config.txt');",
+          "  ",
+          "  const reasoning = 'Have both data and config files. Can proceed with processing.';",
+          "  const confidence = 0.85;",
+          "  ",
+          "  const result = `Decision:",
+          "Reasoning: ${reasoning}",
+          "Confidence: ${confidence}",
+          "Action: Processing data with config settings`;",
+          "  ",
+          "  await writeFile('decision.txt', result);",
+          "  return `Task completed with confidence ${confidence}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_parsed": true,
+          "typescript_executed": true,
+          "tools_called": [
+            "readFile",
+            "writeFile"
+          ],
+          "return_value_matches": ".*0\\.85.*"
+        },
+        "files": [
+          {
+            "path": "decision.txt",
+            "exists": true,
+            "contains": [
+              "Reasoning: Have both data and config files",
+              "Confidence: 0.85",
+              "Action: Processing data with config settings"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "report.txt",
+        "exists": true,
+        "contains": [
+          "Value: 42"
+        ]
+      },
+      {
+        "path": "context_needed.txt",
+        "exists": true,
+        "contains": [
+          "Confidence: 0.75"
+        ]
+      },
+      {
+        "path": "decision.txt",
+        "exists": true,
+        "contains": [
+          "Confidence: 0.85"
+        ]
+      }
+    ]
+  }
+}

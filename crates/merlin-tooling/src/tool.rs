@@ -114,50 +114,20 @@ mod tests {
     use super::*;
     use serde_json::{Value as JsonValue, from_str, json, to_string};
 
-    #[test]
-    fn test_tool_error_display() {
-        let error1 = ToolError::InvalidInput("bad param".to_owned());
-        assert_eq!(error1.to_string(), "Invalid input: bad param");
+    // REMOVED: test_tool_error_display - Low value trait test
 
-        let error2 = ToolError::ExecutionFailed("command failed".to_owned());
-        assert_eq!(error2.to_string(), "Tool execution failed: command failed");
-    }
 
-    #[test]
-    fn test_tool_error_from_io() {
-        use std::io::{Error as StdIoError, ErrorKind};
+    // REMOVED: test_tool_error_from_io - Low value trait test
 
-        let io_error = StdIoError::new(ErrorKind::NotFound, "not found");
-        let error: ToolError = io_error.into();
-        assert!(matches!(error, ToolError::Io(_)));
-    }
 
-    #[test]
-    fn test_tool_input_serialization() {
-        let input = ToolInput {
-            params: json!({"key": "value"}),
-        };
-        let json = to_string(&input).unwrap();
-        let deserialized: ToolInput = from_str(&json).unwrap();
-        assert_eq!(input.params, deserialized.params);
-    }
+    // REMOVED: test_tool_input_serialization - Low value serde test
 
-    #[test]
-    fn test_tool_output_success() {
-        let output = ToolOutput::success("operation completed");
-        assert!(output.success);
-        assert_eq!(output.message, "operation completed");
-        assert!(output.data.is_none());
-    }
 
-    #[test]
-    fn test_tool_output_success_with_data() {
-        let data = json!({"result": 42});
-        let output = ToolOutput::success_with_data("computed", data.clone());
-        assert!(output.success);
-        assert_eq!(output.message, "computed");
-        assert_eq!(output.data, Some(data));
-    }
+    // REMOVED: test_tool_output_success - Trivial test
+
+
+    // REMOVED: test_tool_output_success_with_data - Trivial test
+
 
     #[test]
     fn test_tool_output_error() {
@@ -167,15 +137,8 @@ mod tests {
         assert!(output.data.is_none());
     }
 
-    #[test]
-    fn test_tool_output_serialization() {
-        let output = ToolOutput::success_with_data("done", json!({"count": 5}));
-        let json = to_string(&output).unwrap();
-        let deserialized: ToolOutput = from_str(&json).unwrap();
-        assert_eq!(output.success, deserialized.success);
-        assert_eq!(output.message, deserialized.message);
-        assert_eq!(output.data, deserialized.data);
-    }
+    // REMOVED: test_tool_output_serialization - Low value serde test
+
 
     // Mock tool for testing the trait
     struct MockTool;

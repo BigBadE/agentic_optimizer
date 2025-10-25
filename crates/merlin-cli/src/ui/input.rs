@@ -54,7 +54,7 @@ impl InputManager {
     }
 
     /// Auto-wraps the input text to fit within the specified width
-    pub fn auto_wrap(&mut self, max_line_width: usize) {
+    fn auto_wrap(&mut self, max_line_width: usize) {
         let lines = self.input_area.lines().to_vec();
         let (cursor_row, _cursor_col) = self.input_area.cursor();
 

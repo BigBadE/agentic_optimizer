@@ -7,7 +7,10 @@ use super::fixture::{MatchType, TestEvent, TestFixture, TriggerConfig};
 use super::verifier::{UnifiedVerifier, VerificationResult};
 use async_trait::async_trait;
 use merlin_agent::ThreadStore;
-use merlin_core::{Context, Message, MessageRole, ModelProvider, Query, Response, Result, RoutingError, Thread, ThreadId, TokenUsage};
+use merlin_core::{
+    Context, Message, MessageRole, ModelProvider, Query, Response, Result, RoutingError, Thread,
+    ThreadId, TokenUsage,
+};
 use merlin_tooling::{
     BashTool, ContextRequestTool, DeleteFileTool, EditFileTool, ListFilesTool, ReadFileTool,
     ToolResult, TypeScriptRuntime, WriteFileTool,

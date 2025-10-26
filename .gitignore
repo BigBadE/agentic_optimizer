@@ -17,11 +17,3 @@ Thumbs.db
 # Metrics and logs
 metrics.json
 *.log
-
-# Cache files
-.agentic_cache/
-
-# Coverage reports
-benchmarks/data/coverage/html/
-
-# Benchmark results

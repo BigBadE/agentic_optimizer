@@ -1,11 +1,11 @@
 //! Command handlers for CLI operations
 
 use anyhow::Result;
-use merlin_agent::RoutingOrchestrator;
+use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_routing::RoutingConfig;
 use std::fs;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tracing_subscriber::{
     EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
 };
@@ -67,9 +67,15 @@ pub async fn handle_interactive(
         config.tiers.premium_enabled = false;
     }
 
-    let orchestrator = RoutingOrchestrator::new(config);
+    // Create thread store
+    let thread_storage_path = merlin_dir.join("threads");
+    let thread_store = Arc::new(Mutex::new(ThreadStore::new(thread_storage_path)?));
+
+    // Create orchestrator with thread store
+    let orchestrator =
+        RoutingOrchestrator::new(config)?.with_thread_store(Arc::clone(&thread_store));
 
     let flags = InteractiveFlags { local_only };
 
-    handle_interactive_agent(orchestrator?, project, flags).await
+    handle_interactive_agent(orchestrator, project, flags).await
 }

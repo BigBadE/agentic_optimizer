@@ -124,4 +124,20 @@ impl<B: Backend> TuiApp<B> {
             self.state.loading_tasks = false;
         }
     }
+
+    /// Loads threads from disk
+    ///
+    /// # Errors
+    /// Returns an error if thread loading fails
+    pub fn load_threads(&mut self) -> Result<()> {
+        let loaded_count = self.thread_store.active_threads().len();
+        self.thread_store.load_all()?;
+        let new_count = self.thread_store.active_threads().len();
+        tracing::info!(
+            "Loaded {} threads from disk ({} new)",
+            new_count,
+            new_count.saturating_sub(loaded_count)
+        );
+        Ok(())
+    }
 }

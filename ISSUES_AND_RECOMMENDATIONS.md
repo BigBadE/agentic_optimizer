@@ -4,13 +4,18 @@ Active issues and improvements needed for the Merlin codebase.
 
 ## Status Update (2025-10-26)
 
-**ALL PHASES COMPLETED (1-5):**
+**PHASES 1-7 COMPLETED:**
 - ✅ Thread type system fully implemented and tested
 - ✅ Old types (SubtaskSpec, TaskList) completely removed
 - ✅ TaskListExecutor deleted
 - ✅ UI parent-child hierarchy removed (flat task system)
 - ✅ Thread-aware orchestrator implemented
 - ✅ Thread panel rendering with color-coded threads and status emojis
+- ✅ **ThreadStore integrated into CLI lifecycle** (Phase 6)
+- ✅ **Threads automatically created for every task** (Phase 7)
+- ✅ **Messages added to threads when user submits input** (Phase 7)
+- ✅ **WorkUnit attached to messages with completion status** (Phase 7)
+- ✅ **Threads saved to disk with full work history** (Phase 7)
 - ✅ All 290 tests passing
 - ✅ All 53 fixtures passing
 
@@ -25,12 +30,18 @@ Active issues and improvements needed for the Merlin codebase.
 - `ConversationHistory` type alias for cleaner APIs
 - `FocusedPane::Threads` enum variant for thread panel navigation
 - `render_thread_list()` method displays threads with color emojis and work status
+- **ThreadStore created in `handlers.rs` and passed to orchestrator**
+- **Tasks automatically create/continue threads with thread-aware execution**
+- **Threads loaded on startup from `.merlin/threads/` directory**
+- **Work completion/failure tracked in thread messages**
 
 **Implementation Notes:**
 - Thread panel ready for integration (currently has placeholder dead_code allows)
-- Thread navigation and side-by-side layout deferred to future UX work
-- Queue management and work control integrated into orchestrator
-- All core infrastructure for thread-based conversations complete
+- ThreadStore lifecycle fully integrated (create, load, save)
+- All tasks now execute within thread context
+- Thread history automatically passed to orchestrator for context
+- Threads persist to disk as JSON in `.merlin/threads/<thread_id>.json`
+- Next: Work queue management and UI navigation (Phases 8-9)
 
 ---
 

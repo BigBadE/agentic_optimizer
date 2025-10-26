@@ -52,3 +52,8 @@ runs:
         workspaces: "."
         cache-all-crates: true
         key: ${{ runner.os }}-${{ hashFiles('**/Cargo.toml') }}${{ inputs.cache-key }}
+
+    - name: Make scripts runable
+      shell: bash
+      run:
+        chmod -R +x scripts

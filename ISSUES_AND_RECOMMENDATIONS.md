@@ -41,7 +41,10 @@ Active issues and improvements needed for the Merlin codebase.
 - All tasks now execute within thread context
 - Thread history automatically passed to orchestrator for context
 - Threads persist to disk as JSON in `.merlin/threads/<thread_id>.json`
-- Next: Work queue management and UI navigation (Phases 8-9)
+- **Phase 8**: Basic work queue management implemented via task blocking (prevents simultaneous tasks)
+- **Phase 9**: Thread navigation UI deferred (requires complex TUI changes, not critical for core functionality)
+- **Phase 10**: Thread-based fixtures in progress
+- Core thread system fully functional and integrated
 
 ---
 

@@ -1,0 +1,38 @@
+name: Coverage
+
+on: [push, pull_request]
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions: {}
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+  CARGO_INCREMENTAL: 0
+
+jobs:
+  coverage:
+    name: Coverage on Ubuntu
+    runs-on: ubuntu-latest
+    container: ghcr.io/bigbade/agentic_optimizer/ci:latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
+
+      - name: Run coverage
+        env:
+          CARGO_PROFILE: ci
+          MERLIN_CI: "1"
+        run: ./scripts/verify.sh --cov
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v4
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+          files: ./benchmarks/data/coverage/latest.info
+          verbose: true
+          fail_ci_if_error: false

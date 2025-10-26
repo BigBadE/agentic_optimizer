@@ -15,45 +15,13 @@ env:
   CARGO_INCREMENTAL: 0
 
 jobs:
-  coverage:
-    name: Coverage on Ubuntu
-    runs-on: ubuntu-latest
-
-    steps:
-      - name: Checkout repository
-        uses: actions/checkout@08c6903cd8c0fde910a37f88322edcfb5dd907a8 # v5.0.0
-        with:
-          persist-credentials: false
-
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-        with:
-          components: llvm-tools-preview
-          tools: cargo-llvm-cov,cargo-nextest
-
-      - name: Run coverage via commit.sh
-        shell: bash
-        env:
-          CARGO_PROFILE: ci
-        run: |
-          # Run commit.sh in CI mode (skips clean step)
-          ./scripts/commit.sh --no-cloud --ci
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v4
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./benchmarks/data/coverage/latest.info
-          verbose: true
-          fail_ci_if_error: false
-
   test:
     strategy:
       fail-fast: false
       matrix:
         os: [windows-latest, macos-latest]
 
-    name: Fast tests on ${{ matrix.os }}
+    name: Tests on ${{ matrix.os }}
     runs-on: ${{ matrix.os }}
 
     steps:
@@ -87,4 +55,4 @@ jobs:
 
       - name: Run verify.sh
         shell: bash
-        run: ./scripts/verify.sh --no-cloud
+        run: ./scripts/verify.sh

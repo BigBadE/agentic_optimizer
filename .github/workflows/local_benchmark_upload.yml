@@ -1,4 +1,4 @@
-name: Benchmark Upload
+name: Local Benchmark Upload
 
 on:
   push:

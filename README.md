@@ -41,6 +41,27 @@ An intelligent AI coding assistant with multi-model routing, automatic task deco
 
 ### Installation
 
+**Option 1: Using Docker (Recommended for CI/Development)**
+
+Pull the pre-built container with all dependencies:
+```bash
+docker pull ghcr.io/bigbade/agentic_optimizer/ci:latest
+
+# Run tests
+docker run -v $(pwd):/workspace ghcr.io/bigbade/agentic_optimizer/ci:latest cargo test
+
+# Interactive development
+docker run -v $(pwd):/workspace -it ghcr.io/bigbade/agentic_optimizer/ci:latest bash
+```
+
+The container includes:
+- Rust nightly toolchain (from `rust-toolchain.toml`)
+- cargo-nextest, cargo-llvm-cov, grcov, lcov, cargo-sweep
+- Valgrind for benchmarking
+- All build dependencies
+
+**Option 2: Native Installation**
+
 1. **Install Ollama** (for local models):
 ```bash
 # macOS/Linux

@@ -3,23 +3,41 @@
 set -euo pipefail
 
 # Usage:
-#   ./scripts/verify.sh [--no-cloud] [--ollama]
+#   ./scripts/verify.sh [--cov]
 #
 # Flags:
-#   --no-cloud  Unset cloud provider API keys to prevent running GROQ/OpenRouter/Anthropic tests
-#   --ollama    Additionally run tests filtered to "ollama" (requires a local Ollama server)
+#   --cov       Run coverage testing (delegates to coverage.sh)
+#
+# Environment variables:
+#   MERLIN_CI   Set to skip clean step in CI environments
 
-NO_CLOUD=false
-RUN_OLLAMA=false
+check_file_sizes() {
+  local max_lines=500
+  local violations=()
+
+  # Find all Rust source files
+  while IFS= read -r file; do
+    local line_count=$(wc -l < "$file")
+    if [ "$line_count" -gt "$max_lines" ]; then
+      violations+=("$file: $line_count lines")
+    fi
+  done < <(find crates -name "*.rs" -type f)
+
+  if [ "${#violations[@]}" -gt 0 ]; then
+    echo "ERROR: The following files exceed $max_lines lines:"
+    printf '%s\n' "${violations[@]}"
+    return 1
+  fi
+
+  return 0
+}
+
+RUN_COVERAGE=false
 
 for arg in "$@"; do
   case "$arg" in
-    --no-cloud)
-      NO_CLOUD=true
-      shift
-      ;;
-    --ollama)
-      RUN_OLLAMA=true
+    --cov)
+      RUN_COVERAGE=true
       shift
       ;;
     *)
@@ -28,17 +46,20 @@ for arg in "$@"; do
   esac
 done
 
-if [ "$NO_CLOUD" = true ]; then
-  # Explicitly unset cloud provider keys to ensure their tests are skipped
-  unset GROQ_API_KEY || true
-  unset OPENROUTER_API_KEY || true
-  unset ANTHROPIC_API_KEY || true
-  echo "[verify] Cloud provider tests disabled (--no-cloud)"
-fi
+# Check file sizes
+echo "[verify] Checking file sizes..."
+check_file_sizes
 
 # Format, lint, and test
 cargo fmt -q
-cargo clippy --no-deps --all-targets --all-features -- -D warnings
+# Check libs and tests only (not bins) to avoid false-positive dead code warnings
+# for feature-gated test utilities that are only used by integration tests
+cargo clippy --no-deps --lib --tests --all-features -- -D warnings
+
+# Delegate to coverage.sh if --cov is passed (skip normal tests)
+if [ "$RUN_COVERAGE" = true ]; then
+  exec "$(dirname "${BASH_SOURCE[0]}")/coverage.sh"
+fi
 
 # Run full workspace tests
 echo "[verify] Running tests..."
@@ -48,12 +69,9 @@ export MERLIN_FOLDER="${ROOT_DIR}/target/.merlin"
 # Run main tests
 cargo nextest run --run-ignored all
 
-# Optionally run Ollama-specific tests by name filter
-if [ "$RUN_OLLAMA" = true ]; then
-  : "${OLLAMA_HOST:=http://127.0.0.1:11434}"
-  export OLLAMA_HOST
-  echo "[verify] Running Ollama-filtered tests (OLLAMA_HOST=$OLLAMA_HOST)"
-  # Run tests that contain 'ollama' in their name across the workspace.
-  # If none exist, this will simply find zero tests and succeed.
-  cargo test --workspace ollama -- --nocapture || true
+if [ -z "${MERLIN_CI:-}" ]; then
+  echo "[coverage] Cleaning old build artifacts..."
+  cargo sweep --time 1 -r
+else
+  echo "[coverage] Skipping clean step (MERLIN_CI set)"
 fi

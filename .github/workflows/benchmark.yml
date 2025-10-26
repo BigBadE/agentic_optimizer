@@ -1,4 +1,4 @@
-name: Gungraun Benchmarks
+name: Benchmark
 
 on:
   push:
@@ -23,29 +23,13 @@ jobs:
   gungraun-benchmark:
     name: Run Gungraun Benchmarks
     runs-on: ubuntu-latest
+    container: ghcr.io/bigbade/agentic_optimizer/ci:latest
 
     steps:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Cache apt packages
-        uses: actions/cache@v4
-        with:
-          path: /var/cache/apt/archives
-          key: ${{ runner.os }}-apt-valgrind
-
-      - name: Install Valgrind
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y valgrind
-
-      - name: Setup Rust
-        uses: ./.github/actions/setup-rust
-
-      - name: Install binstall
-        uses: taiki-e/install-action@cargo-binstall
 
       - name: Install gungraun-runner
         run: |
@@ -54,7 +38,11 @@ jobs:
 
       - name: Run Gungraun benchmarks
         run: |
-          cargo bench -p merlin-benchmarks-gungraun --bench gungraun_integration --bench gungraun_routing 2>&1 | tee gungraun-output.txt || true
+          cargo bench -p merlin-benchmarks-gungraun --bench gungraun_integration --bench gungraun_routing 2>&1 | tee gungraun-output.txt
+          if grep -q "FAILED" gungraun-output.txt; then
+            echo "Benchmark failures detected"
+            exit 1
+          fi
 
       - name: Prepare gh-pages workspace
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'

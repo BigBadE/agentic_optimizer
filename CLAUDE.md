@@ -20,6 +20,13 @@ This file provides guidance when working with code in this repository.
 - Terminal UI with real-time progress monitoring
 - TypeScript runtime for agent code execution
 
+**Your workflow**
+- Assess necessary changes and current implementation from module docs
+- Make the changes
+- Update module docs and any other relevant documentation with your changes
+- Add/verify testing covers those changes, preferrably with fixtures
+- Run verify.sh to confirm
+
 ## Architecture
 
 **Cargo workspace with these main crates:**
@@ -122,6 +129,10 @@ Located in `crates/<crate-name>/README.md`:
 Fixtures auto-discovered by `crates/integration-tests/tests/unified_tests.rs` and run with `UnifiedTestRunner`.
 
 **Tests should not be modified to match incorrect behavior**. This is not a production system, it will have issues, rely on tests to find them and fix them.
+
+**Tests should NEVER duplicate behavior**. For example, the fixture runner shouldn't re-implement input handling, it should run the CLI and pass inputs to it.
+
+**Tests should NEVER be relaxed**. Verification is the most important thing. Deleting/simplifying tests just to make them pass is never a good idea. You can change them if necessary, but never make them less strict and lose out on finding potential issues.
 
 ### Test Modification Guidelines
 

@@ -43,8 +43,6 @@ jobs:
 
       - name: Setup Rust
         uses: ./.github/actions/setup-rust
-        with:
-          profile: release
 
       - name: Install binstall
         uses: taiki-e/install-action@cargo-binstall

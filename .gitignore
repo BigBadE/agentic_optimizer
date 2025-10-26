@@ -1,5 +1,4 @@
 /target
-Cargo.lock
 rustc-ice-*.txt
 
 # Config files with secrets

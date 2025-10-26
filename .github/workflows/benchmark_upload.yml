@@ -1,9 +1,10 @@
-name: Quality Benchmarks
+name: Benchmark Upload
 
 on:
   push:
     branches: [ master ]
     paths:
+      - 'benchmarks/data/criterion/latest.json'
       - 'benchmarks/data/quality/latest.json'
   workflow_dispatch:
 
@@ -20,8 +21,8 @@ env:
   CARGO_TERM_COLOR: always
 
 jobs:
-  quality-benchmark:
-    name: Run Quality Benchmarks
+  upload-benchmarks:
+    name: Upload Benchmark Results
     runs-on: ubuntu-latest
 
     steps:
@@ -30,12 +31,21 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Upload results artifact
+      - name: Upload criterion results artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: criterion-benchmark-results
+          path: benchmarks/data/criterion/latest.json
+          retention-days: 90
+          if-no-files-found: warn
+
+      - name: Upload quality results artifact
         uses: actions/upload-artifact@v4
         with:
           name: quality-benchmark-results
-          path: benchmarks/data/quality-results.md
+          path: benchmarks/data/quality/latest.json
           retention-days: 90
+          if-no-files-found: warn
 
       - name: Prepare gh-pages workspace
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
@@ -45,17 +55,8 @@ jobs:
           path: gh-pages
           fetch-depth: 0
 
-      - name: Upload parsed JSON
+      - name: Publish benchmark results to gh-pages
         if: github.event_name == 'push' && github.ref == 'refs/heads/master'
-        uses: actions/upload-artifact@v4
-        with:
-          name: quality-json-results
-          path: benchmark-data/quality/latest.json
-          retention-days: 90
-          if-no-files-found: warn
-
-      - name: Publish quality results to gh-pages
-        if: github.event_name == 'push' && github.ref == 'refs/heads/master' && hashFiles('benchmark-data/quality/latest.json') != ''
         run: |
           set -e
           ts=$(date +%Y-%m-%d-%H-%M-%S)
@@ -64,13 +65,20 @@ jobs:
           cd gh-pages
 
           # Create directories
-          mkdir -p data/quality
+          mkdir -p data/criterion data/quality
 
-          # Copy pre-generated JSON data
-          if [ -f ../benchmark-data/quality/latest.json ]; then
-            cp ../benchmark-data/quality/latest.json data/quality/
-            # Also save timestamped version for history
-            cp ../benchmark-data/quality/latest.json "data/quality/${ts}.json"
+          # Copy criterion results if they exist
+          if [ -f ../benchmarks/data/criterion/latest.json ]; then
+            cp ../benchmarks/data/criterion/latest.json data/criterion/
+            cp ../benchmarks/data/criterion/latest.json "data/criterion/${ts}.json"
+            echo "✓ Copied criterion results"
+          fi
+
+          # Copy quality results if they exist
+          if [ -f ../benchmarks/data/quality/latest.json ]; then
+            cp ../benchmarks/data/quality/latest.json data/quality/
+            cp ../benchmarks/data/quality/latest.json "data/quality/${ts}.json"
+            echo "✓ Copied quality results"
           fi
 
           # Generate dashboard if it doesn't exist
@@ -80,15 +88,13 @@ jobs:
             cd gh-pages
             cp /tmp/dashboard-temp/index.html .
             cp -r /tmp/dashboard-temp/assets .
+            echo "✓ Generated dashboard"
           fi
 
           # Commit and push
           git config user.name 'github-actions[bot]'
           git config user.email 'github-actions[bot]@users.noreply.github.com'
           git add data/ index.html assets/ || true
-          git commit -m "Update quality benchmark results: ${ts}" || echo "No changes to commit"
+          git commit -m "Update benchmark results: ${ts}" || echo "No changes to commit"
           git pull --rebase origin gh-pages || true
           git push origin gh-pages
-
-      # Don't remove benchmarks/data/quality-results.md - keep it for manual review and re-runs
-

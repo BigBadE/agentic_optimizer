@@ -1,18 +1,22 @@
 name: "Setup Rust"
-description: "Installs Rust, caches deps, runs cargo-chef"
+description: "Installs Rust toolchain, components, tools, and caching"
 inputs:
-  profile:
-    description: "Cargo profile to use (dev, ci, release)"
-    required: false
-    default: "dev"
   components:
-    description: "Additional Rust components to install"
+    description: "Additional Rust components to install (comma-separated)"
+    required: false
+    default: ""
+  tools:
+    description: "Cargo tools to install via taiki-e/install-action (comma-separated)"
+    required: false
+    default: ""
+  cache-key:
+    description: "Additional cache key suffix"
     required: false
     default: ""
 runs:
   using: "composite"
   steps:
-    - name: Checkout repository
+    - name: Checkout test repository
       uses: actions/checkout@v4
       with:
         repository: 'BigBadE/valor'
@@ -25,71 +29,32 @@ runs:
           cp .cargo/fast_config.toml .cargo/config.toml
         fi
 
-    - name: Cache toolchain
-      uses: actions/cache@v4
-      with:
-        path: |
-          ~/.rustup/toolchains
-          ~/.cargo/registry/index
-          ~/.cargo/registry/cache
-          ~/.cargo/git/db
-        key: ${{ runner.os }}-rustup-${{ hashFiles('rust-toolchain.toml') }}
-
     - name: Install Rust toolchain
-      uses: actions-rs/toolchain@v1
-      with:
-        toolchain: nightly
-        profile: minimal
-        override: true
-        components: ${{ inputs.components }}
+      shell: bash
+      run: rustup show
 
-    - name: Cache dependencies
-      uses: actions/cache@v4
-      with:
-        path: target/${{ inputs.profile }}
-        key: ${{ runner.os }}-cargo-${{ inputs.profile }}-${{ hashFiles('rust-toolchain.toml') }}-${{ hashFiles('**/Cargo.lock', '**/Cargo.toml') }}
-        restore-keys: |
-          ${{ runner.os }}-cargo-${{ inputs.profile }}-${{ hashFiles('rust-toolchain.toml') }}-
-
-    - name: Check and prune cache if needed
+    - name: Install additional components
+      if: inputs.components != ''
       shell: bash
       run: |
-        TARGET_DIR="target/${{ inputs.profile }}"
-        if [ -d "$TARGET_DIR" ]; then
-          # Calculate cache size in MB
-          CACHE_SIZE=$(du -sm "$TARGET_DIR" | cut -f1)
-          echo "Current cache size: ${CACHE_SIZE}MB"
-
-          # More aggressive cleanup for CI profile (500MB limit)
-          if [ "${{ inputs.profile }}" = "ci" ]; then
-            MAX_SIZE=500
-          else
-            MAX_SIZE=1024
+        IFS=',' read -ra COMPONENTS <<< "${{ inputs.components }}"
+        for component in "${COMPONENTS[@]}"; do
+          component=$(echo "$component" | xargs)  # trim whitespace
+          if [ -n "$component" ]; then
+            echo "Installing component: $component"
+            rustup component add "$component"
           fi
+        done
 
-          # If cache exceeds limit, clean it
-          if [ "$CACHE_SIZE" -gt "$MAX_SIZE" ]; then
-            echo "Cache size exceeds ${MAX_SIZE}MB, cleaning..."
-            # Remove incremental compilation artifacts
-            find "$TARGET_DIR" -type d -name "incremental" -exec rm -rf {} + 2>/dev/null || true
-            # Remove build scripts and their outputs
-            find "$TARGET_DIR" -type d -name "build" -exec rm -rf {} + 2>/dev/null || true
-            # Remove examples and benches (not needed in CI)
-            find "$TARGET_DIR" -type d -name "examples" -exec rm -rf {} + 2>/dev/null || true
-            find "$TARGET_DIR" -type d -name "benches" -exec rm -rf {} + 2>/dev/null || true
-            # Remove old build artifacts (keep only .rlib, .rmeta, and executables)
-            find "$TARGET_DIR" -type f ! -name "*.rlib" ! -name "*.rmeta" ! -name "*.exe" ! -perm /111 -delete 2>/dev/null || true
-            # Remove fingerprint files older than 7 days
-            find "$TARGET_DIR" -name ".fingerprint" -type d -exec find {} -type f -mtime +7 -delete \; 2>/dev/null || true
+    - name: Install cargo tools
+      if: inputs.tools != ''
+      uses: taiki-e/install-action@e7ef886cf8f69c25ecef6bbc2858a42e273496ec # v2.62.28
+      with:
+        tool: ${{ inputs.tools }}
 
-            # Recalculate size
-            NEW_SIZE=$(du -sm "$TARGET_DIR" | cut -f1)
-            echo "Cache size after cleanup: ${NEW_SIZE}MB"
-
-            # If still over limit, remove entire cache
-            if [ "$NEW_SIZE" -gt "$MAX_SIZE" ]; then
-              echo "Cache still too large after cleanup, removing entirely..."
-              rm -rf "$TARGET_DIR"
-            fi
-          fi
-        fi
+    - name: Setup Rust cache
+      uses: Swatinem/rust-cache@v2
+      with:
+        workspaces: "."
+        cache-all-crates: true
+        key: ${{ runner.os }}-${{ hashFiles('**/Cargo.toml') }}${{ inputs.cache-key }}

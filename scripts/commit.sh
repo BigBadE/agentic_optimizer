@@ -3,12 +3,13 @@
 set -euo pipefail
 
 # Usage:
-#   ./scripts/commit.sh [--no-cloud] [--ollama] [--html]
+#   ./scripts/commit.sh [--no-cloud] [--ollama] [--html] [--ci]
 #
 # Flags:
 #   --no-cloud  Unset cloud provider API keys to prevent running GROQ/OpenRouter/Anthropic tests
 #   --ollama    Additionally run tests filtered to "ollama" (requires a local Ollama server)
 #   --html      Generate HTML coverage report in addition to lcov
+#   --ci        Skip clean step (for CI environments)
 #
 # This script runs full verification with coverage instrumentation and generates a coverage report.
 # For faster verification without coverage, use ./scripts/verify.sh instead.
@@ -16,6 +17,7 @@ set -euo pipefail
 NO_CLOUD=false
 RUN_OLLAMA=false
 GENERATE_HTML=false
+CI_MODE=false
 
 for arg in "$@"; do
   case "$arg" in
@@ -25,6 +27,10 @@ for arg in "$@"; do
       ;;
     --ollama)
       RUN_OLLAMA=true
+      shift
+      ;;
+    --ci)
+      CI_MODE=true
       shift
       ;;
     *)
@@ -43,7 +49,12 @@ fi
 
 # Format, lint, and test
 cargo fmt --all -q
-cargo clippy --no-deps --all-targets --all-features -- -D warnings
+CARGO_PROFILE="${CARGO_PROFILE:-dev}"
+if [ "$CARGO_PROFILE" = "ci" ]; then
+  cargo clippy --profile ci --no-deps --all-targets --all-features -- -D warnings
+else
+  cargo clippy --no-deps --all-targets --all-features -- -D warnings
+fi
 
 # Run workspace tests with coverage (excluding expensive crates)
 echo "[commit] Running tests with coverage instrumentation..."
@@ -64,6 +75,7 @@ rm -f "${LLVM_COV_DIR}/*.profraw" 2>/dev/null
 echo "[commit] Running coverage on workspace crates..."
 
 LLVM_PROFILE_FILE_NAME="merlin-%m.profraw" \
+CARGO_PROFILE="${CARGO_PROFILE:-dev}" \
 cargo llvm-cov \
   --no-report \
   --ignore-filename-regex "test_repositories|.cargo|.rustup" \
@@ -74,6 +86,7 @@ cargo llvm-cov \
   --exclude merlin-benchmarks-quality \
   --lib --tests \
   --no-fail-fast \
+  --cargo-profile "${CARGO_PROFILE}" \
   nextest
 
 echo "[commit] Nextest completed with exit code: $?"
@@ -180,5 +193,9 @@ echo "[commit] Coverage reports generated in ${REPORT_TIME}s"
 echo "[commit] Cleaning up profraw files..."
 find "${LLVM_COV_DIR}" -name "*.profraw" -delete 2>/dev/null
 
-echo "[commit] Cleaning old build artifacts..."
-cargo sweep --time 1 -r
+if [ "$CI_MODE" = false ]; then
+  echo "[commit] Cleaning old build artifacts..."
+  cargo sweep --time 1 -r
+else
+  echo "[commit] Skipping clean step (CI mode)"
+fi

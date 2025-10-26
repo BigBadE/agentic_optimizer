@@ -1,6 +1,6 @@
 {
   "name": "Workspace Transaction and Rollback",
-  "description": "Tests TaskWorkspace transaction support with create, modify, delete operations and rollback on validation failure",
+  "description": "Tests TaskWorkspace transaction support with create, modify, delete operations and error handling for missing files",
   "tags": [
     "workspace",
     "transaction",
@@ -158,7 +158,7 @@
     {
       "type": "user_input",
       "data": {
-        "text": "Test read on nonexistent file returns None",
+        "text": "Test read on nonexistent file throws error",
         "submit": true
       }
     },
@@ -171,14 +171,19 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('src/does_not_exist.rs');",
-          "  return content === null ? 'Correctly returned null' : 'Error: should be null';",
+          "  try {",
+          "    const content = await readFile('src/does_not_exist.rs');",
+          "    return 'Error: should have thrown';",
+          "  } catch (error) {",
+          "    return 'Correctly threw error for missing file';",
+          "  }",
           "}"
         ]
       },
       "verify": {
         "execution": {
-          "typescript_executed": true
+          "typescript_executed": true,
+          "return_value_matches": "Correctly threw error"
         }
       }
     }

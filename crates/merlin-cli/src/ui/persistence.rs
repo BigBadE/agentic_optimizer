@@ -1,5 +1,6 @@
 use super::task_manager::{TaskDisplay, TaskStatus};
 use flate2::{Compression, read::GzDecoder, write::GzEncoder};
+use merlin_core::ThreadId;
 use merlin_routing::TaskId;
 use serde::{Deserialize, Serialize};
 use serde_json::{from_str, to_string};
@@ -21,7 +22,7 @@ struct SerializableTask {
     output_lines: Vec<String>,
     created_at: SystemTime,
     timestamp: SystemTime,
-    parent_id: Option<TaskId>,
+    thread_id: Option<ThreadId>,
 }
 
 /// Handles task persistence to disk
@@ -78,7 +79,7 @@ impl TaskPersistence {
             output_lines: task.output_lines.clone(),
             created_at: task.created_at,
             timestamp,
-            parent_id: task.parent_id,
+            thread_id: task.thread_id,
         };
 
         let filename = format!("{}.json.gz", extract_task_id_string(task_id));
@@ -189,7 +190,7 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
         output_lines: serializable.output_lines,
         created_at: serializable.created_at,
         timestamp,
-        parent_id: serializable.parent_id,
+        thread_id: serializable.thread_id,
         output: serializable.output_text,
         steps: Vec::default(),
         current_step: None,

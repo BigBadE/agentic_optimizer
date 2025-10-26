@@ -17,8 +17,6 @@ pub mod self_assess;
 pub mod step;
 /// Task coordination for complex multi-step workflows
 pub mod task_coordinator;
-/// Task list execution with step-by-step verification
-pub mod task_list_executor;
 
 // Re-export context management from merlin-context
 pub use command_runner::{CommandResult, CommandRunner};
@@ -30,6 +28,3 @@ pub use merlin_context::context_inclusion::ContextManager;
 pub use self_assess::SelfAssessor;
 pub use step::StepTracker;
 pub use task_coordinator::{CoordinatorStats, TaskCoordinator, TaskProgress, TaskStatus};
-pub use task_list_executor::{
-    AgentExecutorWrapper, RealAgentExecutorWrapper, TaskListExecutor, TaskListResult,
-};

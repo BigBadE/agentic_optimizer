@@ -1,7 +1,6 @@
 //! Configuration types for routing, validation, execution, and workspace settings.
 
 use crate::routing_error::{Result, RoutingError};
-use crate::task_list;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::fs;
@@ -22,8 +21,6 @@ pub struct RoutingConfig {
     pub workspace: WorkspaceConfig,
     /// Cache configuration
     pub cache: CacheConfig,
-    /// Task list verification commands
-    pub task_list_commands: TaskListCommands,
 }
 
 /// API keys for model providers.
@@ -167,51 +164,6 @@ impl Default for ValidationConfig {
             checks: ValidationChecks::default(),
             build_timeout_seconds: 60,
             test_timeout_seconds: 300,
-        }
-    }
-}
-
-/// Task list step verification commands.
-///
-/// Configures the commands used to verify completion of each step type.
-/// Defaults to Rust commands but can be customized for other languages.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskListCommands {
-    /// Command to verify Debug step completion
-    pub debug_command: String,
-    /// Command to verify Feature step completion
-    pub feature_command: String,
-    /// Command to verify Refactor step completion
-    pub refactor_command: String,
-    /// Command to verify Verify step completion
-    pub verify_command: String,
-    /// Command to verify Test step completion
-    pub test_command: String,
-}
-
-impl Default for TaskListCommands {
-    fn default() -> Self {
-        Self {
-            debug_command: "cargo check".to_owned(),
-            feature_command: "cargo check".to_owned(),
-            refactor_command: "cargo clippy -- -D warnings".to_owned(),
-            verify_command: "cargo check".to_owned(),
-            test_command: "cargo test".to_owned(),
-        }
-    }
-}
-
-impl TaskListCommands {
-    /// Gets the verification command for a given step type.
-    #[must_use]
-    pub fn get_command(&self, step_type: task_list::StepType) -> &str {
-        use task_list::StepType;
-        match step_type {
-            StepType::Debug => &self.debug_command,
-            StepType::Feature => &self.feature_command,
-            StepType::Refactor => &self.refactor_command,
-            StepType::Verify => &self.verify_command,
-            StepType::Test => &self.test_command,
         }
     }
 }

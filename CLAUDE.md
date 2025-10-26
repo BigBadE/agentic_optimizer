@@ -4,175 +4,182 @@ This file provides guidance when working with code in this repository.
 
 ## Project Overview
 
-**Merlin** is an intelligent AI coding assistant with multi-model routing, automatic task decomposition, and comprehensive validation. Named after the Merlin falcon for its speed, precision, and adaptability.
+**Merlin** is an intelligent AI coding assistant with multi-model routing, automatic task decomposition, and comprehensive validation.
 
-**Key Capabilities:**
-- Multi-tier model routing (Local/Groq/Premium) with automatic escalation
+**THIS IS NOT A PRODUCTION OR PUBLIC PROJECT:**
+- No backward compatibility requirements
+- Remove code instead of deprecating
+- Breaking changes are acceptable and encouraged
+- Focus on cleanliness over compatibility
+
+**Core Features:**
+- Multi-tier model routing with automatic escalation
 - Self-determining task decomposition with dependency tracking
 - Parallel task execution with conflict detection
-- Multi-stage validation pipeline (syntax, build, test, lint)
-- Terminal UI for real-time progress monitoring
-- Interactive agent with conversation context
+- Multi-stage validation pipeline
+- Terminal UI with real-time progress monitoring
+- TypeScript runtime for agent code execution
 
 ## Architecture
 
-### Workspace Structure
+**Cargo workspace with these main crates:**
 
-Cargo workspace with multiple crates:
-
-**Core:**
-- `merlin-core` - Fundamental types, traits (`ModelProvider`), error handling
+- `merlin-core` - Fundamental types, traits, error handling
 - `merlin-context` - Context management, file indexing
-- `merlin-languages` - Language-specific backends (Rust via rust-analyzer)
-
-**Model Integration:**
+- `merlin-languages` - Language backends (Rust via rust-analyzer)
 - `merlin-providers` - External API providers (Groq, OpenRouter, Anthropic)
 - `merlin-local` - Local model integration via Ollama
-- `merlin-agent` - Agent execution, self-assessment, step tracking
+- `merlin-routing` - Task analysis, model tier selection, metrics
+- `merlin-agent` - Agent execution, validation, orchestration
+- `merlin-cli` - Command-line interface and TUI
+- `merlin-tooling` - TypeScript runtime, file operations, bash execution
+- `integration-tests` - Fixture-based integration testing
 
-**Routing System (`merlin-routing`):**
-- `analyzer/` - Task complexity analysis and decomposition (`local.rs`, `decompose.rs`, `intent.rs`)
-- `router/` - Model tier selection strategies, provider/model registries (`tiers.rs`, `provider_registry.rs`, `model_registry.rs`)
-- `cache/` - Response caching
-- `metrics/` - Performance metrics collection and reporting
+**Model Routing Flow:**
+1. Analyze task complexity and intent
+2. Select appropriate model tier
+3. Execute with tool registry
+4. Validate results
+5. Escalate to higher tier on failure (up to 3 retries)
 
-**Agent System (`merlin-agent`):**
-- `agent/` - Agent execution (`executor.rs`), conversation tracking (`conversation.rs`), task coordination (`task_coordinator.rs`), self-assessment (`self_assess.rs`), command runner (`command_runner.rs`)
-- `executor/` - Task execution with workspace isolation (`isolation.rs`), conflict detection (`graph.rs`), parallel execution pool (`pool.rs`), transaction state (`transaction.rs`)
-- `validator/` - Multi-stage validation pipeline (`pipeline.rs`) with stages: syntax, build, test, lint
-- `orchestrator.rs` - High-level coordination of all components
-
-**CLI & Tools:**
-- `merlin-cli` - Command-line interface and TUI (`ui/` with ratatui and crossterm)
-- `merlin-tooling` - TypeScript runtime, file operations tools (`ReadFileTool`, `WriteFileTool`, `EditTool`, `DeleteTool`, `ListFilesTool`), bash execution, context requests
-
-**Testing:**
-- `integration-tests` - Unified fixture-based integration testing for all components
-
-### Key Patterns
-
-**Model Routing:**
-1. Analyze - `TaskAnalyzer` determines complexity, intent, scope
-2. Route - `RoutingStrategy` selects model tier
-3. Execute - `AgentExecutor` runs task with `ToolRegistry`
-4. Validate - `ValidationPipeline` runs checks
-5. Escalate - Retry with higher tier on failure (up to 3 retries)
-
-**Task Decomposition:**
-- Complex tasks split into subtasks with dependencies
+**Task Execution:**
+- Complex tasks decomposed into subtasks with dependencies
 - Execution strategies: Sequential, Pipeline, Parallel, Hybrid
+- Transactional file operations with rollback support
 - Conflict detection prevents concurrent file modifications
 
-**Workspace Isolation:**
-- `WorkspaceState` - Manages workspace-level state and transaction history
-- `TransactionState` - Transactional file operations with rollback support
-- `BuildIsolation` - Isolated build environments for validation
-- `ConflictAwareTaskGraph` - Prevents concurrent file modifications through dependency tracking
-
-**TUI Architecture:**
-- `TuiApp` - Application state and event loop (`merlin-cli/src/ui/app/`)
-- `TaskManager` - Task progress tree
-- `InputManager` - User input with `tui-textarea`
-- `UiChannel` - Streaming events from orchestrator
-- `InputEventSource` - Trait for event injection (enables testing without rendering)
-
-**TypeScript Execution:**
-- `TypeScriptRuntime` - JavaScript runtime using Boa engine with tool integration
-- SWC transpiler strips TypeScript types before execution
-- Sandboxed execution with 30-second timeout
-- Tools registered as native JavaScript functions
-- Returns structured `ToolOutput` with execution results
-
-## Critical Constraints
+## Repository Rules
 
 ### Strict Linting
 
-Extremely strict clippy lints (Cargo.toml lines 112-187):
-- All clippy categories denied: `all`, `complexity`, `correctness`, `nursery`, `pedantic`, `perf`, `style`, `suspicious`
-- Restriction lints: `expect_used`, `unwrap_used`, `todo`, `unimplemented`, `print_stdout`, `print_stderr`, and many more
-- `missing_docs` denied
+**Extremely strict clippy configuration:**
+- ALL clippy lints denied (all categories: pedantic, nursery, restriction, etc.)
+- `missing_docs` denied - all public items must have doc comments
+- No panic macros: `.unwrap()`, `.expect()`, `todo!()`, `unimplemented!()`, `unreachable!()`
+- No `println!()`/`eprintln!()` - use `tracing` macros instead
 - All code uses `Result<T, E>` with proper error handling
 
-**Requirements:**
-- Never use `.unwrap()`, `.expect()`, `todo!()`, `unimplemented!()`, `unreachable!()`
-- Never use `println!()`/`eprintln!()` - use `tracing` macros
-- All public items need doc comments
-- Never use `#[allow]` outside test modules (test modules use `#[cfg_attr(test, allow(...))]`)
-- Do NOT use `cargo clean`, ever. On ICE (Internal Compiler Error), delete only incremental compilation caches: `target/debug/incremental` or `target/release/incremental`, NOT the entire profile folder.
+**Critical requirements:**
+- **NEVER add `#[allow]` or `#[cfg_attr(test, allow(...))]` without EXPLICIT user permission**
+  - If clippy complains, FIX THE CODE, do not silence the warning
+  - This applies even for "trivial" lints like `min_ident_chars` or `excessive_nesting`
+  - Refactor code to satisfy clippy's requirements
+  - The ONLY exception is if the user explicitly says "add an allow for X"
+- Do NOT use `cargo clean` - on ICE, delete only `target/{debug,release}/incremental/`, not entire profile
+- Must pass `./scripts/verify.sh` with zero errors before completion
 
-### Rust Edition 2024
+### Code Quality
 
-Uses Rust Edition 2024 (Cargo.toml line 11):
-- Prefer RPITIT over `async-trait` where possible
+**Rust Edition 2024:**
+- Prefer RPITIT (Return Position Impl Trait In Trait) over `async-trait`
 - Leverage gen blocks and async generators
 
-### Dependencies
+**Documentation:**
+All public items need doc comments with:
+- Brief one-line summary
+- Detailed explanation for complex items
+- `# Errors` section for `Result` returns
+- `# Examples` when helpful
 
-**TUI Stack (CRITICAL - DO NOT UPGRADE):**
-```toml
-ratatui = "0.29"        # NOT 0.30+ (incompatible with tui-textarea)
-crossterm = "0.28"      # NOT 0.29+ (incompatible with tui-textarea)
-tui-textarea = "0.7"
+### Repository Maintenance
+
+**When modifying this project:**
+1. Keep CLAUDE.md updated with behavioral changes and new patterns
+2. Do NOT add implementation comments ("Phase 3 implementation", "Deleted function here", etc.)
+3. Update CLAUDE.md if adding new repository rules or critical constraints
+4. Focus CLAUDE.md on **what to do**, not **what was done**
+
+### Crate Documentation
+
+**Each crate has a README.md that must be kept up-to-date:**
+
+Located in `crates/<crate-name>/README.md`:
+- `merlin-core/README.md` - Core types, traits, error handling
+- `merlin-context/README.md` - Context management, semantic search
+- `merlin-languages/README.md` - Language backends
+- `merlin-providers/README.md` - External LLM providers
+- `merlin-local/README.md` - Local model integration
+- `merlin-routing/README.md` - Task routing and analysis
+- `merlin-agent/README.md` - Agent execution and validation
+- `merlin-cli/README.md` - CLI and Terminal UI
+- `merlin-tooling/README.md` - Tool system
+- `integration-tests/README.md` - Testing framework
+
+**When making changes:**
+1. Update the relevant crate's README.md with:
+   - Module or public API changes
+   - Test coverage changes
+   - Changes in features
+2. Keep README sections focused and concise
+3. Update testing status when adding/removing tests
+
+## Testing Philosophy
+
+**ALWAYS prefer JSON fixtures over manual tests.** Fixtures provide reproducible testing across all components with minimal code duplication.
+
+**Fixture location:** `crates/integration-tests/tests/fixtures/`
+
+Fixtures auto-discovered by `crates/integration-tests/tests/unified_tests.rs` and run with `UnifiedTestRunner`.
+
+**Tests should not be modified to match incorrect behavior**. This is not a production system, it will have issues, rely on tests to find them and fix them.
+
+### Test Modification Guidelines
+
+**NEVER delete tests that cover important behavior**, even if they're testing incorrect behavior:
+- If a test expects incorrect behavior, update it to expect the correct behavior
+- Changing test expectations to match correct behavior is allowed and encouraged
+- Only delete tests if they truly duplicate existing coverage or test non-existent features
+- Examples:
+  - ✓ GOOD: Update test expecting `readFile` to return `null` for missing files to expect an error instead
+  - ✗ BAD: Delete the test entirely because it was testing incorrect behavior
+  - ✓ GOOD: Delete a test for `createIsolatedWorkspace()` function that was never implemented
+  - ✗ BAD: Delete a test for error handling just because the current implementation doesn't handle errors correctly
+
+### When to Add Tests
+
+**DO add a fixture if:**
+- Testing new functionality not covered by existing fixtures
+- Adding a new tool or capability
+- Testing edge cases or error conditions
+
+**DO NOT add a test if:**
+- It duplicates existing fixture coverage
+- Before adding, search: `rg "pattern" crates/integration-tests/tests/fixtures/`
+
+**Unit tests** (inline `#[cfg(test)]`):
+- Only for testing internal logic of private functions
+- Must not duplicate fixture coverage
+
+**Benchmarks** (`benchmarks/crates/`):
+- Performance regression testing only
+
+### TUI Testing
+
+**NEVER manipulate TUI state directly.** Always use fixtures:
+- `InputEventSource` trait enables fixture-based event injection
+- Test TUI behavior through fixture events, not by calling TUI methods
+- Verify UI state through fixture `verify.ui` blocks
+
+## Running Verification
+
+**Development (fast):**
+```bash
+./scripts/verify.sh
 ```
 
-**SWC TypeScript Transpiler:**
-All SWC dependencies must be updated together for compatibility:
-```toml
-swc_common = "15.0"
-swc_ecma_ast = "16.0"
-swc_ecma_codegen = "18.0"
-swc_ecma_parser = "25.0"
-swc_ecma_transforms_base = "28.0"
-swc_ecma_transforms_typescript = "31.0"
-swc_ecma_visit = "16.0"
+**Before commits (with coverage):**
+```bash
+./scripts/commit.sh
 ```
 
-**Rust Analyzer:**
-All `ra_ap_*` dependencies pinned to `"0.0"` (latest).
+**Run specific tests with nextest:**
+```bash
+cargo nextest run -p <package> <test_name>
+```
 
-### Build Configuration
+**Never use `cargo test` directly** - always use nextest or verify scripts.
 
-**Profiles:**
-- `dev` - Optimized dependencies (opt-level=3), incremental compilation, minimal debug info
-- `release` - Thin LTO, codegen-units=1, panic=abort, full optimization
-- `bench` - Debug symbols enabled for profiling
-- `ci` - Optimized for size (opt-level=s), minimal disk usage for CI/CD
-
-**Fast Config (`.cargo/fast_config.toml`):**
-- Linux: Clang + LLD linker (optional: mold), nightly flags commented out
-- macOS: Default ld64 (fastest, LLD option commented out)
-- Windows: `rust-lld.exe` linker, nightly flags commented out
-- `checksum-freshness = true` prevents unnecessary rebuilds on timestamp changes
-
-**Toolchain:**
-- Nightly required (`rust-toolchain.toml`)
-- Components: `rustfmt`, `clippy`, `rust-src`
-
-## Common Gotchas
-
-### TUI Event Handling
-
-When modifying TUI code (`merlin-cli/src/ui/`):
-- Input converts to `tui_textarea::Input::from(crossterm::event::Event::Key(key))`
-- Style types from `ratatui`, not `tui-textarea`
-- `TextArea` rendered by reference: `frame.render_widget(&input_area, area)`
-- Use `InputEventSource` trait for all input to enable fixture-based testing
-- Never manipulate `InputManager` or `TuiApp` internal state directly - use fixtures
-
-### File Operations
-
-Available tools from `merlin-tooling`:
-- `ReadFileTool` - Read file contents
-- `WriteFileTool` - Create or overwrite files
-- `EditTool` - Make targeted edits to existing files
-- `DeleteTool` - Delete files or directories
-- `ListFilesTool` - List directory contents
-- `BashTool` - Execute shell commands
-- `ContextRequestTool` - Request additional context from the user
-
-All file operations in task execution use:
-- `TransactionState` for atomic operations with rollback
-- `ConflictAwareTaskGraph` to prevent concurrent file modifications
+## Critical Gotchas
 
 ### Error Handling
 
@@ -182,209 +189,4 @@ let value = result.unwrap();
 
 // GOOD
 let value = result.map_err(|err| RoutingError::ExecutionFailed(err.to_string()))?;
-```
-
-## Testing
-
-**CRITICAL TESTING PHILOSOPHY:**
-
-**ALWAYS prefer JSON fixtures over manual tests.** Fixtures provide comprehensive, reproducible testing across all system components with minimal code duplication.
-
-### Unified Fixture System
-
-All tests use JSON fixtures in `crates/integration-tests/tests/fixtures/`:
-
-**Fixture Categories:**
-- `agent/` - Agent executor, conversation context, tool usage, task execution
-- `basic/` - Simple response handling
-- `cli/` - Command-line interface operations
-- `context/` - Context fetching, conversation building, file references
-- `execution/` - File operations, error handling, state transitions
-- `executor/` - Task decomposition, self-determining execution
-- `orchestrator/` - Task graphs, conflict detection, dependencies
-- `task_lists/` - Task list execution patterns
-- `tools/` - Individual tool operations (show, edit, delete, list)
-- `tui/` - Terminal UI navigation, rendering, event handling
-- `typescript/` - TypeScript execution, type stripping, control flow
-- `validation/` - Validation pipeline stages
-- `workspace/` - Workspace isolation, transactions, file locking
-
-**Fixture Format:** (`crates/integration-tests/src/fixture.rs`)
-```json
-{
-  "name": "Test Name",
-  "description": "What this test verifies",
-  "tags": ["category", "feature"],
-  "setup": {
-    "files": {"path/to/file.txt": "content"},
-    "env_vars": {"VAR": "value"},
-    "terminal_size": [80, 24]
-  },
-  "events": [
-    {
-      "type": "user_input",
-      "data": {"text": "Do something", "submit": true},
-      "verify": {
-        "execution": {"typescript_executed": true},
-        "files": [{"path": "output.txt", "contains": ["expected"]}],
-        "ui": {"input_cleared": true}
-      }
-    },
-    {
-      "type": "llm_response",
-      "trigger": {"pattern": "Do something", "match_type": "contains"},
-      "response": {"typescript": ["function agent_code() { return 'done'; }"]},
-      "verify": {"execution": {"return_value_matches": "done"}}
-    }
-  ],
-  "final_verify": {
-    "execution": {"validation_passed": true}
-  }
-}
-```
-
-**Test Runner:** `crates/integration-tests/tests/unified_tests.rs`
-- Auto-discovers all fixtures
-- Runs them with `UnifiedTestRunner`
-- Verifies execution, file state, UI state, and final outcomes
-
-### When to Add Tests
-
-**DO add a test if:**
-- The behavior is NOT covered by existing fixtures
-- You're adding a new tool or capability
-- You're testing edge cases or error conditions not yet covered
-- You're adding a new validation stage or execution pattern
-
-**DO NOT add a test if:**
-- It duplicates functionality already tested in fixtures
-- Example: Don't add a test for "submitting a message" - fixtures already cover this
-- Example: Don't add a test for "basic file read" - `tools/show_tool.json` covers this
-- Example: Don't test UI event handling directly - use fixtures instead
-
-**Before adding a test:**
-1. Search existing fixtures: `rg "pattern" crates/integration-tests/tests/fixtures/`
-2. Check if a similar test exists in the relevant category
-3. If similar tests exist, extend an existing fixture or create a new one only if testing a distinct scenario
-
-### Manual Testing (Limited Use)
-
-**Unit tests** (inline with `#[cfg(test)]`):
-- Only for testing internal logic of specific functions
-- Must not duplicate fixture coverage
-- Use when testing private implementation details
-
-**Examples of acceptable unit tests:**
-- Testing a pure calculation function
-- Testing error parsing logic
-- Testing data structure transformations
-
-**Benchmarks** (`benchmarks/crates/`):
-- Performance regression testing with criterion
-- Quality benchmarks for LLM routing decisions
-
-### TUI Testing
-
-**NEVER manipulate TUI state directly.** Always use fixtures with event injection:
-- `InputEventSource` trait enables fixture-based event injection
-- Fixtures define `user_input` and `key_press` events
-- `PatternMockProvider` simulates LLM responses based on patterns
-- Verify UI state through fixture `verify.ui` blocks
-
-**Example TUI fixture:** `crates/integration-tests/tests/fixtures/tui/basic_navigation.json`
-
-## Verification Before Completion
-
-**Fast verification (recommended for development):**
-
-```bash
-./scripts/verify.sh
-```
-
-This script:
-1. Formats code (`cargo fmt`)
-2. Runs clippy with warnings as errors
-3. Runs all tests with `cargo nextest run --run-ignored all`
-
-**Full verification with coverage (run before commits):**
-
-```bash
-./scripts/commit.sh
-```
-
-This script runs everything from `verify.sh` plus:
-1. Coverage instrumentation with `cargo llvm-cov` on `--lib --tests` (excludes benchmark crates)
-2. Shows profraw file count and size (typically 1000+ files, 10-20GB)
-3. Manually merges profraw files into single profdata using `llvm-profdata merge -sparse`
-4. Deletes profraw files to save disk space (~18GB freed)
-5. Generates lcov report using `--instr-profile` (fast, no re-merge)
-6. Generates HTML report using `--instr-profile` (fast, no re-merge)
-7. Deletes profdata file after reports
-8. Stages coverage report for commit
-9. Runs `cargo sweep` to clean old build artifacts
-
-**Performance optimization:**
-- Merges profraw files once manually (~40s)
-- Both reports use the merged profdata via `--instr-profile` (no re-merge, ~5s each)
-- Without manual merge: 80s (40s per report × 2)
-- With manual merge: 50s (40s merge + 5s + 5s reports)
-- Profraw files: ~1000 files, 10-20GB → merged profdata: ~25MB
-- After cleanup: Only instrumented binaries remain (~8GB) for faster incremental runs
-
-**Optional flags (both scripts):**
-- `--no-cloud` - Disable cloud provider tests (unsets API keys)
-- `--ollama` - Run Ollama-specific tests (requires local Ollama server)
-- `--html` - Generate HTML coverage report (commit.sh only)
-
-**Must pass with zero errors.** Never use `#[allow]` to silence warnings.
-
-## Running Tests
-
-**IMPORTANT: Never use `cargo test` directly.** Always use one of the following:
-
-**For all tests (recommended):**
-```bash
-./scripts/verify.sh
-```
-
-**For specific tests (use nextest):**
-```bash
-cargo nextest run -p <package> <test_name>
-```
-
-Examples:
-```bash
-# Run specific test in a package
-cargo nextest run -p merlin-cli test_prompt_command_shows_context
-
-# Run all tests in a package
-cargo nextest run -p merlin-agent
-
-# Run with timeout
-cargo nextest run -p merlin-cli --test-threads=4
-```
-
-**Why nextest over cargo test:**
-- Respects build cache and profiles correctly
-- Parallel execution with better isolation
-- Cleaner output and better timeout handling
-- Avoids unnecessary rebuilds of dependency tree
-
-## Documentation Standards
-
-All public items need doc comments:
-```rust
-/// Brief one-line summary.
-///
-/// Detailed explanation with examples if complex.
-///
-/// # Errors
-/// Describe error conditions when returning `Result`.
-///
-/// # Examples
-/// ```
-/// # use merlin_routing::TaskAnalyzer;
-/// let analyzer = TaskAnalyzer::new();
-/// ```
-pub fn function() -> Result<()> { ... }
 ```

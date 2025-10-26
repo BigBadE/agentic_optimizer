@@ -91,9 +91,8 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const show = tools.show as (path: string) => Promise<string>;",
           "  try {",
-          "    await show('nonexistent.txt');",
+          "    await readFile('nonexistent.txt');",
           "    return 'File found unexpectedly';",
           "  } catch (err) {",
           "    return 'Workspace correctly handles missing files: file not found';",
@@ -105,7 +104,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "show"
+            "readFile"
           ]
         }
       }
@@ -127,8 +126,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const show = tools.show as (path: string) => Promise<string>;",
-          "  const content = await show('sample.txt');",
+          "  const content = await readFile('sample.txt');",
           "  return `Workspace state verified. Root path accessible. File content: ${content}`;",
           "}"
         ]
@@ -137,7 +135,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "show"
+            "readFile"
           ]
         },
         "files": [
@@ -222,8 +220,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const list = tools.list as (path: string) => Promise<string[]>;",
-          "  const files = await list('.');",
+          "  const files = await listFiles('.');",
           "  return `Workspace root path canonicalized successfully. Found ${files.length} files in workspace.`;",
           "}"
         ]
@@ -232,7 +229,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "list"
+            "listFiles"
           ]
         }
       }
@@ -254,10 +251,8 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const show = tools.show as (path: string) => Promise<string>;",
-          "  const list = tools.list as (path: string) => Promise<string[]>;",
-          "  const files = await list('.');",
-          "  const sampleContent = await show('sample.txt');",
+          "  const files = await listFiles('.');",
+          "  const sampleContent = await readFile('sample.txt');",
           "  return `Orchestrator analysis verification complete:\\n- Request analysis: ✓\\n- Task decomposition: ✓\\n- Workspace operations: ✓\\n- Configuration handling: ✓\\n- Files in workspace: ${files.length}\\n- Sample content verified: ${sampleContent.includes('Sample file')}`;",
           "}"
         ]
@@ -266,8 +261,8 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "list",
-            "show"
+            "listFiles",
+            "readFile"
           ]
         }
       }

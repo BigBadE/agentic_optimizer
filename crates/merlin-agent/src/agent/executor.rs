@@ -1,4 +1,4 @@
-use serde_json::{Value as JsonValue, from_value};
+use serde_json::from_value;
 use std::future::Future;
 use std::mem::replace;
 use std::pin::Pin;
@@ -10,8 +10,8 @@ use crate::Validator;
 use crate::agent::AgentExecutionResult;
 use merlin_core::{
     Context, ExecutionContext, ExecutionMode, ModelProvider, Query, Response, Result,
-    RoutingConfig, RoutingError, SubtaskSpec, Task, TaskAction, TaskDecision, TaskId, TaskList,
-    TaskResult, TaskState, TokenUsage, ValidationResult,
+    RoutingConfig, RoutingError, Subtask, Task, TaskAction, TaskDecision, TaskId, TaskResult,
+    TaskState, TokenUsage, ValidationResult,
     ui::{TaskProgress, UiChannel, UiEvent},
 };
 use merlin_routing::{ModelRouter, ProviderRegistry, RoutingDecision};
@@ -54,8 +54,6 @@ pub struct AgentExecutor {
     context_dump_enabled: Arc<AtomicBool>,
     /// Provider registry for accessing model providers
     provider_registry: Arc<ProviderRegistry>,
-    /// Temporary storage for `TaskList` from TypeScript execution
-    pending_task_list: Arc<Mutex<Option<TaskList>>>,
 }
 
 struct ExecInputs<'life> {
@@ -108,7 +106,6 @@ impl AgentExecutor {
             conversation_history: Arc::new(Mutex::new(Vec::new())),
             context_dump_enabled: Arc::new(AtomicBool::new(false)),
             provider_registry,
-            pending_task_list: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -125,7 +122,6 @@ impl AgentExecutor {
             conversation_history: Arc::new(Mutex::new(Vec::new())),
             context_dump_enabled: Arc::new(AtomicBool::new(false)),
             provider_registry: params.provider_registry,
-            pending_task_list: Arc::new(Mutex::new(None)),
         })
     }
 
@@ -244,12 +240,6 @@ impl AgentExecutor {
 
         let duration_ms = start.elapsed().as_millis() as u64;
 
-        // Retrieve and clear pending TaskList
-        let task_list = {
-            let mut pending = self.pending_task_list.lock().await;
-            pending.take()
-        };
-
         Ok(TaskResult {
             task_id,
             response,
@@ -257,7 +247,7 @@ impl AgentExecutor {
             tokens_used: TokenUsage::default(),
             validation,
             duration_ms,
-            task_list,
+            work_unit: None,
         })
     }
 
@@ -379,12 +369,9 @@ impl AgentExecutor {
             tracing::debug!("Found TypeScript code, executing...");
 
             // Execute TypeScript code and get result
-            let (execution_result, task_list) = self
+            let execution_result = self
                 .execute_typescript_code(task_id, &typescript_code, ui_channel)
                 .await?;
-
-            // Store task_list for later use (we'll need to pass it through to TaskResult)
-            let task_list_for_result = task_list.clone();
 
             // Handle result based on done status
             if let Some(result_text) = execution_result.get_result() {
@@ -403,14 +390,6 @@ impl AgentExecutor {
                 // Note: Actual task spawning would happen in the orchestrator
                 // For now, we just indicate the continuation request
             }
-
-            // Store TaskList in pending_task_list for retrieval when building TaskResult
-            if let Some(task_list_to_store) = task_list_for_result {
-                let mut pending = self.pending_task_list.lock().await;
-                *pending = Some(task_list_to_store);
-                drop(pending);
-                tracing::debug!("TaskList stored in pending_task_list");
-            }
         } else {
             // No TypeScript code found - send response text as-is
             tracing::debug!("No TypeScript code found in response");
@@ -421,12 +400,6 @@ impl AgentExecutor {
         }
 
         Ok(response)
-    }
-
-    /// Parse a `TaskList` from a `JsonValue` (returned from TypeScript execution)
-    fn parse_task_list_from_value(value: &JsonValue) -> Option<TaskList> {
-        // Try to parse the value as a TaskList
-        from_value::<TaskList>(value.clone()).ok()
     }
 
     /// Extract TypeScript code from markdown code blocks
@@ -474,7 +447,7 @@ impl AgentExecutor {
         task_id: TaskId,
         code: &str,
         ui_channel: &UiChannel,
-    ) -> Result<(AgentExecutionResult, Option<TaskList>)> {
+    ) -> Result<AgentExecutionResult> {
         // Create TypeScript runtime and register tools
         let mut runtime = TypeScriptRuntime::new();
 
@@ -519,22 +492,6 @@ impl AgentExecutor {
             RoutingError::Other(format!("TypeScript execution failed: {err}"))
         })?;
 
-        // Check if the result is a TaskList first
-        if let Some(task_list) = Self::parse_task_list_from_value(&result_value) {
-            tracing::info!("Agent returned TaskList: {}", task_list.title);
-
-            // Return marker result with the TaskList
-            let execution_result =
-                AgentExecutionResult::done(format!("TaskList: {}", task_list.title));
-
-            ui_channel.send(UiEvent::TaskStepCompleted {
-                task_id,
-                step_id: "typescript_execution".to_owned(),
-            });
-
-            return Ok((execution_result, Some(task_list)));
-        }
-
         // Parse result as AgentExecutionResult
         // Handle both structured results and plain strings
         let execution_result: AgentExecutionResult = if result_value.is_string() {
@@ -570,7 +527,7 @@ impl AgentExecutor {
 
         tracing::debug!("TypeScript execution result: {:?}", execution_result);
 
-        Ok((execution_result, None))
+        Ok(execution_result)
     }
 
     /// Build context for a task
@@ -823,7 +780,7 @@ impl AgentExecutor {
                             tokens_used: TokenUsage::default(),
                             validation: ValidationResult::default(),
                             duration_ms,
-                            task_list: None,
+                            work_unit: None,
                         });
                     }
 
@@ -873,7 +830,7 @@ impl AgentExecutor {
     fn execute_with_subtasks(
         &mut self,
         task_id: TaskId,
-        subtasks: Vec<SubtaskSpec>,
+        subtasks: Vec<Subtask>,
         _execution_mode: ExecutionMode,
         ui_channel: UiChannel,
     ) -> BoxedTaskFuture<'_> {
@@ -901,8 +858,9 @@ impl AgentExecutor {
             // For now, only support sequential execution to avoid Send issues
             // Parallel execution can be added later with proper Send bounds
             let total_subtasks = subtasks.len();
-            for (index, spec) in subtasks.into_iter().enumerate() {
-                let subtask = Task::new(spec.description).with_difficulty(spec.difficulty);
+            for (index, subtask_spec) in subtasks.into_iter().enumerate() {
+                let subtask = Task::new(subtask_spec.description.clone())
+                    .with_difficulty(subtask_spec.difficulty);
 
                 // Update progress
                 ui_channel.send(UiEvent::TaskProgress {
@@ -948,7 +906,7 @@ impl AgentExecutor {
                 tokens_used: TokenUsage::default(),
                 validation: ValidationResult::default(),
                 duration_ms,
-                task_list: None,
+                work_unit: None,
             })
         })
     }
@@ -1709,44 +1667,5 @@ def test():
         assert!(code.contains("const x = 1"));
         assert!(!code.contains("fn main"));
         assert!(!code.contains("def test"));
-    }
-
-    #[test]
-    fn test_parse_task_list_from_invalid_json() {
-        use serde_json::json;
-
-        // Test with malformed task list (missing required fields)
-        let invalid_value = json!({
-            "title": "Invalid",
-            // Missing "id", "steps", and "status" fields
-        });
-
-        let result = AgentExecutor::parse_task_list_from_value(&invalid_value);
-        assert!(result.is_none(), "Malformed task list should return None");
-    }
-
-    #[test]
-    fn test_parse_task_list_from_valid_json() {
-        use serde_json::json;
-
-        let valid_value = json!({
-            "id": "test-list",
-            "title": "Test List",
-            "steps": [
-                {
-                    "id": "step1",
-                    "step_type": "Feature",
-                    "description": "Task 1",
-                    "verification": "Run tests",
-                    "exit_command": "echo test"
-                }
-            ]
-        });
-
-        let result = AgentExecutor::parse_task_list_from_value(&valid_value);
-        assert!(result.is_some(), "Valid task list should parse");
-        let task_list = result.unwrap();
-        assert_eq!(task_list.title, "Test List");
-        assert_eq!(task_list.steps.len(), 1);
     }
 }

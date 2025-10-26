@@ -1,6 +1,5 @@
 //! Keyboard input handling and dispatch
 
-use super::conversation;
 use super::input_handler;
 use super::tui_app::TuiApp;
 use crate::ui::app::navigation::{NavigationContext, navigate_tasks_down, navigate_tasks_up};
@@ -62,7 +61,7 @@ impl<B: Backend> TuiApp<B> {
                 self.handle_tasks_enter_key();
                 false
             }
-            FocusedPane::Output => false,
+            FocusedPane::Output | FocusedPane::Threads => false,
         }
     }
 
@@ -72,19 +71,18 @@ impl<B: Backend> TuiApp<B> {
             return;
         };
 
-        // Check if selected task is a child with steps
-        let is_child_with_steps = self
+        // Check if selected task has steps
+        let has_steps = self
             .task_manager
             .get_task(selected_id)
-            .is_some_and(|task| task.parent_id.is_some() && !task.steps.is_empty());
+            .is_some_and(|task| !task.steps.is_empty());
 
-        if is_child_with_steps {
-            // Toggle step expansion for child tasks with steps
+        if has_steps {
+            // Toggle step expansion for tasks with steps
             toggle_set(&mut self.state.expanded_steps, selected_id);
         } else {
-            // Toggle conversation expansion for root tasks or children without steps
-            let root_id = conversation::find_root_conversation(selected_id, &self.task_manager);
-            toggle_set(&mut self.state.expanded_conversations, root_id);
+            // Toggle conversation expansion for tasks without steps
+            toggle_set(&mut self.state.expanded_conversations, selected_id);
         }
     }
 
@@ -159,6 +157,10 @@ impl<B: Backend> TuiApp<B> {
                     );
                 }
             },
+            FocusedPane::Threads => {
+                // Threads pane keyboard handling - placeholder for now
+                // Will add thread navigation in Phase 5
+            }
         }
     }
 }

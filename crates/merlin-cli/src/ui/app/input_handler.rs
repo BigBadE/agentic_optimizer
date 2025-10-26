@@ -97,7 +97,7 @@ pub fn handle_tab(focused_pane: &mut FocusedPane, active_task_id: Option<TaskId>
     if active_task_id.is_some() {
         *focused_pane = match *focused_pane {
             FocusedPane::Input => FocusedPane::Output,
-            FocusedPane::Output | FocusedPane::Tasks => FocusedPane::Input,
+            FocusedPane::Output | FocusedPane::Tasks | FocusedPane::Threads => FocusedPane::Input,
         };
     }
 }

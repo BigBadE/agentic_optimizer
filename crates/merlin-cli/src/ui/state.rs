@@ -1,3 +1,4 @@
+use merlin_core::ThreadId;
 use merlin_routing::TaskId;
 use std::collections::{HashMap, HashSet};
 
@@ -35,6 +36,15 @@ pub struct UiState {
     pub task_output_scroll: HashMap<TaskId, u16>,
     /// Flag to auto-scroll output to bottom on next render
     pub auto_scroll_output_to_bottom: bool,
+    /// Currently active thread
+    #[allow(dead_code, reason = "Will be used in Phase 5")]
+    pub active_thread_id: Option<ThreadId>,
+    /// Thread list scroll offset
+    #[allow(dead_code, reason = "Will be used in Phase 5")]
+    pub thread_list_scroll_offset: usize,
+    /// Which panel is focused (thread list vs work details)
+    #[allow(dead_code, reason = "Will be used in Phase 5")]
+    pub focused_panel: PanelFocus,
 }
 
 impl UiState {
@@ -58,6 +68,17 @@ impl UiState {
             self.conversation_history.len()
         );
     }
+}
+
+/// Which panel has focus
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+#[allow(dead_code, reason = "Will be used in Phase 5")]
+pub enum PanelFocus {
+    /// Thread list panel
+    ThreadList,
+    /// Work details panel
+    #[default]
+    WorkDetails,
 }
 
 /// Conversation entry

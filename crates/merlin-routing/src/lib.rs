@@ -65,7 +65,7 @@ pub use merlin_core::{
     CacheConfig, CommandExecution, ContextRequirements, ExecutionConfig, ExecutionContext,
     ExecutionMode, ExecutionStrategy, FileChange, MessageLevel, Priority, Result, RoutingConfig,
     RoutingError, Severity, StageResult, StepId, StepType, StreamingChannel, StreamingEvent,
-    SubtaskSpec, Task, TaskAction, TaskAnalysis, TaskDecision, TaskId, TaskProgress, TaskResult,
+    Subtask, Task, TaskAction, TaskAnalysis, TaskDecision, TaskId, TaskProgress, TaskResult,
     TaskState, TaskStep, TierConfig, UiChannel, UiEvent, ValidationConfig, ValidationError,
     ValidationResult, ValidationStageType, WorkspaceConfig,
 };

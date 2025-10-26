@@ -10,29 +10,16 @@ use crate::ui::task_manager::TaskManager;
 
 fn build_visible_task_list(
     task_manager: &TaskManager,
-    expanded_conversations: &HashSet<TaskId>,
+    _expanded_conversations: &HashSet<TaskId>,
 ) -> Vec<(TaskId, bool)> {
     // Use task_order which is already sorted correctly (oldest first, newest last)
+    // All tasks are now flat - no parent-child hierarchy
     let mut visible_tasks = Vec::new();
 
     for &task_id in task_manager.task_order() {
-        let Some(task) = task_manager.get_task(task_id) else {
-            continue;
-        };
-
-        if task.parent_id.is_none() {
-            // Root conversation - always visible
+        if task_manager.get_task(task_id).is_some() {
+            // All tasks are root-level now (false = not a child)
             visible_tasks.push((task_id, false));
-
-            // If expanded, children will follow in task_order
-        } else {
-            // Child task - only visible if parent is expanded
-            let Some(parent_id) = task.parent_id else {
-                continue;
-            };
-            if expanded_conversations.contains(&parent_id) {
-                visible_tasks.push((task_id, true));
-            }
         }
     }
 

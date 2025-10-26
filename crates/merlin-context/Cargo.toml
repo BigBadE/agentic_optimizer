@@ -25,5 +25,10 @@ toml.workspace = true
 tracing.workspace = true
 walkdir.workspace = true
 
+[[test]]
+name = "integration_tests"
+path = "tests/integration_tests.rs"
+harness = true
+
 [lints]
 workspace = true

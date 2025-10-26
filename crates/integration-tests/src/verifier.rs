@@ -6,6 +6,7 @@ use super::fixture::{
 };
 use super::runner::{TestState, UiState};
 use merlin_tooling::ToolResult;
+use regex::Regex;
 use serde_json::{Map, Value};
 use std::fs;
 use std::path::Path;
@@ -228,21 +229,41 @@ impl<'fixture> UnifiedVerifier<'fixture> {
         }
     }
 
+    /// Verify return value pattern match
+    fn verify_pattern_match(&mut self, expected: &Value, actual: &Value) {
+        let expected_str = expected
+            .as_str()
+            .map_or_else(|| expected.to_string(), ToString::to_string);
+        let actual_str = actual
+            .as_str()
+            .map_or_else(|| actual.to_string(), ToString::to_string);
+
+        match Regex::new(&expected_str) {
+            Ok(pattern) => {
+                if pattern.is_match(&actual_str) {
+                    self.result
+                        .add_success(format!("Return value matches pattern: {expected_str}"));
+                } else {
+                    self.result.add_failure(format!(
+                        "Return value mismatch.\nPattern: {expected_str}\nActual: {actual_str}"
+                    ));
+                }
+            }
+            Err(err) => {
+                self.result
+                    .add_failure(format!("Invalid regex pattern '{expected_str}': {err}"));
+            }
+        }
+    }
+
     /// Verify return value
     fn verify_return_value(&mut self, verify: &ExecutionVerify) {
         if let Some(Ok(actual_value)) = &self.last_execution {
             let actual_clone = actual_value.clone();
 
-            // Check exact match
+            // Check pattern match (regex)
             if let Some(expected) = &verify.return_value_matches {
-                if &actual_clone == expected {
-                    self.result
-                        .add_success(format!("Return value matches expected: {expected}"));
-                } else {
-                    self.result.add_failure(format!(
-                        "Return value mismatch.\nExpected: {expected}\nActual: {actual_clone}"
-                    ));
-                }
+                self.verify_pattern_match(expected, &actual_clone);
             }
 
             // Check contains (for objects)

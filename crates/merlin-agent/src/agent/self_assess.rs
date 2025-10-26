@@ -1,7 +1,6 @@
 use merlin_core::{Context, ModelProvider, Query, prompts::load_prompt};
 use merlin_core::{
-    ExecutionContext, ExecutionMode, Result, RoutingError, SubtaskSpec, Task, TaskAction,
-    TaskDecision,
+    ExecutionContext, ExecutionMode, Result, RoutingError, Subtask, Task, TaskAction, TaskDecision,
 };
 use serde::{Deserialize, Serialize};
 use serde_json::from_str;
@@ -98,12 +97,10 @@ impl SelfAssessor {
                 TaskAction::Complete { result }
             }
             "DECOMPOSE" => {
-                let subtasks = parsed.details.subtasks.unwrap_or_else(|| {
-                    vec![SubtaskSpec {
-                        description: task.description.clone(),
-                        difficulty: 5,
-                    }]
-                });
+                let subtasks = parsed
+                    .details
+                    .subtasks
+                    .unwrap_or_else(|| vec![Subtask::new(task.description.clone(), 5)]);
 
                 let execution_mode = match parsed
                     .details
@@ -153,7 +150,7 @@ struct AssessmentDetails {
     #[serde(skip_serializing_if = "Option::is_none")]
     result: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]
-    subtasks: Option<Vec<SubtaskSpec>>,
+    subtasks: Option<Vec<Subtask>>,
     #[serde(skip_serializing_if = "Option::is_none")]
     execution_mode: Option<String>,
     #[serde(skip_serializing_if = "Option::is_none")]

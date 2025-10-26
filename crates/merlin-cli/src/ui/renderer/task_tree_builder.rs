@@ -39,11 +39,8 @@ pub fn build_task_tree_lines(
         })
         .collect();
 
-    // Get all root tasks (conversations) - already in correct order from task_order
-    let root_tasks: Vec<_> = all_tasks
-        .iter()
-        .filter(|(_, task)| task.parent_id.is_none())
-        .collect();
+    // All tasks are now root-level (no hierarchy)
+    let root_tasks: Vec<_> = all_tasks.iter().collect();
 
     if focused == FocusedPane::Tasks {
         build_focused_task_lines(
@@ -102,20 +99,10 @@ fn build_focused_task_lines(ctx: &FocusedTaskLinesContext<'_>, lines: &mut Vec<L
     // Build flat list of visible items (roots + expanded children) in display order
     let mut visible_items: Vec<(TaskId, bool)> = Vec::new();
     for (root_id, _) in root_tasks {
-        visible_items.push((*root_id, false)); // false = is_child
+        visible_items.push((*root_id, false)); // false = is_child (all tasks are root-level now)
 
-        // If expanded, add children
-        if ui_ctx.state.expanded_conversations.contains(root_id) {
-            let mut children: Vec<_> = all_tasks
-                .iter()
-                .filter(|(_, task)| task.parent_id == Some(*root_id))
-                .collect();
-            children.sort_by(|(_, task_a), (_, task_b)| task_a.timestamp.cmp(&task_b.timestamp));
-
-            for (child_id, _) in children {
-                visible_items.push((*child_id, true)); // true = is_child
-            }
-        }
+        // No children in the new flat system
+        // Expansion is now used for showing steps or thread messages within a task
     }
 
     // Calculate visible window with scroll offset
@@ -248,12 +235,24 @@ fn build_unfocused_task_lines(ctx: &UnfocusedTaskLinesContext<'_>, lines: &mut V
 /// Context for rendering unfocused root task and children
 struct UnfocusedRootContext<'ctx> {
     root_task: &'ctx TaskDisplay,
+    #[allow(
+        dead_code,
+        reason = "Kept for future use when hierarchy is reimplemented"
+    )]
     all_tasks: &'ctx [(TaskId, &'ctx TaskDisplay)],
+    #[allow(
+        dead_code,
+        reason = "Kept for future use when hierarchy is reimplemented"
+    )]
     primary_root_task_id: TaskId,
     is_active: bool,
     is_selected: bool,
     is_primary_expanded: bool,
     area: Rect,
+    #[allow(
+        dead_code,
+        reason = "Kept for future use when hierarchy is reimplemented"
+    )]
     ui_ctx: &'ctx UiCtx<'ctx>,
     theme: Theme,
 }
@@ -265,23 +264,20 @@ fn render_unfocused_root_and_children(
 ) {
     let UnfocusedRootContext {
         root_task,
-        all_tasks,
-        primary_root_task_id,
         is_active,
         is_selected,
         is_primary_expanded,
         area,
-        ui_ctx,
         theme,
+        ..
     } = *ctx;
     let status_icon = render_helpers::task_status_icon(root_task, is_active);
 
-    // Check if this conversation has children
-    let has_children = all_tasks
-        .iter()
-        .any(|(_, task)| task.parent_id == Some(primary_root_task_id));
+    // In the new flat system, tasks don't have children
+    // Expansion is now used for showing steps or thread messages
+    let has_children = false;
 
-    // Add expand indicator if conversation has children
+    // Add expand indicator if task has expandable content
     let expand_indicator = render_helpers::expansion_indicator(has_children, is_primary_expanded);
 
     let task_line = root_task.progress.as_ref().map_or_else(
@@ -322,18 +318,7 @@ fn render_unfocused_root_and_children(
         lines.push(Line::from(vec![Span::styled(truncated_step, step_style)]));
     }
 
-    // Show children only if conversation is expanded OR if they're currently running
-    let children: Vec<_> = all_tasks
-        .iter()
-        .filter(|(id, task)| {
-            task.parent_id == Some(primary_root_task_id)
-                && (is_primary_expanded
-                    || ui_ctx.state.active_running_tasks.contains(id)
-                    || task.status == TaskStatus::Running)
-        })
-        .collect();
-
-    if !children.is_empty() {
-        task_rendering::add_child_task_lines(area, lines, &children, ui_ctx, theme);
-    }
+    // No children in the new flat system
+    // Tasks are independent and don't have parent-child relationships
+    // Expansion is now used for showing steps or thread messages within a single task
 }

@@ -18,13 +18,13 @@ use merlin_routing::{TaskId, TaskProgress};
 
 /// Determines which root task to display based on selection and running state
 pub fn determine_root_task_to_display(
-    all_tasks: &[(TaskId, &TaskDisplay)],
+    _all_tasks: &[(TaskId, &TaskDisplay)],
     root_tasks: &[&(TaskId, &TaskDisplay)],
     ui_ctx: &UiCtx<'_>,
 ) -> TaskId {
     ui_ctx.state.active_task_id.map_or_else(
         || {
-            // No selection - show the first running root, or just the first
+            // No selection - show the first running task, or just the first
             root_tasks
                 .iter()
                 .find(|(id, _)| ui_ctx.state.active_running_tasks.contains(id))
@@ -38,25 +38,15 @@ pub fn determine_root_task_to_display(
                 )
         },
         |active_id| {
-            // If a task is selected, find its root
-            all_tasks
-                .iter()
-                .find(|(id, _)| *id == active_id)
-                .and_then(|(_, task)| {
-                    if task.parent_id.is_none() {
-                        // Selected task is a root conversation
-                        Some(active_id)
-                    } else {
-                        // Selected task is a child - return its parent (the root conversation)
-                        task.parent_id
-                    }
-                })
-                // If selected task not found, default to first root
-                .unwrap_or_else(|| {
-                    root_tasks
-                        .first()
-                        .map_or_else(TaskId::default, |(id, _)| *id)
-                })
+            // If a task is selected, return it (no hierarchy to navigate)
+            // If selected task not found, default to first root
+            if root_tasks.iter().any(|(id, _)| *id == active_id) {
+                active_id
+            } else {
+                root_tasks
+                    .first()
+                    .map_or_else(TaskId::default, |(id, _)| *id)
+            }
         },
     )
 }
@@ -207,6 +197,10 @@ struct RootTaskContext<'ctx> {
     is_selected: bool,
     _is_primary: bool,
     ui_ctx: &'ctx UiCtx<'ctx>,
+    #[allow(
+        dead_code,
+        reason = "Kept for future use when hierarchy is reimplemented"
+    )]
     all_tasks: &'ctx [(TaskId, &'ctx TaskDisplay)],
     max_width: usize,
     theme: Theme,
@@ -221,17 +215,16 @@ fn render_root_task(ctx: &RootTaskContext<'_>, lines: &mut Vec<Line<'static>>) {
         is_selected,
         _is_primary,
         ui_ctx,
-        all_tasks,
         max_width,
         theme,
+        ..
     } = *ctx;
-    // Check if this conversation has children
-    let has_children = all_tasks
-        .iter()
-        .any(|(_, task_item)| task_item.parent_id == Some(task_id));
+    // In the new flat system, tasks don't have children
+    // Expansion is now used for showing steps or thread messages
+    let has_children = false;
     let is_expanded = ui_ctx.state.expanded_conversations.contains(&task_id);
 
-    // Add expand indicator if conversation has children
+    // Add expand indicator if task has expandable content
     let expand_indicator = render_helpers::expansion_indicator(has_children, is_expanded);
 
     let retry_suffix = if task.retry_count > 0 {
@@ -351,6 +344,10 @@ pub fn truncate_text(text: &str, max_width: usize) -> String {
 }
 
 /// Adds lines for child tasks
+///
+/// This function is currently unused in the flat task system but kept for future
+/// when thread-based grouping is implemented.
+#[allow(dead_code, reason = "Kept for future thread-based grouping feature")]
 pub fn add_child_task_lines(
     area: Rect,
     lines: &mut Vec<Line<'static>>,

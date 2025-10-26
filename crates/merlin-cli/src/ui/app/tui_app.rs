@@ -12,6 +12,7 @@ use crate::ui::persistence::TaskPersistence;
 use crate::ui::renderer::{FocusedPane, Renderer};
 use crate::ui::state::UiState;
 use crate::ui::task_manager::TaskManager;
+use merlin_agent::ThreadStore;
 use merlin_routing::UiEvent;
 
 /// Main TUI application
@@ -40,6 +41,9 @@ pub struct TuiApp<B: Backend> {
     pub(super) last_render_time: Instant,
     /// Cache of actual rendered layout dimensions
     pub(super) layout_cache: layout::LayoutCache,
+    /// Thread storage and management
+    #[allow(dead_code, reason = "Will be used in Phase 5")]
+    pub(super) thread_store: ThreadStore,
 }
 
 // Note: all input is sourced from `event_source` to allow test injection without

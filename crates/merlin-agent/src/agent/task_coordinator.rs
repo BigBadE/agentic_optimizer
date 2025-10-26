@@ -4,7 +4,7 @@ use std::sync::Arc;
 use std::time::{SystemTime, UNIX_EPOCH};
 use tokio::sync::Mutex;
 
-use merlin_core::{Result, RoutingError, SubtaskSpec, Task, TaskId, TaskResult};
+use merlin_core::{Result, RoutingError, Subtask, Task, TaskId, TaskResult};
 
 /// Maximum depth for task decomposition
 const MAX_DECOMPOSITION_DEPTH: usize = 5;
@@ -145,7 +145,7 @@ impl TaskCoordinator {
     pub async fn decompose_task(
         &self,
         task_id: TaskId,
-        subtask_specs: Vec<SubtaskSpec>,
+        subtask_specs: Vec<Subtask>,
     ) -> Result<Vec<Task>> {
         if subtask_specs.len() > MAX_SUBTASKS_PER_TASK {
             return Err(RoutingError::Other(format!(
@@ -156,7 +156,7 @@ impl TaskCoordinator {
 
         let subtasks: Vec<Task> = subtask_specs
             .into_iter()
-            .map(|spec| Task::new(spec.description).with_difficulty(spec.difficulty))
+            .map(|spec| Task::new(spec.description.clone()).with_difficulty(spec.difficulty))
             .collect();
 
         let mut state = self.state.lock().await;
@@ -479,7 +479,7 @@ mod tests {
             tokens_used: TokenUsage::default(),
             validation: ValidationResult::default(),
             duration_ms: 0,
-            task_list: None,
+            work_unit: None,
         }
     }
 
@@ -748,14 +748,8 @@ mod tests {
             .expect("Failed to register parent task");
 
         let subtask_specs = vec![
-            SubtaskSpec {
-                description: "Subtask 1".to_owned(),
-                difficulty: 1,
-            },
-            SubtaskSpec {
-                description: "Subtask 2".to_owned(),
-                difficulty: 2,
-            },
+            Subtask::new("Subtask 1".to_owned(), 1),
+            Subtask::new("Subtask 2".to_owned(), 2),
         ];
 
         let subtasks = coordinator
@@ -784,10 +778,7 @@ mod tests {
         let coordinator = TaskCoordinator::new();
         let fake_id = TaskId::default();
 
-        let subtask_specs = vec![SubtaskSpec {
-            description: "Subtask".to_owned(),
-            difficulty: 5,
-        }];
+        let subtask_specs = vec![Subtask::new("Subtask".to_owned(), 5)];
 
         let result = coordinator.decompose_task(fake_id, subtask_specs).await;
         result.unwrap_err();

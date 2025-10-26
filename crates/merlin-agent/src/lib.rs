@@ -57,14 +57,15 @@ pub mod agent;
 pub mod executor;
 /// High-level orchestration of routing components
 pub mod orchestrator;
+/// Thread persistence and management
+pub mod thread_store;
 /// Validation pipeline and stages
 pub mod validator;
 
 pub use agent::{
-    AgentExecutor, AgentExecutorWrapper, CommandResult, CommandRunner, ContextFetcher,
-    ContextManager, ConversationManager, ConversationMessage, ConversationSummary,
-    CoordinatorStats, RealAgentExecutorWrapper, SelfAssessor, StepTracker, TaskCoordinator,
-    TaskListExecutor, TaskListResult, TaskProgress as AgentTaskProgress, TaskStatus,
+    AgentExecutor, CommandResult, CommandRunner, ContextFetcher, ContextManager,
+    ConversationManager, ConversationMessage, ConversationSummary, CoordinatorStats, SelfAssessor,
+    StepTracker, TaskCoordinator, TaskProgress as AgentTaskProgress, TaskStatus,
 };
 pub use executor::{
     BuildResult, ConflictAwareTaskGraph, ConflictReport, ExecutorPool, FileConflict,
@@ -72,6 +73,7 @@ pub use executor::{
     WorkspaceSnapshot, WorkspaceState,
 };
 pub use orchestrator::RoutingOrchestrator;
+pub use thread_store::ThreadStore;
 pub use validator::{
     BuildValidationStage, LintValidationStage, SyntaxValidationStage, TestValidationStage,
     ValidationPipeline, ValidationStage as ValidationStageTrait, Validator,

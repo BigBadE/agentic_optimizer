@@ -39,8 +39,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<void> {",
-          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
-          "  await edit('shared.rs', 'fn main() {}', 'fn hello() -> String {\\n  \"Hello\".to_string()\\n}\\n\\nfn main() {}');",
+          "  await editFile('shared.rs', 'fn main() {}', 'fn hello() -> String {\\n  \"Hello\".to_string()\\n}\\n\\nfn main() {}');",
           "}"
         ]
       },
@@ -48,7 +47,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "edit"
+            "editFile"
           ]
         },
         "files": [
@@ -79,8 +78,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<void> {",
-          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
-          "  await edit('shared.rs', 'fn main() {}', 'fn goodbye() -> String {\\n  \"Goodbye\".to_string()\\n}\\n\\nfn main() {}');",
+          "  await editFile('shared.rs', 'fn main() {}', 'fn goodbye() -> String {\\n  \"Goodbye\".to_string()\\n}\\n\\nfn main() {}');",
           "}"
         ]
       },
@@ -88,7 +86,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "edit"
+            "editFile"
           ]
         },
         "files": [
@@ -119,8 +117,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<void> {",
-          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
-          "  await edit('file_a.rs', 'fn func_a() {}', 'fn func_a() -> String {\\n  \"A\".to_string()\\n}');",
+          "  await editFile('file_a.rs', 'fn func_a() {}', 'fn func_a() -> String {\\n  \"A\".to_string()\\n}');",
           "}"
         ]
       },
@@ -128,7 +125,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "edit"
+            "editFile"
           ]
         },
         "files": [
@@ -159,8 +156,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<void> {",
-          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
-          "  await edit('file_b.rs', 'fn func_b() {}', 'fn func_b() -> String {\\n  \"B\".to_string()\\n}');",
+          "  await editFile('file_b.rs', 'fn func_b() {}', 'fn func_b() -> String {\\n  \"B\".to_string()\\n}');",
           "}"
         ]
       },
@@ -168,7 +164,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "edit"
+            "editFile"
           ]
         },
         "files": [
@@ -199,10 +195,9 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const show = tools.show as (path: string) => Promise<string>;",
-          "  const shared = await show('shared.rs');",
-          "  const fileA = await show('file_a.rs');",
-          "  const fileB = await show('file_b.rs');",
+          "  const shared = await readFile('shared.rs');",
+          "  const fileA = await readFile('file_a.rs');",
+          "  const fileB = await readFile('file_b.rs');",
           "  return `Conflict detection verified. Files processed correctly:\\nshared.rs: ${shared.includes('fn hello()') && shared.includes('fn goodbye()')}\\nfile_a.rs: ${fileA.includes('func_a() -> String')}\\nfile_b.rs: ${fileB.includes('func_b() -> String')}`;",
           "}"
         ]
@@ -211,7 +206,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "show"
+            "readFile"
           ]
         }
       }
@@ -233,8 +228,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const list = tools.list as (path: string) => Promise<string[]>;",
-          "  const files = await list('.');",
+          "  const files = await listFiles('.');",
           "  const rsFiles = files.filter(f => f.endsWith('.rs'));",
           "  return `Concurrent operations completed. Found ${rsFiles.length} Rust files. All operations executed without conflicts.`;",
           "}"
@@ -244,7 +238,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "list"
+            "listFiles"
           ]
         }
       }

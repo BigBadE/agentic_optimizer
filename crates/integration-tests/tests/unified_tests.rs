@@ -11,15 +11,14 @@
         clippy::missing_panics_doc,
         clippy::missing_errors_doc,
         clippy::print_stdout,
-        clippy::absolute_paths,
-        clippy::min_ident_chars,
+        clippy::print_stderr,
         clippy::tests_outside_test_module,
-        clippy::excessive_nesting,
-        reason = "Allow for tests"
+        reason = "Test allows"
     )
 )]
 
 use integration_tests::{UnifiedTestRunner, VerificationResult};
+use std::fs::read_dir;
 use std::path::PathBuf;
 
 /// Get fixtures directory
@@ -33,266 +32,109 @@ fn fixtures_dir() -> PathBuf {
 async fn run_fixture(fixture_path: PathBuf) -> Result<VerificationResult, String> {
     let fixture_name = fixture_path
         .file_name()
-        .and_then(|n| n.to_str())
+        .and_then(|name| name.to_str())
         .ok_or_else(|| "Invalid fixture name".to_owned())?;
 
-    println!("Running fixture: {fixture_name}");
-
     let fixture = UnifiedTestRunner::load_fixture(&fixture_path)
-        .map_err(|e| format!("Failed to load fixture {fixture_name}: {e}"))?;
+        .map_err(|error| format!("Failed to load fixture {fixture_name}: {error}"))?;
 
     let runner = UnifiedTestRunner::new(fixture)
-        .map_err(|e| format!("Failed to create runner for {fixture_name}: {e}"))?;
+        .map_err(|error| format!("Failed to create runner for {fixture_name}: {error}"))?;
 
     runner
         .run()
         .await
-        .map_err(|e| format!("Failed to run fixture {fixture_name}: {e}"))
+        .map_err(|error| format!("Failed to run fixture {fixture_name}: {error}"))
 }
 
-/// Test all basic fixtures
-#[tokio::test]
-#[cfg_attr(test, allow(clippy::unwrap_used))]
-async fn test_basic_fixtures() {
-    let basic_dir = fixtures_dir().join("basic");
-    if !basic_dir.exists() {
-        println!("No basic fixtures found");
-        return;
+/// Helper to run all fixtures in a directory
+async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<(String, Result<VerificationResult, String>)> {
+    if !dir.exists() {
+        return vec![];
     }
 
-    let fixtures = UnifiedTestRunner::discover_fixtures(&basic_dir).unwrap();
-    println!("Found {} basic fixtures", fixtures.len());
+    let fixtures = UnifiedTestRunner::discover_fixtures(&dir).unwrap();
+    let mut results = vec![];
 
     for fixture_path in fixtures {
+        let fixture_name = fixture_path
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or("unknown")
+            .to_owned();
+
         let result = run_fixture(fixture_path).await;
+        results.push((fixture_name, result));
+    }
+
+    results
+}
+
+/// Run all fixtures in the fixtures directory
+#[tokio::test]
+async fn test_all_fixtures() {
+    let fixtures_root = fixtures_dir();
+
+    // Discover all subdirectories
+    let subdirs = read_dir(&fixtures_root)
+        .expect("Failed to read fixtures directory")
+        .filter_map(Result::ok)
+        .filter(|entry| entry.path().is_dir())
+        .map(|entry| entry.path())
+        .collect::<Vec<_>>();
+
+    let mut all_results = vec![];
+    for subdir in subdirs {
+        let results = run_fixtures_in_dir(subdir).await;
+        all_results.extend(results);
+    }
+
+    // Collect all results for final report
+    let mut failures_with_details = vec![];
+    let mut passed = vec![];
+
+    for (fixture_name, result) in all_results {
         match result {
-            Ok(verification) => {
-                if !verification.passed {
-                    println!("Failures:");
-                    for failure in &verification.failures {
-                        println!("  - {failure}");
-                    }
-                    panic!("Verification failed");
-                }
-                println!("  ✓ Passed");
+            Ok(verification) if verification.passed => {
+                passed.push(fixture_name);
             }
-            Err(e) => {
-                panic!("Test failed: {e}");
+            Ok(verification) => {
+                failures_with_details.push((fixture_name, verification));
+            }
+            Err(error) => {
+                // Create a minimal VerificationResult for errors
+                let mut error_result = VerificationResult::new();
+                error_result.add_failure(error);
+                failures_with_details.push((fixture_name, error_result));
             }
         }
     }
-}
 
-/// Test all execution fixtures
-#[tokio::test]
-#[cfg_attr(test, allow(clippy::unwrap_used))]
-async fn test_execution_fixtures() {
-    let execution_dir = fixtures_dir().join("execution");
-    if !execution_dir.exists() {
-        println!("No execution fixtures found");
-        return;
-    }
+    // Print complete summary at the end
+    println!("\n=== Test Summary ===");
+    println!(
+        "Total fixtures: {}",
+        passed.len() + failures_with_details.len()
+    );
+    println!("Passed: {}", passed.len());
+    println!("Failed: {}", failures_with_details.len());
 
-    let fixtures = UnifiedTestRunner::discover_fixtures(&execution_dir).unwrap();
-    println!("Found {} execution fixtures", fixtures.len());
-
-    for fixture_path in fixtures {
-        let result = run_fixture(fixture_path).await;
-        match result {
-            Ok(verification) => {
-                if !verification.passed {
-                    println!("Failures:");
-                    for failure in &verification.failures {
-                        println!("  - {failure}");
-                    }
-                    panic!("Verification failed");
-                }
-                println!("  ✓ Passed");
-            }
-            Err(e) => {
-                panic!("Test failed: {e}");
+    if failures_with_details.is_empty() {
+        println!("\nAll fixtures passed! ✓");
+    } else {
+        println!("\n=== Failed Fixtures ===");
+        for (fixture_name, verification) in &failures_with_details {
+            println!("\n{fixture_name}:");
+            for failure in &verification.failures {
+                println!("  - {failure}");
             }
         }
-    }
-}
 
-/// Test all task list fixtures
-#[tokio::test]
-#[cfg_attr(test, allow(clippy::unwrap_used))]
-async fn test_task_list_fixtures() {
-    let task_lists_dir = fixtures_dir().join("task_lists");
-    if !task_lists_dir.exists() {
-        println!("No task list fixtures found");
-        return;
-    }
-
-    let fixtures = UnifiedTestRunner::discover_fixtures(&task_lists_dir).unwrap();
-    println!("Found {} task list fixtures", fixtures.len());
-
-    for fixture_path in fixtures {
-        let result = run_fixture(fixture_path).await;
-        match result {
-            Ok(verification) => {
-                if !verification.passed {
-                    println!("Failures:");
-                    for failure in &verification.failures {
-                        println!("  - {failure}");
-                    }
-                    panic!("Verification failed");
-                }
-                println!("  ✓ Passed");
-            }
-            Err(e) => {
-                panic!("Test failed: {e}");
-            }
+        println!("\n=== Passed Fixtures ===");
+        for name in &passed {
+            println!("  ✓ {name}");
         }
-    }
-}
 
-/// Test all TUI fixtures
-#[tokio::test]
-#[cfg_attr(test, allow(clippy::unwrap_used))]
-async fn test_tui_fixtures() {
-    let tui_dir = fixtures_dir().join("tui");
-    if !tui_dir.exists() {
-        println!("No TUI fixtures found");
-        return;
-    }
-
-    let fixtures = UnifiedTestRunner::discover_fixtures(&tui_dir).unwrap();
-    println!("Found {} TUI fixtures", fixtures.len());
-
-    for fixture_path in fixtures {
-        let result = run_fixture(fixture_path).await;
-        match result {
-            Ok(verification) => {
-                if !verification.passed {
-                    println!("Failures:");
-                    for failure in &verification.failures {
-                        println!("  - {failure}");
-                    }
-                    panic!("Verification failed");
-                }
-                println!("  ✓ Passed");
-            }
-            Err(e) => {
-                panic!("Test failed: {e}");
-            }
-        }
-    }
-}
-
-/// Test all TypeScript fixtures
-#[tokio::test]
-#[cfg_attr(test, allow(clippy::unwrap_used))]
-async fn test_typescript_fixtures() {
-    let typescript_dir = fixtures_dir().join("typescript");
-    if !typescript_dir.exists() {
-        println!("No TypeScript fixtures found");
-        return;
-    }
-
-    let fixtures = UnifiedTestRunner::discover_fixtures(&typescript_dir).unwrap();
-    println!("Found {} TypeScript fixtures", fixtures.len());
-
-    for fixture_path in fixtures {
-        let result = run_fixture(fixture_path).await;
-        match result {
-            Ok(verification) => {
-                if !verification.passed {
-                    println!("Failures:");
-                    for failure in &verification.failures {
-                        println!("  - {failure}");
-                    }
-                    panic!("Verification failed");
-                }
-                println!("  ✓ Passed");
-            }
-            Err(e) => {
-                panic!("Test failed: {e}");
-            }
-        }
-    }
-}
-
-/// Test all tool fixtures
-#[tokio::test]
-#[cfg_attr(test, allow(clippy::unwrap_used))]
-async fn test_tool_fixtures() {
-    let tools_dir = fixtures_dir().join("tools");
-    if !tools_dir.exists() {
-        println!("No tool fixtures found");
-        return;
-    }
-
-    let fixtures = UnifiedTestRunner::discover_fixtures(&tools_dir).unwrap();
-    println!("Found {} tool fixtures", fixtures.len());
-
-    for fixture_path in fixtures {
-        let result = run_fixture(fixture_path).await;
-        match result {
-            Ok(verification) => {
-                if !verification.passed {
-                    println!("Failures:");
-                    for failure in &verification.failures {
-                        println!("  - {failure}");
-                    }
-                    panic!("Verification failed");
-                }
-                println!("  ✓ Passed");
-            }
-            Err(e) => {
-                panic!("Test failed: {e}");
-            }
-        }
-    }
-}
-
-/// Test all context fixtures
-#[tokio::test]
-#[cfg_attr(test, allow(clippy::unwrap_used))]
-async fn test_context_fixtures() {
-    let context_dir = fixtures_dir().join("context");
-    if !context_dir.exists() {
-        println!("No context fixtures found");
-        return;
-    }
-
-    let fixtures = UnifiedTestRunner::discover_fixtures(&context_dir).unwrap();
-    println!("Found {} context fixtures", fixtures.len());
-
-    for fixture_path in fixtures {
-        let result = run_fixture(fixture_path).await;
-        match result {
-            Ok(verification) => {
-                if !verification.passed {
-                    println!("Failures:");
-                    for failure in &verification.failures {
-                        println!("  - {failure}");
-                    }
-                    panic!("Verification failed");
-                }
-                println!("  ✓ Passed");
-            }
-            Err(e) => {
-                panic!("Test failed: {e}");
-            }
-        }
-    }
-}
-
-/// Discover all fixtures across all categories
-#[tokio::test]
-#[cfg_attr(test, allow(clippy::unwrap_used))]
-async fn test_discover_all_fixtures() {
-    let fixtures = UnifiedTestRunner::discover_fixtures(&fixtures_dir()).unwrap();
-    println!("Total fixtures discovered: {}", fixtures.len());
-    assert!(!fixtures.is_empty(), "Should discover at least one fixture");
-
-    for fixture_path in &fixtures {
-        println!(
-            "  - {}",
-            fixture_path.file_name().unwrap().to_string_lossy()
-        );
+        panic!("{} fixture(s) failed", failures_with_details.len());
     }
 }

@@ -39,8 +39,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const show = tools.show as (path: string) => Promise<string>;",
-          "  const content = await show('task_a.txt');",
+          "  const content = await readFile('task_a.txt');",
           "  return `Read Task A: ${content}`;",
           "}"
         ]
@@ -49,7 +48,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "show"
+            "readFile"
           ]
         }
       }
@@ -71,8 +70,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const show = tools.show as (path: string) => Promise<string>;",
-          "  const content = await show('task_b.txt');",
+          "  const content = await readFile('task_b.txt');",
           "  return `Read Task B after Task A: ${content}`;",
           "}"
         ]
@@ -81,7 +79,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "show"
+            "readFile"
           ]
         }
       }
@@ -103,8 +101,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const show = tools.show as (path: string) => Promise<string>;",
-          "  const content = await show('task_c.txt');",
+          "  const content = await readFile('task_c.txt');",
           "  return `Read Task C after both A and B: ${content}`;",
           "}"
         ]
@@ -113,7 +110,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "show"
+            "readFile"
           ]
         }
       }
@@ -135,11 +132,10 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const show = tools.show as (path: string) => Promise<string>;",
           "  const results = [];",
-          "  results.push(await show('task_a.txt'));",
-          "  results.push(await show('task_b.txt'));",
-          "  results.push(await show('task_c.txt'));",
+          "  results.push(await readFile('task_a.txt'));",
+          "  results.push(await readFile('task_b.txt'));",
+          "  results.push(await readFile('task_c.txt'));",
           "  return `All tasks completed in dependency order: ${results.join(', ')}`;",
           "}"
         ]
@@ -148,7 +144,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "show"
+            "readFile"
           ]
         }
       }
@@ -170,8 +166,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const list = tools.list as (path: string) => Promise<string[]>;",
-          "  const files = await list('.');",
+          "  const files = await listFiles('.');",
           "  return `Task graph valid (no cycles detected). Found ${files.length} files to process.`;",
           "}"
         ]
@@ -180,7 +175,7 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "list"
+            "listFiles"
           ]
         }
       }

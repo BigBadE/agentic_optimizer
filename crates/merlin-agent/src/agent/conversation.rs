@@ -1,3 +1,4 @@
+use merlin_core::{Thread, ThreadId};
 use regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
@@ -33,6 +34,8 @@ pub struct ConversationManager {
     discussed_concepts: HashMap<String, usize>,
     current_focus: Option<PathBuf>,
     file_importance: HashMap<PathBuf, f32>,
+    /// Current active thread
+    current_thread: Option<ThreadId>,
 }
 
 impl ConversationManager {
@@ -44,6 +47,36 @@ impl ConversationManager {
             discussed_concepts: HashMap::new(),
             current_focus: None,
             file_importance: HashMap::new(),
+            current_thread: None,
+        }
+    }
+
+    /// Sets the current active thread
+    pub fn set_current_thread(&mut self, thread_id: ThreadId) {
+        self.current_thread = Some(thread_id);
+    }
+
+    /// Gets the current active thread
+    #[must_use]
+    pub fn current_thread(&self) -> Option<ThreadId> {
+        self.current_thread
+    }
+
+    /// Populates conversation history from a thread
+    pub fn load_thread(&mut self, thread: &Thread) {
+        self.clear();
+        self.current_thread = Some(thread.id);
+
+        for message in &thread.messages {
+            self.add_message("user".to_owned(), message.content.clone());
+
+            // Add assistant responses from work if completed
+            if let Some(work) = &message.work
+                && !work.subtasks.is_empty()
+            {
+                let response_text = format!("Completed {} subtasks", work.subtasks.len());
+                self.add_message("assistant".to_owned(), response_text);
+            }
         }
     }
 

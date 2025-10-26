@@ -13,6 +13,8 @@ use ratatui::{
     widgets::{Block, Borders, Padding, Paragraph, Wrap},
 };
 
+use merlin_agent::ThreadStore;
+
 use super::input::InputManager;
 use super::layout;
 use super::scroll;
@@ -264,6 +266,91 @@ impl Renderer {
         frame.render_widget(&input_area, area);
     }
 
+    #[allow(
+        dead_code,
+        reason = "Phase 5 in progress - will be called when layout is added"
+    )]
+    fn render_thread_list(
+        &self,
+        frame: &mut Frame,
+        area: Rect,
+        thread_store: &ThreadStore,
+        focused: FocusedPane,
+    ) {
+        use ratatui::text::{Line, Span};
+
+        let border_color = if focused == FocusedPane::Threads {
+            self.theme.focused_border()
+        } else {
+            self.theme.unfocused_border()
+        };
+
+        // Get all active threads
+        let threads = thread_store.active_threads();
+
+        let mut lines = Vec::new();
+
+        if threads.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "No threads yet",
+                Style::default().fg(self.theme.text()),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "Press Enter to start a new conversation",
+                Style::default().fg(self.theme.text()),
+            )));
+        } else {
+            // Display each thread with color emoji and name
+            for thread in &threads {
+                let mut spans = Vec::new();
+
+                // Color emoji
+                spans.push(Span::raw(format!("{} ", thread.color.emoji())));
+
+                // Thread name
+                spans.push(Span::styled(
+                    thread.name.clone(),
+                    Style::default().fg(self.theme.text()),
+                ));
+
+                // Show message count
+                let msg_count = thread.messages.len();
+                if msg_count > 0 {
+                    spans.push(Span::styled(
+                        format!(" ({msg_count})"),
+                        Style::default()
+                            .fg(self.theme.text())
+                            .add_modifier(Modifier::DIM),
+                    ));
+                }
+
+                // Show latest work status if any
+                if let Some(last_msg) = thread.last_message()
+                    && let Some(ref work) = last_msg.work
+                {
+                    spans.push(Span::raw(" "));
+                    spans.push(Span::raw(work.status.emoji()));
+                }
+
+                lines.push(Line::from(spans));
+            }
+        }
+
+        let paragraph = Paragraph::new(lines)
+            .style(Style::default().fg(self.theme.text()))
+            .block(
+                Block::default()
+                    .borders(Borders::ALL)
+                    .title("─── Threads ")
+                    .border_style(Style::default().fg(border_color))
+                    .padding(Padding::horizontal(1)),
+            )
+            .wrap(Wrap { trim: false });
+
+        frame.render_widget(paragraph, area);
+    }
+
     // Helper methods
 
     /// Calculate the number of lines that will be rendered for a task's output
@@ -281,4 +368,10 @@ pub enum FocusedPane {
     Output,
     /// Tasks list pane on the right
     Tasks,
+    /// Threads list pane (side-by-side mode)
+    #[allow(
+        dead_code,
+        reason = "Phase 5 in progress - will be used for thread navigation"
+    )]
+    Threads,
 }

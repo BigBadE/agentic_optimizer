@@ -81,22 +81,13 @@ impl<B: Backend> TuiApp<B> {
             return;
         }
 
-        // After deleting active task, select the next newest conversation
+        // After deleting active task, select the next newest task
         // task_order is already sorted (oldest first, newest last)
-        let root_conversations: Vec<TaskId> = self
-            .task_manager
-            .task_order()
-            .iter()
-            .filter(|&&id| {
-                self.task_manager
-                    .get_task(id)
-                    .is_some_and(|task| task.parent_id.is_none())
-            })
-            .copied()
-            .collect();
+        // All tasks are now flat (no parent-child hierarchy)
+        let all_tasks: Vec<TaskId> = self.task_manager.task_order().to_vec();
 
-        // Select the newest conversation (last in chronological order) if any exist
-        if let Some(&new_id) = root_conversations.last() {
+        // Select the newest task (last in chronological order) if any exist
+        if let Some(&new_id) = all_tasks.last() {
             self.state.active_task_id = Some(new_id);
         } else {
             self.state.active_task_id = None;

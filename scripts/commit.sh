@@ -27,10 +27,6 @@ for arg in "$@"; do
       RUN_OLLAMA=true
       shift
       ;;
-    --html)
-      GENERATE_HTML=true
-      shift
-      ;;
     *)
       # ignore unknown args (forward compatibility)
       ;;
@@ -170,23 +166,15 @@ fi
 rm -rf "$TEMP_COV_DIR"
 git add benchmarks/data/coverage/latest.info
 
-# Optionally generate HTML report from lcov file
-if [ "$GENERATE_HTML" = true ]; then
-  echo "[commit] Generating HTML report from lcov..."
-  mkdir -p benchmarks/data/coverage/html
+  mkdir -p benchmarks/data/coverage
   grcov benchmarks/data/coverage/latest.info \
     -s "${ROOT_DIR}" \
     -t html \
-    -o benchmarks/data/coverage/html 2>/dev/null
-fi
+    -o benchmarks/data/coverage 2>/dev/null
 
 REPORT_END=$(date +%s)
 REPORT_TIME=$((REPORT_END - REPORT_START))
-if [ "$GENERATE_HTML" = true ]; then
-  echo "[commit] Coverage reports generated in ${REPORT_TIME}s (lcov + HTML)"
-else
-  echo "[commit] Coverage reports generated in ${REPORT_TIME}s (lcov)"
-fi
+echo "[commit] Coverage reports generated in ${REPORT_TIME}s"
 
 # Clean up profraw files now that we're done
 echo "[commit] Cleaning up profraw files..."

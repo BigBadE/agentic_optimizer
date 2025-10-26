@@ -26,6 +26,8 @@ use crate::ui::state::{ConversationEntry, ConversationRole, UiState};
 #[cfg(any(test, feature = "test-util"))]
 use crate::ui::task_manager::TaskManager;
 #[cfg(any(test, feature = "test-util"))]
+use merlin_core::ThreadId;
+#[cfg(any(test, feature = "test-util"))]
 use merlin_routing::TaskId;
 
 #[cfg(any(test, feature = "test-util"))]
@@ -123,15 +125,14 @@ impl<B: Backend> TuiApp<B> {
         });
     }
 
-    /// Gets the parent of the selected task
+    /// Gets the thread ID of the selected task
     ///
     /// # Testing Only
-    /// Use this to verify task hierarchy in tests.
-    ///
-    /// TODO: This is for testing task hierarchy features (not yet implemented).
-    pub fn get_selected_task_parent(&self) -> Option<TaskId> {
+    /// Use this to verify task thread membership in tests.
+    #[allow(dead_code, reason = "Test utility for future thread-based features")]
+    pub fn get_selected_task_thread(&self) -> Option<ThreadId> {
         let selected_task_id = self.get_selected_task_id()?;
-        self.task_manager.get_task(selected_task_id)?.parent_id
+        self.task_manager.get_task(selected_task_id)?.thread_id
     }
 
     /// Gets thread context for the selected task

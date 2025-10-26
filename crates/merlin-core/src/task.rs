@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::time::Instant;
 use uuid::Uuid;
 
-use crate::task_list::TaskList;
+use crate::conversation::{Subtask, WorkUnit};
 use crate::{Response, TokenUsage};
 
 /// Unique identifier for a task
@@ -198,9 +198,9 @@ pub struct TaskResult {
     pub validation: ValidationResult,
     /// Execution duration in milliseconds
     pub duration_ms: u64,
-    /// Optional `TaskList` if the agent returned a multi-step workflow
+    /// Optional `WorkUnit` containing the work performed for this task
     #[serde(skip_serializing_if = "Option::is_none")]
-    pub task_list: Option<TaskList>,
+    pub work_unit: Option<WorkUnit>,
 }
 
 /// Validation result with pass/fail status and detailed feedback.
@@ -387,7 +387,7 @@ pub enum TaskAction {
     /// Decompose into subtasks
     Decompose {
         /// Subtasks to spawn
-        subtasks: Vec<SubtaskSpec>,
+        subtasks: Vec<Subtask>,
         /// How to execute the subtasks
         execution_mode: ExecutionMode,
     },
@@ -397,20 +397,6 @@ pub enum TaskAction {
         /// What information is needed
         needs: Vec<String>,
     },
-}
-
-/// Specification for a subtask to be spawned.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct SubtaskSpec {
-    /// Description of what the subtask should do
-    pub description: String,
-    /// Difficulty rating from 1 (easiest) to 10 (hardest)
-    #[serde(default = "default_difficulty")]
-    pub difficulty: u8,
-}
-
-fn default_difficulty() -> u8 {
-    5
 }
 
 /// How to execute multiple subtasks.

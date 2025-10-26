@@ -18,6 +18,7 @@ use crate::ui::renderer::{FocusedPane, Renderer};
 use crate::ui::state::UiState;
 use crate::ui::task_manager::TaskManager;
 use crate::ui::theme::Theme;
+use merlin_agent::ThreadStore;
 use merlin_routing::{Result, RoutingError};
 
 impl TuiApp<CrosstermBackend<io::Stdout>> {
@@ -51,6 +52,14 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             .as_ref()
             .map(|dir| TaskPersistence::new(dir.clone()));
 
+        let thread_storage_path = tasks_dir.as_ref().map_or_else(
+            || PathBuf::from(".merlin/threads"),
+            |dir| dir.join("threads"),
+        );
+
+        let thread_store = ThreadStore::new(thread_storage_path)
+            .map_err(|err| RoutingError::Other(format!("Failed to create thread store: {err}")))?;
+
         let app = Self {
             terminal,
             event_receiver: receiver,
@@ -64,6 +73,7 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             event_source: Box::new(CrosstermEventSource),
             last_render_time: Instant::now(),
             layout_cache: layout::LayoutCache::new(),
+            thread_store,
         };
 
         let channel = UiChannel::from_sender(sender);

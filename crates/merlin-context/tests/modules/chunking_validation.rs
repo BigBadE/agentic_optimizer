@@ -1,19 +1,4 @@
 //! Integration tests for chunking validation.
-#![cfg_attr(
-    test,
-    allow(
-        dead_code,
-        clippy::expect_used,
-        clippy::unwrap_used,
-        clippy::panic,
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        clippy::print_stdout,
-        clippy::print_stderr,
-        clippy::tests_outside_test_module,
-        reason = "Test allows"
-    )
-)]
 
 use merlin_context::embedding::chunking::{
     FileChunk, MAX_CHUNK_TOKENS, MIN_CHUNK_TOKENS, chunk_file, estimate_tokens,

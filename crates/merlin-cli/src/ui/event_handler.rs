@@ -33,8 +33,8 @@ impl<'handler> EventHandler<'handler> {
             UiEvent::TaskStarted {
                 task_id,
                 description,
-                parent_id,
-            } => self.handle_task_started(task_id, description, parent_id),
+                ..
+            } => self.handle_task_started(task_id, description),
 
             UiEvent::TaskProgress { task_id, progress } => {
                 self.handle_task_progress(task_id, progress);
@@ -106,28 +106,7 @@ impl<'handler> EventHandler<'handler> {
 
     // Private event handlers
 
-    fn handle_task_started(
-        &mut self,
-        task_id: TaskId,
-        description: String,
-        parent_id: Option<TaskId>,
-    ) {
-        // Normalize parent_id to always point to root conversation (max 1 level deep)
-        let normalized_parent_id = if let Some(parent_id) = parent_id {
-            // Find the root conversation (parent might be a child itself)
-            let mut root_id = parent_id;
-            while let Some(task) = self.task_manager.get_task(root_id) {
-                if let Some(grandparent_id) = task.parent_id {
-                    root_id = grandparent_id;
-                } else {
-                    break;
-                }
-            }
-            Some(root_id)
-        } else {
-            None
-        };
-
+    fn handle_task_started(&mut self, task_id: TaskId, description: String) {
         let task_display = TaskDisplay {
             description,
             status: TaskStatus::Running,
@@ -135,7 +114,7 @@ impl<'handler> EventHandler<'handler> {
             output_lines: Vec::default(),
             created_at: SystemTime::now(),
             timestamp: Instant::now(),
-            parent_id: normalized_parent_id,
+            thread_id: None,
             output: String::new(),
             steps: Vec::default(),
             current_step: None,
@@ -145,15 +124,7 @@ impl<'handler> EventHandler<'handler> {
         self.task_manager.add_task(task_id, task_display);
         self.state.active_running_tasks.insert(task_id);
 
-        // Clear processing status since task has started
         self.state.processing_status = None;
-
-        // Ensure parent conversation is expanded to show the new child task
-        if let Some(root_id) = normalized_parent_id {
-            self.state.expanded_conversations.insert(root_id);
-        }
-
-        // Auto-select newly spawned task
         self.select_task(task_id);
     }
 

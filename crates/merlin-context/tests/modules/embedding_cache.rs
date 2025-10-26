@@ -4,30 +4,13 @@
 //! They use minimal test files (2 tiny files) to reduce I/O time.
 //! Embeddings are deterministic (content hash-based) using `FakeEmbeddingClient`.
 
-#![cfg_attr(
-    test,
-    allow(
-        dead_code,
-        unsafe_code,
-        clippy::expect_used,
-        clippy::unwrap_used,
-        clippy::panic,
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        clippy::print_stdout,
-        clippy::print_stderr,
-        clippy::tests_outside_test_module,
-        clippy::undocumented_unsafe_blocks,
-        reason = "Test allows"
-    )
-)]
-
 use merlin_context::{EmbeddingProvider, VectorSearchManager};
 use merlin_core::CoreResult as Result;
 use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::fs;
 use std::hash::{Hash as _, Hasher as _};
+use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Fake embedding client for testing (deterministic, hash-based)
@@ -81,10 +64,6 @@ fn create_minimal_project() -> TempDir {
 #[tokio::test]
 async fn test_cache_lifecycle() {
     // Test cache creation, persistence, and reload in one test
-    unsafe {
-        env::remove_var("MERLIN_FOLDER");
-    }
-
     let temp_dir = create_minimal_project();
     let project_root = temp_dir.path().to_path_buf();
 
@@ -96,11 +75,22 @@ async fn test_cache_lifecycle() {
         .await
         .expect("Should initialize with fake embeddings");
 
-    let cache_path = project_root
-        .join(".merlin")
-        .join("cache")
-        .join("vector")
-        .join("embeddings.bin");
+    // Resolve cache path the same way VectorSearchManager does
+    let cache_path = env::var("MERLIN_FOLDER").map_or_else(
+        |_| {
+            project_root
+                .join(".merlin")
+                .join("cache")
+                .join("vector")
+                .join("embeddings.bin")
+        },
+        |folder| {
+            PathBuf::from(folder)
+                .join("cache")
+                .join("vector")
+                .join("embeddings.bin")
+        },
+    );
     assert!(cache_path.exists(), "Cache file should exist");
     let len1 = manager1.len();
 
@@ -124,10 +114,6 @@ async fn test_cache_lifecycle() {
 #[tokio::test]
 async fn test_cache_file_changes() {
     // Test modification, addition, and deletion in one test
-    unsafe {
-        env::remove_var("MERLIN_FOLDER");
-    }
-
     let temp_dir = create_minimal_project();
     let project_root = temp_dir.path().to_path_buf();
     let src_dir = project_root.join("src");
@@ -178,10 +164,6 @@ async fn test_cache_file_changes() {
 
 #[tokio::test]
 async fn test_corrupted_cache_recovery() {
-    unsafe {
-        env::remove_var("MERLIN_FOLDER");
-    }
-
     let temp_dir = create_minimal_project();
     let project_root = temp_dir.path().to_path_buf();
 
@@ -193,12 +175,22 @@ async fn test_corrupted_cache_recovery() {
         .expect("Should initialize with fake embeddings");
     let initial_len = manager.len();
 
-    // Corrupt cache
-    let cache_path = project_root
-        .join(".merlin")
-        .join("cache")
-        .join("vector")
-        .join("embeddings.bin");
+    // Corrupt cache - resolve path the same way VectorSearchManager does
+    let cache_path = env::var("MERLIN_FOLDER").map_or_else(
+        |_| {
+            project_root
+                .join(".merlin")
+                .join("cache")
+                .join("vector")
+                .join("embeddings.bin")
+        },
+        |folder| {
+            PathBuf::from(folder)
+                .join("cache")
+                .join("vector")
+                .join("embeddings.bin")
+        },
+    );
     fs::write(&cache_path, b"corrupted").expect("Failed to corrupt cache");
 
     // Should rebuild

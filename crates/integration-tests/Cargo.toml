@@ -37,15 +37,5 @@ name = "unified_tests"
 path = "tests/unified_tests.rs"
 harness = true
 
-[[test]]
-name = "core_task_step"
-path = "tests/core/task_step_comprehensive.rs"
-harness = true
-
-[[test]]
-name = "routing_task_list_e2e"
-path = "tests/routing/task_list_e2e.rs"
-harness = true
-
 [lints]
 workspace = true

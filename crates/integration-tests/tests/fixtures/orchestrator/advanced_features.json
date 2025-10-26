@@ -37,10 +37,8 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<void> {",
-          "  const show = tools.show as (path: string) => Promise<string>;",
-          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
-          "  const current = await show('test.rs');",
-          "  await edit('test.rs', 'fn main() {}', 'fn hello() -> String {\\n  \"Hello\".to_string()\\n}\\n\\nfn main() {}');",
+          "  const current = await readFile('test.rs');",
+          "  await editFile('test.rs', 'fn main() {}', 'fn hello() -> String {\\n  \"Hello\".to_string()\\n}\\n\\nfn main() {}');",
           "}"
         ]
       },
@@ -48,8 +46,8 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "show",
-            "edit"
+            "readFile",
+            "editFile"
           ]
         },
         "files": [
@@ -80,10 +78,8 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<void> {",
-          "  const show = tools.show as (path: string) => Promise<string>;",
-          "  const edit = tools.edit as (path: string, old_str: string, new_str: string) => Promise<void>;",
-          "  const current = await show('test.rs');",
-          "  await edit('test.rs', 'fn main() {}', 'fn goodbye() -> String {\\n  \"Goodbye\".to_string()\\n}\\n\\nfn main() {}');",
+          "  const current = await readFile('test.rs');",
+          "  await editFile('test.rs', 'fn main() {}', 'fn goodbye() -> String {\\n  \"Goodbye\".to_string()\\n}\\n\\nfn main() {}');",
           "}"
         ]
       },
@@ -91,8 +87,8 @@
         "execution": {
           "typescript_executed": true,
           "tools_called": [
-            "show",
-            "edit"
+            "readFile",
+            "editFile"
           ]
         },
         "files": [

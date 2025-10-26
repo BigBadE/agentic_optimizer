@@ -1,12 +1,10 @@
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 
 use crate::{
-    AgentExecutor, ConflictAwareTaskGraph, ContextFetcher, ExecutorPool, TaskGraph,
-    TaskListExecutor, TaskListResult, ValidationPipeline, Validator, WorkspaceState,
+    AgentExecutor, ConflictAwareTaskGraph, ContextFetcher, ExecutorPool, TaskGraph, ThreadStore,
+    ValidationPipeline, Validator, WorkspaceState,
 };
-use merlin_core::{
-    Context, Response, Result, RoutingConfig, RoutingError, Task, TaskResult, UiChannel,
-};
+use merlin_core::{Result, RoutingConfig, RoutingError, Task, TaskResult, ThreadId, UiChannel};
 use merlin_routing::{
     LocalTaskAnalyzer, ModelRouter, ProviderRegistry, StrategyRouter, TaskAnalysis, TaskAnalyzer,
 };
@@ -14,11 +12,14 @@ use merlin_tooling::{
     BashTool, ContextRequestTool, ListFilesTool, ReadFileTool, ToolRegistry, WriteFileTool,
 };
 
+/// Type alias for conversation history (role, content) tuples
+type ConversationHistory = Vec<(String, String)>;
+
 /// Parameters for task execution (internal)
 struct TaskExecutionParams {
     task: Task,
     ui_channel: UiChannel,
-    conversation_history: Vec<(String, String)>,
+    conversation_history: ConversationHistory,
 }
 
 /// High-level orchestrator that coordinates all routing components
@@ -31,6 +32,8 @@ pub struct RoutingOrchestrator {
     workspace: Arc<WorkspaceState>,
     /// Provider registry (for testing, allows injecting mock providers)
     provider_registry: Option<Arc<ProviderRegistry>>,
+    /// Thread storage for conversation management
+    thread_store: Option<Arc<Mutex<ThreadStore>>>,
 }
 
 impl RoutingOrchestrator {
@@ -62,6 +65,7 @@ impl RoutingOrchestrator {
             validator,
             workspace,
             provider_registry: None,
+            thread_store: None,
         })
     }
 
@@ -96,6 +100,7 @@ impl RoutingOrchestrator {
             validator,
             workspace,
             provider_registry: Some(provider_registry),
+            thread_store: None,
         })
     }
 
@@ -118,6 +123,18 @@ impl RoutingOrchestrator {
     pub fn with_validator(mut self, validator: Arc<dyn Validator>) -> Self {
         self.validator = validator;
         self
+    }
+
+    /// Attaches thread storage for conversation management.
+    #[must_use]
+    pub fn with_thread_store(mut self, thread_store: Arc<Mutex<ThreadStore>>) -> Self {
+        self.thread_store = Some(thread_store);
+        self
+    }
+
+    /// Gets the thread store if available
+    pub fn thread_store(&self) -> Option<Arc<Mutex<ThreadStore>>> {
+        self.thread_store.clone()
     }
 
     /// Analyze a user request and decompose into tasks
@@ -149,7 +166,7 @@ impl RoutingOrchestrator {
         &self,
         task: Task,
         ui_channel: UiChannel,
-        conversation_history: Vec<(String, String)>,
+        conversation_history: ConversationHistory,
     ) -> Result<TaskResult> {
         self.execute_task_streaming_once(TaskExecutionParams {
             task,
@@ -157,6 +174,71 @@ impl RoutingOrchestrator {
             conversation_history,
         })
         .await
+    }
+
+    /// Execute a task within a thread context, automatically extracting conversation history.
+    ///
+    /// # Errors
+    /// Returns an error if thread not found, or if task execution or validation fails
+    pub async fn execute_task_in_thread(
+        &self,
+        task: Task,
+        ui_channel: UiChannel,
+        thread_id: ThreadId,
+    ) -> Result<TaskResult> {
+        let conversation_history = self.extract_thread_history(thread_id)?;
+
+        self.execute_task_streaming_with_history(task, ui_channel, conversation_history)
+            .await
+    }
+
+    /// Extracts conversation history from a thread
+    ///
+    /// # Errors
+    /// Returns an error if thread store is not available or thread not found
+    fn extract_thread_history(&self, thread_id: ThreadId) -> Result<ConversationHistory> {
+        let thread_store = self
+            .thread_store
+            .as_ref()
+            .ok_or_else(|| RoutingError::Other("Thread store not initialized".to_string()))?;
+
+        let store = thread_store
+            .lock()
+            .map_err(|_| RoutingError::Other("Failed to lock thread store".to_string()))?;
+
+        let thread = store
+            .get_thread(thread_id)
+            .ok_or_else(|| RoutingError::Other(format!("Thread {thread_id} not found")))?
+            .clone();
+
+        // Drop the lock before processing
+        drop(store);
+
+        let mut history = Vec::new();
+
+        for message in &thread.messages {
+            // Add user message
+            history.push(("user".to_string(), message.content.clone()));
+
+            // Add assistant response from work unit if available
+            if let Some(ref work) = message.work {
+                // For now, we don't have the actual response text stored in WorkUnit
+                // This will be enhanced when we integrate with the execution flow
+                // Placeholder: use subtask descriptions as response
+                let response_text = work
+                    .subtasks
+                    .iter()
+                    .map(|subtask| subtask.description.clone())
+                    .collect::<Vec<_>>()
+                    .join("\n");
+
+                if !response_text.is_empty() {
+                    history.push(("assistant".to_string(), response_text));
+                }
+            }
+        }
+
+        Ok(history)
     }
 
     /// Execute a task once without retry logic (internal method)
@@ -173,45 +255,6 @@ impl RoutingOrchestrator {
             .execute_streaming(params.task.clone(), params.ui_channel.clone())
             .await?;
 
-        // Check if the result contains a TaskList (from TypeScript execution)
-        if let Some(mut task_list) = result.task_list.clone() {
-            tracing::info!("Found TaskList in result: {}", task_list.title);
-
-            // Create TaskListExecutor
-            let executor_arc = Arc::new(executor.clone());
-            let task_list_executor =
-                TaskListExecutor::new(&executor_arc, self.workspace.root_path().clone());
-
-            // Execute the task list
-            let context = Context::new(String::new());
-            let task_list_result = task_list_executor
-                .execute_task_list(&mut task_list, &context, &params.ui_channel, params.task.id)
-                .await?;
-
-            // Check if task list succeeded
-            match task_list_result {
-                TaskListResult::Success => {
-                    tracing::info!("TaskList completed successfully");
-                    // Return the original result but update the response text
-                    return Ok(TaskResult {
-                        response: Response {
-                            text: format!("TaskList completed: {title}", title = task_list.title),
-                            ..result.response
-                        },
-                        task_list: Some(task_list),
-                        ..result
-                    });
-                }
-                TaskListResult::Failed { failed_step } => {
-                    tracing::error!("TaskList failed at step: {failed_step}");
-                    return Err(RoutingError::Other(format!(
-                        "TaskList failed at step: {failed_step}"
-                    )));
-                }
-            }
-        }
-
-        // No TaskList found, return result as-is
         Ok(result)
     }
 
@@ -264,7 +307,7 @@ impl RoutingOrchestrator {
     async fn setup_conversation_history(
         &self,
         executor: &mut AgentExecutor,
-        conversation_history: Vec<(String, String)>,
+        conversation_history: ConversationHistory,
     ) {
         if conversation_history.is_empty() {
             tracing::info!("No conversation history to set");

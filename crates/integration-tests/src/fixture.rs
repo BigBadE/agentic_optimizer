@@ -255,6 +255,28 @@ pub struct UiVerify {
     pub failed_tasks_count: Option<usize>,
     /// Selected task description contains
     pub selected_task_contains: Option<String>,
+    /// Thread-specific verification
+    /// Number of active threads
+    pub thread_count: Option<usize>,
+    /// Selected thread ID (if any)
+    pub selected_thread_id: Option<String>,
+    /// Thread list is visible (side-by-side mode)
+    pub thread_list_visible: Option<bool>,
+    /// Thread names that should be visible
+    #[serde(default)]
+    pub thread_names_visible: Vec<String>,
+    /// Thread colors (emoji strings) that should be visible
+    #[serde(default)]
+    pub thread_colors_visible: Vec<String>,
+    /// Thread message counts (in order)
+    #[serde(default)]
+    pub thread_message_counts: Vec<usize>,
+    /// Queued input prompt is visible
+    pub queued_input_prompt_visible: Option<bool>,
+    /// Queued input text matches
+    pub queued_input_text: Option<String>,
+    /// Cancel is requested
+    pub cancel_requested: Option<bool>,
 }
 
 /// State verification

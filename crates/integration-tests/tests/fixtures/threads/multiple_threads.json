@@ -1,0 +1,140 @@
+{
+  "name": "Multiple Threads Display",
+  "description": "Tests display of multiple threads with different colors and message counts",
+  "tags": [
+    "threads",
+    "display",
+    "colors",
+    "tui"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Task for thread one",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "thread_count": 1,
+          "thread_names_visible": ["Thread 1"],
+          "thread_message_counts": [1]
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Task for thread one",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Thread one response';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "ui": {
+          "output_contains": ["Thread one response"],
+          "thread_message_counts": [2]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Another message in thread one",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "thread_count": 1,
+          "thread_message_counts": [3]
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Another message in thread one",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Thread one second response';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "ui": {
+          "output_contains": ["Thread one second response"],
+          "thread_message_counts": [4],
+          "completed_tasks_count": 2
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Third message in thread one",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "thread_count": 1,
+          "thread_message_counts": [5]
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Third message in thread one",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Thread one third response';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "ui": {
+          "output_contains": ["Thread one third response"],
+          "thread_message_counts": [6],
+          "completed_tasks_count": 3
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "ui": {
+      "thread_count": 1,
+      "thread_list_visible": true,
+      "thread_names_visible": ["Thread 1"],
+      "thread_message_counts": [6],
+      "all_tasks_completed": true,
+      "completed_tasks_count": 3
+    }
+  }
+}

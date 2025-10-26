@@ -110,6 +110,14 @@ pub fn toggle_task_focus(focused_pane: &mut FocusedPane) {
     };
 }
 
+/// Toggles focus between the threads pane and the input pane
+pub fn toggle_thread_focus(focused_pane: &mut FocusedPane) {
+    *focused_pane = match *focused_pane {
+        FocusedPane::Threads => FocusedPane::Input,
+        _ => FocusedPane::Threads,
+    };
+}
+
 /// Handles backspace behavior in the tasks pane (two-step delete)
 /// Returns true if a task was deleted
 pub fn handle_backspace_in_tasks(

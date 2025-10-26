@@ -1,0 +1,99 @@
+{
+  "name": "Work Cancellation and Queueing",
+  "description": "Tests cancel/queue workflow when work is in progress",
+  "tags": [
+    "threads",
+    "tui",
+    "cancellation",
+    "queue"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Long running task",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "input_cleared": true,
+          "thread_count": 1
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Long running task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Long task completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "ui": {
+          "output_contains": ["Long task completed"],
+          "running_tasks_count": 0,
+          "completed_tasks_count": 1
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Another task while running",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "queued_input_prompt_visible": false,
+          "thread_message_counts": [3]
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Another task while running",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Queued task completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "ui": {
+          "output_contains": ["Queued task completed"]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "ui": {
+      "thread_count": 1,
+      "thread_message_counts": [4],
+      "all_tasks_completed": true,
+      "completed_tasks_count": 2
+    }
+  }
+}

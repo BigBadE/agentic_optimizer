@@ -16,12 +16,6 @@ inputs:
 runs:
   using: "composite"
   steps:
-    - name: Checkout test repository
-      uses: actions/checkout@v4
-      with:
-        repository: 'BigBadE/valor'
-        path: benchmarks/crates/quality/test_repositories/valor
-
     - name: Setup fast cargo config
       shell: bash
       run: |

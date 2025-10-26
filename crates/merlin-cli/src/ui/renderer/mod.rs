@@ -14,11 +14,13 @@ use ratatui::{
 };
 
 use merlin_agent::ThreadStore;
+use merlin_core::{Thread, ThreadId};
+use ratatui::text::Line;
 
 use super::input::InputManager;
 use super::layout;
 use super::scroll;
-use super::state::UiState;
+use super::state::{PanelFocus, UiState};
 use super::task_manager::{TaskDisplay, TaskManager};
 use super::theme::Theme;
 
@@ -51,6 +53,8 @@ pub struct RenderCtx<'ctx> {
     pub focused: FocusedPane,
     /// Layout cache to populate with actual rendered dimensions
     pub layout_cache: &'ctx mut layout::LayoutCache,
+    /// Thread store reference
+    pub thread_store: &'ctx ThreadStore,
 }
 
 impl Renderer {
@@ -73,6 +77,22 @@ impl Renderer {
     pub fn render(&self, frame: &mut Frame, ctx: &mut RenderCtx<'_>) {
         let main_area = frame.area();
 
+        // Check if thread mode should be active
+        let thread_mode = ctx.focused == FocusedPane::Threads
+            || ctx.ui_ctx.state.active_thread_id.is_some()
+            || ctx.ui_ctx.state.focused_panel == PanelFocus::ThreadList;
+
+        if thread_mode {
+            // Thread mode: side-by-side layout (threads | work + input)
+            self.render_thread_mode(frame, main_area, ctx);
+        } else {
+            // Classic mode: tasks + output + input (vertical layout)
+            self.render_classic_mode(frame, main_area, ctx);
+        }
+    }
+
+    /// Renders the classic task-based layout
+    fn render_classic_mode(&self, frame: &mut Frame, main_area: Rect, ctx: &mut RenderCtx<'_>) {
         // Calculate task content lines
         let max_task_area_height = if ctx.focused == FocusedPane::Tasks {
             let max_height = (main_area.height * TASKS_PANE_MAX_HEIGHT_PERCENT) / 100;
@@ -128,6 +148,36 @@ impl Renderer {
             self.render_focused_detail_section(frame, primary_split[1], &ctx.ui_ctx, ctx.focused);
             self.render_input_area(frame, primary_split[2], ctx.input, ctx);
         }
+    }
+
+    /// Renders the thread-based side-by-side layout
+    fn render_thread_mode(&self, frame: &mut Frame, main_area: Rect, ctx: &RenderCtx<'_>) {
+        let input_content_lines = ctx.input.input_area().lines().len() as u16;
+        let input_height = layout::calculate_input_area_height(input_content_lines);
+
+        // Split horizontally: threads (30%) | work details (70%)
+        let horizontal_split = Layout::default()
+            .direction(Direction::Horizontal)
+            .constraints([Constraint::Percentage(30), Constraint::Percentage(70)])
+            .split(main_area);
+
+        // For the work details side, split vertically: tasks + output | input
+        let right_side_split = Layout::default()
+            .direction(Direction::Vertical)
+            .constraints([
+                Constraint::Min(MIN_REMAINING_HEIGHT),
+                Constraint::Length(input_height),
+            ])
+            .split(horizontal_split[1]);
+
+        // Render thread list on left
+        self.render_thread_list(frame, horizontal_split[0], ctx);
+
+        // Render work details on top right
+        self.render_focused_detail_section(frame, right_side_split[0], &ctx.ui_ctx, ctx.focused);
+
+        // Render input on bottom right
+        self.render_input_area(frame, right_side_split[1], ctx.input, ctx);
     }
 
     // Rendering methods
@@ -266,18 +316,10 @@ impl Renderer {
         frame.render_widget(&input_area, area);
     }
 
-    #[allow(
-        dead_code,
-        reason = "Phase 5 in progress - will be called when layout is added"
-    )]
-    fn render_thread_list(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        thread_store: &ThreadStore,
-        focused: FocusedPane,
-    ) {
-        use ratatui::text::{Line, Span};
+    fn render_thread_list(&self, frame: &mut Frame, area: Rect, ctx: &RenderCtx<'_>) {
+        let focused = ctx.focused;
+        let selected_thread_id = ctx.ui_ctx.state.active_thread_id;
+        let thread_store = ctx.thread_store;
 
         let border_color = if focused == FocusedPane::Threads {
             self.theme.focused_border()
@@ -285,57 +327,8 @@ impl Renderer {
             self.theme.unfocused_border()
         };
 
-        // Get all active threads
         let threads = thread_store.active_threads();
-
-        let mut lines = Vec::new();
-
-        if threads.is_empty() {
-            lines.push(Line::from(Span::styled(
-                "No threads yet",
-                Style::default().fg(self.theme.text()),
-            )));
-            lines.push(Line::from(""));
-            lines.push(Line::from(Span::styled(
-                "Press Enter to start a new conversation",
-                Style::default().fg(self.theme.text()),
-            )));
-        } else {
-            // Display each thread with color emoji and name
-            for thread in &threads {
-                let mut spans = Vec::new();
-
-                // Color emoji
-                spans.push(Span::raw(format!("{} ", thread.color.emoji())));
-
-                // Thread name
-                spans.push(Span::styled(
-                    thread.name.clone(),
-                    Style::default().fg(self.theme.text()),
-                ));
-
-                // Show message count
-                let msg_count = thread.messages.len();
-                if msg_count > 0 {
-                    spans.push(Span::styled(
-                        format!(" ({msg_count})"),
-                        Style::default()
-                            .fg(self.theme.text())
-                            .add_modifier(Modifier::DIM),
-                    ));
-                }
-
-                // Show latest work status if any
-                if let Some(last_msg) = thread.last_message()
-                    && let Some(ref work) = last_msg.work
-                {
-                    spans.push(Span::raw(" "));
-                    spans.push(Span::raw(work.status.emoji()));
-                }
-
-                lines.push(Line::from(spans));
-            }
-        }
+        let lines = self.build_thread_list_lines(&threads, selected_thread_id, focused);
 
         let paragraph = Paragraph::new(lines)
             .style(Style::default().fg(self.theme.text()))
@@ -349,6 +342,105 @@ impl Renderer {
             .wrap(Wrap { trim: false });
 
         frame.render_widget(paragraph, area);
+    }
+
+    /// Builds the lines for thread list display
+    fn build_thread_list_lines(
+        &self,
+        threads: &[&Thread],
+        selected_thread_id: Option<ThreadId>,
+        focused: FocusedPane,
+    ) -> Vec<Line<'static>> {
+        use ratatui::text::Span;
+
+        let mut lines = Vec::new();
+
+        if threads.is_empty() {
+            lines.push(Line::from(Span::styled(
+                "No threads yet",
+                Style::default().fg(self.theme.text()),
+            )));
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "Press 'n' to create a new thread",
+                Style::default().fg(self.theme.text()),
+            )));
+        } else {
+            for thread in threads {
+                lines.push(self.build_thread_line(thread, selected_thread_id));
+            }
+        }
+
+        // Add help text at bottom
+        if focused == FocusedPane::Threads {
+            lines.push(Line::from(""));
+            lines.push(Line::from(Span::styled(
+                "n:new b:branch d:delete ↑↓:navigate",
+                Style::default()
+                    .fg(self.theme.text())
+                    .add_modifier(Modifier::DIM),
+            )));
+        }
+
+        lines
+    }
+
+    /// Builds a single thread line with selection, color, name, and status
+    fn build_thread_line(
+        &self,
+        thread: &Thread,
+        selected_thread_id: Option<ThreadId>,
+    ) -> Line<'static> {
+        use ratatui::text::Span;
+
+        let is_selected = selected_thread_id == Some(thread.id);
+        let mut spans = Vec::new();
+
+        // Selection indicator
+        if is_selected {
+            spans.push(Span::styled(
+                "> ",
+                Style::default()
+                    .fg(self.theme.focused_border())
+                    .add_modifier(Modifier::BOLD),
+            ));
+        } else {
+            spans.push(Span::raw("  "));
+        }
+
+        // Color emoji
+        spans.push(Span::raw(format!("{} ", thread.color.emoji())));
+
+        // Thread name
+        let name_style = if is_selected {
+            Style::default()
+                .fg(self.theme.text())
+                .add_modifier(Modifier::BOLD)
+        } else {
+            Style::default().fg(self.theme.text())
+        };
+        spans.push(Span::styled(thread.name.clone(), name_style));
+
+        // Show message count
+        let msg_count = thread.messages.len();
+        if msg_count > 0 {
+            spans.push(Span::styled(
+                format!(" ({msg_count})"),
+                Style::default()
+                    .fg(self.theme.text())
+                    .add_modifier(Modifier::DIM),
+            ));
+        }
+
+        // Show latest work status if any
+        if let Some(last_msg) = thread.last_message()
+            && let Some(ref work) = last_msg.work
+        {
+            spans.push(Span::raw(" "));
+            spans.push(Span::raw(work.status.emoji()));
+        }
+
+        Line::from(spans)
     }
 
     // Helper methods
@@ -369,9 +461,5 @@ pub enum FocusedPane {
     /// Tasks list pane on the right
     Tasks,
     /// Threads list pane (side-by-side mode)
-    #[allow(
-        dead_code,
-        reason = "Phase 5 in progress - will be used for thread navigation"
-    )]
     Threads,
 }

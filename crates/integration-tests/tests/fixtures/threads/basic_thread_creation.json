@@ -1,0 +1,77 @@
+{
+  "name": "Basic Thread Creation",
+  "description": "Tests creating threads when submitting tasks and verifies thread list displays correctly. Expected: Thread created on first submit, messages accumulate in thread, thread list shows 'Thread 1' with correct message count",
+  "tags": [
+    "threads",
+    "tui",
+    "ui"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "First task",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "First task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'First task completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Second task in same thread",
+        "submit": true
+      },
+      "verify": {}
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Second task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Second task completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

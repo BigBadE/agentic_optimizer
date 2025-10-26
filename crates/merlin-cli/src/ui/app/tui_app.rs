@@ -42,7 +42,6 @@ pub struct TuiApp<B: Backend> {
     /// Cache of actual rendered layout dimensions
     pub(super) layout_cache: layout::LayoutCache,
     /// Thread storage and management
-    #[allow(dead_code, reason = "Will be used in Phase 5")]
     pub(super) thread_store: ThreadStore,
 }
 

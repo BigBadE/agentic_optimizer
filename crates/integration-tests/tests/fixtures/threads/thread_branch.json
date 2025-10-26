@@ -1,0 +1,101 @@
+{
+  "name": "Thread Branching",
+  "description": "Tests creating branches from existing thread messages",
+  "tags": [
+    "threads",
+    "branching",
+    "tui"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Initial task",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "input_cleared": true,
+          "thread_count": 1,
+          "thread_names_visible": ["Thread 1"]
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Initial task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Initial work done';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "ui": {
+          "output_contains": ["Initial work done"],
+          "thread_message_counts": [2]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Follow-up task",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "input_cleared": true,
+          "thread_count": 1,
+          "thread_message_counts": [3]
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Follow-up task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Follow-up work done';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "ui": {
+          "output_contains": ["Follow-up work done"],
+          "thread_message_counts": [4]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "ui": {
+      "thread_count": 1,
+      "thread_list_visible": true,
+      "thread_names_visible": ["Thread 1"],
+      "thread_message_counts": [4],
+      "all_tasks_completed": true
+    }
+  }
+}

@@ -817,6 +817,159 @@ impl<'fixture> UnifiedVerifier<'fixture> {
         self.verify_output_completion(ui, verify);
     }
 
+    /// Verify thread count and selection
+    fn verify_thread_basics(&mut self, ui: &UiState, verify: &UiVerify) {
+        // Verify thread count
+        if let Some(expected_count) = verify.thread_count {
+            if ui.thread_count == expected_count {
+                self.result
+                    .add_success(format!("Thread count matches: {expected_count}"));
+            } else {
+                self.result.add_failure(format!(
+                    "Thread count mismatch. Expected: {expected_count}, Actual: {}",
+                    ui.thread_count
+                ));
+            }
+        }
+
+        // Verify selected thread ID
+        if let Some(expected_id) = &verify.selected_thread_id {
+            match &ui.selected_thread_id {
+                Some(actual_id) if actual_id == expected_id => {
+                    self.result
+                        .add_success(format!("Selected thread ID matches: '{expected_id}'"));
+                }
+                Some(actual_id) => {
+                    self.result.add_failure(format!(
+                        "Selected thread ID mismatch. Expected: '{expected_id}', Actual: '{actual_id}'"
+                    ));
+                }
+                None => {
+                    self.result
+                        .add_failure(format!("No thread selected, expected: '{expected_id}'"));
+                }
+            }
+        }
+
+        // Verify thread list visibility
+        if let Some(expected_visible) = verify.thread_list_visible {
+            if ui.thread_list_visible == expected_visible {
+                self.result.add_success(format!(
+                    "Thread list visibility correct: {expected_visible}"
+                ));
+            } else {
+                self.result.add_failure(format!(
+                    "Thread list visibility mismatch. Expected: {expected_visible}, Actual: {}",
+                    ui.thread_list_visible
+                ));
+            }
+        }
+    }
+
+    /// Verify thread display content
+    fn verify_thread_display(&mut self, ui: &UiState, verify: &UiVerify) {
+        // Verify thread names
+        for expected_name in &verify.thread_names_visible {
+            if ui
+                .thread_names
+                .iter()
+                .any(|name| name.contains(expected_name))
+            {
+                self.result
+                    .add_success(format!("Thread name visible: '{expected_name}'"));
+            } else {
+                self.result.add_failure(format!(
+                    "Thread name not visible: '{expected_name}'. Visible: {:?}",
+                    ui.thread_names
+                ));
+            }
+        }
+
+        // Verify thread colors
+        for expected_color in &verify.thread_colors_visible {
+            if ui.thread_colors.contains(expected_color) {
+                self.result
+                    .add_success(format!("Thread color visible: '{expected_color}'"));
+            } else {
+                self.result.add_failure(format!(
+                    "Thread color not visible: '{expected_color}'. Visible: {:?}",
+                    ui.thread_colors
+                ));
+            }
+        }
+
+        // Verify thread message counts
+        if !verify.thread_message_counts.is_empty() {
+            if ui.thread_message_counts == verify.thread_message_counts {
+                self.result.add_success(format!(
+                    "Thread message counts match: {:?}",
+                    verify.thread_message_counts
+                ));
+            } else {
+                self.result.add_failure(format!(
+                    "Thread message counts mismatch. Expected: {:?}, Actual: {:?}",
+                    verify.thread_message_counts, ui.thread_message_counts
+                ));
+            }
+        }
+    }
+
+    /// Verify queue and cancellation state
+    fn verify_thread_queue(&mut self, ui: &UiState, verify: &UiVerify) {
+        // Verify queued input prompt
+        if let Some(expected_prompt) = verify.queued_input_prompt_visible {
+            if ui.queued_input_prompt_visible == expected_prompt {
+                self.result.add_success(format!(
+                    "Queued input prompt visibility correct: {expected_prompt}"
+                ));
+            } else {
+                self.result.add_failure(format!(
+                    "Queued input prompt visibility mismatch. Expected: {expected_prompt}, Actual: {}",
+                    ui.queued_input_prompt_visible
+                ));
+            }
+        }
+
+        // Verify queued input text
+        if let Some(expected_text) = &verify.queued_input_text {
+            match &ui.queued_input_text {
+                Some(actual_text) if actual_text == expected_text => {
+                    self.result
+                        .add_success(format!("Queued input text matches: '{expected_text}'"));
+                }
+                Some(actual_text) => {
+                    self.result.add_failure(format!(
+                        "Queued input text mismatch. Expected: '{expected_text}', Actual: '{actual_text}'"
+                    ));
+                }
+                None => {
+                    self.result
+                        .add_failure(format!("No queued input, expected: '{expected_text}'"));
+                }
+            }
+        }
+
+        // Verify cancel requested
+        if let Some(expected_cancel) = verify.cancel_requested {
+            if ui.cancel_requested == expected_cancel {
+                self.result
+                    .add_success(format!("Cancel requested state correct: {expected_cancel}"));
+            } else {
+                self.result.add_failure(format!(
+                    "Cancel requested mismatch. Expected: {expected_cancel}, Actual: {}",
+                    ui.cancel_requested
+                ));
+            }
+        }
+    }
+
+    /// Verify thread-specific UI state
+    fn verify_ui_threads(&mut self, ui: &UiState, verify: &UiVerify) {
+        self.verify_thread_basics(ui, verify);
+        self.verify_thread_display(ui, verify);
+        self.verify_thread_queue(ui, verify);
+    }
+
     /// Verify UI
     fn verify_ui(&mut self, verify: &UiVerify) {
         let ui = if let Some(state) = &self.ui_state {
@@ -829,6 +982,7 @@ impl<'fixture> UnifiedVerifier<'fixture> {
 
         self.verify_ui_input(&ui, verify);
         self.verify_ui_tasks(&ui, verify);
+        self.verify_ui_threads(&ui, verify);
     }
 
     /// Verify state

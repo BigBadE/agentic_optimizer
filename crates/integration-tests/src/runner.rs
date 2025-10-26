@@ -6,7 +6,8 @@
 use super::fixture::{MatchType, TestEvent, TestFixture, TriggerConfig};
 use super::verifier::{UnifiedVerifier, VerificationResult};
 use async_trait::async_trait;
-use merlin_core::{Context, ModelProvider, Query, Response, Result, RoutingError, TokenUsage};
+use merlin_agent::ThreadStore;
+use merlin_core::{Context, Message, MessageRole, ModelProvider, Query, Response, Result, RoutingError, Thread, ThreadId, TokenUsage};
 use merlin_tooling::{
     BashTool, ContextRequestTool, DeleteFileTool, EditFileTool, ListFilesTool, ReadFileTool,
     ToolResult, TypeScriptRuntime, WriteFileTool,
@@ -15,7 +16,10 @@ use regex::Regex;
 use serde_json::{Value, from_str};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Arc, Mutex};
+use std::sync::{
+    Arc, Mutex,
+    atomic::{AtomicUsize, Ordering},
+};
 use tempfile::TempDir;
 use tokio::time::{Duration, sleep};
 
@@ -26,7 +30,7 @@ pub struct PatternMockProvider {
     /// Pattern responses
     responses: Arc<Mutex<Vec<PatternResponse>>>,
     /// Call counter for debugging
-    call_count: Arc<Mutex<usize>>,
+    call_count: Arc<AtomicUsize>,
 }
 
 /// Pattern response configuration
@@ -49,14 +53,12 @@ impl PatternResponse {
     /// # Errors
     /// Returns error if regex compilation fails
     fn new(trigger: &TriggerConfig, typescript: String) -> Result<Self> {
-        let regex = if matches!(trigger.match_type, MatchType::Regex) {
-            Some(
+        let regex = matches!(trigger.match_type, MatchType::Regex)
+            .then(|| {
                 Regex::new(&trigger.pattern)
-                    .map_err(|err| RoutingError::InvalidTask(format!("Invalid regex: {err}")))?,
-            )
-        } else {
-            None
-        };
+                    .map_err(|err| RoutingError::InvalidTask(format!("Invalid regex: {err}")))
+            })
+            .transpose()?;
 
         Ok(Self {
             pattern: trigger.pattern.clone(),
@@ -87,7 +89,7 @@ impl PatternMockProvider {
         Self {
             name,
             responses: Arc::new(Mutex::new(Vec::new())),
-            call_count: Arc::new(Mutex::new(0)),
+            call_count: Arc::new(AtomicUsize::new(0)),
         }
     }
 
@@ -144,13 +146,7 @@ impl PatternMockProvider {
                 response.used = false;
             }
         }
-        {
-            let mut count = self
-                .call_count
-                .lock()
-                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
-            *count = 0;
-        }
+        self.call_count.store(0, Ordering::SeqCst);
         Ok(())
     }
 }
@@ -167,13 +163,7 @@ impl ModelProvider for PatternMockProvider {
 
     async fn generate(&self, query: &Query, _context: &Context) -> Result<Response> {
         // Increment call count
-        {
-            let mut count = self
-                .call_count
-                .lock()
-                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
-            *count += 1;
-        }
+        self.call_count.fetch_add(1, Ordering::SeqCst);
 
         // Get matching response
         let typescript = self.get_response(&query.text)?;
@@ -202,12 +192,16 @@ impl ModelProvider for PatternMockProvider {
 
 /// UI state for testing
 #[derive(Debug, Clone, Default)]
+#[allow(
+    clippy::struct_excessive_bools,
+    reason = "Test state struct tracking multiple boolean UI states"
+)]
 pub struct UiState {
     /// Current input text
     pub input_text: String,
     /// Cursor position in input
     pub cursor_position: usize,
-    /// Focused pane (input, output, tasks)
+    /// Focused pane (input, output, tasks, threads)
     pub focused_pane: String,
     /// Last output text
     pub last_output: String,
@@ -233,6 +227,25 @@ pub struct UiState {
     pub failed_count: usize,
     /// Selected task description
     pub selected_task_description: Option<String>,
+    /// Thread-specific state
+    /// Number of active threads
+    pub thread_count: usize,
+    /// Currently selected thread ID (if any)
+    pub selected_thread_id: Option<String>,
+    /// Thread list visible (side-by-side mode active)
+    pub thread_list_visible: bool,
+    /// Thread names currently visible
+    pub thread_names: Vec<String>,
+    /// Thread colors (emojis) currently visible
+    pub thread_colors: Vec<String>,
+    /// Thread message counts
+    pub thread_message_counts: Vec<usize>,
+    /// Whether queued input prompt is showing
+    pub queued_input_prompt_visible: bool,
+    /// Queued input text (if any)
+    pub queued_input_text: Option<String>,
+    /// Whether cancel is requested
+    pub cancel_requested: bool,
 }
 
 /// Test state for tracking execution
@@ -436,6 +449,7 @@ impl UnifiedTestRunner {
             "output".clone_into(&mut ui.focused_pane);
             ui.tasks_displayed += 1;
             ui.task_status = Some("completed".to_owned());
+            ui.completed_count += 1;
         }
 
         Ok(execution_result)

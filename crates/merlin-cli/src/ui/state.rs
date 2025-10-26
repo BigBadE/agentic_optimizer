@@ -37,14 +37,16 @@ pub struct UiState {
     /// Flag to auto-scroll output to bottom on next render
     pub auto_scroll_output_to_bottom: bool,
     /// Currently active thread
-    #[allow(dead_code, reason = "Will be used in Phase 5")]
     pub active_thread_id: Option<ThreadId>,
-    /// Thread list scroll offset
-    #[allow(dead_code, reason = "Will be used in Phase 5")]
+    /// Thread list scroll offset (for future use)
+    #[allow(dead_code, reason = "Reserved for scroll position persistence")]
     pub thread_list_scroll_offset: usize,
     /// Which panel is focused (thread list vs work details)
-    #[allow(dead_code, reason = "Will be used in Phase 5")]
     pub focused_panel: PanelFocus,
+    /// Pending user input waiting for running work to finish
+    pub queued_input: Option<String>,
+    /// Flag to cancel currently running work
+    pub cancel_requested: bool,
 }
 
 impl UiState {
@@ -72,7 +74,6 @@ impl UiState {
 
 /// Which panel has focus
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-#[allow(dead_code, reason = "Will be used in Phase 5")]
 pub enum PanelFocus {
     /// Thread list panel
     ThreadList,

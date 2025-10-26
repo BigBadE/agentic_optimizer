@@ -1,0 +1,93 @@
+{
+  "name": "Thread Navigation and Focus",
+  "description": "Tests thread panel navigation, focus switching, and thread selection",
+  "tags": [
+    "threads",
+    "navigation",
+    "focus",
+    "tui"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "First thread task",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "input_cleared": true,
+          "focused_pane": "output",
+          "thread_count": 1,
+          "thread_list_visible": true
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "First thread task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'First thread response';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "typescript_executed": true
+        },
+        "ui": {
+          "output_contains": ["First thread response"],
+          "thread_message_counts": [2],
+          "tasks_displayed": 1,
+          "completed_tasks_count": 1
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "tasks",
+          "focus_changed": true
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "input",
+          "focus_changed": false
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "ui": {
+      "thread_count": 1,
+      "thread_list_visible": true,
+      "thread_names_visible": ["Thread 1"],
+      "thread_message_counts": [2],
+      "all_tasks_completed": true,
+      "focused_pane": "input"
+    }
+  }
+}

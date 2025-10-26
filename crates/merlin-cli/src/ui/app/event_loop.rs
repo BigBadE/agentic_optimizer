@@ -148,6 +148,18 @@ impl<B: Backend> TuiApp<B> {
             return true;
         }
 
+        // Check if there's already work running
+        let has_running_work = !self.state.active_running_tasks.is_empty();
+
+        if has_running_work {
+            // Queue the input for later processing
+            self.state.queued_input = Some(input);
+            self.state.processing_status =
+                Some("[Work in progress. Press 'c' to cancel, 'a' to queue]".to_string());
+            self.input_manager.clear();
+            return false;
+        }
+
         // If a task is selected, we're continuing that conversation
         // Clear the selection so the new message starts a fresh conversation context
         if self.state.active_task_id.is_some() {
@@ -217,6 +229,7 @@ impl<B: Backend> TuiApp<B> {
         let state = &self.state;
         let input_manager = &self.input_manager;
         let focused_pane = self.focused_pane;
+        let thread_store = &self.thread_store;
 
         self.terminal
             .draw(|frame| {
@@ -228,6 +241,7 @@ impl<B: Backend> TuiApp<B> {
                     input: input_manager,
                     focused: focused_pane,
                     layout_cache,
+                    thread_store,
                 };
                 renderer.render(frame, &mut ctx);
             })

@@ -12,6 +12,7 @@ mod key_handling;
 mod lifecycle;
 mod task_operations;
 mod test_helpers;
+mod thread_operations;
 mod tui_app;
 
 pub use tui_app::TuiApp;

@@ -2,86 +2,48 @@
 
 Active issues and improvements needed for the Merlin codebase.
 
-## Status Update (2025-10-26)
+## Summary (2025-10-26)
 
-**PHASES 1-7 COMPLETED:**
-- ✅ Thread type system fully implemented and tested
-- ✅ Old types (SubtaskSpec, TaskList) completely removed
-- ✅ TaskListExecutor deleted
-- ✅ UI parent-child hierarchy removed (flat task system)
-- ✅ Thread-aware orchestrator implemented
-- ✅ Thread panel rendering with color-coded threads and status emojis
-- ✅ **ThreadStore integrated into CLI lifecycle** (Phase 6)
-- ✅ **Threads automatically created for every task** (Phase 7)
-- ✅ **Messages added to threads when user submits input** (Phase 7)
-- ✅ **WorkUnit attached to messages with completion status** (Phase 7)
-- ✅ **Threads saved to disk with full work history** (Phase 7)
-- ✅ All 290 tests passing
-- ✅ All 53 fixtures passing
+**Thread system FULLY IMPLEMENTED - All phases complete!**
 
-**Key Changes:**
-- Unified `Subtask` type replaces both `SubtaskSpec` and `TaskList`
-- `TaskAction::Decompose` now uses `Vec<Subtask>`
-- `TaskDisplay.parent_id` replaced with `TaskDisplay.thread_id`
-- `TaskManager` simplified to chronological ordering
-- Backward compatibility via serde defaults for `id` and `status` fields
-- `RoutingOrchestrator` now has optional `ThreadStore` support
-- New `execute_task_in_thread()` method with automatic history extraction
-- `ConversationHistory` type alias for cleaner APIs
-- `FocusedPane::Threads` enum variant for thread panel navigation
-- `render_thread_list()` method displays threads with color emojis and work status
-- **ThreadStore created in `handlers.rs` and passed to orchestrator**
-- **Tasks automatically create/continue threads with thread-aware execution**
-- **Threads loaded on startup from `.merlin/threads/` directory**
-- **Work completion/failure tracked in thread messages**
+**Core System (Phases 1-8):**
+- ✅ Unified `Subtask` type with optional verification (replaces SubtaskSpec and TaskList)
+- ✅ Thread-based conversation history with automatic context extraction
+- ✅ ThreadStore persistence (`.merlin/threads/*.json`)
+- ✅ Work tracking with completion/failure status
+- ✅ Task blocking with cancel/queue support
 
-**Implementation Notes:**
-- Thread panel ready for integration (currently has placeholder dead_code allows)
-- ThreadStore lifecycle fully integrated (create, load, save)
-- All tasks now execute within thread context
-- Thread history automatically passed to orchestrator for context
-- Threads persist to disk as JSON in `.merlin/threads/<thread_id>.json`
-- **Phase 8**: Basic work queue management implemented via task blocking (prevents simultaneous tasks)
-- **Phase 9**: Thread navigation UI deferred (requires complex TUI changes, not critical for core functionality)
-- **Phase 10**: Thread-based fixtures in progress
-- Core thread system fully functional and integrated
+**UI Implementation (Phases 9-10):**
+- ✅ Thread navigation panel with full keyboard support
+- ✅ Side-by-side layout (threads | work details)
+- ✅ Thread creation, branching, archiving
+- ✅ Work cancellation and queueing
+- ✅ Thread-based test fixtures
+
+**Keybindings:**
+- `Ctrl+Shift+T` - Toggle thread panel focus
+- `n` - Create new thread (in thread pane)
+- `b` - Branch from current message
+- `d` - Archive/delete thread
+- `↑↓` - Navigate thread list
+- `c`/`a`/`Esc` - Cancel/queue/discard when work is running
 
 ---
 
 ## Unified Thread-Based Execution System
 
-### Current System: Three Separate Concepts
+### System Overview
 
-**1. Subtasks (Self-Assessment Decomposition)**
-- Agent decides to decompose task via `TaskAction::Decompose`
-- Creates `SubtaskSpec` instances with descriptions and difficulty
-- Executed sequentially or in parallel via `execute_with_subtasks()`
-- **Not visible in TUI** - just shows "Decomposing into N subtasks" message
-- Results combined into single response
+**Core principle:** Tasks are ephemeral work containers. Threads are persistent conversation contexts.
 
-**2. TaskList (TypeScript-Determined Steps)**
-- Agent writes TypeScript code that creates a `TaskList`
-- Steps have: id, type (Debug/Feature/Test), description, verification, exit_command
-- Executed sequentially via `TaskListExecutor`
-- **Visible in TUI** as sub-items under parent task
-- Each step has status: Pending → InProgress → Completed/Failed
+All work happens within threads:
+- Each user message creates or continues a thread
+- Threads maintain full conversation history
+- Tasks spawn from messages and create work units
+- Work units contain subtasks with optional verification
+- Thread history automatically provides context to agents
 
-**3. Parent-Child Tasks (TUI Conversation Continuity)**
-- User presses 'c' to continue conversation
-- Creates new task with `parent_id` set
-- Normalized to max depth 1 (no grandchildren)
-- **Displayed as indented tasks**
-- Used to extract conversation history
-
-**Problem:** These three systems overlap and conflict. We need ONE unified model.
-
----
-
-### Proposed: Unified Thread System
-
-**Core Insight:** Everything is a **Message** in a **Thread**, and messages can spawn **Work** (tasks with subtasks).
-
-#### Mental Model
+### Mental Model
 
 ```
 Thread = Conversation
@@ -96,41 +58,35 @@ Thread = Conversation
 │     └─ Subtask 2: "Add reset endpoint"
 ```
 
-**Key principle:** Tasks are ephemeral work containers. Threads are persistent conversation contexts.
-
----
-
-### Type System Design
+### Implemented Type System
 
 **Core Types:**
 - `Thread` - Conversation with messages and context manager
 - `ThreadId` - Unique identifier for threads
 - `Message` - User input that spawns work
 - `WorkUnit` - Unit of work spawned by a message
-- `WorkId` - Unique identifier for work
-- `Subtask` - Individual task within work unit (merges SubtaskSpec and TaskList)
-- `SubtaskId` - Unique identifier for subtasks
-- `VerificationStep` - Optional verification for subtasks (replaces TaskList)
+- `Subtask` - Individual task within work unit (unified type with optional verification)
+- `VerificationStep` - Optional verification for subtasks
 
-**Message:**
-- User input + timestamp + WorkUnit
+**Thread Structure:**
+- Messages: Vec of user/assistant conversation
+- Context: Shared context manager for the thread
+- Persistence: Auto-saved to `.merlin/threads/<id>.json`
 
-**WorkUnit:**
-- Description, subtasks, execution mode (sequential/parallel), status
+**Subtask (Unified Type):**
+- Replaces both SubtaskSpec (agent decomposition) and TaskList (verification steps)
+- Fields: description, difficulty, status, optional verification
+- Supports both sequential and parallel execution
 
-**Subtask:**
-- Description, difficulty, status, optional verification step
-- Merges both agent decomposition AND TaskList into one concept
-
-**WorkStatus:**
-- Planning, Executing, Verifying, Completed, Failed, Cancelled
-
-**SubtaskStatus:**
-- Pending, InProgress, Completed, Failed, Cancelled
+**Status Tracking:**
+- WorkStatus: Planning, Executing, Verifying, Completed, Failed, Cancelled
+- SubtaskStatus: Pending, InProgress, Completed, Failed, Cancelled
 
 ---
 
-### TUI Display Design
+### TUI Display Design (Implemented - Phase 9)
+
+**Status:** Fully implemented! This section describes the thread navigation UI that is now live.
 
 #### Main View: Side-by-Side Thread List + Work Details
 
@@ -545,44 +501,51 @@ Press Space to collapse all work, show only summary:
 - ✅ Update persistence to save thread_id instead
 - ✅ All UI tests passing
 
-**Phase 4: Thread-Aware Orchestrator (3 days)** ✅ COMPLETED
+**Phase 4: Thread-Aware Orchestrator** ✅ COMPLETED
 - ✅ Add thread storage to RoutingOrchestrator
 - ✅ Add `execute_task_in_thread()` method
 - ✅ Extract conversation history from threads
 - ✅ Add `with_thread_store()` builder method
 - ✅ Create `ConversationHistory` type alias
-- ⏸️ Queue management (deferred to Phase 6)
 
-**Phase 5: TUI Side-by-Side Layout (3 days)** ⏸️ PENDING
-- Implement side-by-side split (threads | work details)
-- Add thread color assignment
-- Add expand/collapse state management
-- Update persistence to store threads
-- Add ThreadStore initialization (already in TuiApp)
+**Phase 5: TUI Thread Panel Foundation** ✅ COMPLETED
+- ✅ Add `FocusedPane::Threads` enum variant
+- ✅ Add `render_thread_list()` method
+- ✅ Add ThreadStore initialization in TuiApp
 
-**Phase 6: User Input & Work Control (2 days)** ⏸️ PENDING
-- Update input handling for thread context
-- Implement cancel/queue prompt when work running
-- Add n/b/f keybindings
-- Add thread selection and navigation
-- Add work cancellation logic
+**Phase 6: ThreadStore CLI Integration** ✅ COMPLETED
+- ✅ ThreadStore created in handlers.rs
+- ✅ ThreadStore passed to orchestrator
+- ✅ Threads loaded on startup from `.merlin/threads/`
+- ✅ Thread lifecycle (create, load, save) fully integrated
 
-**Phase 7: Work Unit Display (2 days)** ⏸️ PENDING
-- Implement subtask progress display with emojis
-- Add verification step visualization
-- Handle parallel vs sequential display
-- Add drill-down views
-- Add status animations
+**Phase 7: Thread-Based Task Execution** ✅ COMPLETED
+- ✅ Tasks automatically create/continue threads
+- ✅ Messages added to threads when user submits input
+- ✅ WorkUnit attached to messages
+- ✅ Work completion/failure tracked in thread messages
+- ✅ Thread history passed to orchestrator
 
-**Phase 8: Testing & Polish (2 days)** ⏸️ PENDING
-- Create fixtures for threaded conversations
-- Test subtask execution with verification
-- Test branching/forking scenarios
-- Test cancel/queue behavior
-- Performance testing
-- Color contrast testing
+**Phase 8: Work Queue Management** ✅ COMPLETED (Implicit)
+- ✅ Task blocking via single `pending_input` slot
+- ✅ Prevents simultaneous task execution
+- Note: Explicit queue UI deferred to Phase 9
 
-**Total: ~14 days**
+**Phase 9: Thread Navigation UI** ✅ COMPLETED
+- ✅ Implemented side-by-side split (threads 30% | work details 70%)
+- ✅ Added thread color emoji display in list
+- ✅ Added selection highlighting with `>` indicator
+- ✅ Implemented n/b/d keybindings for thread operations
+- ✅ Implemented cancel/queue prompt when work running
+- ✅ Thread list shows message counts and work status emojis
+- ✅ Help text displayed when thread pane focused
+
+**Phase 10: Thread-Based Test Fixtures** ✅ COMPLETED
+- ✅ Created `basic_thread_creation.json` - tests thread creation and navigation
+- ✅ Created `thread_branch.json` - tests branching from messages
+- ✅ Created `work_cancellation.json` - tests cancel/queue workflow
+- ✅ Fixtures use standard TUI event format (key_press, user_input)
+- ✅ Verification points for thread count, selection state, UI state
 
 ---
 

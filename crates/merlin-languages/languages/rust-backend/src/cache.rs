@@ -343,6 +343,12 @@ mod tests {
 
     #[test]
     fn test_cache_clear() {
+        // Ensure MERLIN_FOLDER env var is not set during test
+        // SAFETY: This is safe in a test environment where we control the execution
+        unsafe {
+            env::remove_var("MERLIN_FOLDER");
+        }
+
         let (_temp_dir, project_root, file_metadata) = create_test_project();
         let cache = WorkspaceCache::new(project_root.clone(), file_metadata);
 
@@ -353,7 +359,11 @@ mod tests {
 
         // Verify it exists
         let cache_path = WorkspaceCache::cache_path(&project_root);
-        assert!(cache_path.exists());
+        assert!(
+            cache_path.exists(),
+            "Cache file should exist at {}",
+            cache_path.display()
+        );
 
         // Clear the cache
         WorkspaceCache::clear(&project_root)

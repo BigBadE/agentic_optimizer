@@ -227,6 +227,9 @@ pub struct UiVerify {
     /// Output contains patterns
     #[serde(default)]
     pub output_contains: Vec<String>,
+    /// Output does not contain patterns
+    #[serde(default)]
+    pub output_not_contains: Vec<String>,
     /// Snapshot file path
     pub snapshot: Option<String>,
     /// Final state
@@ -235,6 +238,23 @@ pub struct UiVerify {
     pub all_tasks_completed: Option<bool>,
     /// Task created
     pub task_created: Option<bool>,
+    /// Task descriptions that should be visible
+    #[serde(default)]
+    pub task_descriptions_visible: Vec<String>,
+    /// Progress percentage (0-100)
+    pub progress_percentage: Option<u8>,
+    /// Placeholder text is visible
+    pub placeholder_visible: Option<bool>,
+    /// Number of pending tasks
+    pub pending_tasks_count: Option<usize>,
+    /// Number of running tasks
+    pub running_tasks_count: Option<usize>,
+    /// Number of completed tasks
+    pub completed_tasks_count: Option<usize>,
+    /// Number of failed tasks
+    pub failed_tasks_count: Option<usize>,
+    /// Selected task description contains
+    pub selected_task_contains: Option<String>,
 }
 
 /// State verification

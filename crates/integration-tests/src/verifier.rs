@@ -605,8 +605,8 @@ impl<'fixture> UnifiedVerifier<'fixture> {
         }
     }
 
-    /// Verify output and completion
-    fn verify_output_completion(&mut self, ui: &UiState, verify: &UiVerify) {
+    /// Verify output patterns
+    fn verify_output_patterns(&mut self, ui: &UiState, verify: &UiVerify) {
         for pattern in &verify.output_contains {
             if ui.last_output.contains(pattern) {
                 self.result
@@ -618,6 +618,145 @@ impl<'fixture> UnifiedVerifier<'fixture> {
                 ));
             }
         }
+
+        for pattern in &verify.output_not_contains {
+            if ui.last_output.contains(pattern) {
+                self.result.add_failure(format!(
+                    "UI output should not contain pattern '{pattern}'. Output: {}",
+                    ui.last_output
+                ));
+            } else {
+                self.result
+                    .add_success(format!("UI output does not contain '{pattern}'"));
+            }
+        }
+    }
+
+    /// Verify task counts by status
+    fn verify_task_counts(&mut self, ui: &UiState, verify: &UiVerify) {
+        if let Some(expected_pending) = verify.pending_tasks_count {
+            if ui.pending_count == expected_pending {
+                self.result
+                    .add_success(format!("Pending tasks count matches: {expected_pending}"));
+            } else {
+                self.result.add_failure(format!(
+                    "Pending tasks count mismatch. Expected: {expected_pending}, Actual: {}",
+                    ui.pending_count
+                ));
+            }
+        }
+
+        if let Some(expected_running) = verify.running_tasks_count {
+            if ui.running_count == expected_running {
+                self.result
+                    .add_success(format!("Running tasks count matches: {expected_running}"));
+            } else {
+                self.result.add_failure(format!(
+                    "Running tasks count mismatch. Expected: {expected_running}, Actual: {}",
+                    ui.running_count
+                ));
+            }
+        }
+
+        if let Some(expected_completed) = verify.completed_tasks_count {
+            if ui.completed_count == expected_completed {
+                self.result.add_success(format!(
+                    "Completed tasks count matches: {expected_completed}"
+                ));
+            } else {
+                self.result.add_failure(format!(
+                    "Completed tasks count mismatch. Expected: {expected_completed}, Actual: {}",
+                    ui.completed_count
+                ));
+            }
+        }
+
+        if let Some(expected_failed) = verify.failed_tasks_count {
+            if ui.failed_count == expected_failed {
+                self.result
+                    .add_success(format!("Failed tasks count matches: {expected_failed}"));
+            } else {
+                self.result.add_failure(format!(
+                    "Failed tasks count mismatch. Expected: {expected_failed}, Actual: {}",
+                    ui.failed_count
+                ));
+            }
+        }
+    }
+
+    /// Verify task details (descriptions, progress, placeholder, selection)
+    fn verify_task_details(&mut self, ui: &UiState, verify: &UiVerify) {
+        for expected_desc in &verify.task_descriptions_visible {
+            if ui
+                .task_descriptions
+                .iter()
+                .any(|desc| desc.contains(expected_desc))
+            {
+                self.result
+                    .add_success(format!("Task description visible: '{expected_desc}'"));
+            } else {
+                self.result.add_failure(format!(
+                    "Task description not visible: '{expected_desc}'. Visible: {:?}",
+                    ui.task_descriptions
+                ));
+            }
+        }
+
+        if let Some(expected_progress) = verify.progress_percentage {
+            match ui.progress_percentage {
+                Some(actual_progress) if actual_progress == expected_progress => {
+                    self.result
+                        .add_success(format!("Progress percentage matches: {expected_progress}%"));
+                }
+                Some(actual_progress) => {
+                    self.result.add_failure(format!(
+                        "Progress percentage mismatch. Expected: {expected_progress}%, Actual: {actual_progress}%"
+                    ));
+                }
+                None => {
+                    self.result
+                        .add_failure(format!("No progress shown, expected: {expected_progress}%"));
+                }
+            }
+        }
+
+        if let Some(expected_placeholder) = verify.placeholder_visible {
+            if ui.placeholder_visible == expected_placeholder {
+                self.result.add_success(format!(
+                    "Placeholder visibility correct: {expected_placeholder}"
+                ));
+            } else {
+                self.result.add_failure(format!(
+                    "Placeholder visibility mismatch. Expected: {expected_placeholder}, Actual: {}",
+                    ui.placeholder_visible
+                ));
+            }
+        }
+
+        if let Some(expected_pattern) = &verify.selected_task_contains {
+            match &ui.selected_task_description {
+                Some(desc) if desc.contains(expected_pattern) => {
+                    self.result.add_success(format!(
+                        "Selected task description contains '{expected_pattern}'"
+                    ));
+                }
+                Some(desc) => {
+                    self.result.add_failure(format!(
+                        "Selected task description missing pattern '{expected_pattern}'. Description: {desc}"
+                    ));
+                }
+                None => {
+                    self.result.add_failure(format!(
+                        "No task selected, expected description containing '{expected_pattern}'"
+                    ));
+                }
+            }
+        }
+    }
+
+    /// Verify output and completion
+    fn verify_output_completion(&mut self, ui: &UiState, verify: &UiVerify) {
+        self.verify_output_patterns(ui, verify);
 
         if let Some(expected_created) = verify.task_created {
             let was_created = ui.tasks_displayed > 0;
@@ -646,6 +785,9 @@ impl<'fixture> UnifiedVerifier<'fixture> {
                 ));
             }
         }
+
+        self.verify_task_details(ui, verify);
+        self.verify_task_counts(ui, verify);
     }
 
     /// Verify UI tasks and output

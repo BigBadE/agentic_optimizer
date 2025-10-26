@@ -112,22 +112,17 @@ pub trait Tool: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{Value as JsonValue, from_str, json, to_string};
+    use serde_json::{Value as JsonValue, json};
 
     // REMOVED: test_tool_error_display - Low value trait test
 
-
     // REMOVED: test_tool_error_from_io - Low value trait test
-
 
     // REMOVED: test_tool_input_serialization - Low value serde test
 
-
     // REMOVED: test_tool_output_success - Trivial test
 
-
     // REMOVED: test_tool_output_success_with_data - Trivial test
-
 
     #[test]
     fn test_tool_output_error() {
@@ -138,7 +133,6 @@ mod tests {
     }
 
     // REMOVED: test_tool_output_serialization - Low value serde test
-
 
     // Mock tool for testing the trait
     struct MockTool;

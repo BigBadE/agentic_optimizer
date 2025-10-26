@@ -52,12 +52,9 @@ mod tests {
 
     // REMOVED: test_language_equality - Trait implementation test
 
-
     // REMOVED: test_language_debug - Trait implementation test
 
-
     // REMOVED: test_language_clone - Trait implementation test
-
 
     #[test]
     fn test_create_backend_rust() {

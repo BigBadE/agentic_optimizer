@@ -1,1 +1,0 @@
-{"name":"Render Focused Input","description":"Tests focused input pane","config":{"terminal_size":[80,24],"enable_vector_cache":false},"initial_state":{"workspace_files":[],"vector_cache_state":"complete"},"steps":[{"step":1,"action":{"type":"user_input","data":{"text":"test","submit":false}},"expectations":{"ui_state":{"snapshot":"render_focused_input.txt"}}}]}

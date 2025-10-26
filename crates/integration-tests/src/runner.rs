@@ -217,6 +217,22 @@ pub struct UiState {
     pub task_status: Option<String>,
     /// Whether task tree is expanded
     pub task_tree_expanded: bool,
+    /// Visible task descriptions
+    pub task_descriptions: Vec<String>,
+    /// Current progress percentage (if showing progress)
+    pub progress_percentage: Option<u8>,
+    /// Whether placeholder is visible
+    pub placeholder_visible: bool,
+    /// Task counts by status
+    pub pending_count: usize,
+    /// Running tasks count
+    pub running_count: usize,
+    /// Completed tasks count
+    pub completed_count: usize,
+    /// Failed tasks count
+    pub failed_count: usize,
+    /// Selected task description
+    pub selected_task_description: Option<String>,
 }
 
 /// Test state for tracking execution
@@ -326,24 +342,63 @@ impl UnifiedTestRunner {
                 .lock()
                 .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
 
+            // Replace text (each user_input event sets the complete input text)
             ui.input_text.clone_from(&input_event.data.text);
-            ui.cursor_position = input_event.data.text.len();
-            "input".clone_into(&mut ui.focused_pane);
+            ui.cursor_position = ui.input_text.len();
 
             if input_event.data.submit {
                 ui.input_text.clear();
                 ui.cursor_position = 0;
+                // Change focus to output pane after submit
                 "output".clone_into(&mut ui.focused_pane);
+            } else {
+                // Not submitting, keep focus on input
+                "input".clone_into(&mut ui.focused_pane);
             }
         }
 
-        // Increment conversation count
-        {
+        // Increment conversation count if submitting
+        if input_event.data.submit {
             let mut state = self
                 .test_state
                 .lock()
                 .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
             state.conversation_count += 1;
+        }
+
+        Ok(())
+    }
+
+    /// Handle key press event
+    ///
+    /// # Errors
+    /// Returns error if state lock fails
+    fn handle_key_press(&self, key_event: &super::fixture::KeyPressEvent) -> Result<()> {
+        {
+            let mut ui = self
+                .ui_state
+                .lock()
+                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
+
+            match key_event.data.key.as_str() {
+                "Tab" => {
+                    // Cycle through panes: input -> output -> tasks -> input
+                    match ui.focused_pane.as_str() {
+                        "input" => "output".clone_into(&mut ui.focused_pane),
+                        "output" => "tasks".clone_into(&mut ui.focused_pane),
+                        _ => "input".clone_into(&mut ui.focused_pane),
+                    }
+                }
+                "Up" | "Down" | "PageUp" | "PageDown" => {
+                    // Navigation keys don't change focus, just update focused pane to tasks
+                    if ui.focused_pane != "tasks" {
+                        "tasks".clone_into(&mut ui.focused_pane);
+                    }
+                }
+                _ => {
+                    // Other keys don't affect state
+                }
+            }
         }
 
         Ok(())
@@ -419,6 +474,23 @@ impl UnifiedTestRunner {
                         .map_err(RoutingError::ExecutionFailed)?;
                 }
                 TestEvent::KeyPress(key_event) => {
+                    self.handle_key_press(key_event)?;
+
+                    // Pass state to verifier
+                    let ui_state = self
+                        .ui_state
+                        .lock()
+                        .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
+                        .clone();
+                    let test_state = self
+                        .test_state
+                        .lock()
+                        .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
+                        .clone();
+
+                    verifier.set_ui_state(ui_state);
+                    verifier.set_test_state(test_state);
+
                     verifier
                         .verify_event(event, &key_event.verify)
                         .map_err(RoutingError::ExecutionFailed)?;

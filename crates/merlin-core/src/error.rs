@@ -68,12 +68,9 @@ impl Error {
 
 #[cfg(test)]
 mod tests {
-    use super::*;
-    use serde_json::{Value as JsonValue, from_str};
-    use std::io;
+    use super::Error;
 
     // REMOVED: test_error_display - Low value trait test
-
 
     #[test]
     fn test_error_is_retryable() {
@@ -94,21 +91,7 @@ mod tests {
 
     // REMOVED: test_error_from_io - Low value trait test
 
-
     // REMOVED: test_error_from_json - Low value trait test
 
-
-    #[test]
-    fn test_result_type() {
-        fn returns_result() -> String {
-            "success".to_owned()
-        }
-
-        fn returns_error() -> Result<String> {
-            Err(Error::Other("failed".to_owned()))
-        }
-
-        returns_result();
-        returns_error().unwrap_err();
-    }
+    // REMOVED: test_result_type - Trivial type alias test
 }

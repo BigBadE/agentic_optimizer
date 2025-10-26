@@ -6,7 +6,6 @@ edition.workspace = true
 [dependencies]
 # Merlin crates (alphabetically organized)
 merlin-agent = { path = "../merlin-agent" }
-merlin-cli = { path = "../merlin-cli", features = ["test-util"] }
 merlin-context = { path = "../merlin-context" }
 merlin-core = { path = "../merlin-core" }
 merlin-providers = { path = "../merlin-providers" }

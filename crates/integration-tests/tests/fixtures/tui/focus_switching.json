@@ -1,0 +1,59 @@
+{
+  "name": "Focus Switching Between Panes",
+  "description": "Verifies that Tab key switches focus between input, output, and tasks panes",
+  "tags": ["tui", "focus", "navigation"],
+  "setup": {
+    "terminal_size": [80, 30]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "hello",
+        "submit": false
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "input",
+          "input_text": "hello"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "output",
+          "focus_changed": true
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "tasks",
+          "focus_changed": true
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "input",
+          "focus_changed": false
+        }
+      }
+    }
+  ]
+}

@@ -274,4 +274,3 @@ fn test_task_step_complete_clears_error() {
     assert!(step.error.is_none());
     assert_eq!(step.result, Some("Fixed!".to_owned()));
 }
-

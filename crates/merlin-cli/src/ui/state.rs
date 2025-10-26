@@ -79,20 +79,3 @@ pub enum ConversationRole {
     /// System message
     System,
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // REMOVED: test_add_conversation_entry - Duplicates agent::conversation
-
-
-    // REMOVED: test_conversation_history_limit - Duplicates agent::conversation
-
-
-    // REMOVED: test_clear_conversation_history - Duplicates agent::conversation
-
-
-    // REMOVED: test_conversation_entry_role_accessors - Duplicates agent::conversation
-
-}

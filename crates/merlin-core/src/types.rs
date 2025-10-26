@@ -146,7 +146,6 @@ mod tests {
 
     // REMOVED: test_query_new - Constructor test
 
-
     #[test]
     fn test_query_with_files() {
         let files = vec![PathBuf::from("file1.rs"), PathBuf::from("file2.rs")];
@@ -176,9 +175,7 @@ mod tests {
 
     // REMOVED: test_token_usage_default - Constructor test
 
-
     // REMOVED: test_context_new - Constructor test
-
 
     #[test]
     fn test_context_with_files() {
@@ -214,7 +211,6 @@ mod tests {
     }
 
     // REMOVED: test_file_context_new - Constructor test
-
 
     #[test]
     fn test_file_context_from_path() {

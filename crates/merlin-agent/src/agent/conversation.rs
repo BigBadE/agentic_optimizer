@@ -255,7 +255,6 @@ mod tests {
 
     // REMOVED: test_conversation_manager_creation - Constructor test only
 
-
     #[test]
     fn test_add_message() {
         let mut manager = ConversationManager::new();

@@ -130,7 +130,6 @@ mod tests {
 
     // REMOVED: test_symbol_kind_equality - Trait implementation test
 
-
     #[test]
     fn test_symbol_info_creation() {
         let symbol = SymbolInfo {
@@ -201,5 +200,4 @@ mod tests {
     }
 
     // REMOVED: test_symbol_kind_debug - Trait implementation test
-
 }

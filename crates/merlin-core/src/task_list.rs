@@ -339,23 +339,3 @@ impl TaskList {
         ((completed as f64 / self.steps.len() as f64) * 100.0) as u8
     }
 }
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // REMOVED: test_task_step_lifecycle - Duplicate of integration test
-
-
-    // REMOVED: test_task_step_failure - Duplicate of integration test
-
-
-    // REMOVED: test_task_list_status_updates - Duplicate of integration test
-
-
-    // REMOVED: test_task_list_with_failures - Duplicate of integration test
-
-
-    // REMOVED: test_next_pending_step - Duplicate of integration test
-
-}

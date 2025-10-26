@@ -359,5 +359,4 @@ mod tests {
     }
 
     // REMOVED: test_display_response_metrics - Display formatting test
-
 }

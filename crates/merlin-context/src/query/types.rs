@@ -79,13 +79,9 @@ mod tests {
 
     // REMOVED: test_action_variants - Low value enum test
 
-
     // REMOVED: test_scope_variants - Low value enum test
-
 
     // REMOVED: test_complexity_ordering - Low value enum test
 
-
     // REMOVED: test_serde_query_intent - Low value serde test
-
 }

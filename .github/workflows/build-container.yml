@@ -8,6 +8,7 @@ on:
       - 'rust-toolchain.toml'
       - '.github/docker/Dockerfile'
       - '.github/workflows/build-container.yml'
+      - '.cargo/fast-config.toml'
     branches:
       - master
   workflow_dispatch:

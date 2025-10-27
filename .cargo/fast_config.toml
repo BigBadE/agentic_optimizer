@@ -10,7 +10,7 @@ rustflags = [
     # - Ubuntu: `sudo apt-get install lld clang`
     # - Fedora: `sudo dnf install lld clang`
     # - Arch: `sudo pacman -S lld clang`
-    "-Clink-arg=-fuse-ld=lld",
+    #"-Clink-arg=-fuse-ld=lld",
 
     # Mold linker
     #
@@ -19,11 +19,12 @@ rustflags = [
     # - Ubuntu: `sudo apt-get install mold clang`
     # - Fedora: `sudo dnf install mold clang`
     # - Arch: `sudo pacman -S mold clang`
-    # "-Clink-arg=-fuse-ld=mold",
+    "-Clink-arg=-fuse-ld=mold",
+    "-Clink-arg=--threads=8",
 
     # Nightly
     #"-Zshare-generics=y",
-    #"-Zthreads=0",
+    "-Zthreads=0",
 ]
 # Some systems may experience linker performance issues when running doc tests.
 # See https://github.com/bevyengine/bevy/issues/12207 for details.
@@ -86,14 +87,11 @@ rustflags = [
     #"-Zthreads=0",
 ]
 
-# Optional: Uncommenting the following improves compile times, but reduces the amount of debug info to 'line number tables only'.
-# In most cases the gains are negligible, but if you are on macOS and have slow compile times you should see significant gains.
-# [profile.dev]
-# debug = 1
-
-# This prevents constantly re-building dependencies if the timestamp changes.
 [unstable]
-checksum-freshness = true
+codegen-backend = true
+
+[profile.dev]
+codegen-backend = "cranelift"
 
 [llvm-cov]
 merge = true

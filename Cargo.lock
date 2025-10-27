@@ -2011,6 +2011,7 @@ dependencies = [
  "async-trait",
  "crossterm",
  "merlin-agent",
+ "merlin-cli",
  "merlin-context",
  "merlin-core",
  "merlin-providers",

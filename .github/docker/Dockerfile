@@ -48,18 +48,16 @@ RUN useradd -m -s /bin/bash builder && \
     mkdir -p /workspace && \
     chown -R builder:builder /workspace
 
-# Copy cargo config for optimized builds
-COPY .cargo /usr/local/cargo/config-template
-RUN mkdir -p /home/builder/.cargo && \
-    cp -r /usr/local/cargo/config-template/* /home/builder/.cargo/ && \
-    chown -R builder:builder /home/builder/.cargo
-
 USER builder
 WORKDIR /workspace
 
 # Pre-build workspace dependencies by copying entire workspace and building
 # This layer will be cached as long as dependencies don't change
 COPY --chown=builder:builder . .
+
+# Copy cargo config to builder's home directory for optimized builds
+RUN mkdir -p /home/builder/.cargo && \
+    cp -r .cargo/* /home/builder/.cargo/
 
 # Build all workspace dependencies (release and test)
 # The compiled dependencies will be cached in the target directory

@@ -4,194 +4,29 @@
 //! by running the actual CLI with pattern-based mock LLM responses.
 
 use super::event_source::FixtureEventSource;
-use super::fixture::{MatchType, TestEvent, TestFixture, TriggerConfig};
+use super::execution_tracker::ExecutionResultTracker;
+use super::fixture::{TestEvent, TestFixture};
+use super::mock_provider::{MockRouter, PatternMockProvider};
 use super::verification_result::VerificationResult;
 use super::verifier::UnifiedVerifier;
-use async_trait::async_trait;
+use merlin_agent::RoutingOrchestrator;
 use merlin_cli::TuiApp;
-use merlin_core::{Context, ModelProvider, Query, Response, Result, RoutingError, TokenUsage};
-use merlin_deps::ratatui::backend::TestBackend;
-use merlin_deps::regex::Regex;
-use merlin_deps::serde_json::from_str;
-use merlin_deps::tempfile::TempDir;
-use merlin_tooling::{
-    BashTool, ContextRequestTool, DeleteFileTool, EditFileTool, ListFilesTool, ReadFileTool,
-    TypeScriptRuntime, WriteFileTool,
+use merlin_core::{
+    ModelProvider, Response, Result, RoutingError, TaskResult, TokenUsage, ValidationResult,
 };
+use merlin_deps::ratatui::backend::TestBackend;
+use merlin_deps::serde_json::{Value as JsonValue, from_str};
+use merlin_deps::tempfile::TempDir;
+use merlin_routing::{Model, ProviderRegistry, RoutingConfig, UiEvent};
+use merlin_tooling::{ToolError, ToolResult};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicUsize, Ordering},
-};
-use tokio::time::{Duration as TokioDuration, sleep};
+use std::sync::Arc;
+use tokio::sync::mpsc;
+use tokio::time::{self as tokio_time, Duration as TokioDuration, timeout};
 
-/// Pattern-based mock provider
-pub struct PatternMockProvider {
-    /// Provider name
-    name: &'static str,
-    /// Pattern responses
-    responses: Arc<Mutex<Vec<PatternResponse>>>,
-    /// Call counter for debugging
-    call_count: Arc<AtomicUsize>,
-}
-
-/// Pattern response configuration
-struct PatternResponse {
-    /// Trigger pattern
-    pattern: String,
-    /// Match type
-    match_type: MatchType,
-    /// TypeScript response
-    typescript: String,
-    /// Whether this response has been used
-    used: bool,
-    /// Compiled regex (if `match_type` is Regex)
-    regex: Option<Regex>,
-}
-
-impl PatternResponse {
-    /// Create new pattern response
-    ///
-    /// # Errors
-    /// Returns error if regex compilation fails
-    fn new(trigger: &TriggerConfig, typescript: String) -> Result<Self> {
-        let regex = matches!(trigger.match_type, MatchType::Regex)
-            .then(|| {
-                Regex::new(&trigger.pattern)
-                    .map_err(|err| RoutingError::InvalidTask(format!("Invalid regex: {err}")))
-            })
-            .transpose()?;
-
-        Ok(Self {
-            pattern: trigger.pattern.clone(),
-            match_type: trigger.match_type,
-            typescript,
-            used: false,
-            regex,
-        })
-    }
-
-    /// Check if this pattern matches the query
-    fn matches(&self, query_text: &str) -> bool {
-        match self.match_type {
-            MatchType::Exact => query_text == self.pattern,
-            MatchType::Contains => query_text.contains(&self.pattern),
-            MatchType::Regex => self
-                .regex
-                .as_ref()
-                .is_some_and(|regex| regex.is_match(query_text)),
-        }
-    }
-}
-
-impl PatternMockProvider {
-    /// Create new pattern mock provider
-    #[must_use]
-    pub fn new(name: &'static str) -> Self {
-        Self {
-            name,
-            responses: Arc::new(Mutex::new(Vec::new())),
-            call_count: Arc::new(AtomicUsize::new(0)),
-        }
-    }
-
-    /// Add response pattern
-    ///
-    /// # Errors
-    /// Returns error if pattern is invalid
-    pub fn add_response(&self, trigger: &TriggerConfig, typescript: String) -> Result<()> {
-        let response = PatternResponse::new(trigger, typescript)?;
-        self.responses
-            .lock()
-            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
-            .push(response);
-        Ok(())
-    }
-
-    /// Get matching response for query
-    ///
-    /// # Errors
-    /// Returns error if no matching pattern found
-    fn get_response(&self, query_text: &str) -> Result<String> {
-        let mut responses = self
-            .responses
-            .lock()
-            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
-
-        // Find first unused matching pattern
-        let result = responses
-            .iter_mut()
-            .find(|resp| !resp.used && resp.matches(query_text))
-            .map(|resp| {
-                resp.used = true;
-                resp.typescript.clone()
-            });
-
-        drop(responses);
-
-        result.ok_or_else(|| {
-            RoutingError::ExecutionFailed(format!("No matching pattern for query: {query_text}"))
-        })
-    }
-
-    /// Reset all patterns to unused (for testing)
-    ///
-    /// # Errors
-    /// Returns error if lock acquisition fails
-    pub fn reset(&self) -> Result<()> {
-        {
-            let mut responses = self
-                .responses
-                .lock()
-                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
-            for response in responses.iter_mut() {
-                response.used = false;
-            }
-        }
-        self.call_count.store(0, Ordering::SeqCst);
-        Ok(())
-    }
-}
-
-#[async_trait]
-impl ModelProvider for PatternMockProvider {
-    fn name(&self) -> &'static str {
-        self.name
-    }
-
-    async fn is_available(&self) -> bool {
-        true
-    }
-
-    async fn generate(&self, query: &Query, _context: &Context) -> Result<Response> {
-        // Increment call count
-        self.call_count.fetch_add(1, Ordering::SeqCst);
-
-        // Get matching response
-        let typescript = self.get_response(&query.text)?;
-
-        // Wrap TypeScript in code block
-        let content = format!("```typescript\n{typescript}\n```");
-
-        Ok(Response {
-            text: content,
-            confidence: 1.0,
-            tokens_used: TokenUsage {
-                input: query.text.len() as u64,
-                output: typescript.len() as u64,
-                cache_read: 0,
-                cache_write: 0,
-            },
-            provider: self.name.to_owned(),
-            latency_ms: 0,
-        })
-    }
-
-    fn estimate_cost(&self, _context: &Context) -> f64 {
-        0.0 // Mock provider is free
-    }
-}
+/// Result type for task completion with captured outputs
+type TaskCompletionResult = (Box<TaskResult>, Vec<String>);
 
 /// Unified test runner
 pub struct UnifiedTestRunner {
@@ -201,10 +36,10 @@ pub struct UnifiedTestRunner {
     workspace: TempDir,
     /// Mock provider
     provider: Arc<PatternMockProvider>,
-    /// TypeScript runtime for executing LLM responses
-    runtime: TypeScriptRuntime,
     /// The actual TUI application under test
     tui_app: TuiApp<TestBackend>,
+    /// Event tap receiver for listening to task completions
+    event_receiver: mpsc::UnboundedReceiver<UiEvent>,
 }
 
 impl UnifiedTestRunner {
@@ -238,17 +73,26 @@ impl UnifiedTestRunner {
             }
         }
 
-        // Setup TypeScript runtime with file operation tools
-        let mut runtime = TypeScriptRuntime::new();
-        runtime.register_tool(Arc::new(BashTool));
-        runtime.register_tool(Arc::new(ContextRequestTool::new(
-            workspace.path().to_path_buf(),
-        )));
-        runtime.register_tool(Arc::new(DeleteFileTool::new(workspace.path())));
-        runtime.register_tool(Arc::new(EditFileTool::new(workspace.path())));
-        runtime.register_tool(Arc::new(WriteFileTool::new(workspace.path())));
-        runtime.register_tool(Arc::new(ReadFileTool::new(workspace.path())));
-        runtime.register_tool(Arc::new(ListFilesTool::new(workspace.path())));
+        // Create routing config for test orchestrator
+        let mut config = RoutingConfig::default();
+        config.workspace.root_path = workspace.path().to_path_buf();
+        config.execution.max_concurrent_tasks = 4;
+        // Disable all real tiers
+        config.tiers.local_enabled = false;
+        config.tiers.groq_enabled = false;
+        config.tiers.premium_enabled = false;
+
+        // Create provider registry and register mock provider
+        let mut registry = ProviderRegistry::new(config.clone())?;
+        registry.register_provider(
+            Model::Qwen25Coder32B,
+            Arc::clone(&provider) as Arc<dyn ModelProvider>,
+        );
+
+        // Create orchestrator with mock router and provider registry
+        let router = Arc::new(MockRouter);
+        let orchestrator =
+            RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?;
 
         // Create fixture-based event source
         let event_source = Box::new(FixtureEventSource::new(&fixture));
@@ -257,16 +101,24 @@ impl UnifiedTestRunner {
         let terminal_size = fixture.setup.terminal_size.unwrap_or((80, 24));
         let backend = TestBackend::new(terminal_size.0, terminal_size.1);
 
-        // Create TUI app with test backend and fixture event source
-        let (tui_app, _ui_channel) =
-            TuiApp::new_for_test(backend, event_source, Some(workspace.path().to_path_buf()))?;
+        // Create TUI app with test backend, fixture event source, and orchestrator
+        let mut tui_app = TuiApp::new_for_test(
+            backend,
+            event_source,
+            Some(workspace.path().to_path_buf()),
+            Some(Arc::new(orchestrator)),
+        )?;
+
+        // Set up event tap for task completion monitoring
+        let (event_tx, event_rx) = mpsc::unbounded_channel();
+        tui_app.test_set_event_tap(event_tx);
 
         Ok(Self {
             fixture,
             workspace,
             provider,
-            runtime,
             tui_app,
+            event_receiver: event_rx,
         })
     }
 
@@ -288,44 +140,137 @@ impl UnifiedTestRunner {
         &self.tui_app
     }
 
+    /// Process a submit event and await completion
+    ///
+    /// Since we process one submit at a time sequentially, we wait for the next
+    /// `TaskCompleted` or `TaskFailed` event. We drain ALL `TaskOutput` events
+    /// from the channel during this wait to ensure we capture outputs from the
+    /// main task and any subtasks (like TypeScript tool executions).
+    ///
+    /// Returns the task result and any captured output from `TaskOutput` events.
+    ///
+    /// # Errors
+    /// Returns error if submission fails
+    async fn process_submit_and_await(&mut self) -> Result<TaskCompletionResult> {
+        // Tick once to trigger submission
+        self.tui_app.tick()?;
+
+        // Wait for the task to complete (10 second timeout)
+        let result = timeout(TokioDuration::from_secs(10), async {
+            let mut outputs = Vec::new();
+
+            loop {
+                // Keep ticking to process events
+                self.tui_app.tick()?;
+
+                // Check for completion events and capture outputs
+                // Returns Some if task completed/failed, None if still running
+                if let Some(result) = self.process_completion_events(&mut outputs) {
+                    return result;
+                }
+
+                // Small delay before next tick
+                tokio_time::sleep(TokioDuration::from_millis(10)).await;
+            }
+        })
+        .await;
+
+        result.map_err(|_| RoutingError::ExecutionFailed("Task execution timeout".to_owned()))?
+    }
+
+    /// Process UI events and capture completion or output events
+    ///
+    /// Returns Some with result when task completes/fails, None if still running.
+    fn process_completion_events(
+        &mut self,
+        outputs: &mut Vec<String>,
+    ) -> Option<Result<TaskCompletionResult>> {
+        while let Ok(event) = self.event_receiver.try_recv() {
+            match event {
+                UiEvent::TaskCompleted { result, .. } => {
+                    return Some(Ok((result, outputs.clone())));
+                }
+                UiEvent::TaskFailed { error, task_id } => {
+                    // Create a failure result instead of returning an error
+                    // This allows fixtures to verify that expected errors occurred
+                    let task_result = TaskResult {
+                        task_id,
+                        response: Response {
+                            text: error,
+                            confidence: 0.0,
+                            tokens_used: TokenUsage::default(),
+                            provider: "mock".to_owned(),
+                            latency_ms: 0,
+                        },
+                        tier_used: "default".to_owned(),
+                        tokens_used: TokenUsage::default(),
+                        validation: ValidationResult::default(),
+                        duration_ms: 0,
+                        work_unit: None,
+                    };
+                    return Some(Ok((Box::new(task_result), outputs.clone())));
+                }
+                UiEvent::TaskOutput { output, .. } => {
+                    // Capture all outputs - they're scoped to this submit by the channel drain
+                    outputs.push(output);
+                }
+                _ => {
+                    // Ignore other events (TaskStarted, TaskProgress, etc.)
+                }
+            }
+        }
+        // No completion yet, continue looping
+        None
+    }
+
     /// Run the test
     ///
     /// # Errors
     /// Returns error if test execution or verification fails
     pub async fn run(&mut self) -> Result<VerificationResult> {
-        let mut verifier = UnifiedVerifier::new(&self.fixture, self.workspace.path());
+        let workspace_path = self.workspace.path().to_path_buf();
 
-        // Process each event in the fixture
-        for event in &self.fixture.events {
+        // Clone the events and final_verify to avoid borrowing issues
+        let events = self.fixture.events.clone();
+        let final_verify = self.fixture.final_verify.clone();
+
+        // Create single execution tracker for entire fixture run
+        let mut execution_tracker = ExecutionResultTracker::new();
+
+        // Create single verifier instance that will use the tracker
+        let mut verifier = UnifiedVerifier::new(&workspace_path);
+
+        for event in &events {
             match event {
-                TestEvent::UserInput(_) | TestEvent::KeyPress(_) => {
-                    // These events are already loaded into the FixtureEventSource
-                    // Drive the TUI to process one event from the queue
-                    let _should_quit = self.tui_app.tick()?;
+                TestEvent::UserInput(input_event) if input_event.data.submit => {
+                    // Process submit and await completion with result capture
+                    let (task_result, outputs) = self.process_submit_and_await().await?;
 
-                    // Process any UI events that were triggered
-                    while self.tui_app.tick()? {
-                        // Keep processing until no more events
-                    }
+                    // Extract execution result and add to tracker
+                    let execution_result =
+                        Self::extract_execution_result(&task_result, &outputs);
+                    execution_tracker.add_result(execution_result, outputs, task_result);
+                }
+                TestEvent::UserInput(_) | TestEvent::KeyPress(_) => {
+                    // Non-submit input or key press
+                    self.tui_app.tick()?;
                 }
                 TestEvent::LlmResponse(llm_event) => {
-                    // Execute the TypeScript response
-                    let typescript = llm_event.response.typescript.join("\n");
-                    let execution_result = self.runtime.execute(&typescript).await;
-
-                    verifier.set_last_execution_result(execution_result);
-
-                    // Verify this event
+                    // LLM response events are handled by the orchestrator internally
+                    // Just verify the results after processing
                     verifier
-                        .verify_event(event, &llm_event.verify)
+                        .verify_event(
+                            event,
+                            &llm_event.verify,
+                            Some(&self.tui_app),
+                            &execution_tracker,
+                        )
                         .map_err(RoutingError::ExecutionFailed)?;
-
-                    // Let TUI process any resulting UI events
-                    self.tui_app.tick()?;
                 }
                 TestEvent::Wait(wait_event) => {
                     // Sleep for specified duration
-                    sleep(TokioDuration::from_millis(wait_event.data.duration_ms)).await;
+                    tokio_time::sleep(TokioDuration::from_millis(wait_event.data.duration_ms))
+                        .await;
 
                     // Process any pending UI events during wait
                     self.tui_app.tick()?;
@@ -333,15 +278,59 @@ impl UnifiedTestRunner {
             }
         }
 
-        // Pass TUI app state to verifier for final verification
-        verifier.set_tui_app(&self.tui_app);
-
-        // Verify final state
+        // Verify final state (pass TUI app reference and execution tracker)
         verifier
-            .verify_final(&self.fixture.final_verify)
+            .verify_final(&final_verify, Some(&self.tui_app), &execution_tracker)
             .map_err(RoutingError::ExecutionFailed)?;
 
         Ok(verifier.result())
+    }
+
+    /// Extract execution result from `TaskResult` and captured outputs
+    ///
+    /// The TypeScript execution result is sent via `TaskOutput` events during execution.
+    /// We capture these outputs and parse them to extract the actual execution result.
+    ///
+    /// The last output typically contains the result returned by the TypeScript code.
+    ///
+    /// # Errors
+    /// Returns error if task execution failed - this is expected and allows verification
+    fn extract_execution_result(
+        task_result: &TaskResult,
+        outputs: &[String],
+    ) -> ToolResult<JsonValue> {
+        // Check if the task result contains an error (from TaskFailed event)
+        // These errors are captured from TypeScript execution failures or other task errors
+        let response_text = &task_result.response.text;
+
+        // If response contains error indicators, return as error
+        if response_text.contains("TypeScript execution failed")
+            || response_text.contains("Tool execution failed")
+            || response_text.contains("Task execution failed")
+        {
+            return Err(ToolError::ExecutionFailed(response_text.clone()));
+        }
+
+        // Check if there were any outputs from TypeScript execution
+        outputs.last().map_or_else(
+            || {
+                // No outputs captured - this could mean:
+                // 1. No TypeScript was executed
+                // 2. TypeScript executed but didn't produce output
+                // Return the response text as fallback
+                Ok(JsonValue::String(response_text.clone()))
+            },
+            |last_output| {
+                // Try to parse the output as JSON first
+                from_str::<JsonValue>(last_output).map_or_else(
+                    |_| {
+                        // If not valid JSON, return as string
+                        Ok(JsonValue::String(last_output.clone()))
+                    },
+                    Ok,
+                )
+            },
+        )
     }
 
     /// Load fixture from file
@@ -384,63 +373,5 @@ impl UnifiedTestRunner {
         }
 
         Ok(fixtures)
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    /// Tests exact pattern matching
-    ///
-    /// # Panics
-    /// Panics if pattern creation fails
-    #[test]
-    #[cfg_attr(test, allow(clippy::unwrap_used, reason = "Allow for tests"))]
-    fn test_pattern_response_exact_match() {
-        let trigger = TriggerConfig {
-            pattern: "hello world".to_owned(),
-            match_type: MatchType::Exact,
-        };
-        let response = PatternResponse::new(&trigger, "test".to_owned()).unwrap();
-        assert!(response.matches("hello world"));
-        assert!(!response.matches("hello"));
-        assert!(!response.matches("hello world!"));
-    }
-
-    /// Tests contains pattern matching
-    ///
-    /// # Panics
-    /// Panics if pattern creation fails
-    #[test]
-    #[cfg_attr(test, allow(clippy::unwrap_used, reason = "Allow for tests"))]
-    fn test_pattern_response_contains_match() {
-        let trigger = TriggerConfig {
-            pattern: "world".to_owned(),
-            match_type: MatchType::Contains,
-        };
-        let response = PatternResponse::new(&trigger, "test".to_owned()).unwrap();
-        assert!(response.matches("hello world"));
-        assert!(response.matches("world"));
-        assert!(response.matches("world hello"));
-        assert!(!response.matches("hello"));
-    }
-
-    /// Tests regex pattern matching
-    ///
-    /// # Panics
-    /// Panics if pattern creation fails
-    #[test]
-    #[cfg_attr(test, allow(clippy::unwrap_used, reason = "Allow for tests"))]
-    fn test_pattern_response_regex_match() {
-        let trigger = TriggerConfig {
-            pattern: r"hello\s+\w+".to_owned(),
-            match_type: MatchType::Regex,
-        };
-        let response = PatternResponse::new(&trigger, "test".to_owned()).unwrap();
-        assert!(response.matches("hello world"));
-        assert!(response.matches("hello there"));
-        assert!(!response.matches("hello"));
-        assert!(!response.matches("helloworld"));
     }
 }

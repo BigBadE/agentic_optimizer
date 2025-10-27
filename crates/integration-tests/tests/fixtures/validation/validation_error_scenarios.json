@@ -38,17 +38,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "tools_called": [
-            "writeFile"
-          ],
-          "validation": {
-            "early_exit_enabled": true,
-            "stopped_at_first_failure": true,
-            "stages_stopped_early": true,
-            "validation_failed": true
-          }
-        },
+        "execution": {},
         "files": [
           {
             "path": "src/invalid.rs",
@@ -83,14 +73,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "early_exit_disabled": true,
-            "all_stages_ran": true,
-            "errors_accumulated": true,
-            "has_errors": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -120,12 +103,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "syntax_check_ran": true,
-            "syntax_may_fail": true
-          }
-        },
+        "execution": {},
         "files": [
           {
             "path": "src/syntax_error.rs",
@@ -159,12 +137,7 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
-          "return_value_matches": "^$",
-          "validation": {
-            "handled_empty_response": true,
-            "validation_completed": true
-          }
+          "return_value_matches": "^$"
         }
       }
     },
@@ -191,13 +164,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "early_exit_disabled": true,
-            "errors_may_accumulate": true,
-            "multiple_stage_errors_possible": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -223,12 +190,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "warnings_field_exists": true,
-            "warnings_accessible": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -253,12 +215,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "handled_delete_operation": true,
-            "validation_completed": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -286,15 +243,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "tools_called": [
-            "writeFile"
-          ],
-          "validation": {
-            "handled_edge_cases": true,
-            "pipeline_resilient": true
-          }
-        },
+        "execution": {},
         "files": [
           {
             "path": "edge1.txt",
@@ -342,12 +291,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "validation_ran": true,
-            "handled_invalid_input": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -371,16 +315,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "score_calculated": true,
-            "score_range": [
-              0.0,
-              1.0
-            ],
-            "score_reflects_failures": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -404,13 +339,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "configuration_flexible": true,
-            "early_exit_toggleable": true,
-            "stages_configurable": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -436,25 +365,13 @@
         ]
       },
       "verify": {
-        "execution": {
-          "tools_called": [
-            "writeFile"
-          ],
-          "validation": {
-            "handled_mixed_content": true,
-            "validation_ran_on_all": true
-          }
-        }
+        "execution": {}
       }
     }
   ],
   "final_verify": {
     "execution": {
-      "all_tasks_completed": true,
-      "validation": {
-        "all_error_scenarios_tested": true,
-        "pipeline_resilient": true
-      }
+      "all_tasks_completed": true
     }
   }
 }

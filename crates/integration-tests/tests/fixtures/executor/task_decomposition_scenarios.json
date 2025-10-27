@@ -53,14 +53,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "writeFile"
-          ]
-        },
         "files": [
           {
             "path": "sequential_output.txt",
@@ -71,7 +63,8 @@
               "Input data 3"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -106,14 +99,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "writeFile"
-          ]
-        },
         "files": [
           {
             "path": "output1.txt",
@@ -136,7 +121,8 @@
               "INPUT DATA 3"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -175,14 +161,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "writeFile"
-          ]
-        },
         "files": [
           {
             "path": "intermediate.txt",
@@ -198,7 +176,8 @@
               "1 DATA INPUT - PROCESSED"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     }
   ],

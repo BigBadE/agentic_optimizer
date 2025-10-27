@@ -2,6 +2,8 @@
 
 use merlin_deps::ratatui::Terminal;
 use merlin_deps::ratatui::backend::Backend;
+use std::fs;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::mpsc;
 
@@ -12,7 +14,7 @@ use crate::ui::persistence::TaskPersistence;
 use crate::ui::renderer::{FocusedPane, Renderer};
 use crate::ui::state::UiState;
 use crate::ui::task_manager::TaskManager;
-use merlin_agent::ThreadStore;
+use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_routing::UiEvent;
 
 /// Main TUI application
@@ -25,6 +27,8 @@ pub struct TuiApp<B: Backend> {
     pub(crate) terminal: Terminal<B>,
     /// Channel receiving UI events from background tasks
     pub(crate) event_receiver: mpsc::UnboundedReceiver<UiEvent>,
+    /// Channel for sending UI events (kept internal)
+    pub(crate) event_sender: mpsc::UnboundedSender<UiEvent>,
     /// Manages tasks and their ordering/visibility
     pub(crate) task_manager: TaskManager,
     /// Current UI state, including selections and flags
@@ -47,6 +51,13 @@ pub struct TuiApp<B: Backend> {
     pub(crate) layout_cache: layout::LayoutCache,
     /// Thread storage and management
     pub(crate) thread_store: ThreadStore,
+    /// Orchestrator for executing tasks
+    pub(crate) orchestrator: Option<Arc<RoutingOrchestrator>>,
+    /// Log file for task execution
+    pub(crate) log_file: Option<fs::File>,
+    /// Event tap for testing - receives copies of all UI events
+    #[cfg(feature = "test-util")]
+    pub(crate) test_event_tap: Option<mpsc::UnboundedSender<UiEvent>>,
 }
 
 // Note: all input is sourced from `event_source` to allow test injection without

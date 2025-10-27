@@ -50,9 +50,7 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
           "return_type": "array",
-          "array_length": 3,
           "return_value_contains": {
             "0": {
               "name": "Alice"
@@ -104,7 +102,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
           "return_value_contains": {
             "totalA": 250
           }
@@ -154,7 +151,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
           "return_value_contains": {
             "version": "1.1.0",
             "dependencies": {
@@ -198,7 +194,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
           "return_value_contains": {
             "sum": 55,
             "max": 10,

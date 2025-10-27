@@ -12,7 +12,6 @@ test = false  # Don't run tests for the binary, only the library
 
 [dependencies]
 bincode.workspace = true
-clap.workspace = true
 merlin-agent.workspace = true
 merlin-context.workspace = true
 merlin-core.workspace = true
@@ -21,6 +20,7 @@ merlin-languages.workspace = true
 merlin-local.workspace = true
 merlin-providers.workspace = true
 merlin-routing.workspace = true
+pico-args.workspace = true
 serde.workspace = true
 tokio.workspace = true
 

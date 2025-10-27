@@ -60,12 +60,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        },
         "ui": {
           "output_contains": [
             "Read file",
@@ -74,7 +68,8 @@
           "tasks_displayed": 1,
           "task_status": "completed",
           "task_created": true
-        }
+        },
+        "execution": {}
       }
     },
     {
@@ -99,12 +94,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "writeFile"
-          ]
-        },
         "ui": {
           "output_contains": [
             "created successfully"
@@ -119,7 +108,8 @@
               "New content"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -143,9 +133,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "ui": {
           "output_contains": [
             "Task three completed"

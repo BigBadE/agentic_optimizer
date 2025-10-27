@@ -1,9 +1,16 @@
 {
   "name": "Focus Switching Between Panes",
   "description": "Verifies that Tab key switches focus between input, output, and tasks panes",
-  "tags": ["tui", "focus", "navigation"],
+  "tags": [
+    "tui",
+    "focus",
+    "navigation"
+  ],
   "setup": {
-    "terminal_size": [80, 30]
+    "terminal_size": [
+      80,
+      30
+    ]
   },
   "events": [
     {

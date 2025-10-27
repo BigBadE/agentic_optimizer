@@ -27,8 +27,7 @@
       "data": {
         "text": "Read task_a.txt",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -45,12 +44,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -58,8 +52,7 @@
       "data": {
         "text": "Read task_b.txt which depends on task_a.txt being read first",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -76,12 +69,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -89,8 +77,7 @@
       "data": {
         "text": "Read task_c.txt which depends on both task_a.txt and task_b.txt",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -107,12 +94,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -120,8 +102,7 @@
       "data": {
         "text": "Execute a complex task with multiple dependencies to verify graph completion tracking",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -141,12 +122,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -154,8 +130,7 @@
       "data": {
         "text": "Verify task graph has no cycles by processing all files",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -172,12 +147,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "listFiles"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -185,8 +155,7 @@
       "data": {
         "text": "Verify all tasks are marked complete after execution",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -202,9 +171,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     }
   ],

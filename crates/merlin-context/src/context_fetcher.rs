@@ -10,7 +10,6 @@ use tokio::fs::read_to_string;
 use crate::{ContextBuilder, ProgressCallback};
 use merlin_core::{Context, FileContext, Query};
 use merlin_core::{Result, RoutingError};
-use merlin_languages::{Language, create_backend};
 
 /// Extracts file references and builds contextual information for tasks
 pub struct ContextFetcher {
@@ -28,20 +27,13 @@ impl ContextFetcher {
         // Check if we should skip expensive operations (for tests)
         let skip_embeddings = env::var("MERLIN_SKIP_EMBEDDINGS").is_ok();
 
-        // Try to create a language backend (Rust for now) unless skipping
+        // Create context builder unless skipping embeddings
         let context_builder = if skip_embeddings {
-            debug!("Skipping language backend initialization (MERLIN_SKIP_EMBEDDINGS set)");
+            debug!("Skipping context builder initialization (MERLIN_SKIP_EMBEDDINGS set)");
             None
         } else {
-            let mut builder = ContextBuilder::new(project_root.clone());
-
-            if let Ok(backend) = create_backend(Language::Rust) {
-                builder = builder.with_language_backend(backend);
-                debug!("Language backend (Rust) initialized for context fetcher");
-            } else {
-                debug!("Failed to initialize language backend, will use vector search only");
-            }
-
+            let builder = ContextBuilder::new(project_root.clone());
+            debug!("Context builder initialized for context fetcher");
             Some(builder)
         };
 

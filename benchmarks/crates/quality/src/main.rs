@@ -12,33 +12,63 @@
     reason = "Test allows"
 )]
 
-use anyhow::{Context as _, Result};
-use clap::Parser;
-use merlin_benchmarks_quality::{generate_report, run_benchmarks_async};
 use std::fs::write;
 use std::path::PathBuf;
+use std::process::exit;
+
+use anyhow::{Context as _, Result};
+use merlin_benchmarks_quality::{generate_report, run_benchmarks_async};
+use pico_args::Arguments;
 use tracing::Level;
 use tracing_subscriber::{EnvFilter, fmt};
 
-#[derive(Parser)]
-#[command(name = "quality-bench")]
-#[command(about = "Run context quality benchmarks", long_about = None)]
 struct Args {
-    /// Directory containing test case TOML files
-    #[arg(short, long, default_value = "benchmarks/crates/quality/test_cases")]
     test_cases: PathBuf,
-
-    /// Output file for results (markdown format)
-    #[arg(short, long)]
     output: Option<PathBuf>,
-
-    /// Run specific test case by name
-    #[arg(short = 'n', long)]
     name: Option<String>,
-
-    /// Show verbose output
-    #[arg(short, long)]
     verbose: bool,
+}
+
+impl Args {
+    fn parse() -> Result<Self> {
+        let mut pargs = Arguments::from_env();
+
+        if pargs.contains(["-h", "--help"]) {
+            print_help();
+            exit(0);
+        }
+
+        let args = Self {
+            test_cases: pargs
+                .opt_value_from_str(["-t", "--test-cases"])?
+                .unwrap_or_else(|| PathBuf::from("benchmarks/crates/quality/test_cases")),
+            output: pargs.opt_value_from_str(["-o", "--output"])?,
+            name: pargs.opt_value_from_str(["-n", "--name"])?,
+            verbose: pargs.contains(["-v", "--verbose"]),
+        };
+
+        let remaining = pargs.finish();
+        if !remaining.is_empty() {
+            tracing::warn!("Unexpected arguments: {remaining:?}");
+        }
+
+        Ok(args)
+    }
+}
+
+fn print_help() {
+    println!("quality-bench - Run context quality benchmarks");
+    println!();
+    println!("USAGE:");
+    println!("    quality-bench [OPTIONS]");
+    println!();
+    println!("OPTIONS:");
+    println!("    -t, --test-cases <PATH>      Directory containing test case TOML files");
+    println!("                                 [default: benchmarks/crates/quality/test_cases]");
+    println!("    -o, --output <PATH>          Output file for results (markdown format)");
+    println!("    -n, --name <NAME>            Run specific test case by name");
+    println!("    -v, --verbose                Show verbose output");
+    println!("    -h, --help                   Print help information");
 }
 
 #[tokio::main]
@@ -48,7 +78,7 @@ async fn main() -> Result<()> {
         .with_env_filter(EnvFilter::from_default_env().add_directive(Level::INFO.into()))
         .init();
 
-    let args = Args::parse();
+    let args = Args::parse()?;
 
     println!("Running context quality benchmarks...");
     println!("Test cases directory: {}", args.test_cases.display());

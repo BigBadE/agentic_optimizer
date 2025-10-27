@@ -10,7 +10,9 @@ pub mod navigation;
 mod event_loop;
 mod key_handling;
 mod lifecycle;
+mod task_execution;
 mod task_operations;
+#[cfg(any(test, feature = "test-util"))]
 mod test_helpers;
 #[cfg(feature = "test-util")]
 mod test_util;

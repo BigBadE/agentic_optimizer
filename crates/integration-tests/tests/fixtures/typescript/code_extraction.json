@@ -36,8 +36,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
           "return_type": "object"
         }
       }
@@ -63,8 +61,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
           "return_type": "object",
           "return_value_contains": {
             "done": true,
@@ -93,8 +89,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
           "return_type": "object",
           "return_value_contains": {
             "done": true,

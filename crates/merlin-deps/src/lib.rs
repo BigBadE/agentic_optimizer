@@ -40,11 +40,3 @@ pub use swc_ecma_parser;
 pub use swc_ecma_transforms_base;
 pub use swc_ecma_transforms_typescript;
 pub use swc_ecma_visit;
-
-// Rust analyzer integration
-pub use ra_ap_ide;
-pub use ra_ap_ide_db;
-pub use ra_ap_load_cargo;
-pub use ra_ap_project_model;
-pub use ra_ap_syntax;
-pub use ra_ap_vfs;

@@ -42,11 +42,11 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "ui": {
-          "output_contains": ["Long task completed"],
+          "output_contains": [
+            "Long task completed"
+          ],
           "running_tasks_count": 0,
           "completed_tasks_count": 1
         }
@@ -61,7 +61,9 @@
       "verify": {
         "ui": {
           "queued_input_prompt_visible": false,
-          "thread_message_counts": [3]
+          "thread_message_counts": [
+            3
+          ]
         }
       }
     },
@@ -79,11 +81,11 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "ui": {
-          "output_contains": ["Queued task completed"]
+          "output_contains": [
+            "Queued task completed"
+          ]
         }
       }
     }
@@ -91,7 +93,9 @@
   "final_verify": {
     "ui": {
       "thread_count": 1,
-      "thread_message_counts": [4],
+      "thread_message_counts": [
+        4
+      ],
       "all_tasks_completed": true,
       "completed_tasks_count": 2
     }

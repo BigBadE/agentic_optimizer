@@ -42,13 +42,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "editFile",
-            "readFile"
-          ]
-        },
         "files": [
           {
             "path": "src/lib.rs",
@@ -60,7 +53,8 @@
               "a + b"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -86,20 +80,14 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "editFile",
-            "readFile"
-          ]
-        },
         "files": [
           {
             "path": "test.txt",
             "exists": true,
             "exact_content": "FOO bar FOO baz FOO"
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -128,12 +116,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "editFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -159,13 +142,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "editFile",
-            "readFile"
-          ]
-        },
         "files": [
           {
             "path": "multiline.txt",
@@ -178,7 +154,8 @@
               "Line 5"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -204,13 +181,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "editFile",
-            "readFile"
-          ]
-        },
         "files": [
           {
             "path": "unicode.txt",
@@ -224,7 +194,8 @@
               "世界"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     }
   ],

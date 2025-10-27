@@ -40,9 +40,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -178,12 +176,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "bash"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -219,12 +212,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "bash"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -249,9 +237,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -276,9 +262,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -330,9 +314,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -389,9 +371,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -415,9 +395,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {

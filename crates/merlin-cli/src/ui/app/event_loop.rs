@@ -3,6 +3,7 @@
 use merlin_deps::crossterm::event::{Event, KeyEventKind};
 use merlin_deps::ratatui::backend::Backend;
 use merlin_deps::tracing::warn;
+use std::sync::Arc;
 use std::time::{Duration, Instant};
 
 use super::navigation;
@@ -55,16 +56,17 @@ impl<B: Backend> TuiApp<B> {
         Ok(false)
     }
 
-    /// Takes pending input from the user
-    pub fn take_pending_input(&mut self) -> Option<String> {
-        self.pending_input.take()
-    }
-
     /// Processes any pending UI events from the channel and updates state
     pub(super) fn process_ui_events(&mut self) -> bool {
         let mut had_events = false;
 
         while let Ok(event) = self.event_receiver.try_recv() {
+            // Broadcast to test event tap if present
+            #[cfg(feature = "test-util")]
+            if let Some(ref tap) = self.test_event_tap {
+                drop(tap.send(event.clone()));
+            }
+
             let persistence = self.persistence.as_ref();
             let mut handler =
                 EventHandler::new(&mut self.task_manager, &mut self.state, persistence);
@@ -161,10 +163,7 @@ impl<B: Backend> TuiApp<B> {
         }
 
         // If a task is selected, we're continuing that conversation
-        // Clear the selection so the new message starts a fresh conversation context
         if self.state.active_task_id.is_some() {
-            // Keep the conversation history from the selected task's root
-            // The orchestrator will use this to continue the conversation
             self.state.continuing_conversation_from = self.state.active_task_id;
             self.state.active_task_id = None;
         }
@@ -174,12 +173,23 @@ impl<B: Backend> TuiApp<B> {
             text: input.clone(),
         });
 
-        // Set processing status
         self.state.processing_status = Some("[Processing...]".to_string());
 
-        self.pending_input = Some(input);
-        self.input_manager.clear();
+        if let Some(ref orchestrator) = self.orchestrator {
+            let conversation_history = self.get_conversation_history();
+            let parent_task_id = self.state.continuing_conversation_from;
 
+            self.spawn_task_execution(
+                Arc::clone(orchestrator),
+                input,
+                parent_task_id,
+                conversation_history,
+            );
+        } else {
+            self.pending_input = Some(input);
+        }
+
+        self.input_manager.clear();
         false
     }
 

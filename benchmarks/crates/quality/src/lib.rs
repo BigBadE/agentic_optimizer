@@ -18,7 +18,6 @@ pub mod test_case;
 use anyhow::{Context as _, Result, anyhow, bail};
 use merlin_context::ContextBuilder;
 use merlin_core::{FileContext, Query};
-use merlin_languages::{Language, LanguageProvider, create_backend};
 use metrics::{AggregateMetrics, BenchmarkMetrics};
 use std::collections::HashMap;
 use std::fs::create_dir_all;
@@ -93,22 +92,16 @@ async fn run_benchmarks_for_project(
 ) -> Vec<BenchmarkResult> {
     let project_root = Path::new(project_root_str).to_path_buf();
 
-    // Create language backend
-    let rust_backend: Box<dyn LanguageProvider> =
-        create_backend(Language::Rust).expect("Failed to create Rust backend");
-
-    // Create builder with language backend and increase max_files
+    // Create builder with increased max_files for benchmarks
     let builder = Arc::new(Mutex::new(
-        ContextBuilder::new(project_root.clone())
-            .with_language_backend(rust_backend)
-            .with_max_files(20), // Request more files for benchmarks
+        ContextBuilder::new(project_root.clone()).with_max_files(20),
     ));
 
     // Warm up the builder by running a dummy query to initialize all systems
-    // This ensures embeddings and rust-analyzer are ready before parallel execution
+    // This ensures embeddings are ready before parallel execution
     {
         let warmup_query = Query::new("initialization");
-        drop(builder.lock().await.build_context(&warmup_query).await);
+        let _ignored = builder.lock().await.build_context(&warmup_query).await;
     }
 
     // Run test cases in parallel, sharing the builder

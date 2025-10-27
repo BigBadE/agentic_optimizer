@@ -19,8 +19,7 @@
       "data": {
         "text": "First task",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -36,9 +35,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -46,8 +43,7 @@
       "data": {
         "text": "Second task in same thread",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -63,9 +59,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     }
   ],

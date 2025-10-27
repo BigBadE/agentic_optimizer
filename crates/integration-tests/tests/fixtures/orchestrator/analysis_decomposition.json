@@ -25,8 +25,7 @@
       "data": {
         "text": "Add a comment to the code",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -42,9 +41,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -52,8 +49,7 @@
       "data": {
         "text": "Refactor the entire codebase to use async/await",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -69,9 +65,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -79,8 +73,7 @@
       "data": {
         "text": "Read a non-existent file to test workspace error handling",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -101,12 +94,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -114,8 +102,7 @@
       "data": {
         "text": "Verify workspace state with existing file",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -132,12 +119,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        },
         "files": [
           {
             "path": "sample.txt",
@@ -146,7 +127,8 @@
               "Sample file"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -154,8 +136,7 @@
       "data": {
         "text": "Test orchestrator with custom configuration: max_concurrent_tasks=4, conflict_detection=enabled, validation_early_exit=true",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -171,9 +152,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -181,8 +160,7 @@
       "data": {
         "text": "Analyze a simple task for decomposition",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -198,9 +176,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -208,8 +184,7 @@
       "data": {
         "text": "Test workspace root path canonicalization",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -226,12 +201,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "listFiles"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -239,8 +209,7 @@
       "data": {
         "text": "Perform final verification of all orchestrator analysis features",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -258,13 +227,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "listFiles",
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     }
   ],

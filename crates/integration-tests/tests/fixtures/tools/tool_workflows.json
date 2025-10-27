@@ -48,14 +48,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "editFile",
-            "readFile"
-          ]
-        },
         "files": [
           {
             "path": "src/lib.rs",
@@ -67,7 +59,8 @@
               "a + b"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -109,15 +102,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "writeFile",
-            "listFiles",
-            "deleteFile",
-            "listFiles"
-          ]
-        },
         "files": [
           {
             "path": "test1.txt",
@@ -139,7 +123,8 @@
             "path": "test5.txt",
             "exists": false
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -165,9 +150,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -196,9 +179,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     }
   ],

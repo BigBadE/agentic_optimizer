@@ -37,8 +37,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
           "return_type": "string",
           "return_value_matches": "Task completed"
         }
@@ -67,7 +65,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
           "return_value_matches": "Result: 15"
         }
       }
@@ -97,7 +94,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
           "return_value_matches": "Sum is 15"
         }
       }
@@ -126,7 +122,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
           "return_value_matches": "High"
         }
       }
@@ -155,7 +150,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
           "return_value_matches": "Sum is 15"
         }
       }

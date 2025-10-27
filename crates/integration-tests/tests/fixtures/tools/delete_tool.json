@@ -41,13 +41,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "deleteFile",
-            "listFiles"
-          ]
-        },
         "files": [
           {
             "path": "to_delete.txt",
@@ -57,7 +50,8 @@
             "path": "keep_this.txt",
             "exists": true
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -86,12 +80,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "deleteFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -120,18 +109,13 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "deleteFile"
-          ]
-        },
         "files": [
           {
             "path": "src/main.rs",
             "exists": true
           }
-        ]
+        ],
+        "execution": {}
       }
     }
   ],

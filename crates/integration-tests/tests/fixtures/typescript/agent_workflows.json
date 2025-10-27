@@ -45,10 +45,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "bash"
-          ],
           "return_type": "object"
         }
       }
@@ -77,10 +73,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "bash"
-          ],
           "return_type": "object"
         }
       }
@@ -119,10 +111,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "bash"
-          ],
           "return_type": "object"
         }
       }
@@ -163,10 +151,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "bash"
-          ],
           "return_type": "object"
         }
       }
@@ -207,10 +191,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "bash"
-          ],
           "return_type": "object"
         }
       }
@@ -254,10 +234,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "bash"
-          ],
           "return_type": "object"
         }
       }
@@ -302,10 +278,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "bash"
-          ],
           "return_type": "object"
         }
       }
@@ -360,10 +332,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "bash"
-          ],
           "return_type": "object"
         }
       }
@@ -408,10 +376,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "bash"
-          ],
           "return_type": "object"
         }
       }

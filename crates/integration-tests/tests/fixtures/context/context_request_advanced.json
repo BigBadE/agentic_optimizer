@@ -47,12 +47,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "requestContext"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -83,12 +78,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "requestContext"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -113,12 +103,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "requestContext"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -148,12 +133,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "requestContext"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -179,12 +159,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "requestContext"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -213,12 +188,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "requestContext"
-          ]
-        }
+        "execution": {}
       }
     }
   ],

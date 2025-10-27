@@ -36,6 +36,9 @@
           "  return 'Starting count: 1';",
           "}"
         ]
+      },
+      "verify": {
+        "execution": {}
       }
     },
     {
@@ -55,6 +58,9 @@
         "typescript": [
           "return 'Count: 2';"
         ]
+      },
+      "verify": {
+        "execution": {}
       }
     },
     {
@@ -74,6 +80,9 @@
         "typescript": [
           "return 'Count: 3';"
         ]
+      },
+      "verify": {
+        "execution": {}
       }
     },
     {
@@ -93,6 +102,9 @@
         "typescript": [
           "return 'Count: 4';"
         ]
+      },
+      "verify": {
+        "execution": {}
       }
     },
     {
@@ -112,6 +124,9 @@
         "typescript": [
           "return 'Count: 5';"
         ]
+      },
+      "verify": {
+        "execution": {}
       }
     },
     {
@@ -131,6 +146,9 @@
         "typescript": [
           "return 'Count: 6';"
         ]
+      },
+      "verify": {
+        "execution": {}
       }
     },
     {
@@ -150,6 +168,9 @@
         "typescript": [
           "return 'Count: 7';"
         ]
+      },
+      "verify": {
+        "execution": {}
       }
     },
     {
@@ -169,6 +190,9 @@
         "typescript": [
           "return 'Count: 8';"
         ]
+      },
+      "verify": {
+        "execution": {}
       }
     },
     {
@@ -188,6 +212,9 @@
         "typescript": [
           "return 'Count: 9';"
         ]
+      },
+      "verify": {
+        "execution": {}
       }
     },
     {
@@ -207,6 +234,9 @@
         "typescript": [
           "return 'Count: 10';"
         ]
+      },
+      "verify": {
+        "execution": {}
       }
     },
     {
@@ -230,10 +260,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     }
   ],

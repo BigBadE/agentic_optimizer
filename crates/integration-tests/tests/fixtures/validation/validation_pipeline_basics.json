@@ -36,24 +36,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "validation": {
-            "pipeline_ran": true,
-            "stages_executed": [
-              "syntax",
-              "build",
-              "test",
-              "lint"
-            ],
-            "all_stages_passed": true,
-            "score_range": [
-              0.0,
-              1.0
-            ]
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -77,20 +60,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "validation": {
-            "pipeline_ran": true,
-            "stages_executed": [
-              "syntax",
-              "build"
-            ],
-            "stages_not_executed": [
-              "test",
-              "lint"
-            ]
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -114,15 +84,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "validation": {
-            "pipeline_ran": true,
-            "stages_executed": [],
-            "validation_passed": true,
-            "score": 1.0
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -146,15 +108,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "validation": {
-            "stages_executed": [
-              "syntax"
-            ],
-            "stage_count": 1
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -178,24 +132,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "stages_have_names": true,
-            "stages_have_types": true,
-            "stage_names": [
-              "Syntax",
-              "Build",
-              "Test",
-              "Lint"
-            ],
-            "stage_types": [
-              "syntax",
-              "build",
-              "test",
-              "lint"
-            ]
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -219,16 +156,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "overall_score_range": [
-              0.0,
-              1.0
-            ],
-            "stage_scores_normalized": true,
-            "scores_within_bounds": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -252,12 +180,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "quick_check_passed": true,
-            "quick_check_faster": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -281,22 +204,13 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "pipeline_configured": true,
-            "configuration_chainable": true
-          }
-        }
+        "execution": {}
       }
     }
   ],
   "final_verify": {
     "execution": {
-      "all_tasks_completed": true,
-      "validation": {
-        "all_pipelines_executed": true,
-        "no_validation_errors": true
-      }
+      "all_tasks_completed": true
     }
   }
 }

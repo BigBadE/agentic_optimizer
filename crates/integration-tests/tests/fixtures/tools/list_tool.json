@@ -42,12 +42,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "listFiles"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -73,12 +68,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "listFiles"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -104,12 +94,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "listFiles"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -135,12 +120,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "listFiles"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -169,12 +149,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "listFiles"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -203,12 +178,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "listFiles"
-          ]
-        }
+        "execution": {}
       }
     }
   ],

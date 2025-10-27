@@ -1,17 +1,22 @@
 {
   "name": "File Size Verification",
   "description": "Tests file size constraints (size_gt, size_lt) in verification system",
-  "tags": ["tools", "file-ops", "size-verification"],
-
+  "tags": [
+    "tools",
+    "file-ops",
+    "size-verification"
+  ],
   "setup": {
     "files": {
       "small.txt": "tiny",
       "medium.txt": "This file contains some medium-length content with multiple words and sentences.",
       "large.txt": "Lorem ipsum dolor sit amet, consectetur adipiscing elit. Sed do eiusmod tempor incididunt ut labore et dolore magna aliqua. Ut enim ad minim veniam, quis nostrud exercitation ullamco laboris nisi ut aliquip ex ea commodo consequat. Duis aute irure dolor in reprehenderit in voluptate velit esse cillum dolore eu fugiat nulla pariatur. Excepteur sint occaecat cupidatat non proident, sunt in culpa qui officia deserunt mollit anim id est laborum. Sed ut perspiciatis unde omnis iste natus error sit voluptatem accusantium doloremque laudantium, totam rem aperiam, eaque ipsa quae ab illo inventore veritatis et quasi architecto beatae vitae dicta sunt explicabo."
     },
-    "terminal_size": [80, 24]
+    "terminal_size": [
+      80,
+      24
+    ]
   },
-
   "events": [
     {
       "type": "user_input",
@@ -36,10 +41,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": ["writeFile"]
-        },
         "files": [
           {
             "path": "exactly100.txt",
@@ -47,7 +48,8 @@
             "size_gt": 99,
             "size_lt": 101
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -72,9 +74,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "files": [
           {
             "path": "tiny.txt",
@@ -107,9 +107,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "files": [
           {
             "path": "big.txt",
@@ -143,14 +141,10 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": ["readFile"]
-        }
+        "execution": {}
       }
     }
   ],
-
   "final_verify": {
     "execution": {
       "all_tasks_completed": true

@@ -22,8 +22,7 @@
       "data": {
         "text": "Execute Task A",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -39,9 +38,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -65,9 +62,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -95,9 +90,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     }
   ],

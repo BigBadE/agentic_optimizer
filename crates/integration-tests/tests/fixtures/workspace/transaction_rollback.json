@@ -40,9 +40,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "files": [
           {
             "path": "src/new_file.rs",
@@ -76,9 +74,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "files": [
           {
             "path": "src/lib.rs",
@@ -117,9 +113,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "files": [
           {
             "path": "src/existing.rs",
@@ -150,9 +144,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -182,7 +174,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
           "return_value_matches": "Correctly threw error"
         }
       }

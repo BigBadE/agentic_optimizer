@@ -3,13 +3,14 @@
 use merlin_deps::crossterm::terminal;
 use merlin_deps::ratatui::Terminal;
 use merlin_deps::ratatui::backend::{Backend, CrosstermBackend};
+use std::fs;
 use std::io;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::mpsc;
 
 use super::tui_app::TuiApp;
-use crate::ui::UiChannel;
 use crate::ui::event_source::CrosstermEventSource;
 use crate::ui::input::InputManager;
 use crate::ui::layout;
@@ -18,15 +19,19 @@ use crate::ui::renderer::{FocusedPane, Renderer};
 use crate::ui::state::UiState;
 use crate::ui::task_manager::TaskManager;
 use crate::ui::theme::Theme;
-use merlin_agent::ThreadStore;
+use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_routing::{Result, RoutingError};
 
 impl TuiApp<CrosstermBackend<io::Stdout>> {
-    /// Creates a new `TuiApp` with task storage
+    /// Creates a new `TuiApp` with task storage and orchestrator
     ///
     /// # Errors
     /// Returns an error if terminal initialization or clearing fails.
-    pub fn new_with_storage(tasks_dir: impl Into<Option<PathBuf>>) -> Result<(Self, UiChannel)> {
+    pub fn new_with_storage(
+        tasks_dir: impl Into<Option<PathBuf>>,
+        orchestrator: Option<Arc<RoutingOrchestrator>>,
+        log_file: Option<fs::File>,
+    ) -> Result<Self> {
         let (sender, receiver) = mpsc::unbounded_channel();
 
         let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))
@@ -63,6 +68,7 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
         let app = Self {
             terminal,
             event_receiver: receiver,
+            event_sender: sender,
             task_manager: TaskManager::default(),
             state,
             input_manager: InputManager::default(),
@@ -74,11 +80,13 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             last_render_time: Instant::now(),
             layout_cache: layout::LayoutCache::new(),
             thread_store,
+            orchestrator,
+            log_file,
+            #[cfg(feature = "test-util")]
+            test_event_tap: None,
         };
 
-        let channel = UiChannel::from_sender(sender);
-
-        Ok((app, channel))
+        Ok(app)
     }
 
     /// Enables raw mode

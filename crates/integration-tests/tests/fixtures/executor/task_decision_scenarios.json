@@ -40,8 +40,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
           "return_type": "string"
         }
       }
@@ -70,11 +68,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ],
           "return_value_matches": "Gathered context: Initial context for gathering"
         }
       }
@@ -106,14 +99,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "writeFile"
-          ]
-        },
         "files": [
           {
             "path": "decision_output.txt",
@@ -122,7 +107,8 @@
               "INITIAL CONTEXT FOR GATHERING"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     }
   ],

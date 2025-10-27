@@ -22,8 +22,7 @@
       "data": {
         "text": "Create a hello world function",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -39,11 +38,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": []
-        }
+        "execution": {}
       }
     },
     {
@@ -67,10 +62,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": []
-        }
+        "execution": {}
       }
     },
     {
@@ -94,9 +86,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     }
   ],

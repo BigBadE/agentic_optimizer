@@ -44,12 +44,14 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "ui": {
-          "output_contains": ["First thread response"],
-          "thread_message_counts": [2],
+          "output_contains": [
+            "First thread response"
+          ],
+          "thread_message_counts": [
+            2
+          ],
           "tasks_displayed": 1,
           "completed_tasks_count": 1
         }
@@ -84,8 +86,12 @@
     "ui": {
       "thread_count": 1,
       "thread_list_visible": true,
-      "thread_names_visible": ["Thread 1"],
-      "thread_message_counts": [2],
+      "thread_names_visible": [
+        "Thread 1"
+      ],
+      "thread_message_counts": [
+        2
+      ],
       "all_tasks_completed": true,
       "focused_pane": "input"
     }

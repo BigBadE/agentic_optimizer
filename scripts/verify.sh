@@ -13,19 +13,17 @@ set -euo pipefail
 
 check_file_sizes() {
   local max_lines=500
-  local violations=()
+  local violations=$(
+          find crates -type f -name '*.rs' -print0 |
+          xargs -0 awk -v max="$max_lines" '
+            { count[FILENAME]++ }
+            ENDFILE { if (count[FILENAME] > max) print FILENAME ": " count[FILENAME] " lines" }
+          '
+        )
 
-  # Find all Rust source files
-  while IFS= read -r file; do
-    local line_count=$(wc -l < "$file")
-    if [ "$line_count" -gt "$max_lines" ]; then
-      violations+=("$file: $line_count lines")
-    fi
-  done < <(find crates -name "*.rs" -type f)
-
-  if [ "${#violations[@]}" -gt 0 ]; then
+  if [ -n "$violations" ]; then
     echo "ERROR: The following files exceed $max_lines lines:"
-    printf '%s\n' "${violations[@]}"
+    echo "$violations"
     return 1
   fi
 

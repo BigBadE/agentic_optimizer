@@ -41,14 +41,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "writeFile"
-          ]
-        },
         "files": [
           {
             "path": "data.json",
@@ -58,7 +50,8 @@
               "\"name\": \"test\""
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     }
   ],

@@ -19,29 +19,25 @@
       "data": {
         "text": "Test input field",
         "submit": false
-      },
-      "verify": {}
+      }
     },
     {
       "type": "key_press",
       "data": {
         "key": "tab"
-      },
-      "verify": {}
+      }
     },
     {
       "type": "key_press",
       "data": {
         "key": "tab"
-      },
-      "verify": {}
+      }
     },
     {
       "type": "key_press",
       "data": {
         "key": "tab"
-      },
-      "verify": {}
+      }
     }
   ],
   "final_verify": {}

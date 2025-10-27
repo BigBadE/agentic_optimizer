@@ -38,13 +38,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "writeFile"
-          ]
-        },
         "files": [
           {
             "path": "src/test.rs",
@@ -53,7 +46,8 @@
               "pub fn first"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -79,14 +73,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "writeFile"
-          ]
-        },
         "files": [
           {
             "path": "src/test.rs",
@@ -96,7 +82,8 @@
               "pub fn second"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -120,10 +107,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     }
   ],

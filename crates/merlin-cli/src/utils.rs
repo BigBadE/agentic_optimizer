@@ -136,6 +136,10 @@ mod tests {
         merlin_deps::tracing::info!("  Cost: ${actual_cost:.4}");
     }
 
+    /// Tests basic cost calculation without cache
+    ///
+    /// # Panics
+    /// Panics if cost calculation produces incorrect result
     #[test]
     fn test_calculate_cost_basic() {
         const EXPECTED_COST: f64 = 0.0105;
@@ -154,6 +158,10 @@ mod tests {
         );
     }
 
+    /// Tests cost calculation with cache tokens
+    ///
+    /// # Panics
+    /// Panics if cost calculation produces incorrect result
     #[test]
     fn test_calculate_cost_with_cache() {
         const EXPECTED_COST: f64 = 0.01485;
@@ -172,6 +180,10 @@ mod tests {
         );
     }
 
+    /// Tests cost calculation with zero tokens
+    ///
+    /// # Panics
+    /// Panics if zero tokens produce non-zero cost
     #[test]
     fn test_calculate_cost_zero_tokens() {
         const TOLERANCE: f64 = 0.0001;
@@ -189,6 +201,10 @@ mod tests {
         );
     }
 
+    /// Tests cost calculation with large token values
+    ///
+    /// # Panics
+    /// Panics if cost calculation produces incorrect result
     #[test]
     fn test_calculate_cost_large_values() {
         const LARGE_INPUT: u64 = 1_000_000;
@@ -209,6 +225,10 @@ mod tests {
         );
     }
 
+    /// Tests cleanup when .merlin directory doesn't exist
+    ///
+    /// # Panics
+    /// Panics if temp directory creation or cleanup fails
     #[test]
     fn test_cleanup_old_tasks_no_directory() {
         let temp = TempDir::new().expect("Failed to create temp dir");
@@ -220,6 +240,10 @@ mod tests {
         );
     }
 
+    /// Tests cleanup when task count is under limit
+    ///
+    /// # Panics
+    /// Panics if temp directory creation or file operations fail
     #[test]
     fn test_cleanup_old_tasks_under_limit() {
         const NUM_TASKS: usize = 5;
@@ -244,6 +268,10 @@ mod tests {
         );
     }
 
+    /// Tests cleanup when task count exceeds limit
+    ///
+    /// # Panics
+    /// Panics if temp directory creation or file operations fail
     #[test]
     fn test_cleanup_old_tasks_over_limit() {
         const OVER_LIMIT: usize = MAX_TASKS + 10;
@@ -271,6 +299,10 @@ mod tests {
         assert_eq!(remaining, MAX_TASKS, "Should keep exactly MAX_TASKS tasks");
     }
 
+    /// Tests cleanup ignores non-gz files
+    ///
+    /// # Panics
+    /// Panics if temp directory creation or file operations fail
     #[test]
     fn test_cleanup_old_tasks_ignores_non_gz() {
         const NUM_GZ_TASKS: usize = 3;
@@ -300,6 +332,10 @@ mod tests {
         assert_eq!(total_files, EXPECTED_TOTAL, "Should preserve non-gz files");
     }
 
+    /// Tests cleanup with mixed file extensions
+    ///
+    /// # Panics
+    /// Panics if temp directory creation or file operations fail
     #[test]
     fn test_cleanup_old_tasks_with_mixed_extensions() {
         const NUM_GZ_FILES: usize = 30;

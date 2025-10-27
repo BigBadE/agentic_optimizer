@@ -41,13 +41,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -73,13 +67,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "writeFile"
-          ]
-        },
         "files": [
           {
             "path": "src/main.rs",
@@ -96,7 +83,8 @@
               "pub mod utils"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     }
   ],

@@ -28,4 +28,3 @@ pub mod scroll;
 
 // Re-exports
 pub use app::TuiApp;
-pub use merlin_routing::{MessageLevel, UiChannel, UiEvent};

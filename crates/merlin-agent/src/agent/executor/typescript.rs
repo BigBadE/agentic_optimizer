@@ -2,7 +2,7 @@
 
 use crate::agent::AgentExecutionResult;
 use merlin_core::{Result, RoutingError, TaskId, ui::UiEvent};
-use merlin_deps::serde_json::from_value;
+use merlin_deps::serde_json::{from_value, to_string as json_to_string};
 use merlin_routing::UiChannel;
 use merlin_tooling::{ToolRegistry, TypeScriptRuntime};
 use std::sync::Arc;
@@ -97,30 +97,29 @@ pub async fn execute_typescript_code(
     })?;
 
     // Parse result as AgentExecutionResult
-    // Handle both structured results and plain strings
+    // Handle both structured results and plain values
     let execution_result: AgentExecutionResult = if result_value.is_string() {
         // Plain string result - treat as "done" with the string as the result
         let result_str = result_value.as_str().unwrap_or("").to_owned();
         AgentExecutionResult::done(result_str)
-    } else {
-        // Try to parse as structured AgentExecutionResult
-        from_value(result_value.clone()).map_err(|err| {
-            merlin_deps::tracing::info!(
-                "Failed to parse execution result. Code was:\n{}\n\nReturned value: {:?}\n\nError: {}",
-                code,
-                result_value,
+    } else if result_value.is_object() && result_value.get("done").is_some() {
+        // Try to parse as structured AgentExecutionResult (has "done" field)
+        // If parsing fails, fall back to treating as plain object
+        from_value(result_value.clone()).unwrap_or_else(|err| {
+            merlin_deps::tracing::debug!(
+                "Could not parse as AgentExecutionResult, treating as plain value: {}",
                 err
             );
-
-            // Send step failed event
-            ui_channel.send(UiEvent::TaskStepFailed {
-                task_id,
-                step_id: "typescript_execution".to_owned(),
-                error: format!("Failed to parse execution result: {err}"),
-            });
-
-            RoutingError::Other(format!("Failed to parse execution result: {err}"))
-        })?
+            // Fall back to treating as plain object - use compact JSON serialization
+            let result_str = json_to_string(&result_value)
+                .unwrap_or_else(|_| result_value.to_string());
+            AgentExecutionResult::done(result_str)
+        })
+    } else {
+        // Plain value (object, array, number, etc.) - serialize to compact JSON and treat as "done"
+        let result_str = json_to_string(&result_value)
+            .unwrap_or_else(|_| result_value.to_string());
+        AgentExecutionResult::done(result_str)
     };
 
     // Send step completed event

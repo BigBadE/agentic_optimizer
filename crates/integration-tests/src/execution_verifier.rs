@@ -11,76 +11,42 @@ pub struct ExecutionVerifier;
 
 impl ExecutionVerifier {
     /// Verify execution
+    ///
+    /// With "built to fail" approach: if LLM provides TypeScript, we EXPECT it to execute
+    /// and produce results. Missing execution results is a FAILURE unless an error is expected.
     pub fn verify_execution(
         result: &mut VerificationResult,
         last_execution: Option<&ToolResult<Value>>,
         verify: &ExecutionVerify,
     ) {
-        // Check if execution succeeded or failed
-        let execution_succeeded = last_execution.is_some_and(Result::is_ok);
-
-        // If error_occurred is specified, we expect an error - don't check typescript_executed
-        let expect_error = verify.error_occurred.is_some();
-
-        // TypeScript parsed check (always done if execution happened)
-        if let Some(expected) = verify.typescript_parsed {
-            // If we have any execution result (success or error), parsing succeeded
-            let parsed = last_execution.is_some();
-            if expected && parsed {
-                result.add_success("TypeScript parsed successfully".to_owned());
-            } else if expected && !parsed {
-                result.add_failure("TypeScript failed to parse".to_owned());
-            }
-        }
-
-        // TypeScript executed check (only if no error expected)
-        if let Some(expected) = verify.typescript_executed {
-            Self::verify_typescript_executed(
-                result,
-                last_execution,
-                expected,
-                expect_error,
-                execution_succeeded,
-            );
-        }
-
-        // Verify expected error
+        // If we expect an error, verify it occurred
         if let Some(expected_error) = &verify.error_occurred {
             Self::verify_expected_error(result, last_execution, expected_error);
+            return; // Don't check return values when expecting errors
         }
 
-        if let Some(tools) = &verify.tools_called {
-            for tool in tools {
-                result.add_success(format!("Tool '{tool}' was called"));
+        // If no error is expected, we MUST have execution results
+        // This is the "built to fail" approach - catch when execution isn't happening
+        let Some(execution_result) = last_execution else {
+            result.add_failure(
+                "TypeScript execution results not captured - test infrastructure issue".to_owned(),
+            );
+            return;
+        };
+
+        // Execution happened - verify it succeeded
+        match execution_result {
+            Ok(_value) => {
+                result.add_success("TypeScript executed successfully".to_owned());
+
+                // Verify return value if specified
+                if verify.return_value_matches.is_some() || verify.return_value_contains.is_some() {
+                    Self::verify_return_value(result, last_execution, verify);
+                }
             }
-        }
-
-        // Verify return value
-        if verify.return_value_matches.is_some() || verify.return_value_contains.is_some() {
-            Self::verify_return_value(result, last_execution, verify);
-        }
-    }
-
-    /// Verify typescript execution status
-    fn verify_typescript_executed(
-        result: &mut VerificationResult,
-        last_execution: Option<&ToolResult<Value>>,
-        expected: bool,
-        expect_error: bool,
-        execution_succeeded: bool,
-    ) {
-        if expect_error {
-            // If we expect an error, typescript_executed means "it ran" not "it succeeded"
-            if last_execution.is_some() {
-                result.add_success("TypeScript executed (with expected error)".to_owned());
+            Err(err) => {
+                result.add_failure(format!("TypeScript execution failed: {err}"));
             }
-        } else if expected && execution_succeeded {
-            result.add_success("TypeScript executed successfully".to_owned());
-        } else if expected
-            && !execution_succeeded
-            && let Some(Err(err)) = last_execution
-        {
-            result.add_failure(format!("TypeScript execution failed: {err}"));
         }
     }
 
@@ -90,22 +56,27 @@ impl ExecutionVerifier {
         last_execution: Option<&ToolResult<Value>>,
         expected_error: &str,
     ) {
-        if let Some(exec) = last_execution {
-            match exec {
-                Ok(_) => {
+        let Some(exec) = last_execution else {
+            result.add_failure(format!(
+                "Expected error '{expected_error}' but no execution results captured"
+            ));
+            return;
+        };
+
+        match exec {
+            Ok(_) => {
+                result.add_failure(format!(
+                    "Expected error '{expected_error}' but execution succeeded"
+                ));
+            }
+            Err(err) => {
+                let error_msg = err.to_string();
+                if error_msg.contains(expected_error) {
+                    result.add_success(format!("Expected error occurred: {expected_error}"));
+                } else {
                     result.add_failure(format!(
-                        "Expected error '{expected_error}' but execution succeeded"
+                        "Expected error '{expected_error}' but got '{error_msg}'"
                     ));
-                }
-                Err(err) => {
-                    let error_msg = err.to_string();
-                    if error_msg.contains(expected_error) {
-                        result.add_success(format!("Expected error occurred: {expected_error}"));
-                    } else {
-                        result.add_failure(format!(
-                            "Expected error '{expected_error}' but got '{error_msg}'"
-                        ));
-                    }
                 }
             }
         }

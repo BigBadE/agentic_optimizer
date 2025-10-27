@@ -1,14 +1,13 @@
 //! Verification system for unified tests.
 
+use super::execution_tracker::ExecutionResultTracker;
 use super::execution_verifier::ExecutionVerifier;
 use super::file_verifier::FileVerifier;
-use super::fixture::{FinalVerify, TestEvent, TestFixture, VerifyConfig};
+use super::fixture::{FinalVerify, TestEvent, VerifyConfig};
 use super::ui_verifier::UiVerifier;
 use super::verification_result::VerificationResult;
 use merlin_cli::TuiApp;
 use merlin_deps::ratatui::backend::TestBackend;
-use merlin_deps::serde_json::Value;
-use merlin_tooling::ToolResult;
 use std::path::Path;
 use std::result::Result;
 
@@ -18,32 +17,16 @@ pub struct UnifiedVerifier<'fixture> {
     workspace_root: &'fixture Path,
     /// Accumulated result
     result: VerificationResult,
-    /// Last TypeScript execution result
-    last_execution: Option<ToolResult<Value>>,
-    /// Reference to TUI app for state verification
-    tui_app: Option<&'fixture TuiApp<TestBackend>>,
 }
 
 impl<'fixture> UnifiedVerifier<'fixture> {
     /// Create new verifier
     #[must_use]
-    pub fn new(_fixture: &'fixture TestFixture, workspace_root: &'fixture Path) -> Self {
+    pub fn new(workspace_root: &'fixture Path) -> Self {
         Self {
             workspace_root,
             result: VerificationResult::new(),
-            last_execution: None,
-            tui_app: None,
         }
-    }
-
-    /// Set the last TypeScript execution result
-    pub fn set_last_execution_result(&mut self, result: ToolResult<Value>) {
-        self.last_execution = Some(result);
-    }
-
-    /// Set the TUI app for state verification
-    pub fn set_tui_app(&mut self, app: &'fixture TuiApp<TestBackend>) {
-        self.tui_app = Some(app);
     }
 
     /// Verify an event
@@ -54,14 +37,14 @@ impl<'fixture> UnifiedVerifier<'fixture> {
         &mut self,
         _event: &TestEvent,
         verify: &VerifyConfig,
+        tui_app: Option<&TuiApp<TestBackend>>,
+        execution_tracker: &ExecutionResultTracker,
     ) -> Result<(), String> {
         // Verify execution if specified
         if let Some(exec_verify) = &verify.execution {
-            ExecutionVerifier::verify_execution(
-                &mut self.result,
-                self.last_execution.as_ref(),
-                exec_verify,
-            );
+            // Get the most recent execution result from tracker
+            let last_result = execution_tracker.last_result().map(|record| record.result());
+            ExecutionVerifier::verify_execution(&mut self.result, last_result, exec_verify);
         }
 
         // Verify files if specified
@@ -73,12 +56,12 @@ impl<'fixture> UnifiedVerifier<'fixture> {
 
         // Verify UI if specified
         if let Some(ui_verify) = &verify.ui {
-            UiVerifier::verify_ui(&mut self.result, self.tui_app, ui_verify);
+            UiVerifier::verify_ui(&mut self.result, tui_app, ui_verify);
         }
 
         // Verify state if specified
         if let Some(state_verify) = &verify.state {
-            UiVerifier::verify_state(&mut self.result, self.tui_app, state_verify);
+            UiVerifier::verify_state(&mut self.result, tui_app, state_verify);
         }
 
         Ok(())
@@ -88,7 +71,12 @@ impl<'fixture> UnifiedVerifier<'fixture> {
     ///
     /// # Errors
     /// Returns error if verification fails
-    pub fn verify_final(&mut self, verify: &FinalVerify) -> Result<(), String> {
+    pub fn verify_final(
+        &mut self,
+        verify: &FinalVerify,
+        tui_app: Option<&TuiApp<TestBackend>>,
+        execution_tracker: &ExecutionResultTracker,
+    ) -> Result<(), String> {
         // Verify final execution state
         if let Some(exec_verify) = &verify.execution {
             if let Some(expected) = exec_verify.all_tasks_completed
@@ -102,6 +90,14 @@ impl<'fixture> UnifiedVerifier<'fixture> {
             {
                 self.result.add_success("Validation passed".to_owned());
             }
+
+            // Verify return value for final execution if specified
+            if exec_verify.return_value_matches.is_some()
+                || exec_verify.return_value_contains.is_some()
+            {
+                let last_result = execution_tracker.last_result().map(|record| record.result());
+                ExecutionVerifier::verify_execution(&mut self.result, last_result, exec_verify);
+            }
         }
 
         // Verify final files
@@ -109,6 +105,16 @@ impl<'fixture> UnifiedVerifier<'fixture> {
             for file_verify in file_verifies {
                 FileVerifier::verify_file(&mut self.result, self.workspace_root, file_verify);
             }
+        }
+
+        // Verify final UI state if specified
+        if let Some(ui_verify) = &verify.ui {
+            UiVerifier::verify_ui(&mut self.result, tui_app, ui_verify);
+        }
+
+        // Verify final state if specified
+        if let Some(state_verify) = &verify.state {
+            UiVerifier::verify_state(&mut self.result, tui_app, state_verify);
         }
 
         Ok(())

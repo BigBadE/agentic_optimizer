@@ -8,16 +8,17 @@ use merlin_deps::ratatui::backend::Backend;
 use super::tui_app::TuiApp;
 use crate::ui::event_source::InputEventSource;
 use crate::ui::input::InputManager;
+use crate::ui::layout;
 use crate::ui::persistence::TaskPersistence;
 use crate::ui::renderer::{FocusedPane, Renderer};
 use crate::ui::state::UiState;
 use crate::ui::task_manager::TaskManager;
 use crate::ui::theme::Theme;
-use crate::ui::{UiChannel, layout};
-use merlin_agent::ThreadStore;
+use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_deps::ratatui::Terminal;
-use merlin_routing::{Result, RoutingError};
+use merlin_routing::{Result, RoutingError, UiEvent};
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::mpsc;
 
@@ -33,7 +34,8 @@ impl<B: Backend> TuiApp<B> {
         backend: B,
         event_source: Box<dyn InputEventSource + Send>,
         tasks_dir: impl Into<Option<PathBuf>>,
-    ) -> Result<(Self, UiChannel)> {
+        orchestrator: Option<Arc<RoutingOrchestrator>>,
+    ) -> Result<Self> {
         let (sender, receiver) = mpsc::unbounded_channel();
 
         let mut terminal =
@@ -70,6 +72,7 @@ impl<B: Backend> TuiApp<B> {
         let app = Self {
             terminal,
             event_receiver: receiver,
+            event_sender: sender,
             task_manager: TaskManager::default(),
             state,
             input_manager: InputManager::default(),
@@ -81,11 +84,20 @@ impl<B: Backend> TuiApp<B> {
             last_render_time: Instant::now(),
             layout_cache: layout::LayoutCache::new(),
             thread_store,
+            orchestrator,
+            log_file: None,
+            test_event_tap: None,
         };
 
-        let channel = UiChannel::from_sender(sender);
+        Ok(app)
+    }
 
-        Ok((app, channel))
+    /// Set event tap for testing
+    ///
+    /// The event tap receives copies of all UI events processed by the app.
+    /// This allows tests to listen for task completion without polling.
+    pub fn test_set_event_tap(&mut self, sender: mpsc::UnboundedSender<UiEvent>) {
+        self.test_event_tap = Some(sender);
     }
 
     /// Get read-only access to UI state for testing

@@ -19,8 +19,7 @@
       "data": {
         "text": "Show me a task tree",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -55,7 +54,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_parsed": true,
           "return_type": "TaskList"
         }
       }
@@ -64,8 +62,7 @@
       "type": "key_press",
       "data": {
         "key": "tab"
-      },
-      "verify": {}
+      }
     }
   ],
   "final_verify": {}

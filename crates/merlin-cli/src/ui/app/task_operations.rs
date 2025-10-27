@@ -10,11 +10,6 @@ use crate::ui::state::ConversationRole;
 use merlin_routing::TaskId;
 
 impl<B: Backend> TuiApp<B> {
-    /// Takes the task ID to continue conversation from (clears it after taking)
-    pub fn take_continuing_conversation_from(&mut self) -> Option<TaskId> {
-        self.state.continuing_conversation_from.take()
-    }
-
     /// Gets conversation history in (role, content) format for context building
     pub fn get_conversation_history(&self) -> Vec<(String, String)> {
         // If continuing a conversation, load history from that task

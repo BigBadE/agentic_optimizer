@@ -40,16 +40,14 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
+        "ui": {
+          "output_contains": [
+            "File contents",
+            "fn main()",
+            "println"
           ]
         },
-        "ui": {
-          "output_contains": ["File contents", "fn main()", "println"]
-        }
+        "execution": {}
       }
     },
     {
@@ -74,12 +72,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -104,12 +97,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -138,12 +126,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     }
   ],

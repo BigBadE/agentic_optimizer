@@ -24,8 +24,12 @@
       "verify": {
         "ui": {
           "thread_count": 1,
-          "thread_names_visible": ["Thread 1"],
-          "thread_message_counts": [1]
+          "thread_names_visible": [
+            "Thread 1"
+          ],
+          "thread_message_counts": [
+            1
+          ]
         }
       }
     },
@@ -43,12 +47,14 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "ui": {
-          "output_contains": ["Thread one response"],
-          "thread_message_counts": [2]
+          "output_contains": [
+            "Thread one response"
+          ],
+          "thread_message_counts": [
+            2
+          ]
         }
       }
     },
@@ -61,7 +67,9 @@
       "verify": {
         "ui": {
           "thread_count": 1,
-          "thread_message_counts": [3]
+          "thread_message_counts": [
+            3
+          ]
         }
       }
     },
@@ -79,12 +87,14 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "ui": {
-          "output_contains": ["Thread one second response"],
-          "thread_message_counts": [4],
+          "output_contains": [
+            "Thread one second response"
+          ],
+          "thread_message_counts": [
+            4
+          ],
           "completed_tasks_count": 2
         }
       }
@@ -98,7 +108,9 @@
       "verify": {
         "ui": {
           "thread_count": 1,
-          "thread_message_counts": [5]
+          "thread_message_counts": [
+            5
+          ]
         }
       }
     },
@@ -116,12 +128,14 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        },
+        "execution": {},
         "ui": {
-          "output_contains": ["Thread one third response"],
-          "thread_message_counts": [6],
+          "output_contains": [
+            "Thread one third response"
+          ],
+          "thread_message_counts": [
+            6
+          ],
           "completed_tasks_count": 3
         }
       }
@@ -131,8 +145,12 @@
     "ui": {
       "thread_count": 1,
       "thread_list_visible": true,
-      "thread_names_visible": ["Thread 1"],
-      "thread_message_counts": [6],
+      "thread_names_visible": [
+        "Thread 1"
+      ],
+      "thread_message_counts": [
+        6
+      ],
       "all_tasks_completed": true,
       "completed_tasks_count": 3
     }

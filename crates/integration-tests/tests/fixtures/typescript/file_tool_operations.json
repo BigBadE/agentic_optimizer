@@ -47,10 +47,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "writeFile"
-          ],
           "return_value_contains": {
             "message": "File written",
             "filename": "test.txt",

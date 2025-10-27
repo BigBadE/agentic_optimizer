@@ -42,8 +42,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
           "return_value_matches": "Hello! How can I help you\\?"
         }
       }
@@ -80,12 +78,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "writeFile"
-          ],
           "return_value_matches": ".*0\\.95.*"
         },
         "files": [
@@ -141,12 +133,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "writeFile"
-          ],
           "return_value_matches": ".*0\\.75.*"
         },
         "files": [
@@ -196,12 +182,6 @@
       },
       "verify": {
         "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "writeFile"
-          ],
           "return_value_matches": ".*0\\.85.*"
         },
         "files": [

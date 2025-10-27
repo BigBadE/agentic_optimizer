@@ -9,7 +9,8 @@ use merlin_routing::{
     LocalTaskAnalyzer, ModelRouter, ProviderRegistry, StrategyRouter, TaskAnalysis, TaskAnalyzer,
 };
 use merlin_tooling::{
-    BashTool, ContextRequestTool, ListFilesTool, ReadFileTool, ToolRegistry, WriteFileTool,
+    BashTool, ContextRequestTool, DeleteFileTool, EditFileTool, ListFilesTool, ReadFileTool,
+    ToolRegistry, WriteFileTool,
 };
 
 /// Type alias for conversation history (role, content) tuples
@@ -269,6 +270,8 @@ impl RoutingOrchestrator {
             .with_tool(Arc::new(BashTool))
             .with_tool(Arc::new(ReadFileTool::new(workspace_root)))
             .with_tool(Arc::new(WriteFileTool::new(workspace_root)))
+            .with_tool(Arc::new(EditFileTool::new(workspace_root)))
+            .with_tool(Arc::new(DeleteFileTool::new(workspace_root)))
             .with_tool(Arc::new(ListFilesTool::new(workspace_root)))
             .with_tool(Arc::new(ContextRequestTool::new(workspace_root.clone())));
         let tool_registry = Arc::new(tool_registry);

@@ -162,20 +162,15 @@ pub struct VerifyConfig {
 
 /// Execution verification
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ExecutionVerify {
-    /// TypeScript was parsed successfully
-    pub typescript_parsed: Option<bool>,
-    /// TypeScript was executed successfully
-    pub typescript_executed: Option<bool>,
-    /// Tools that were called
-    pub tools_called: Option<Vec<String>>,
     /// Return type
     pub return_type: Option<String>,
     /// Return value matches exactly (for arrays and primitives)
     pub return_value_matches: Option<Value>,
     /// Return value contains these key-value pairs (for objects)
     pub return_value_contains: Option<Value>,
-    /// Error occurred (error message expected, or `false` if no error expected)
+    /// Error occurred (error message substring expected)
     #[serde(default)]
     pub error_occurred: Option<String>,
     /// All tasks completed

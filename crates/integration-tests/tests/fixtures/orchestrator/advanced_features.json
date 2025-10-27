@@ -25,8 +25,7 @@
       "data": {
         "text": "Modify test.rs to add a hello function",
         "submit": true
-      },
-      "verify": {}
+      }
     },
     {
       "type": "llm_response",
@@ -43,13 +42,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "editFile"
-          ]
-        },
         "files": [
           {
             "path": "test.rs",
@@ -59,7 +51,8 @@
               "Hello"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -84,13 +77,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile",
-            "editFile"
-          ]
-        },
         "files": [
           {
             "path": "test.rs",
@@ -100,7 +86,8 @@
               "fn goodbye()"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -124,9 +111,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     },
     {
@@ -150,9 +135,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true
-        }
+        "execution": {}
       }
     }
   ],

@@ -8,7 +8,6 @@ mod system_init;
 use std::path::PathBuf;
 
 use merlin_core::{Context, CoreResult as Result, FileContext, Query};
-use merlin_languages::LanguageProvider;
 
 use crate::embedding::{ProgressCallback, VectorSearchManager};
 use crate::query::{QueryAnalyzer, QueryIntent};
@@ -21,10 +20,6 @@ pub struct ContextBuilder {
     max_files: usize,
     /// Maximum file size in bytes to include
     max_file_size: usize,
-    /// Optional language backend for semantic analysis
-    language_backend: Option<Box<dyn LanguageProvider>>,
-    /// Whether the language backend has been initialized
-    language_backend_initialized: bool,
     /// Vector search manager for semantic search
     vector_manager: Option<VectorSearchManager>,
     /// Optional progress callback for embedding operations
@@ -38,8 +33,6 @@ impl ContextBuilder {
             project_root,
             max_files: 50,
             max_file_size: 100_000,
-            language_backend: None,
-            language_backend_initialized: false,
             vector_manager: None,
             progress_callback: None,
         }
@@ -49,16 +42,6 @@ impl ContextBuilder {
     #[must_use]
     pub fn with_max_files(mut self, max_files: usize) -> Self {
         self.max_files = max_files;
-        self
-    }
-
-    /// Enable a language backend for semantic analysis.
-    ///
-    /// This accepts any implementation of the `LanguageProvider` trait,
-    /// allowing support for multiple languages (Rust, Java, Python, etc.)
-    #[must_use]
-    pub fn with_language_backend(mut self, backend: Box<dyn LanguageProvider>) -> Self {
-        self.language_backend = Some(backend);
         self
     }
 
@@ -154,14 +137,12 @@ impl ContextBuilder {
         file_scanner::collect_all_files(&self.project_root, self.max_files, self.max_file_size)
     }
 
-    /// Initializes systems (language backend and vector search) in parallel.
+    /// Initializes vector search system.
     ///
     /// # Errors
     /// Returns an error if critical initialization fails.
     async fn initialize_systems_parallel(&mut self) -> Result<()> {
         system_init::initialize_systems_parallel(
-            &mut self.language_backend,
-            &mut self.language_backend_initialized,
             &mut self.vector_manager,
             self.project_root.as_path(),
             self.progress_callback.as_ref(),

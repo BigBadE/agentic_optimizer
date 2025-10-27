@@ -44,16 +44,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_executed": true,
-          "tools_called": [
-            "writeFile"
-          ],
-          "validation": {
-            "syntax_stage_passed": true,
-            "syntax_errors": []
-          }
-        },
+        "execution": {},
         "files": [
           {
             "path": "src/hello.rs",
@@ -87,12 +78,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "build_stage_executed": true,
-            "build_quick_check_passed": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -116,12 +102,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "test_stage_executed": true,
-            "test_quick_check_passed": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -145,12 +126,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "lint_stage_executed": true,
-            "lint_quick_check_passed": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -174,15 +150,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "syntax_independent": true,
-            "build_independent": true,
-            "test_independent": true,
-            "lint_independent": true,
-            "all_stages_runnable": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -207,15 +175,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "tools_called": [
-            "writeFile"
-          ],
-          "validation": {
-            "pipeline_ran": true,
-            "file_changes_validated": true
-          }
-        },
+        "execution": {},
         "files": [
           {
             "path": "src/test.rs",
@@ -251,15 +211,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "tools_called": [
-            "writeFile"
-          ],
-          "validation": {
-            "multiple_files_validated": true,
-            "validation_passed": true
-          }
-        },
+        "execution": {},
         "files": [
           {
             "path": "src/module1.rs",
@@ -297,18 +249,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "result_has_stages": true,
-            "result_has_passed_field": true,
-            "result_has_score": true,
-            "result_has_errors": true,
-            "result_has_warnings": true,
-            "stage_results_valid": true,
-            "stage_types_correct": true,
-            "scores_normalized": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -332,18 +273,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "stages_in_order": true,
-            "expected_order": [
-              "syntax",
-              "build",
-              "test",
-              "lint"
-            ],
-            "ordering_preserved": true
-          }
-        }
+        "execution": {}
       }
     },
     {
@@ -367,25 +297,13 @@
         ]
       },
       "verify": {
-        "execution": {
-          "validation": {
-            "syntax_quick_check": true,
-            "build_quick_check": true,
-            "test_quick_check": true,
-            "lint_quick_check": true,
-            "all_quick_checks_passed": true
-          }
-        }
+        "execution": {}
       }
     }
   ],
   "final_verify": {
     "execution": {
-      "all_tasks_completed": true,
-      "validation": {
-        "all_stages_tested": true,
-        "all_validations_passed": true
-      }
+      "all_tasks_completed": true
     },
     "files": [
       {

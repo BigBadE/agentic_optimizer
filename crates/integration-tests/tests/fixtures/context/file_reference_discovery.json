@@ -49,13 +49,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -83,13 +77,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     },
     {
@@ -119,13 +107,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        },
         "files": [
           {
             "path": "config.toml",
@@ -148,7 +129,8 @@
               "\"test\""
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -175,13 +157,6 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "writeFile"
-          ]
-        },
         "files": [
           {
             "path": "config.toml",
@@ -206,7 +181,8 @@
               "\"value\": 100"
             ]
           }
-        ]
+        ],
+        "execution": {}
       }
     },
     {
@@ -240,13 +216,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": [
-            "readFile"
-          ]
-        }
+        "execution": {}
       }
     }
   ],

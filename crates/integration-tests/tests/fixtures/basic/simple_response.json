@@ -34,11 +34,7 @@
         ]
       },
       "verify": {
-        "execution": {
-          "typescript_parsed": true,
-          "typescript_executed": true,
-          "tools_called": []
-        }
+        "execution": {}
       }
     }
   ],

@@ -29,8 +29,10 @@ rm -f "${LLVM_COV_DIR}/*.profraw" 2>/dev/null
 # Excludes benchmark crates and test repositories from instrumentation
 echo "[coverage] Running coverage on workspace crates..."
 
+# Set cargo profile with default
+CARGO_PROFILE="${CARGO_PROFILE:-dev}"
+
 LLVM_PROFILE_FILE_NAME="merlin-%m.profraw" \
-CARGO_PROFILE="${CARGO_PROFILE:-dev}" \
 cargo llvm-cov \
   --no-report \
   --ignore-filename-regex "test_repositories|.cargo|.rustup" \

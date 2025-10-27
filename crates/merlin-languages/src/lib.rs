@@ -1,7 +1,7 @@
 //! Language-specific code analysis and context building.
 //!
-//! This crate provides language provider abstractions and implementations
-//! for semantic code analysis using language-specific tools like rust-analyzer.
+//! This crate provides language provider abstractions for semantic code analysis.
+//! Language backends have been removed as they are not currently in use.
 #![cfg_attr(
     test,
     allow(
@@ -17,48 +17,7 @@
     )
 )]
 
-mod backends;
 /// Language provider trait and types.
 pub mod provider;
 
 pub use provider::{LanguageProvider, SearchQuery, SearchResult, SymbolInfo, SymbolKind};
-
-use merlin_core::CoreResult as Result;
-
-/// Supported language types for backend creation
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum Language {
-    /// Rust language
-    Rust,
-    // Future: Java, Python, TypeScript, etc.
-}
-
-/// Create a language backend for the specified language
-///
-/// # Errors
-/// Returns an error if the backend cannot be created
-pub fn create_backend(language: Language) -> Result<Box<dyn LanguageProvider>> {
-    match language {
-        Language::Rust => {
-            let backend = backends::RustBackendWrapper::default();
-            Ok(Box::new(backend))
-        }
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    // REMOVED: test_language_equality - Trait implementation test
-
-    // REMOVED: test_language_debug - Trait implementation test
-
-    // REMOVED: test_language_clone - Trait implementation test
-
-    #[test]
-    fn test_create_backend_rust() {
-        let result = create_backend(Language::Rust);
-        result.unwrap();
-    }
-}

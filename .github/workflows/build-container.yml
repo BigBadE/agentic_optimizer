@@ -43,7 +43,8 @@ jobs:
       - name: Build and push container
         uses: docker/build-push-action@v5
         with:
-          context: .github/docker
+          context: .
+          file: .github/docker/Dockerfile
           push: true
           tags: ghcr.io/bigbade/agentic_optimizer/ci:latest
           cache-from: type=gha

@@ -61,9 +61,9 @@ RUN mkdir -p /home/builder/.cargo && \
 RUN cargo build --release --workspace && \
     cargo build --tests --workspace
 
-# Remove all workspace source files, keeping only the compiled dependencies
+# Remove all workspace source files, keeping only the compiled dependencies and .cargo config
 # This ensures fresh builds in CI while reusing dependency compilation
-RUN find . -mindepth 1 -maxdepth 1 ! -name 'target' -exec rm -rf {} + && \
+RUN find . -mindepth 1 -maxdepth 1 ! -name 'target' ! -name '.cargo' -exec rm -rf {} + && \
     find target -type f \( -name '*merlin*' -o -name '*quality*' -o -name '*criterion*' -o -name '*gungraun*' \) \
     \( -name '*.rlib' -o -name '*.so' -o -name '*.a' -o -perm -111 \) -delete
 

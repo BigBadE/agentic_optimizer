@@ -1,7 +1,7 @@
 # Minimal Debian container for Merlin CI with Rust toolchain and coverage tools
 FROM debian:bookworm-slim
 
-# Install all system dependencies including mold for faster linking
+# Install all system dependencies including mold for faster linking and lcov for coverage
 RUN apt-get update && \
     apt-get install -y --no-install-recommends \
     ca-certificates \
@@ -13,6 +13,7 @@ RUN apt-get update && \
     python3-pip \
     jq \
     mold \
+    lcov \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust toolchain
@@ -23,16 +24,22 @@ ENV RUSTUP_HOME=/usr/local/rustup \
 # Install rustup with nightly toolchain (version specified later via rust-toolchain.toml)
 RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain nightly --profile minimal
 
-# Install cargo tools (including cargo-binstall for gungraun-runner)
-RUN cargo install --locked cargo-nextest cargo-llvm-cov cargo-sweep cargo-binstall grcov && \
-    cargo binstall --no-confirm gungraun-runner --version 0.17 && \
+# Install cargo-binstall first, then use it to install other tools from pre-built binaries
+RUN cargo install --locked cargo-binstall && \
+    cargo binstall --no-confirm \
+    cargo-nextest \
+    cargo-llvm-cov \
+    cargo-sweep \
+    grcov \
+    gungraun-runner && \
     cargo uninstall cargo-binstall && \
     rm -rf /usr/local/cargo/registry /usr/local/cargo/git ~/.cargo/registry ~/.cargo/git
 
 # Create a non-root user for running builds
 RUN useradd -m -s /bin/bash builder && \
     mkdir -p /workspace && \
-    chown -R builder:builder /workspace
+    chown -R builder:builder /workspace && \
+    chown -R builder:builder /usr/local/rustup /usr/local/cargo
 
 USER builder
 WORKDIR /workspace
@@ -41,9 +48,9 @@ WORKDIR /workspace
 # This layer will be cached as long as dependencies don't change
 COPY --chown=builder:builder . .
 
-# Install the exact toolchain from rust-toolchain.toml and add cranelift
+# Install the exact toolchain from rust-toolchain.toml and add cranelift + llvm-tools
 RUN rustup show && \
-    rustup component add rustc-codegen-cranelift-preview
+    rustup component add rustc-codegen-cranelift-preview llvm-tools-preview
 
 # Copy cargo config to builder's home directory for optimized builds
 RUN mkdir -p /home/builder/.cargo && \

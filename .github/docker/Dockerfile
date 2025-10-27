@@ -14,6 +14,8 @@ RUN apt-get update && \
     jq \
     mold \
     lcov \
+    pkg-config \
+    libssl-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # Install Rust toolchain

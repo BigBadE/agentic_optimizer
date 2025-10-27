@@ -24,6 +24,10 @@ pub fn count_text_lines(text: &str) -> u16 {
 mod tests {
     use super::*;
 
+    /// Test text line counting
+    ///
+    /// # Panics
+    /// Panics if test assertions fail
     #[test]
     fn test_count_text_lines() {
         // Empty text

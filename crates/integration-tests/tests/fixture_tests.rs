@@ -21,13 +21,6 @@ use integration_tests::{UnifiedTestRunner, VerificationResult};
 use std::fs::read_dir;
 use std::path::PathBuf;
 
-/// Get fixtures directory
-fn fixtures_dir() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
-        .join("tests")
-        .join("fixtures")
-}
-
 /// Run a single fixture
 async fn run_fixture(fixture_path: PathBuf) -> Result<VerificationResult, String> {
     let fixture_name = fixture_path
@@ -38,7 +31,7 @@ async fn run_fixture(fixture_path: PathBuf) -> Result<VerificationResult, String
     let fixture = UnifiedTestRunner::load_fixture(&fixture_path)
         .map_err(|error| format!("Failed to load fixture {fixture_name}: {error}"))?;
 
-    let runner = UnifiedTestRunner::new(fixture)
+    let mut runner = UnifiedTestRunner::new(fixture)
         .map_err(|error| format!("Failed to create runner for {fixture_name}: {error}"))?;
 
     runner
@@ -49,11 +42,7 @@ async fn run_fixture(fixture_path: PathBuf) -> Result<VerificationResult, String
 
 /// Helper to run all fixtures in a directory
 async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<(String, Result<VerificationResult, String>)> {
-    if !dir.exists() {
-        return vec![];
-    }
-
-    let fixtures = UnifiedTestRunner::discover_fixtures(&dir).unwrap();
+    let fixtures = UnifiedTestRunner::discover_fixtures(&dir).unwrap_or(vec![]);
     let mut results = vec![];
 
     for fixture_path in fixtures {
@@ -73,7 +62,9 @@ async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<(String, Result<VerificationRe
 /// Run all fixtures in the fixtures directory
 #[tokio::test]
 async fn test_all_fixtures() {
-    let fixtures_root = fixtures_dir();
+    let fixtures_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join("tests")
+        .join("fixtures");
 
     // Discover all subdirectories
     let subdirs = read_dir(&fixtures_root)

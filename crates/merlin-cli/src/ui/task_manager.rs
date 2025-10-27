@@ -175,6 +175,10 @@ mod tests {
         }
     }
 
+    /// Test task ordering after loading from persistence
+    ///
+    /// # Panics
+    /// Panics if test assertions fail
     #[test]
     fn test_task_order_after_loading() {
         let mut manager = TaskManager::default();

@@ -6,6 +6,7 @@ edition.workspace = true
 [dependencies]
 # Merlin crates (alphabetically organized)
 merlin-agent = { path = "../merlin-agent" }
+merlin-cli = { path = "../merlin-cli", features = ["test-util"] }
 merlin-context = { path = "../merlin-context" }
 merlin-core = { path = "../merlin-core" }
 merlin-providers = { path = "../merlin-providers" }
@@ -33,8 +34,8 @@ name = "integration_tests"
 path = "src/lib.rs"
 
 [[test]]
-name = "unified_tests"
-path = "tests/unified_tests.rs"
+name = "fixture_tests"
+path = "tests/fixture_tests.rs"
 harness = true
 
 [lints]

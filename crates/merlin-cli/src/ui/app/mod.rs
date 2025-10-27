@@ -12,6 +12,8 @@ mod key_handling;
 mod lifecycle;
 mod task_operations;
 mod test_helpers;
+#[cfg(feature = "test-util")]
+mod test_util;
 mod thread_operations;
 mod tui_app;
 

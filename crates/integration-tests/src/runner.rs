@@ -1,18 +1,22 @@
 //! Unified test runner.
 //!
 //! This module provides the test runner that executes unified test fixtures
-//! with pattern-based mock LLM responses.
+//! by running the actual CLI with pattern-based mock LLM responses.
 
+use super::event_source::FixtureEventSource;
 use super::fixture::{MatchType, TestEvent, TestFixture, TriggerConfig};
-use super::verifier::{UnifiedVerifier, VerificationResult};
+use super::verification_result::VerificationResult;
+use super::verifier::UnifiedVerifier;
 use async_trait::async_trait;
+use merlin_cli::TuiApp;
 use merlin_core::{Context, ModelProvider, Query, Response, Result, RoutingError, TokenUsage};
 use merlin_tooling::{
     BashTool, ContextRequestTool, DeleteFileTool, EditFileTool, ListFilesTool, ReadFileTool,
-    ToolResult, TypeScriptRuntime, WriteFileTool,
+    TypeScriptRuntime, WriteFileTool,
 };
+use ratatui::backend::TestBackend;
 use regex::Regex;
-use serde_json::{Value, from_str};
+use serde_json::from_str;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{
@@ -20,7 +24,7 @@ use std::sync::{
     atomic::{AtomicUsize, Ordering},
 };
 use tempfile::TempDir;
-use tokio::time::{Duration, sleep};
+use tokio::time::{Duration as TokioDuration, sleep};
 
 /// Pattern-based mock provider
 pub struct PatternMockProvider {
@@ -189,75 +193,6 @@ impl ModelProvider for PatternMockProvider {
     }
 }
 
-/// UI state for testing
-#[derive(Debug, Clone, Default)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "Test state struct tracking multiple boolean UI states"
-)]
-pub struct UiState {
-    /// Current input text
-    pub input_text: String,
-    /// Cursor position in input
-    pub cursor_position: usize,
-    /// Focused pane (input, output, tasks, threads)
-    pub focused_pane: String,
-    /// Last output text
-    pub last_output: String,
-    /// Number of tasks displayed
-    pub tasks_displayed: usize,
-    /// Current task status
-    pub task_status: Option<String>,
-    /// Whether task tree is expanded
-    pub task_tree_expanded: bool,
-    /// Visible task descriptions
-    pub task_descriptions: Vec<String>,
-    /// Current progress percentage (if showing progress)
-    pub progress_percentage: Option<u8>,
-    /// Whether placeholder is visible
-    pub placeholder_visible: bool,
-    /// Task counts by status
-    pub pending_count: usize,
-    /// Running tasks count
-    pub running_count: usize,
-    /// Completed tasks count
-    pub completed_count: usize,
-    /// Failed tasks count
-    pub failed_count: usize,
-    /// Selected task description
-    pub selected_task_description: Option<String>,
-    /// Thread-specific state
-    /// Number of active threads
-    pub thread_count: usize,
-    /// Currently selected thread ID (if any)
-    pub selected_thread_id: Option<String>,
-    /// Thread list visible (side-by-side mode active)
-    pub thread_list_visible: bool,
-    /// Thread names currently visible
-    pub thread_names: Vec<String>,
-    /// Thread colors (emojis) currently visible
-    pub thread_colors: Vec<String>,
-    /// Thread message counts
-    pub thread_message_counts: Vec<usize>,
-    /// Whether queued input prompt is showing
-    pub queued_input_prompt_visible: bool,
-    /// Queued input text (if any)
-    pub queued_input_text: Option<String>,
-    /// Whether cancel is requested
-    pub cancel_requested: bool,
-}
-
-/// Test state for tracking execution
-#[derive(Debug, Clone, Default)]
-pub struct TestState {
-    /// Conversation message count
-    pub conversation_count: usize,
-    /// Currently selected task ID
-    pub selected_task: Option<String>,
-    /// Vector cache status
-    pub vector_cache_status: Option<String>,
-}
-
 /// Unified test runner
 pub struct UnifiedTestRunner {
     /// Test fixture
@@ -268,10 +203,8 @@ pub struct UnifiedTestRunner {
     provider: Arc<PatternMockProvider>,
     /// TypeScript runtime for executing LLM responses
     runtime: TypeScriptRuntime,
-    /// UI state
-    ui_state: Arc<Mutex<UiState>>,
-    /// Test state
-    test_state: Arc<Mutex<TestState>>,
+    /// The actual TUI application under test
+    tui_app: TuiApp<TestBackend>,
 }
 
 impl UnifiedTestRunner {
@@ -317,16 +250,23 @@ impl UnifiedTestRunner {
         runtime.register_tool(Arc::new(ReadFileTool::new(workspace.path())));
         runtime.register_tool(Arc::new(ListFilesTool::new(workspace.path())));
 
+        // Create fixture-based event source
+        let event_source = Box::new(FixtureEventSource::new(&fixture));
+
+        // Create test backend with reasonable size
+        let terminal_size = fixture.setup.terminal_size.unwrap_or((80, 24));
+        let backend = TestBackend::new(terminal_size.0, terminal_size.1);
+
+        // Create TUI app with test backend and fixture event source
+        let (tui_app, _ui_channel) =
+            TuiApp::new_for_test(backend, event_source, Some(workspace.path().to_path_buf()))?;
+
         Ok(Self {
             fixture,
             workspace,
             provider,
             runtime,
-            ui_state: Arc::new(Mutex::new(UiState {
-                focused_pane: "input".to_owned(),
-                ..Default::default()
-            })),
-            test_state: Arc::new(Mutex::new(TestState::default())),
+            tui_app,
         })
     }
 
@@ -342,202 +282,59 @@ impl UnifiedTestRunner {
         Arc::clone(&self.provider)
     }
 
-    /// Handle user input event
-    ///
-    /// # Errors
-    /// Returns error if state lock fails
-    fn handle_user_input(&self, input_event: &super::fixture::UserInputEvent) -> Result<()> {
-        // Update UI state
-        {
-            let mut ui = self
-                .ui_state
-                .lock()
-                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
-
-            // Replace text (each user_input event sets the complete input text)
-            ui.input_text.clone_from(&input_event.data.text);
-            ui.cursor_position = ui.input_text.len();
-
-            if input_event.data.submit {
-                ui.input_text.clear();
-                ui.cursor_position = 0;
-                // Change focus to output pane after submit
-                "output".clone_into(&mut ui.focused_pane);
-            } else {
-                // Not submitting, keep focus on input
-                "input".clone_into(&mut ui.focused_pane);
-            }
-        }
-
-        // Increment conversation count if submitting
-        if input_event.data.submit {
-            let mut state = self
-                .test_state
-                .lock()
-                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
-            state.conversation_count += 1;
-        }
-
-        Ok(())
-    }
-
-    /// Handle key press event
-    ///
-    /// # Errors
-    /// Returns error if state lock fails
-    fn handle_key_press(&self, key_event: &super::fixture::KeyPressEvent) -> Result<()> {
-        {
-            let mut ui = self
-                .ui_state
-                .lock()
-                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
-
-            match key_event.data.key.as_str() {
-                "Tab" => {
-                    // Cycle through panes: input -> output -> tasks -> input
-                    match ui.focused_pane.as_str() {
-                        "input" => "output".clone_into(&mut ui.focused_pane),
-                        "output" => "tasks".clone_into(&mut ui.focused_pane),
-                        _ => "input".clone_into(&mut ui.focused_pane),
-                    }
-                }
-                "Up" | "Down" | "PageUp" | "PageDown" => {
-                    // Navigation keys don't change focus, just update focused pane to tasks
-                    if ui.focused_pane != "tasks" {
-                        "tasks".clone_into(&mut ui.focused_pane);
-                    }
-                }
-                _ => {
-                    // Other keys don't affect state
-                }
-            }
-        }
-
-        Ok(())
-    }
-
-    /// Handle LLM response event
-    ///
-    /// # Errors
-    /// Returns error if execution or state update fails
-    async fn handle_llm_response(
-        &self,
-        llm_event: &super::fixture::LlmResponseEvent,
-    ) -> Result<ToolResult<Value>> {
-        // Increment conversation count
-        {
-            let mut state = self
-                .test_state
-                .lock()
-                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
-            state.conversation_count += 1;
-        }
-
-        // Execute TypeScript
-        let typescript = llm_event.response.typescript.join("\n");
-        let execution_result = self.runtime.execute(&typescript).await;
-
-        // Update UI state
-        if let Ok(ref value) = execution_result {
-            let output_str = format!("{value}");
-            let mut ui = self
-                .ui_state
-                .lock()
-                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
-            ui.last_output = output_str;
-            "output".clone_into(&mut ui.focused_pane);
-            ui.tasks_displayed += 1;
-            ui.task_status = Some("completed".to_owned());
-            ui.completed_count += 1;
-        }
-
-        Ok(execution_result)
+    /// Get read-only reference to TUI app for verification
+    #[must_use]
+    pub fn tui_app(&self) -> &TuiApp<TestBackend> {
+        &self.tui_app
     }
 
     /// Run the test
     ///
     /// # Errors
     /// Returns error if test execution or verification fails
-    pub async fn run(&self) -> Result<VerificationResult> {
+    pub async fn run(&mut self) -> Result<VerificationResult> {
         let mut verifier = UnifiedVerifier::new(&self.fixture, self.workspace.path());
 
-        // Process each event
+        // Process each event in the fixture
         for event in &self.fixture.events {
             match event {
-                TestEvent::UserInput(input_event) => {
-                    self.handle_user_input(input_event)?;
+                TestEvent::UserInput(_) | TestEvent::KeyPress(_) => {
+                    // These events are already loaded into the FixtureEventSource
+                    // Drive the TUI to process one event from the queue
+                    let _should_quit = self.tui_app.tick()?;
 
-                    // Pass state to verifier
-                    let ui_state = self
-                        .ui_state
-                        .lock()
-                        .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
-                        .clone();
-                    let test_state = self
-                        .test_state
-                        .lock()
-                        .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
-                        .clone();
-
-                    verifier.set_ui_state(ui_state);
-                    verifier.set_test_state(test_state);
-
-                    verifier
-                        .verify_event(event, &input_event.verify)
-                        .map_err(RoutingError::ExecutionFailed)?;
-                }
-                TestEvent::KeyPress(key_event) => {
-                    self.handle_key_press(key_event)?;
-
-                    // Pass state to verifier
-                    let ui_state = self
-                        .ui_state
-                        .lock()
-                        .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
-                        .clone();
-                    let test_state = self
-                        .test_state
-                        .lock()
-                        .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
-                        .clone();
-
-                    verifier.set_ui_state(ui_state);
-                    verifier.set_test_state(test_state);
-
-                    verifier
-                        .verify_event(event, &key_event.verify)
-                        .map_err(RoutingError::ExecutionFailed)?;
+                    // Process any UI events that were triggered
+                    while self.tui_app.tick()? {
+                        // Keep processing until no more events
+                    }
                 }
                 TestEvent::LlmResponse(llm_event) => {
-                    let execution_result = self.handle_llm_response(llm_event).await?;
+                    // Execute the TypeScript response
+                    let typescript = llm_event.response.typescript.join("\n");
+                    let execution_result = self.runtime.execute(&typescript).await;
 
                     verifier.set_last_execution_result(execution_result);
 
-                    // Pass state to verifier
-                    let ui_state = self
-                        .ui_state
-                        .lock()
-                        .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
-                        .clone();
-                    let test_state = self
-                        .test_state
-                        .lock()
-                        .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
-                        .clone();
-
-                    verifier.set_ui_state(ui_state);
-                    verifier.set_test_state(test_state);
-
+                    // Verify this event
                     verifier
                         .verify_event(event, &llm_event.verify)
                         .map_err(RoutingError::ExecutionFailed)?;
+
+                    // Let TUI process any resulting UI events
+                    self.tui_app.tick()?;
                 }
                 TestEvent::Wait(wait_event) => {
                     // Sleep for specified duration
-                    sleep(Duration::from_millis(wait_event.data.duration_ms)).await;
+                    sleep(TokioDuration::from_millis(wait_event.data.duration_ms)).await;
+
+                    // Process any pending UI events during wait
+                    self.tui_app.tick()?;
                 }
             }
         }
+
+        // Pass TUI app state to verifier for final verification
+        verifier.set_tui_app(&self.tui_app);
 
         // Verify final state
         verifier

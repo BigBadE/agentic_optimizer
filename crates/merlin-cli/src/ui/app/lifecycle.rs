@@ -101,6 +101,8 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
     }
 }
 
+// Test utilities (new_for_test) moved to app/test_util.rs, only compiled with test-util feature
+
 impl<B: Backend> TuiApp<B> {
     /// Loads tasks asynchronously
     pub async fn load_tasks_async(&mut self) {

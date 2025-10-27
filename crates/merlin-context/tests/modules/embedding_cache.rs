@@ -14,6 +14,7 @@ use std::path::PathBuf;
 use tempfile::TempDir;
 
 /// Fake embedding client for testing (deterministic, hash-based)
+#[derive(Clone)]
 struct FakeEmbeddingClient;
 
 impl EmbeddingProvider for FakeEmbeddingClient {
@@ -68,8 +69,7 @@ async fn test_cache_lifecycle() {
     let project_root = temp_dir.path().to_path_buf();
 
     // First init - builds cache with fake embeddings
-    let mut manager1 =
-        VectorSearchManager::with_provider(project_root.clone(), FakeEmbeddingClient);
+    let mut manager1 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
     manager1
         .initialize()
         .await
@@ -95,8 +95,7 @@ async fn test_cache_lifecycle() {
     let len1 = manager1.len();
 
     // Second init - loads from cache (fast)
-    let mut manager2 =
-        VectorSearchManager::with_provider(project_root.clone(), FakeEmbeddingClient);
+    let mut manager2 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
     manager2.initialize().await.expect("Should load from cache");
     assert_eq!(len1, manager2.len(), "Cache reload should have same files");
 
@@ -104,8 +103,7 @@ async fn test_cache_lifecycle() {
     fs::remove_file(&cache_path).expect("Failed to delete cache");
 
     // Third init - rebuilds cache
-    let mut manager3 =
-        VectorSearchManager::with_provider(project_root.clone(), FakeEmbeddingClient);
+    let mut manager3 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
     manager3.initialize().await.expect("Should rebuild cache");
     assert_eq!(len1, manager3.len(), "Rebuild should have same files");
     assert!(cache_path.exists(), "Cache should be recreated");
@@ -119,7 +117,7 @@ async fn test_cache_file_changes() {
     let src_dir = project_root.join("src");
 
     // Initial state
-    let mut manager = VectorSearchManager::with_provider(project_root.clone(), FakeEmbeddingClient);
+    let mut manager = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
     manager
         .initialize()
         .await
@@ -128,8 +126,7 @@ async fn test_cache_file_changes() {
 
     // Test 1: Modification
     fs::write(src_dir.join("lib.rs"), "pub fn b() { }").expect("Failed to modify");
-    let mut manager2 =
-        VectorSearchManager::with_provider(project_root.clone(), FakeEmbeddingClient);
+    let mut manager2 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
     manager2
         .initialize()
         .await
@@ -142,8 +139,7 @@ async fn test_cache_file_changes() {
 
     // Test 2: Addition
     fs::write(src_dir.join("new.rs"), "pub fn c() { }").expect("Failed to add");
-    let mut manager3 =
-        VectorSearchManager::with_provider(project_root.clone(), FakeEmbeddingClient);
+    let mut manager3 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
     manager3.initialize().await.expect("Should handle addition");
     assert!(
         manager3.len() > initial_len,
@@ -153,8 +149,7 @@ async fn test_cache_file_changes() {
 
     // Test 3: Deletion
     fs::remove_file(src_dir.join("new.rs")).expect("Failed to delete");
-    let mut manager4 =
-        VectorSearchManager::with_provider(project_root.clone(), FakeEmbeddingClient);
+    let mut manager4 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
     manager4.initialize().await.expect("Should handle deletion");
     assert!(
         manager4.len() < after_add,
@@ -168,7 +163,7 @@ async fn test_corrupted_cache_recovery() {
     let project_root = temp_dir.path().to_path_buf();
 
     // Build cache
-    let mut manager = VectorSearchManager::with_provider(project_root.clone(), FakeEmbeddingClient);
+    let mut manager = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
     manager
         .initialize()
         .await
@@ -194,8 +189,7 @@ async fn test_corrupted_cache_recovery() {
     fs::write(&cache_path, b"corrupted").expect("Failed to corrupt cache");
 
     // Should rebuild
-    let mut manager2 =
-        VectorSearchManager::with_provider(project_root.clone(), FakeEmbeddingClient);
+    let mut manager2 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
     manager2
         .initialize()
         .await

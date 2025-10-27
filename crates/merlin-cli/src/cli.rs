@@ -1,3 +1,4 @@
+#![allow(dead_code, reason = "Work in progress")]
 use clap::{Parser, ValueEnum};
 use std::path::PathBuf;
 

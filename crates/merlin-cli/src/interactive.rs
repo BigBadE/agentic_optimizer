@@ -14,25 +14,6 @@ use tokio::spawn;
 
 use crate::utils::{cleanup_old_tasks, get_merlin_folder, try_write_log};
 
-/// Flags for interactive mode configuration
-pub struct InteractiveFlags {
-    /// Whether to use local models only
-    pub local_only: bool,
-}
-
-/// Handle interactive agent session with multi-model routing
-///
-/// # Errors
-/// Returns an error if TUI or IO operations fail, or if the orchestrator returns an error.
-pub async fn handle_interactive_agent(
-    orchestrator: RoutingOrchestrator,
-    project: PathBuf,
-    flags: InteractiveFlags,
-) -> Result<()> {
-    // Run TUI mode (only mode supported)
-    run_tui_interactive(orchestrator, project, flags.local_only).await
-}
-
 /// Initialize logging for TUI session
 ///
 /// # Errors
@@ -358,7 +339,7 @@ async fn initialize_embeddings_background(ui_channel: UiChannel, project: PathBu
 ///
 /// # Errors
 /// Returns an error if filesystem, TUI, or async operations fail.
-async fn run_tui_interactive(
+pub async fn run_tui_interactive(
     orchestrator: RoutingOrchestrator,
     project: PathBuf,
     local_only: bool,
@@ -417,8 +398,7 @@ async fn run_tui_interactive(
     // Main event loop - event-driven
     loop {
         // Tick the TUI (handles rendering and input)
-        let should_quit = tui_app.tick()?;
-        if should_quit {
+        if tui_app.tick()? {
             break;
         }
 

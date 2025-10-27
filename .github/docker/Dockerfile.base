@@ -1,0 +1,98 @@
+# Stage 1: Install cargo tools using official Rust image and binstall
+FROM rust:slim AS tools
+
+# Install minimal dependencies for binstall
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install cargo-binstall (must compile this one)
+RUN cargo install --locked cargo-binstall && \
+    rm -rf /usr/local/cargo/registry /usr/local/cargo/git
+
+# Use binstall to download pre-built binaries (much faster than compiling)
+RUN cargo binstall --no-confirm \
+    cargo-nextest \
+    cargo-llvm-cov \
+    cargo-sweep \
+    cargo-chef \
+    grcov \
+    gungraun-runner
+
+# Stage 2: Generate recipe.json using official Rust image
+FROM rust:slim AS planner
+
+# Copy only cargo-chef from tools stage
+COPY --from=tools /usr/local/cargo/bin/cargo-chef /usr/local/cargo/bin/cargo-chef
+
+WORKDIR /workspace
+COPY . .
+RUN cargo chef prepare --recipe-path recipe.json
+
+# Stage 3: Base image with pre-built dependencies
+FROM debian:bookworm-slim AS base
+
+# Install all system dependencies
+RUN apt-get update && \
+    apt-get install -y --no-install-recommends \
+    ca-certificates \
+    curl \
+    git \
+    build-essential \
+    clang \
+    valgrind \
+    python3 \
+    python3-pip \
+    jq \
+    mold \
+    lcov \
+    pkg-config \
+    libssl-dev \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install Rust toolchain
+ENV RUSTUP_HOME=/usr/local/rustup \
+    CARGO_HOME=/usr/local/cargo \
+    PATH=/usr/local/cargo/bin:$PATH
+
+RUN curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh -s -- -y --default-toolchain none --profile minimal
+
+# Create non-root user
+RUN useradd -m -s /bin/bash builder && \
+    mkdir -p /workspace && \
+    chown -R builder:builder /workspace && \
+    chown -R builder:builder /usr/local/rustup /usr/local/cargo
+
+USER builder
+WORKDIR /workspace
+
+# Install toolchain from rust-toolchain.toml
+COPY --chown=builder:builder rust-toolchain.toml ./
+RUN rustup component add rustc-codegen-cranelift-preview llvm-tools-preview
+
+# Copy only the tool binaries we need (not entire cargo directory)
+COPY --from=tools --chown=builder:builder /usr/local/cargo/bin/cargo-nextest /usr/local/cargo/bin/
+COPY --from=tools --chown=builder:builder /usr/local/cargo/bin/cargo-llvm-cov /usr/local/cargo/bin/
+COPY --from=tools --chown=builder:builder /usr/local/cargo/bin/cargo-sweep /usr/local/cargo/bin/
+COPY --from=tools --chown=builder:builder /usr/local/cargo/bin/cargo-chef /usr/local/cargo/bin/
+COPY --from=tools --chown=builder:builder /usr/local/cargo/bin/grcov /usr/local/cargo/bin/
+COPY --from=tools --chown=builder:builder /usr/local/cargo/bin/gungraun-runner /usr/local/cargo/bin/
+
+# Copy cargo config and recipe
+COPY --from=planner --chown=builder:builder /workspace/recipe.json ./recipe.json
+COPY --chown=builder:builder .cargo ./.cargo
+COPY --chown=builder:builder .cargo/fast_config.toml ./.cargo/config.toml
+
+# Build dependencies with cargo-chef
+RUN --mount=type=cache,target=/usr/local/cargo/registry,uid=1000,gid=1000 \
+    --mount=type=cache,target=/usr/local/cargo/git,uid=1000,gid=1000 \
+    CARGO_INCREMENTAL=0 cargo chef cook --recipe-path recipe.json
+
+# Remove stub crates and benchmarks created by cargo-chef
+# These are just empty placeholders for the dependency build
+RUN rm -rf crates benchmarks Cargo.toml Cargo.lock recipe.json
+
+# The base image now contains all pre-compiled external dependencies
+# Commit images will inherit this and only compile workspace crates incrementally

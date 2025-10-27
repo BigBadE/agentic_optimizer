@@ -4,6 +4,20 @@ members = [
     "crates/*",
     "crates/merlin-languages/languages/*",
     "benchmarks/crates/*"
+    #"crates/integration-tests",
+    #"crates/merlin-agent",
+    #"crates/merlin-cli",
+    #"crates/merlin-context",
+    #"crates/merlin-core",
+    #"crates/merlin-languages",
+    #"crates/merlin-local",
+    #"crates/merlin-providers",
+    #"crates/merlin-routing",
+    #"crates/merlin-tooling",
+    #"crates/merlin-languages/languages/rust-backend",
+    #"benchmarks/crates/criterion",
+    #"benchmarks/crates/gungraun",
+    #"benchmarks/crates/quality"
 ]
 
 [workspace.package]

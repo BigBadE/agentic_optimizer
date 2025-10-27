@@ -131,6 +131,7 @@ impl VectorStore {
 }
 
 /// Ollama embedding client
+#[derive(Clone)]
 pub struct OllamaEmbeddingClient {
     ollama: Ollama,
     model: String,

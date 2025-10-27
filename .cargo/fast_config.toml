@@ -20,7 +20,6 @@ rustflags = [
     # - Fedora: `sudo dnf install mold clang`
     # - Arch: `sudo pacman -S mold clang`
     "-Clink-arg=-fuse-ld=mold",
-    "-Clink-arg=--threads=8",
 
     # Nightly
     #"-Zshare-generics=y",
@@ -86,6 +85,9 @@ rustflags = [
     #"-Zshare-generics=n",
     #"-Zthreads=0",
 ]
+
+[build]
+rustflags = ["-Z", "threads=8"]
 
 [unstable]
 codegen-backend = true

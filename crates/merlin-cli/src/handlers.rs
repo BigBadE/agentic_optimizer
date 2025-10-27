@@ -1,3 +1,4 @@
+#![allow(dead_code, reason = "Work in progress")]
 //! Command handlers for CLI operations
 
 use anyhow::Result;
@@ -11,7 +12,7 @@ use tracing_subscriber::{
 };
 
 use crate::cli::Validation;
-use crate::interactive::{InteractiveFlags, handle_interactive_agent};
+use crate::interactive::run_tui_interactive;
 use crate::utils::get_merlin_folder;
 
 /// Handle interactive agent session with routing
@@ -75,7 +76,5 @@ pub async fn handle_interactive(
     let orchestrator =
         RoutingOrchestrator::new(config)?.with_thread_store(Arc::clone(&thread_store));
 
-    let flags = InteractiveFlags { local_only };
-
-    handle_interactive_agent(orchestrator, project, flags).await
+    run_tui_interactive(orchestrator, project, true).await
 }

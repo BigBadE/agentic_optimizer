@@ -15,7 +15,12 @@ This crate provides the tool system that enables agents to interact with the fil
 - `delete_tool.rs` - `DeleteFileTool` for file deletion
 - `context_request.rs` - `ContextRequestTool` for dynamic context requests
 - `registry.rs` - `ToolRegistry` for tool management
-- `runtime.rs` - `TypeScriptRuntime` for TypeScript/JavaScript execution
+- `runtime/` - `TypeScriptRuntime` for TypeScript/JavaScript execution (modularized)
+  - `mod.rs` - Main runtime interface (210 lines)
+  - `conversion.rs` - JS/JSON value conversion (106 lines)
+  - `typescript.rs` - TypeScript type stripping and code wrapping (101 lines)
+  - `promise.rs` - Promise extraction and handling (94 lines)
+  - `tool_registration.rs` - Tool function registration in JS context (180 lines)
 - `signatures.rs` - TypeScript signature generation
 
 ## Public API

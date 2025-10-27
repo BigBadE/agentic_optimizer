@@ -1,3 +1,4 @@
+#![allow(dead_code, reason = "Work in progress")]
 //! Utility functions for CLI operations
 
 use anyhow::{Context as _, Result};

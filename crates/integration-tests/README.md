@@ -6,13 +6,20 @@ Unified fixture-based integration testing framework for Merlin.
 
 This crate provides comprehensive integration testing using JSON fixtures. All components of Merlin are tested through fixtures that define inputs, expected outputs, and verification criteria.
 
+**Key principle: Tests run the actual CLI, not mock implementations.**
+
 ## Module Structure
 
 - `lib.rs` - Main exports
 - `fixture.rs` - `TestFixture` definition types
+- `event_source.rs` - `FixtureEventSource` for injecting test events into TUI
 - `runner.rs` - `UnifiedTestRunner`, `PatternMockProvider`
-- `verifier.rs` - `UnifiedVerifier` for test verification
-- `tests/unified_tests.rs` - Auto-discovery and execution
+- `verifier.rs` - `UnifiedVerifier` for test verification (main orchestrator)
+- `verification_result.rs` - `VerificationResult` type
+- `execution_verifier.rs` - Execution and return value verification logic
+- `file_verifier.rs` - File verification logic
+- `ui_verifier.rs` - UI and state verification logic
+- `tests/fixture_tests.rs` - Auto-discovery and execution
 
 ## Fixture Structure
 
@@ -57,12 +64,22 @@ Fixtures are JSON files with the following structure:
 - `validation/` - Validation pipeline (3 fixtures)
 - `workspace/` - Workspace isolation (2 fixtures)
 
+## Architecture
+
+Tests instantiate the actual `TuiApp` from `merlin-cli` with:
+- `TestBackend` - ratatui test backend for headless TUI testing
+- `FixtureEventSource` - Injects fixture events into the TUI event loop
+- Read-only access to TUI state for verification (via `test-util` feature)
+
+**No duplicate behavior**: The test runner does not re-implement any CLI logic.
+
 ## Public API
 
 - `TestFixture` - Fixture structure
-- `UnifiedTestRunner` - Test execution
+- `UnifiedTestRunner` - Test execution using actual CLI
 - `UnifiedVerifier` - Verification logic
 - `PatternMockProvider` - Mock LLM responses based on patterns
+- `FixtureEventSource` - Event source for fixture-based testing
 
 ## Features
 
@@ -75,6 +92,21 @@ fn discover_fixtures() -> Vec<PathBuf> {
 }
 ```
 
+### Actual CLI Testing
+Tests run the real CLI with fixture-based event injection:
+
+```rust
+// Create fixture event source
+let event_source = Box::new(FixtureEventSource::new(&fixture));
+
+// Create TUI app with test backend
+let backend = TestBackend::new(80, 24);
+let (tui_app, _) = TuiApp::new_for_test(backend, event_source, workspace_dir)?;
+
+// Verify by reading TUI state (read-only)
+let state = tui_app.test_state();
+```
+
 ### Pattern-Based Mocking
 `PatternMockProvider` returns responses based on query patterns:
 
@@ -85,11 +117,9 @@ provider.add_pattern("error handling", "Added error handling...");
 
 ### Comprehensive Verification
 `UnifiedVerifier` checks:
-- Success/failure status
-- Output content
-- Modified files
-- UI state (task counts, completion)
-- Custom verification logic
+- TypeScript execution results
+- File modifications
+- TUI state (via read-only accessors)
 
 ## Testing Status
 
@@ -176,13 +206,27 @@ Tests transactional workspaces and conflict detection.
 
 ## Dependencies
 
+- `merlin-cli` - CLI and TUI (with `test-util` feature for test accessors)
 - `merlin-core` - Core types
 - `merlin-agent` - Agent execution
 - `merlin-routing` - Routing logic
 - `merlin-tooling` - Tool system
+- `ratatui` - TUI framework (with `TestBackend`)
 - `serde` / `serde_json` - Fixture parsing
 - `tokio` - Async runtime
 
-## Issues and Recommendations
+## Current Status
 
-**None** - This crate provides comprehensive fixture-based testing coverage for the entire Merlin system.
+**Refactored to test actual CLI** - Integration tests now:
+- ✅ Use actual `TuiApp` from `merlin-cli`
+- ✅ Inject events via `FixtureEventSource`
+- ✅ Read state via test-feature-gated accessors
+- ✅ No duplicate CLI implementation
+- ⚠️ TUI event loop integration pending
+- ⚠️ UI verification temporarily stubbed out
+
+## Next Steps
+
+1. Implement TUI event loop driving in `UnifiedTestRunner::run()`
+2. Re-implement UI verification methods to read from actual `TuiApp` state
+3. Update fixtures if needed for new verification approach

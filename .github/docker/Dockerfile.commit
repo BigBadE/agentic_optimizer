@@ -1,0 +1,23 @@
+# Incremental build Dockerfile that builds from the base image with pre-compiled dependencies
+# This allows fast incremental builds on every commit while reusing dependency compilation
+ARG BASE_IMAGE=ghcr.io/bigbade/agentic_optimizer/ci:base
+FROM ${BASE_IMAGE}
+
+ARG COMMIT_SHA
+ENV MERLIN_COMMIT_SHA=${COMMIT_SHA}
+
+USER builder
+WORKDIR /workspace
+
+# Copy the full workspace source code
+# The base image already has all external dependencies compiled in /workspace/target
+# This will trigger incremental compilation of only the workspace crates
+COPY --chown=builder:builder . .
+
+# Build the workspace incrementally using pre-compiled dependencies from base image
+# Only workspace crates need compilation, external dependencies are already built
+RUN cargo build --release --workspace && \
+    cargo build --tests --workspace
+
+# Label the image with the commit SHA for traceability
+LABEL org.opencontainers.image.revision="${COMMIT_SHA}"

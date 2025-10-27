@@ -3,7 +3,7 @@
 mod bm25;
 pub mod chunking;
 mod client;
-mod vector_search;
+pub mod vector_search;
 
 pub use bm25::BM25Index;
 pub use chunking::{FileChunk, chunk_file};

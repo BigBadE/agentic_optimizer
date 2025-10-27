@@ -84,6 +84,10 @@ pub fn calculate_input_area_height(input_content_lines: u16) -> u16 {
 mod tests {
     use super::*;
 
+    /// Test layout cache viewport height calculation
+    ///
+    /// # Panics
+    /// Panics if test assertions fail
     #[test]
     fn test_layout_cache_viewport_height() {
         let mut cache = LayoutCache::new();
@@ -96,6 +100,10 @@ mod tests {
         assert_eq!(cache.output_viewport_height(), 8); // 10 - 2 (borders)
     }
 
+    /// Test task area height when task pane is focused
+    ///
+    /// # Panics
+    /// Panics if test assertions fail
     #[test]
     fn test_task_area_height_focused() {
         // When tasks focused, allow up to 60%
@@ -104,6 +112,10 @@ mod tests {
         assert_eq!(height, 12);
     }
 
+    /// Test task area height when output pane is focused
+    ///
+    /// # Panics
+    /// Panics if test assertions fail
     #[test]
     fn test_task_area_height_output_focused() {
         // When output focused, limit to 5
@@ -111,6 +123,10 @@ mod tests {
         assert_eq!(height, 5);
     }
 
+    /// Test input area height calculation
+    ///
+    /// # Panics
+    /// Panics if test assertions fail
     #[test]
     fn test_input_area_height() {
         assert_eq!(calculate_input_area_height(1), 3); // Minimum

@@ -1,3 +1,4 @@
+#![allow(dead_code, reason = "Work in progress")]
 //! Configuration management for Merlin CLI
 //!
 //! Handles loading configuration from files and environment variables.

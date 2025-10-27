@@ -8,8 +8,13 @@
 //!
 //! All tests use the same fixture format with optional verification layers.
 
+mod event_source;
+mod execution_verifier;
+mod file_verifier;
 mod fixture;
 mod runner;
+mod ui_verifier;
+mod verification_result;
 mod verifier;
 
 pub use fixture::{
@@ -17,4 +22,5 @@ pub use fixture::{
     StateVerify, TestEvent, TestFixture, TriggerConfig, UiVerify, UserInputEvent, VerifyConfig,
 };
 pub use runner::{PatternMockProvider, UnifiedTestRunner};
-pub use verifier::{UnifiedVerifier, VerificationResult};
+pub use verification_result::VerificationResult;
+pub use verifier::UnifiedVerifier;

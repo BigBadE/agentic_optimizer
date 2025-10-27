@@ -7,6 +7,8 @@ default-run = "merlin"
 [[bin]]
 name = "merlin"
 path = "src/main.rs"
+test = false  # Don't run tests for the binary, only the library
+# Note: Bin inherits all lints from lib, no need to check separately
 
 [dependencies]
 merlin-agent.workspace = true

@@ -3,8 +3,8 @@
 //! This module defines the complete fixture format for unified integration tests.
 //! All tests use the same format with optional verification layers.
 
+use merlin_deps::serde_json::Value;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::collections::HashMap;
 
 /// Complete test fixture

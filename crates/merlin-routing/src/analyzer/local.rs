@@ -35,7 +35,7 @@ impl TaskAnalyzer for LocalTaskAnalyzer {
         let intent = self.intent_extractor.extract(request);
 
         let difficulty = intent.difficulty_hint.unwrap_or(5);
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "📊 Task difficulty analysis: {} | Action: {:?} | Scope: {}",
             difficulty,
             intent.action,

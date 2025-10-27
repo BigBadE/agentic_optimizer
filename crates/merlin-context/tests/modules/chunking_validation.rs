@@ -3,14 +3,14 @@
 use merlin_context::embedding::chunking::{
     FileChunk, MAX_CHUNK_TOKENS, MIN_CHUNK_TOKENS, chunk_file, estimate_tokens,
 };
+use merlin_deps::tracing::info;
 use std::env::current_dir;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tracing::info;
 
 /// Walk the crates directory and collect all source files
 fn collect_crates_source_files() -> Vec<PathBuf> {
-    use ignore::WalkBuilder;
+    use merlin_deps::ignore::WalkBuilder;
 
     let project_root: PathBuf = current_dir()
         .ok()

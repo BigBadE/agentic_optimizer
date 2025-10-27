@@ -1,0 +1,54 @@
+[package]
+name = "merlin-deps"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["dylib"]
+
+[dependencies]
+# Core dependencies
+anyhow = { workspace = true }
+boa_engine = { workspace = true }
+chrono = { workspace = true }
+console = { workspace = true }
+dirs = { workspace = true }
+flate2 = { workspace = true }
+futures = { workspace = true }
+glob = { workspace = true }
+ignore = { workspace = true }
+ollama-rs = { workspace = true }
+petgraph = { workspace = true }
+regex = { workspace = true }
+reqwest = { workspace = true }
+serde_json = { workspace = true }
+tempfile = { workspace = true }
+filetime = { workspace = true }
+toml = { workspace = true }
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+uuid = { workspace = true }
+walkdir = { workspace = true }
+
+# TUI dependencies
+crossterm = { workspace = true }
+ratatui = { workspace = true }
+tui-textarea = { workspace = true }
+unicode-width = { workspace = true }
+
+# SWC TypeScript transpiler
+swc_common = { workspace = true }
+swc_ecma_ast = { workspace = true }
+swc_ecma_codegen = { workspace = true }
+swc_ecma_parser = { workspace = true }
+swc_ecma_transforms_base = { workspace = true }
+swc_ecma_transforms_typescript = { workspace = true }
+swc_ecma_visit = { workspace = true }
+
+# Rust analyzer integration
+ra_ap_ide = { workspace = true }
+ra_ap_ide_db = { workspace = true }
+ra_ap_load-cargo = { workspace = true }
+ra_ap_project_model = { workspace = true }
+ra_ap_syntax = { workspace = true }
+ra_ap_vfs = { workspace = true }

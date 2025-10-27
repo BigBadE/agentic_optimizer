@@ -3,11 +3,11 @@
 use std::fs::read_to_string;
 use std::path::Path;
 
-use ra_ap_ide::{
+use merlin_deps::ra_ap_ide::{
     Analysis, FileId, FilePosition, FileStructureConfig, LineCol, ReferenceSearchResult,
     StructureNodeKind, SymbolKind as RaSymbolKind,
 };
-use ra_ap_ide_db::symbol_index::Query;
+use merlin_deps::ra_ap_ide_db::symbol_index::Query;
 
 use crate::{RustBackend, SearchQuery, SearchResult, SymbolInfo, SymbolKind};
 use merlin_core::{CoreResult as Result, Error, FileContext};

@@ -6,28 +6,18 @@ edition.workspace = true
 [dependencies]
 merlin-context.workspace = true
 merlin-core.workspace = true
+merlin-deps.workspace = true
 merlin-languages.workspace = true
 merlin-local.workspace = true
 merlin-providers.workspace = true
 merlin-tooling.workspace = true
 async-trait.workspace = true
-crossterm.workspace = true
-dirs.workspace = true
-ratatui.workspace = true
-regex.workspace = true
 serde.workspace = true
-serde_json.workspace = true
-tempfile.workspace = true
 thiserror.workspace = true
-tokio.workspace = true
-toml.workspace = true
-tracing.workspace = true
-tui-textarea.workspace = true
-uuid.workspace = true
 
 [dev-dependencies]
-tracing-subscriber.workspace = true
 merlin-tooling.workspace = true
+tokio.workspace = true
 
 [lints]
 workspace = true

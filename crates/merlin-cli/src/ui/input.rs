@@ -1,10 +1,10 @@
-use crossterm::event::{Event, KeyCode};
-use ratatui::{
+use merlin_deps::crossterm::event::{Event, KeyCode};
+use merlin_deps::ratatui::{
     style::{Modifier, Style},
     widgets::{Block, Borders},
 };
+use merlin_deps::tui_textarea::{CursorMove, TextArea};
 use std::collections::HashSet;
-use tui_textarea::{CursorMove, TextArea};
 
 /// Manages input area state and text wrapping
 pub struct InputManager {

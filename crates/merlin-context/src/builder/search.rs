@@ -18,14 +18,14 @@ pub async fn perform_hybrid_search(
     vector_manager: Option<&VectorSearchManager>,
     query_text: &str,
 ) -> Result<Vec<SearchResult>> {
-    tracing::info!("Running hybrid search (BM25 + Vector)...");
-    tracing::info!("Using hybrid BM25 + Vector search for context");
+    merlin_deps::tracing::info!("Running hybrid search (BM25 + Vector)...");
+    merlin_deps::tracing::info!("Using hybrid BM25 + Vector search for context");
 
     let semantic_matches = if let Some(manager) = &vector_manager {
         match manager.search(query_text, 50).await {
             Ok(results) => results,
             Err(search_error) => {
-                tracing::warn!("Hybrid search failed: {search_error}");
+                merlin_deps::tracing::warn!("Hybrid search failed: {search_error}");
                 Vec::new()
             }
         }
@@ -34,11 +34,11 @@ pub async fn perform_hybrid_search(
     };
 
     if semantic_matches.is_empty() {
-        tracing::info!("Hybrid search: no results (store may be empty)");
+        merlin_deps::tracing::info!("Hybrid search: no results (store may be empty)");
     } else {
-        tracing::info!("Hybrid search found {} matches", semantic_matches.len());
+        merlin_deps::tracing::info!("Hybrid search found {} matches", semantic_matches.len());
         for (idx, result) in semantic_matches.iter().enumerate().take(10) {
-            tracing::debug!(
+            merlin_deps::tracing::debug!(
                 "  {}. {} (score: {:.3})",
                 idx + 1,
                 result.file_path.display(),
@@ -46,11 +46,11 @@ pub async fn perform_hybrid_search(
             );
         }
         if semantic_matches.len() > 10 {
-            tracing::debug!("  ... and {} more", semantic_matches.len() - 10);
+            merlin_deps::tracing::debug!("  ... and {} more", semantic_matches.len() - 10);
         }
     }
 
-    tracing::info!("Hybrid search complete");
+    merlin_deps::tracing::info!("Hybrid search complete");
     Ok(semantic_matches)
 }
 
@@ -74,14 +74,14 @@ pub async fn use_subagent_for_context(
     let mut context_mgr = ContextManager::new(MAX_CONTEXT_TOKENS);
 
     let added = add_prioritized_files(&mut context_mgr, search_prioritized);
-    tracing::info!(
+    merlin_deps::tracing::info!(
         "Added {} chunks from hybrid search ({} tokens used)",
         added,
         context_mgr.token_count()
     );
 
     // List all chunks with their detailed scores
-    tracing::info!(
+    merlin_deps::tracing::info!(
         "📁 Context files: {} files ({} tokens)",
         context_mgr.file_count(),
         context_mgr.token_count()
@@ -146,7 +146,7 @@ fn log_context_files(context_mgr: &ContextManager, file_scores: &[FileScoreInfo]
             (None, None) => format!("total:{total_score:.3} bm25:N/A vec:N/A"),
         };
 
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "  [{index}] {} | {} | {} tok | {}",
             file.path.display(),
             section_info,

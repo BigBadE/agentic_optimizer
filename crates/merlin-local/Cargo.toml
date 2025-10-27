@@ -5,11 +5,12 @@ edition.workspace = true
 
 [dependencies]
 merlin-core.workspace = true
+merlin-deps.workspace = true
 async-trait.workspace = true
-reqwest.workspace = true
 serde.workspace = true
-serde_json.workspace = true
 thiserror.workspace = true
+
+[dev-dependencies]
 tokio.workspace = true
 
 [lints]

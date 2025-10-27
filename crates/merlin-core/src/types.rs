@@ -140,9 +140,9 @@ impl FileContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{from_str, to_string};
+    use merlin_deps::serde_json::{from_str, to_string};
+    use merlin_deps::tempfile::TempDir;
     use std::fs::write;
-    use tempfile::TempDir;
 
     // REMOVED: test_query_new - Constructor test
 

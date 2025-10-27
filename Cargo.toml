@@ -4,20 +4,6 @@ members = [
     "crates/*",
     "crates/merlin-languages/languages/*",
     "benchmarks/crates/*"
-    #"crates/integration-tests",
-    #"crates/merlin-agent",
-    #"crates/merlin-cli",
-    #"crates/merlin-context",
-    #"crates/merlin-core",
-    #"crates/merlin-languages",
-    #"crates/merlin-local",
-    #"crates/merlin-providers",
-    #"crates/merlin-routing",
-    #"crates/merlin-tooling",
-    #"crates/merlin-languages/languages/rust-backend",
-    #"benchmarks/crates/criterion",
-    #"benchmarks/crates/gungraun",
-    #"benchmarks/crates/quality"
 ]
 
 [workspace.package]
@@ -29,6 +15,7 @@ edition = "2024"
 merlin-agent = { path = "crates/merlin-agent" }
 merlin-context = { path = "crates/merlin-context" }
 merlin-core = { path = "crates/merlin-core" }
+merlin-deps = { path = "crates/merlin-deps" }
 merlin-languages = { path = "crates/merlin-languages" }
 merlin-local = { path = "crates/merlin-local" }
 merlin-providers = { path = "crates/merlin-providers" }

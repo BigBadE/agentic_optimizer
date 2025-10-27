@@ -5,9 +5,9 @@ use super::typescript;
 use crate::{ValidationPipeline, agent::AgentExecutionResult};
 use merlin_context::ContextFetcher;
 use merlin_core::RoutingConfig;
+use merlin_deps::serde_json::{from_value, json};
 use merlin_routing::StrategyRouter;
 use merlin_tooling::{BashTool, ToolRegistry};
-use serde_json::{from_value, json};
 use std::path::PathBuf;
 use std::sync::Arc;
 
@@ -200,7 +200,7 @@ fn test_extract_typescript_code_empty_block() {
 #[test]
 fn test_agent_execution_result_error_handling() {
     // Test that error results without "done" or "continue" fields are handled
-    use serde_json::Result as SerdeResult;
+    use merlin_deps::serde_json::Result as SerdeResult;
 
     let error_value = json!({
         "error": "Something went wrong",

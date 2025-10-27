@@ -1,6 +1,6 @@
-use ratatui::style::Color;
+use merlin_deps::ratatui::style::Color;
+use merlin_deps::serde_json::{from_str, to_string};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_str, to_string};
 use std::fs::{read_to_string as read_file_to_string, write as write_file};
 use std::io;
 use std::path::Path;

@@ -310,9 +310,9 @@ impl RoutingOrchestrator {
         conversation_history: ConversationHistory,
     ) {
         if conversation_history.is_empty() {
-            tracing::info!("No conversation history to set");
+            merlin_deps::tracing::info!("No conversation history to set");
         } else {
-            tracing::info!(
+            merlin_deps::tracing::info!(
                 "Setting conversation history with {} messages",
                 conversation_history.len()
             );

@@ -52,7 +52,7 @@ pub struct UiState {
 impl UiState {
     /// Add a conversation entry and trim history if needed
     pub fn add_conversation_entry(&mut self, entry: ConversationEntry) {
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "UiState::add_conversation_entry() - role: {:?}, text length: {}",
             entry.role,
             entry.text.len()
@@ -65,7 +65,7 @@ impl UiState {
             self.conversation_history.drain(0..excess);
         }
 
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "UiState now has {} conversation entries",
             self.conversation_history.len()
         );

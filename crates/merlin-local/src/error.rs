@@ -1,7 +1,7 @@
 use core::result::Result as CoreResult;
 use merlin_core::Error as CoreError;
-use reqwest::Error as ReqwestError;
-use serde_json::Error as SerdeJsonError;
+use merlin_deps::reqwest::Error as ReqwestError;
+use merlin_deps::serde_json::Error as SerdeJsonError;
 use thiserror::Error;
 
 /// Result type for local provider operations.

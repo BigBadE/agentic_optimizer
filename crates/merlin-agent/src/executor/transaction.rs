@@ -189,7 +189,7 @@ fn hash_content(content: Option<&String>) -> u64 {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
+    use merlin_deps::tempfile::TempDir;
 
     #[tokio::test]
     async fn test_task_workspace_isolation() {

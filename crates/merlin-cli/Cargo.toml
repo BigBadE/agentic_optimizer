@@ -11,29 +11,18 @@ test = false  # Don't run tests for the binary, only the library
 # Note: Bin inherits all lints from lib, no need to check separately
 
 [dependencies]
+bincode.workspace = true
+clap.workspace = true
 merlin-agent.workspace = true
 merlin-context.workspace = true
 merlin-core.workspace = true
+merlin-deps.workspace = true
 merlin-languages.workspace = true
 merlin-local.workspace = true
 merlin-providers.workspace = true
 merlin-routing.workspace = true
-anyhow.workspace = true
-clap.workspace = true
-console.workspace = true
-crossterm.workspace = true
-dirs.workspace = true
-flate2.workspace = true
-ratatui.workspace = true
-reqwest.workspace = true
 serde.workspace = true
-serde_json.workspace = true
 tokio.workspace = true
-toml.workspace = true
-tracing.workspace = true
-tracing-subscriber.workspace = true
-tui-textarea.workspace = true
-unicode-width.workspace = true
 
 [features]
 # Enable test utilities for integration tests
@@ -41,9 +30,7 @@ test-util = []
 
 [dev-dependencies]
 assert_cmd.workspace = true
-filetime.workspace = true
 predicates.workspace = true
-tempfile.workspace = true
 
 [lints]
 workspace = true

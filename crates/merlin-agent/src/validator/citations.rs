@@ -4,7 +4,7 @@
 //! ensuring traceability and accountability.
 
 use merlin_core::{Severity, StageResult, ValidationError, ValidationStageType};
-use regex::Regex;
+use merlin_deps::regex::Regex;
 use std::collections::HashSet;
 use std::path::PathBuf;
 use std::sync::LazyLock;

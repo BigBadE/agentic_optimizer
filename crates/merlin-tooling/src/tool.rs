@@ -1,8 +1,8 @@
 use std::io::Error as IoError;
 
 use async_trait::async_trait;
+use merlin_deps::serde_json::{Error as SerdeJsonError, Value};
 use serde::{Deserialize, Serialize};
-use serde_json::{Error as SerdeJsonError, Value};
 use thiserror::Error;
 
 /// Errors that can occur during tool execution.
@@ -112,7 +112,7 @@ pub trait Tool: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{Value as JsonValue, json};
+    use merlin_deps::serde_json::{Value as JsonValue, json};
 
     // REMOVED: test_tool_error_display - Low value trait test
 

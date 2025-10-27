@@ -1,7 +1,7 @@
 use merlin_core::{Task, TaskId};
-use petgraph::graph::DiGraph;
-use petgraph::visit::EdgeRef as _;
-use petgraph::{Direction, algo};
+use merlin_deps::petgraph::graph::DiGraph;
+use merlin_deps::petgraph::visit::EdgeRef as _;
+use merlin_deps::petgraph::{Direction, algo};
 use std::collections::{HashMap, HashSet};
 
 /// Immutable task dependency graph

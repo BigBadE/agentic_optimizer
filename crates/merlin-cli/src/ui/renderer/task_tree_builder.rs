@@ -3,7 +3,7 @@
 //! Builds the flattened list of task tree lines for rendering,
 //! handling both focused and unfocused views with different layout strategies.
 
-use ratatui::{
+use merlin_deps::ratatui::{
     layout::Rect,
     style::{Color, Modifier, Style},
     text::{Line, Span},

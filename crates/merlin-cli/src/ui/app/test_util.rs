@@ -3,7 +3,7 @@
 //! This module is only compiled when the `test-util` feature is enabled.
 //! It provides read-only access to internal TUI state for integration testing.
 
-use ratatui::backend::Backend;
+use merlin_deps::ratatui::backend::Backend;
 
 use super::tui_app::TuiApp;
 use crate::ui::event_source::InputEventSource;
@@ -15,8 +15,8 @@ use crate::ui::task_manager::TaskManager;
 use crate::ui::theme::Theme;
 use crate::ui::{UiChannel, layout};
 use merlin_agent::ThreadStore;
+use merlin_deps::ratatui::Terminal;
 use merlin_routing::{Result, RoutingError};
-use ratatui::Terminal;
 use std::path::PathBuf;
 use std::time::Instant;
 use tokio::sync::mpsc;

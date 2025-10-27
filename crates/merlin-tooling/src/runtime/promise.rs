@@ -1,7 +1,7 @@
 //! Promise extraction and handling utilities.
 
-use boa_engine::property::Attribute;
-use boa_engine::{Context, JsValue, Source, js_string};
+use merlin_deps::boa_engine::property::Attribute;
+use merlin_deps::boa_engine::{Context, JsValue, Source};
 
 use crate::{ToolError, ToolResult};
 
@@ -16,10 +16,14 @@ pub fn extract_promise_if_needed(result: JsValue, context: &mut Context) -> Tool
 
     // Check if it's a Promise by looking at its constructor name
     let is_promise = obj
-        .get(js_string!("constructor"), context)
+        .get(boa_engine::js_string!("constructor"), context)
         .ok()
         .and_then(|constructor| constructor.as_object())
-        .and_then(|constructor_obj| constructor_obj.get(js_string!("name"), context).ok())
+        .and_then(|constructor_obj| {
+            constructor_obj
+                .get(boa_engine::js_string!("name"), context)
+                .ok()
+        })
         .and_then(|name| {
             name.as_string()
                 .map(|js_str| js_str.to_std_string_escaped())
@@ -30,11 +34,15 @@ pub fn extract_promise_if_needed(result: JsValue, context: &mut Context) -> Tool
         return Ok(result);
     }
 
-    tracing::debug!("Result is a Promise, extracting resolved value");
+    merlin_deps::tracing::debug!("Result is a Promise, extracting resolved value");
 
     // Store the promise in a global variable and use JavaScript to extract its value
     context
-        .register_global_property(js_string!("__promise__"), result, Attribute::all())
+        .register_global_property(
+            boa_engine::js_string!("__promise__"),
+            result,
+            Attribute::all(),
+        )
         .map_err(|err| ToolError::ExecutionFailed(format!("Failed to register promise: {err}")))?;
 
     // Use a JavaScript helper to extract the resolved value
@@ -83,7 +91,9 @@ pub fn extract_error_message(error_check: &JsValue, context: &mut Context) -> St
         || format!("{error_check:?}"),
         |err_obj| {
             let result = (|| {
-                let val = err_obj.get(js_string!("message"), context).ok()?;
+                let val = err_obj
+                    .get(boa_engine::js_string!("message"), context)
+                    .ok()?;
                 val.as_string().map(|js_str| js_str.to_std_string_escaped())
             })();
             result.unwrap_or_else(|| format!("{error_check:?}"))

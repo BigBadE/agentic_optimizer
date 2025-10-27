@@ -3,7 +3,7 @@
 //! Handles rendering of task lists, task trees with expand/collapse,
 //! and individual task items with their status and progress indicators.
 
-use ratatui::{
+use merlin_deps::ratatui::{
     layout::Rect,
     style::{Color, Style},
     text::{Line, Span},
@@ -318,7 +318,7 @@ fn get_spinner() -> char {
 
 /// Truncates text to fit within `max_width`, adding "..." if truncated
 pub fn truncate_text(text: &str, max_width: usize) -> String {
-    use unicode_width::{UnicodeWidthChar as _, UnicodeWidthStr as _};
+    use merlin_deps::unicode_width::{UnicodeWidthChar as _, UnicodeWidthStr as _};
 
     let text_width = text.width();
     if text_width <= max_width {

@@ -2,11 +2,11 @@
 
 /// Strip TypeScript type annotations to convert to valid JavaScript using SWC
 pub fn strip_typescript_types(code: &str) -> String {
-    use swc_common::{FileName, GLOBALS, Globals, Mark, SourceMap, sync::Lrc};
-    use swc_ecma_ast::EsVersion;
-    use swc_ecma_codegen::{Config as CodegenConfig, Emitter, text_writer::JsWriter};
-    use swc_ecma_parser::{Syntax, TsSyntax, parse_file_as_program};
-    use swc_ecma_transforms_typescript::strip;
+    use merlin_deps::swc_common::{FileName, GLOBALS, Globals, Mark, SourceMap, sync::Lrc};
+    use merlin_deps::swc_ecma_ast::EsVersion;
+    use merlin_deps::swc_ecma_codegen::{Config as CodegenConfig, Emitter, text_writer::JsWriter};
+    use merlin_deps::swc_ecma_parser::{Syntax, TsSyntax, parse_file_as_program};
+    use merlin_deps::swc_ecma_transforms_typescript::strip;
 
     // Create a source map
     let source_map = Lrc::new(SourceMap::default());
@@ -26,7 +26,7 @@ pub fn strip_typescript_types(code: &str) -> String {
         parse_file_as_program(&source_file, syntax, EsVersion::Es2022, None, &mut vec![])
     else {
         // If parsing fails, return original code
-        tracing::warn!("Failed to parse TypeScript code, returning original");
+        merlin_deps::tracing::warn!("Failed to parse TypeScript code, returning original");
         return code.to_owned();
     };
 
@@ -36,8 +36,8 @@ pub fn strip_typescript_types(code: &str) -> String {
         let top_level_mark = Mark::new();
 
         // Apply the strip transform
-        let pass = strip(unresolved_mark, top_level_mark);
-        program.apply(pass)
+        let mut pass = strip(unresolved_mark, top_level_mark);
+        program.apply(&mut pass)
     });
 
     // Generate JavaScript code
@@ -52,13 +52,15 @@ pub fn strip_typescript_types(code: &str) -> String {
         };
 
         if emitter.emit_program(&program).is_err() {
-            tracing::warn!("Failed to emit JavaScript code, returning original");
+            merlin_deps::tracing::warn!("Failed to emit JavaScript code, returning original");
             return code.to_owned();
         }
     }
 
     String::from_utf8(buf).unwrap_or_else(|_| {
-        tracing::warn!("Failed to convert generated code to UTF-8, returning original");
+        merlin_deps::tracing::warn!(
+            "Failed to convert generated code to UTF-8, returning original"
+        );
         code.to_owned()
     })
 }

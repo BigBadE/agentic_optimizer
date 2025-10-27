@@ -226,7 +226,7 @@ impl RoutingConfig {
     /// # Errors
     /// Returns an error if the home directory cannot be determined
     pub fn config_dir() -> Result<PathBuf> {
-        use dirs::home_dir;
+        use merlin_deps::dirs::home_dir;
         let home = home_dir()
             .ok_or_else(|| RoutingError::Other("Could not determine home directory".to_owned()))?;
         Ok(home.join(".merlin"))
@@ -262,13 +262,13 @@ impl RoutingConfig {
     /// # Errors
     /// Returns an error if the file cannot be read or parsed
     pub fn load_from_file(path: &Path) -> Result<Self> {
-        use toml::from_str;
+        use merlin_deps::toml::from_str;
         let contents = fs::read_to_string(path)
             .map_err(|error| RoutingError::Other(format!("Failed to read config: {error}")))?;
         let config: Self = from_str(&contents)
             .map_err(|error| RoutingError::Other(format!("Failed to parse config: {error}")))?;
 
-        tracing::debug!(
+        merlin_deps::tracing::debug!(
             "Loaded config from {:?}: groq_api_key={}, openrouter_api_key={}",
             path,
             if config.api_keys.groq_api_key.is_some() {
@@ -291,7 +291,7 @@ impl RoutingConfig {
     /// # Errors
     /// Returns an error if the file cannot be written
     pub fn save_to_file(&self, path: &Path) -> Result<()> {
-        use toml::to_string_pretty;
+        use merlin_deps::toml::to_string_pretty;
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|error| {
                 RoutingError::Other(format!("Failed to create config directory: {error}"))
@@ -332,7 +332,7 @@ impl RoutingConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use serde_json::{from_str, to_string};
+    use merlin_deps::serde_json::{from_str, to_string};
 
     #[test]
     fn test_default_config() {
@@ -358,8 +358,8 @@ mod tests {
 
     #[test]
     fn test_api_key_loading_from_toml() {
+        use merlin_deps::tempfile::NamedTempFile;
         use std::io::Write as _;
-        use tempfile::NamedTempFile;
 
         // Create a temporary config file with API keys
         let toml_content = r#"

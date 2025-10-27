@@ -15,7 +15,7 @@
 pub mod metrics;
 pub mod test_case;
 
-use anyhow::{Context as _, Result, anyhow};
+use anyhow::{Context as _, Result, anyhow, bail};
 use merlin_context::ContextBuilder;
 use merlin_core::{FileContext, Query};
 use merlin_languages::{Language, LanguageProvider, create_backend};
@@ -248,13 +248,13 @@ fn setup_repository(project_root: &str, config: &test_case::RepositoryConfig) ->
 
         if !clone_output.status.success() {
             let stderr = String::from_utf8_lossy(&clone_output.stderr);
-            anyhow::bail!("Git clone failed: {stderr}");
+            bail!("Git clone failed: {stderr}");
         }
     }
 
     // Verify it's a git repository
     if !repo_path.join(".git").exists() {
-        anyhow::bail!("Directory exists but is not a git repository: {project_root}");
+        bail!("Directory exists but is not a git repository: {project_root}");
     }
 
     // Stash any local changes
@@ -279,7 +279,7 @@ fn setup_repository(project_root: &str, config: &test_case::RepositoryConfig) ->
 
     if !checkout_output.status.success() {
         let stderr = String::from_utf8_lossy(&checkout_output.stderr);
-        anyhow::bail!("Git checkout failed: {stderr}");
+        bail!("Git checkout failed: {stderr}");
     }
 
     Ok(())

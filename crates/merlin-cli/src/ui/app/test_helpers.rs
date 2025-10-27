@@ -13,7 +13,7 @@
 //! Never manipulate internal state directly - use the provided methods.
 
 #[cfg(any(test, feature = "test-util"))]
-use ratatui::backend::Backend;
+use merlin_deps::ratatui::backend::Backend;
 
 #[cfg(any(test, feature = "test-util"))]
 use super::tui_app::TuiApp;

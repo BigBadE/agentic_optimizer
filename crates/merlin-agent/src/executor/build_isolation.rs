@@ -1,10 +1,10 @@
 use super::state::WorkspaceState;
 use merlin_core::{FileChange, Result, RoutingError};
+use merlin_deps::tempfile::TempDir;
 use std::future::Future;
 use std::path::{Path, PathBuf};
 use std::pin::Pin;
 use std::time::{Duration, Instant};
-use tempfile::TempDir;
 use tokio::fs::{create_dir_all, read_dir, read_to_string, remove_file, write};
 use tokio::process::Command;
 use tokio::time::timeout;

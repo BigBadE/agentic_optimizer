@@ -282,7 +282,7 @@ impl AgentExecutor {
             .validate(response, task)
             .await
             .map_err(|validation_error| {
-                tracing::info!(
+                merlin_deps::tracing::info!(
                     "Validation failed. Model response was:\n{}\n\nError: {:?}",
                     response.text,
                     validation_error

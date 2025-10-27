@@ -3,7 +3,7 @@
 //! Provides reusable functions for style calculation, status icons,
 //! and other common rendering operations to reduce code duplication.
 
-use ratatui::style::{Color, Modifier, Style};
+use merlin_deps::ratatui::style::{Color, Modifier, Style};
 
 use super::super::task_manager::{TaskDisplay, TaskStatus};
 use super::super::theme::Theme;

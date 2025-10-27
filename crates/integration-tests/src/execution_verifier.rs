@@ -2,9 +2,9 @@
 
 use super::fixture::ExecutionVerify;
 use super::verification_result::VerificationResult;
+use merlin_deps::regex::Regex;
+use merlin_deps::serde_json::{Map, Value};
 use merlin_tooling::ToolResult;
-use regex::Regex;
-use serde_json::{Map, Value};
 
 /// Execution verifier helper
 pub struct ExecutionVerifier;

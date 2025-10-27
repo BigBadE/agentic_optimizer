@@ -1,4 +1,4 @@
-use reqwest::Client;
+use merlin_deps::reqwest::Client;
 use std::time::Duration;
 
 /// Manages Ollama installation and models

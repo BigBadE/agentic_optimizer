@@ -1,8 +1,8 @@
 //! Interactive mode functionality - TUI mode
 
-use anyhow::Result;
 use merlin_agent::RoutingOrchestrator;
 use merlin_core::{Message, MessageId, TaskResult, ThreadId, TokenUsage, WorkUnit};
+use merlin_deps::anyhow::Result;
 use merlin_routing::{Task, TaskId};
 
 use crate::ui::{MessageLevel, TuiApp, UiChannel, UiEvent};
@@ -65,7 +65,7 @@ fn create_or_continue_thread(
         .map_or((None, None), |thread_store_arc| {
             thread_store_arc.lock().map_or_else(
                 |poison_err| {
-                    tracing::error!("Thread store lock poisoned: {poison_err}");
+                    merlin_deps::tracing::error!("Thread store lock poisoned: {poison_err}");
                     (None, None)
                 },
                 |mut store| {
@@ -75,7 +75,7 @@ fn create_or_continue_thread(
                         let thread = store.create_thread(thread_name);
                         let tid = thread.id;
                         if let Err(save_err) = store.save_thread(&thread) {
-                            tracing::warn!("Failed to create thread: {save_err}");
+                            merlin_deps::tracing::warn!("Failed to create thread: {save_err}");
                         }
                         tid
                     });
@@ -93,7 +93,7 @@ fn create_or_continue_thread(
                     if let Some(thread) = thread_to_save
                         && let Err(save_err) = store.save_thread(&thread)
                     {
-                        tracing::warn!("Failed to save thread message: {save_err}");
+                        merlin_deps::tracing::warn!("Failed to save thread message: {save_err}");
                     }
 
                     (Some(tid), Some(msg_id))
@@ -140,7 +140,7 @@ fn update_thread_work_completed(orchestrator: &RoutingOrchestrator, info: WorkCo
     if let Some(thread) = thread_to_save
         && let Err(save_err) = store.save_thread(&thread)
     {
-        tracing::warn!("Failed to save thread work completion: {save_err}");
+        merlin_deps::tracing::warn!("Failed to save thread work completion: {save_err}");
     }
 }
 
@@ -175,7 +175,7 @@ fn update_thread_work_failed(
     if let Some(thread) = thread_to_save
         && let Err(save_err) = store.save_thread(&thread)
     {
-        tracing::warn!("Failed to save thread work failure: {save_err}");
+        merlin_deps::tracing::warn!("Failed to save thread work failure: {save_err}");
     }
 }
 
@@ -265,7 +265,7 @@ async fn execute_user_task(params: TaskExecutionParams) {
         output: format!("Prompt: {user_input}\n"),
     });
 
-    tracing::info!(
+    merlin_deps::tracing::info!(
         "execute_user_task: Passing {} conversation messages to orchestrator",
         conversation_history.len()
     );
@@ -307,12 +307,12 @@ async fn initialize_embeddings_background(ui_channel: UiChannel, project: PathBu
     use merlin_context::VectorSearchManager;
     use std::sync::Arc;
 
-    tracing::info!("Starting background embedding initialization...");
+    merlin_deps::tracing::info!("Starting background embedding initialization...");
 
     let ui_channel_progress = ui_channel.clone();
     let progress_callback = Arc::new(move |stage: &str, current: u64, total: Option<u64>| {
         if let Some(total_count) = total {
-            tracing::debug!("Embedding progress: {stage} {current}/{total_count}");
+            merlin_deps::tracing::debug!("Embedding progress: {stage} {current}/{total_count}");
             ui_channel_progress.send(UiEvent::EmbeddingProgress {
                 current,
                 total: total_count,
@@ -325,11 +325,11 @@ async fn initialize_embeddings_background(ui_channel: UiChannel, project: PathBu
 
     match manager.initialize().await {
         Ok(()) => {
-            tracing::info!("Embedding initialization completed successfully");
+            merlin_deps::tracing::info!("Embedding initialization completed successfully");
             // Don't send UI message - keeps output clean
         }
         Err(error) => {
-            tracing::warn!("Embedding initialization failed: {error}");
+            merlin_deps::tracing::warn!("Embedding initialization failed: {error}");
             // Don't send UI message - keeps output clean, logged to debug.log
         }
     }
@@ -364,7 +364,7 @@ pub async fn run_tui_interactive(
     // Load tasks and threads
     tui_app.load_tasks_async().await;
     if let Err(err) = tui_app.load_threads() {
-        tracing::warn!("Failed to load threads: {err}");
+        merlin_deps::tracing::warn!("Failed to load threads: {err}");
     }
 
     // Start embedding initialization in background
@@ -414,7 +414,7 @@ pub async fn run_tui_interactive(
 
             // Get parent task ID - use continuing_from if set, otherwise use selected task
             let parent_task_id = continuing_from.or_else(|| tui_app.get_selected_task_id());
-            tracing::info!(
+            merlin_deps::tracing::info!(
                 "interactive.rs: Extracted {} conversation messages for task execution{}",
                 conversation_history.len(),
                 if continuing_from.is_some() {

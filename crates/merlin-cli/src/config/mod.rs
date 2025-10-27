@@ -42,7 +42,7 @@ impl Default for ProvidersConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use toml::to_string_pretty;
+    use merlin_deps::toml::to_string_pretty;
 
     #[test]
     fn test_config_default() {

@@ -57,7 +57,7 @@ impl CommandRunner {
             return Err(RoutingError::Other("Empty command string".to_owned()));
         }
 
-        tracing::debug!(
+        merlin_deps::tracing::debug!(
             "Running command: {} in directory: {:?}",
             command_str,
             self.working_dir
@@ -91,14 +91,14 @@ impl CommandRunner {
                     let stdout = String::from_utf8_lossy(&output_result.stdout).to_string();
                     let stderr = String::from_utf8_lossy(&output_result.stderr).to_string();
 
-                    tracing::debug!(
+                    merlin_deps::tracing::debug!(
                         "Command completed with exit code {} in {:?}",
                         exit_code,
                         duration
                     );
 
                     if !success {
-                        tracing::debug!("Command stderr: {}", stderr);
+                        merlin_deps::tracing::debug!("Command stderr: {}", stderr);
                     }
 
                     return Ok(CommandResult {

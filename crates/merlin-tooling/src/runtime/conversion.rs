@@ -1,9 +1,9 @@
 //! JavaScript/JSON value conversion utilities.
 
-use boa_engine::object::JsObject;
-use boa_engine::object::builtins::JsArray;
-use boa_engine::{Context, JsResult, JsValue, js_string};
-use serde_json::{Map, Number, Value};
+use merlin_deps::boa_engine::object::JsObject;
+use merlin_deps::boa_engine::object::builtins::JsArray;
+use merlin_deps::boa_engine::{Context, JsResult, JsValue};
+use merlin_deps::serde_json::{Map, Number, Value};
 
 use crate::ToolError;
 use crate::ToolResult;
@@ -41,7 +41,7 @@ pub fn js_value_to_json_static(value: &JsValue, context: &mut Context) -> JsResu
         // Check if it's an array
         if obj.is_array() {
             let length = obj
-                .get(js_string!("length"), context)?
+                .get(boa_engine::js_string!("length"), context)?
                 .to_u32(context)
                 .unwrap_or(0);
             let mut array = Vec::new();
@@ -85,7 +85,7 @@ pub fn json_to_js_value_static(value: &Value, context: &mut Context) -> JsResult
             },
             |int| Ok(JsValue::from(int)),
         ),
-        Value::String(string) => Ok(JsValue::from(js_string!(string.as_str()))),
+        Value::String(string) => Ok(JsValue::from(boa_engine::js_string!(string.as_str()))),
         Value::Array(array) => {
             let js_array = JsArray::new(context);
             for (index, val) in array.iter().enumerate() {
@@ -98,7 +98,7 @@ pub fn json_to_js_value_static(value: &Value, context: &mut Context) -> JsResult
             let js_obj = JsObject::with_object_proto(context.intrinsics());
             for (key, val) in obj {
                 let js_val = json_to_js_value_static(val, context)?;
-                js_obj.set(js_string!(key.as_str()), js_val, true, context)?;
+                js_obj.set(boa_engine::js_string!(key.as_str()), js_val, true, context)?;
             }
             Ok(js_obj.into())
         }

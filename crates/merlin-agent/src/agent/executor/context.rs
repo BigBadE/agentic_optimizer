@@ -171,7 +171,7 @@ impl ContextBuilder {
 
     /// Log conversation preview
     pub async fn log_conversation_preview(&self) {
-        use tracing::info;
+        use merlin_deps::tracing::info;
 
         let (message_count, messages, has_more) = {
             let conv_history = self.conversation_history.lock().await;
@@ -217,7 +217,7 @@ impl ContextBuilder {
 
     /// Log conversation history section
     pub async fn log_conversation_history(&self) {
-        use tracing::info;
+        use merlin_deps::tracing::info;
 
         let conv_history = self.conversation_history.lock().await;
         if !conv_history.is_empty() {

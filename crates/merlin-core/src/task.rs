@@ -4,11 +4,11 @@
 //! including task representation, complexity/priority levels, validation results,
 //! and execution context.
 
+use merlin_deps::uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::time::Instant;
-use uuid::Uuid;
 
 use crate::conversation::{Subtask, WorkUnit};
 use crate::{Response, TokenUsage};

@@ -1,8 +1,8 @@
 //! Application lifecycle operations (constructors, initialization, raw mode)
 
-use crossterm::terminal;
-use ratatui::Terminal;
-use ratatui::backend::{Backend, CrosstermBackend};
+use merlin_deps::crossterm::terminal;
+use merlin_deps::ratatui::Terminal;
+use merlin_deps::ratatui::backend::{Backend, CrosstermBackend};
 use std::io;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -122,7 +122,7 @@ impl<B: Backend> TuiApp<B> {
                 self.adjust_task_list_scroll();
             }
 
-            tracing::info!("Loaded {} tasks from persistence", loaded_count);
+            merlin_deps::tracing::info!("Loaded {} tasks from persistence", loaded_count);
             self.state.loading_tasks = false;
         }
     }
@@ -135,7 +135,7 @@ impl<B: Backend> TuiApp<B> {
         let loaded_count = self.thread_store.active_threads().len();
         self.thread_store.load_all()?;
         let new_count = self.thread_store.active_threads().len();
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "Loaded {} threads from disk ({} new)",
             new_count,
             new_count.saturating_sub(loaded_count)

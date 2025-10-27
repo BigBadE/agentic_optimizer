@@ -1,11 +1,11 @@
-use regex::Regex;
+use merlin_deps::regex::Regex;
+use merlin_deps::tracing::{debug, info};
 use std::collections::HashSet;
 use std::env;
 use std::fmt::Write as _;
 use std::mem::replace;
 use std::path::{Path, PathBuf};
 use tokio::fs::read_to_string;
-use tracing::{debug, info};
 
 use crate::{ContextBuilder, ProgressCallback};
 use merlin_core::{Context, FileContext, Query};

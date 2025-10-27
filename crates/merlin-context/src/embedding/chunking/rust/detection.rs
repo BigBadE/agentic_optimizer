@@ -76,7 +76,7 @@ pub fn extract_rust_item_indices(lines: &[&str], start: usize) -> (usize, usize,
             if offset > 10 {
                 // Force stop after accumulating some lines, even if not balanced
                 let end_line = start + offset;
-                tracing::warn!(
+                merlin_deps::tracing::warn!(
                     "Force-stopping {identifier} at line {} due to MAX_CHUNK_TOKENS (depth={})",
                     end_line + 1,
                     brace_depth

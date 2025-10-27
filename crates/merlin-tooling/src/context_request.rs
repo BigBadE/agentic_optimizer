@@ -4,9 +4,9 @@
 //! when they need more information to complete a task.
 
 use async_trait::async_trait;
-use glob::glob;
+use merlin_deps::glob::glob;
+use merlin_deps::serde_json::{from_value, to_value};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_value, to_value};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 #[cfg(test)]
@@ -218,7 +218,7 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
         let args: ContextRequestArgs = from_value(input.params)
             .map_err(|err| ToolError::InvalidInput(format!("Invalid arguments: {err}")))?;
 
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "Context request: pattern='{}', reason='{}'",
             args.pattern,
             args.reason
@@ -259,7 +259,7 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
                     });
                 }
                 Err(err) => {
-                    tracing::warn!("Failed to read {}: {}", path.display(), err);
+                    merlin_deps::tracing::warn!("Failed to read {}: {}", path.display(), err);
                 }
             }
         }
@@ -270,7 +270,7 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
             format!("Added {} files to context", context_files.len())
         };
 
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "Context request result: {} files added",
             context_files.len()
         );
@@ -291,7 +291,7 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
+    use merlin_deps::tempfile::TempDir;
 
     #[tokio::test]
     async fn test_context_request_exact_file() {
@@ -305,7 +305,7 @@ mod tests {
         let tool = ContextRequestTool::new(temp_dir.path().to_path_buf());
 
         let input = ToolInput {
-            params: serde_json::json!({
+            params: merlin_deps::serde_json::json!({
                 "pattern": "test.rs",
                 "reason": "Testing exact file match"
             }),
@@ -340,7 +340,7 @@ mod tests {
         let tool = ContextRequestTool::new(temp_dir.path().to_path_buf());
 
         let input = ToolInput {
-            params: serde_json::json!({
+            params: merlin_deps::serde_json::json!({
                 "pattern": "**/*.rs",
                 "reason": "Testing glob pattern",
                 "max_files": 10

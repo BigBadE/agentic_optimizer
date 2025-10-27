@@ -3,7 +3,7 @@
 //! These tools provide safe file system access for agents executing in the TypeScript runtime.
 
 use async_trait::async_trait;
-use serde_json::{Value, json};
+use merlin_deps::serde_json::{Value, json};
 use std::fs;
 use std::path::PathBuf;
 
@@ -321,7 +321,7 @@ impl Tool for ListFilesTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
+    use merlin_deps::tempfile::TempDir;
 
     #[tokio::test]
     async fn test_write_file_success() {

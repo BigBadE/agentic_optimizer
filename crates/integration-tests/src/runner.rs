@@ -10,20 +10,20 @@ use super::verifier::UnifiedVerifier;
 use async_trait::async_trait;
 use merlin_cli::TuiApp;
 use merlin_core::{Context, ModelProvider, Query, Response, Result, RoutingError, TokenUsage};
+use merlin_deps::ratatui::backend::TestBackend;
+use merlin_deps::regex::Regex;
+use merlin_deps::serde_json::from_str;
+use merlin_deps::tempfile::TempDir;
 use merlin_tooling::{
     BashTool, ContextRequestTool, DeleteFileTool, EditFileTool, ListFilesTool, ReadFileTool,
     TypeScriptRuntime, WriteFileTool,
 };
-use ratatui::backend::TestBackend;
-use regex::Regex;
-use serde_json::from_str;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::{
     Arc, Mutex,
     atomic::{AtomicUsize, Ordering},
 };
-use tempfile::TempDir;
 use tokio::time::{Duration as TokioDuration, sleep};
 
 /// Pattern-based mock provider

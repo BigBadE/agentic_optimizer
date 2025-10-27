@@ -4,7 +4,7 @@ use super::fixture::{StateVerify, UiVerify};
 use super::verification_result::VerificationResult;
 use merlin_cli::TuiApp;
 use merlin_cli::ui::renderer::FocusedPane;
-use ratatui::backend::TestBackend;
+use merlin_deps::ratatui::backend::TestBackend;
 
 /// UI verifier helper
 pub struct UiVerifier;

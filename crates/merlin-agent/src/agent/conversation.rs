@@ -1,5 +1,5 @@
 use merlin_core::{Thread, ThreadId};
-use regex::Regex;
+use merlin_deps::regex::Regex;
 use serde::{Deserialize, Serialize};
 use std::cmp::Ordering;
 use std::collections::{HashMap, HashSet, VecDeque};

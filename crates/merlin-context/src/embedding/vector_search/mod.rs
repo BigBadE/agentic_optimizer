@@ -8,10 +8,10 @@ mod scoring;
 pub use cache::{CachedEmbedding, VectorCache};
 pub use embedding::ProgressCallback;
 
+use merlin_deps::tracing::{info, warn};
 use std::cmp::Ordering;
 use std::fs;
 use std::path::{Path, PathBuf};
-use tracing::{info, warn};
 
 use crate::embedding::client::EmbeddingProvider;
 use crate::embedding::{BM25Index, EmbeddingClient, SearchResult, VectorStore};
@@ -85,11 +85,11 @@ impl<E: EmbeddingProvider + Clone> VectorSearchManager<E> {
     /// Returns an error if embedding model is unavailable or embedding/cache IO fails
     pub async fn initialize(&mut self) -> Result<()> {
         // Check if embedding model is available
-        tracing::info!("Checking embedding model availability...");
+        merlin_deps::tracing::info!("Checking embedding model availability...");
         self.client.ensure_model_available().await?;
 
         let cache_path = InitializationHelper::resolve_cache_path(&self.project_root);
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "Loading embedding cache (path: {})...",
             cache_path.display()
         );
@@ -118,7 +118,7 @@ impl<E: EmbeddingProvider + Clone> VectorSearchManager<E> {
     /// Returns an error if cache loading fails or cache is invalid/empty
     pub async fn initialize_partial(&mut self) -> Result<()> {
         let cache_path = InitializationHelper::resolve_cache_path(&self.project_root);
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "Loading embedding cache for partial init (path: {})...",
             cache_path.display()
         );
@@ -177,7 +177,7 @@ impl<E: EmbeddingProvider + Clone> VectorSearchManager<E> {
             return Ok(false);
         }
 
-        tracing::info!("Validating {} cached embeddings...", cache.embeddings.len());
+        merlin_deps::tracing::info!("Validating {} cached embeddings...", cache.embeddings.len());
 
         self.process_cached_embeddings(&cache).await?;
 
@@ -231,23 +231,23 @@ impl<E: EmbeddingProvider + Clone> VectorSearchManager<E> {
 
         if !new_files.is_empty() {
             info!("  Found {new_count} new files to embed");
-            tracing::info!("Embedding {new_count} new files...");
+            merlin_deps::tracing::info!("Embedding {new_count} new files...");
             self.report_progress("Embedding new files", 0, Some(new_count as u64));
             self.embed_files(new_files).await?;
         }
 
         if !invalid.is_empty() {
-            tracing::info!("Re-embedding {invalid_count} modified files...");
+            merlin_deps::tracing::info!("Re-embedding {invalid_count} modified files...");
             self.report_progress("Re-embedding modified files", 0, Some(invalid_count as u64));
             self.embed_files(invalid).await?;
-            tracing::info!(
+            merlin_deps::tracing::info!(
                 "✓ Loaded cache + updated {} files",
                 invalid_count + new_count
             );
         } else if new_count > 0 {
-            tracing::info!("✓ Loaded cache + added {new_count} new files");
+            merlin_deps::tracing::info!("✓ Loaded cache + added {new_count} new files");
         } else {
-            tracing::info!("✓ Loaded embeddings from cache");
+            merlin_deps::tracing::info!("✓ Loaded embeddings from cache");
         }
 
         Ok(())
@@ -259,16 +259,16 @@ impl<E: EmbeddingProvider + Clone> VectorSearchManager<E> {
     /// Returns an error if embedding operations fail
     async fn initialize_from_scratch(&mut self) -> Result<()> {
         info!("  No valid cache found - building from scratch");
-        tracing::info!("Building embedding index for codebase...");
+        merlin_deps::tracing::info!("Building embedding index for codebase...");
         let files = InitializationHelper::collect_source_files(&self.project_root);
 
         info!("  Found {} source files to embed", files.len());
-        tracing::info!("Embedding {} source files...", files.len());
+        merlin_deps::tracing::info!("Embedding {} source files...", files.len());
         self.report_progress("Embedding", 0, Some(files.len() as u64));
         self.embed_files(files).await?;
 
         info!("  Embedded {} files total", self.store.len());
-        tracing::info!("✓ Indexed {} files with embeddings", self.store.len());
+        merlin_deps::tracing::info!("✓ Indexed {} files with embeddings", self.store.len());
 
         info!("  Saving cache to disk...");
         self.report_progress("Saving cache", 0, None);

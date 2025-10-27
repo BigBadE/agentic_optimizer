@@ -1,6 +1,6 @@
 use crate::task::{TaskId, TaskResult};
+use merlin_deps::serde_json::Value;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 
 /// UI event that tasks send to update display.
 #[derive(Debug, Clone, Serialize, Deserialize)]

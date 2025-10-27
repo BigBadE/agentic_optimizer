@@ -5,11 +5,11 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
-use anyhow::Context as _;
-use ra_ap_ide::{AnalysisHost, FileId};
-use ra_ap_load_cargo::{LoadCargoConfig, ProcMacroServerChoice, load_workspace_at};
-use ra_ap_project_model::{CargoConfig, RustLibSource};
-use ra_ap_vfs::Vfs;
+use merlin_deps::anyhow::Context as _;
+use merlin_deps::ra_ap_ide::{AnalysisHost, FileId};
+use merlin_deps::ra_ap_load_cargo::{LoadCargoConfig, ProcMacroServerChoice, load_workspace_at};
+use merlin_deps::ra_ap_project_model::{CargoConfig, RustLibSource};
+use merlin_deps::ra_ap_vfs::Vfs;
 
 use crate::cache::WorkspaceCache;
 use merlin_core::{CoreResult as Result, Error};
@@ -95,21 +95,21 @@ impl WorkspaceLoader {
     }
 
     fn report_cache_status(&self) {
-        tracing::debug!("Checking cache...");
+        merlin_deps::tracing::debug!("Checking cache...");
         if self.config.use_cache
             && let Ok(cache) = WorkspaceCache::load(&self.project_root)
             && cache.is_valid(&self.project_root).unwrap_or(false)
         {
-            tracing::info!(
+            merlin_deps::tracing::info!(
                 "Using cached workspace state (timestamp: {:?})",
                 cache.timestamp
             );
         }
-        tracing::debug!("Cache checked");
+        merlin_deps::tracing::debug!("Cache checked");
     }
 
     fn log_loading_path(&self) {
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "Loading Cargo workspace from: {}",
             self.project_root.display()
         );
@@ -139,8 +139,9 @@ impl WorkspaceLoader {
         cargo_config: &CargoConfig,
         load_config: &LoadCargoConfig,
     ) -> Result<(AnalysisHost, Vfs)> {
-        tracing::info!("Initializing rust-analyzer...");
-        let on_progress = |message: String| tracing::debug!("Workspace loading: {}", message);
+        merlin_deps::tracing::info!("Initializing rust-analyzer...");
+        let on_progress =
+            |message: String| merlin_deps::tracing::debug!("Workspace loading: {}", message);
         let (analysis_db, virtual_fs, _) = load_workspace_at(
             self.project_root.as_path(),
             cargo_config,
@@ -154,25 +155,25 @@ impl WorkspaceLoader {
             )
         })
         .map_err(|error| Error::Other(error.to_string()))?;
-        tracing::info!("Rust-analyzer initialized");
+        merlin_deps::tracing::info!("Rust-analyzer initialized");
         Ok((AnalysisHost::with_database(analysis_db), virtual_fs))
     }
 
     fn index_files(virtual_fs: &Vfs) -> (FileIdMap, FileMetadata) {
-        tracing::debug!("Building file index...");
+        merlin_deps::tracing::debug!("Building file index...");
         let (file_id_map, file_metadata) = build_file_index(virtual_fs);
-        tracing::info!("Indexed {} Rust files", file_id_map.len());
+        merlin_deps::tracing::info!("Indexed {} Rust files", file_id_map.len());
         (file_id_map, file_metadata)
     }
 
     fn maybe_save_cache(&self, file_metadata: FileMetadata) {
         if self.config.use_cache {
-            tracing::debug!("Saving cache...");
+            merlin_deps::tracing::debug!("Saving cache...");
             let cache = WorkspaceCache::new(self.project_root.clone(), file_metadata);
             if let Err(error) = cache.save(&self.project_root) {
-                tracing::warn!("Failed to save workspace cache: {}", error);
+                merlin_deps::tracing::warn!("Failed to save workspace cache: {}", error);
             } else {
-                tracing::debug!("Cache saved");
+                merlin_deps::tracing::debug!("Cache saved");
             }
         }
     }

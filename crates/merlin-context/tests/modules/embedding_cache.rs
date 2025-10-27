@@ -6,12 +6,12 @@
 
 use merlin_context::{EmbeddingProvider, VectorSearchManager};
 use merlin_core::CoreResult as Result;
+use merlin_deps::tempfile::TempDir;
 use std::collections::hash_map::DefaultHasher;
 use std::env;
 use std::fs;
 use std::hash::{Hash as _, Hasher as _};
 use std::path::PathBuf;
-use tempfile::TempDir;
 
 /// Fake embedding client for testing (deterministic, hash-based)
 #[derive(Clone)]

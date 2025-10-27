@@ -1,4 +1,4 @@
-use crossterm::event::{self, Event};
+use merlin_deps::crossterm::event::{self, Event};
 use std::io;
 use std::time::Duration;
 

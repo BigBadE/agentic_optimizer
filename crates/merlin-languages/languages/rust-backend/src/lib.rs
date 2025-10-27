@@ -29,8 +29,8 @@ use std::collections::HashMap;
 use std::path::{Path, PathBuf};
 use std::sync::{Arc, Mutex};
 
-use ra_ap_ide::{Analysis, AnalysisHost, FileId};
-use ra_ap_vfs::Vfs;
+use merlin_deps::ra_ap_ide::{Analysis, AnalysisHost, FileId};
+use merlin_deps::ra_ap_vfs::Vfs;
 
 use merlin_core::{CoreResult as Result, Error, FileContext};
 /// Information about a code symbol (function, struct, etc.)
@@ -128,7 +128,7 @@ impl RustBackend {
         project_root: &Path,
         config: LoadConfig,
     ) -> Result<()> {
-        tracing::info!("Initializing Rust workspace at: {}", project_root.display());
+        merlin_deps::tracing::info!("Initializing Rust workspace at: {}", project_root.display());
 
         self.project_root = project_root.to_path_buf();
 
@@ -139,7 +139,7 @@ impl RustBackend {
         self.vfs = Some(Arc::new(vfs));
         self.file_id_map = Arc::new(file_id_map);
 
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "Workspace initialized with {} files",
             self.file_id_map.len()
         );

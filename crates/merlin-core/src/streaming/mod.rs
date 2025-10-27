@@ -4,10 +4,10 @@
 //! including steps, tool calls, and thinking updates.
 
 use crate::task::TaskId;
+use merlin_deps::serde_json::Value;
+use merlin_deps::uuid::Uuid;
 use serde::{Deserialize, Serialize};
-use serde_json::Value;
 use std::time::Instant;
-use uuid::Uuid;
 
 /// Channel for streaming events
 pub mod channel;

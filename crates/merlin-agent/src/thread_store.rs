@@ -3,8 +3,8 @@
 //! Handles saving/loading threads to/from disk and managing thread operations.
 
 use merlin_core::{MessageId, Result, RoutingError, Thread, ThreadColor, ThreadId};
+use merlin_deps::serde_json::{from_str, to_string_pretty};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_str, to_string_pretty};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -218,7 +218,7 @@ impl ThreadStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
+    use merlin_deps::tempfile::TempDir;
 
     fn create_test_store() -> (ThreadStore, TempDir) {
         let temp_dir = TempDir::new().expect("Failed to create temp dir");

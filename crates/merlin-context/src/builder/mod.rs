@@ -78,13 +78,13 @@ impl ContextBuilder {
         let analyzer = QueryAnalyzer;
         let intent = analyzer.analyze(&query.text);
 
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "Query intent: action={:?}, scope={:?}, complexity={:?}",
             intent.action,
             intent.scope,
             intent.complexity
         );
-        tracing::debug!(
+        merlin_deps::tracing::debug!(
             "Keywords: {:?}, Entities: {:?}",
             intent.keywords,
             intent.entities
@@ -96,7 +96,7 @@ impl ContextBuilder {
 
             // Step 3: Use hybrid search for context (vector search works without backend)
             let agent_files = self.use_subagent_for_context(&intent, &query.text).await?;
-            tracing::info!(
+            merlin_deps::tracing::info!(
                 "Intelligent context fetching found {} files",
                 agent_files.len()
             );
@@ -111,7 +111,10 @@ impl ContextBuilder {
             }
             if collected.is_empty() {
                 let all_files = self.collect_all_files();
-                tracing::info!("Collected {} files from project scan", all_files.len());
+                merlin_deps::tracing::info!(
+                    "Collected {} files from project scan",
+                    all_files.len()
+                );
                 all_files
             } else {
                 collected
@@ -119,7 +122,7 @@ impl ContextBuilder {
         };
 
         files.truncate(self.max_files);
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "Final context: {} files (max: {})",
             files.len(),
             self.max_files

@@ -8,8 +8,8 @@ use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 
 use merlin_core::Error as CoreError;
+use merlin_deps::serde_json::{from_reader, to_writer};
 use serde::{Deserialize, Serialize};
-use serde_json::{from_reader, to_writer};
 
 /// Cached metadata about the rust-analyzer workspace state
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,7 +75,7 @@ impl WorkspaceCache {
                 .map_err(|error| CoreError::Other(format!("Failed to serialize cache: {error}")))?;
         }
 
-        tracing::info!("Saved rust-analyzer cache to {}", cache_path.display());
+        merlin_deps::tracing::info!("Saved rust-analyzer cache to {}", cache_path.display());
         Ok(())
     }
 
@@ -99,7 +99,7 @@ impl WorkspaceCache {
         let cache: Self = from_reader(reader)
             .map_err(|error| CoreError::Other(format!("Failed to deserialize cache: {error}")))?;
 
-        tracing::info!("Loaded rust-analyzer cache from {}", cache_path.display());
+        merlin_deps::tracing::info!("Loaded rust-analyzer cache from {}", cache_path.display());
         Ok(cache)
     }
 
@@ -110,14 +110,14 @@ impl WorkspaceCache {
     /// Returns an error if file metadata cannot be read.
     pub fn is_valid(&self, project_root: &Path) -> Result<bool, CoreError> {
         if self.project_root != project_root {
-            tracing::debug!("Cache invalid: project root mismatch");
+            merlin_deps::tracing::debug!("Cache invalid: project root mismatch");
             return Ok(false);
         }
 
         if let Ok(elapsed) = self.timestamp.elapsed()
             && elapsed.as_secs() > 86_400
         {
-            tracing::debug!("Cache invalid: older than 24 hours");
+            merlin_deps::tracing::debug!("Cache invalid: older than 24 hours");
             return Ok(false);
         }
 
@@ -129,7 +129,7 @@ impl WorkspaceCache {
 
             // If we can't get metadata, the file might be deleted or inaccessible
             if metadata.is_err() {
-                tracing::debug!(
+                merlin_deps::tracing::debug!(
                     "Cache invalid: file {} is missing or inaccessible",
                     path.display()
                 );
@@ -141,7 +141,10 @@ impl WorkspaceCache {
                 .modified()
             {
                 if modified > *cached_time {
-                    tracing::debug!("Cache invalid: file {} was modified", path.display());
+                    merlin_deps::tracing::debug!(
+                        "Cache invalid: file {} was modified",
+                        path.display()
+                    );
                     return Ok(false);
                 }
                 checked += 1;
@@ -149,11 +152,11 @@ impl WorkspaceCache {
         }
 
         if checked == 0 {
-            tracing::debug!("Cache invalid: no files could be verified");
+            merlin_deps::tracing::debug!("Cache invalid: no files could be verified");
             return Ok(false);
         }
 
-        tracing::info!("Cache is valid (checked {checked}/{sample_size} files)");
+        merlin_deps::tracing::info!("Cache is valid (checked {checked}/{sample_size} files)");
         Ok(true)
     }
 
@@ -168,7 +171,7 @@ impl WorkspaceCache {
         if cache_path.exists() {
             match filesystem::remove_file(&cache_path) {
                 Ok(()) => {
-                    tracing::info!("Cleared rust-analyzer cache");
+                    merlin_deps::tracing::info!("Cleared rust-analyzer cache");
                     Ok(())
                 }
                 Err(error) if error.kind() == ErrorKind::NotFound => {
@@ -191,12 +194,12 @@ impl WorkspaceCache {
 )]
 mod tests {
     use super::*;
+    use merlin_deps::tempfile::TempDir;
     use std::env;
     use std::fs;
     use std::io::Write as _;
     use std::thread;
     use std::time::Duration;
-    use tempfile::TempDir;
 
     /// Test project setup data
     type TestProject = (TempDir, PathBuf, HashMap<PathBuf, SystemTime>);

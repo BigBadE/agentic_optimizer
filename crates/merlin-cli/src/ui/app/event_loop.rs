@@ -1,9 +1,9 @@
 //! Main event loop and event processing logic
 
-use crossterm::event::{Event, KeyEventKind};
-use ratatui::backend::Backend;
+use merlin_deps::crossterm::event::{Event, KeyEventKind};
+use merlin_deps::ratatui::backend::Backend;
+use merlin_deps::tracing::warn;
 use std::time::{Duration, Instant};
-use tracing::warn;
 
 use super::navigation;
 use super::tui_app::TuiApp;

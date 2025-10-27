@@ -1,7 +1,7 @@
 #![allow(dead_code, reason = "Work in progress")]
 //! Utility functions for CLI operations
 
-use anyhow::{Context as _, Result};
+use merlin_deps::anyhow::{Context as _, Result};
 use merlin_routing::{MessageLevel, UiChannel, UiEvent};
 use std::env;
 use std::fs;
@@ -65,7 +65,7 @@ pub fn cleanup_old_tasks(merlin_dir: &Path) -> Result<()> {
     // Keep only the 50 most recent, delete the rest
     for (path, _) in task_files.iter().skip(MAX_TASKS) {
         if let Err(error) = fs::remove_file(path) {
-            tracing::warn!("failed to remove old task file {:?}: {}", path, error);
+            merlin_deps::tracing::warn!("failed to remove old task file {:?}: {}", path, error);
         }
     }
 
@@ -85,10 +85,10 @@ pub fn try_write_log(ui: &UiChannel, writer: &mut fs::File, message: &str) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use filetime::{FileTime, set_file_mtime};
     use merlin_core::{Response, TokenUsage};
+    use merlin_deps::filetime::{FileTime, set_file_mtime};
+    use merlin_deps::tempfile::TempDir;
     use std::fs;
-    use tempfile::TempDir;
 
     /// Calculate estimated cost based on token usage.
     fn calculate_cost(usage: &TokenUsage) -> f64 {
@@ -108,32 +108,32 @@ mod tests {
 
     /// Display response metrics
     fn display_response_metrics(response: &Response) {
-        tracing::info!("\n{sep}\n", sep = "=".repeat(80));
-        tracing::info!("{text}", text = response.text);
-        tracing::info!("{sep}", sep = "=".repeat(80));
+        merlin_deps::tracing::info!("\n{sep}\n", sep = "=".repeat(80));
+        merlin_deps::tracing::info!("{text}", text = response.text);
+        merlin_deps::tracing::info!("{sep}", sep = "=".repeat(80));
 
-        tracing::info!("\nMetrics:");
-        tracing::info!("  Provider: {provider}", provider = response.provider);
-        tracing::info!(
+        merlin_deps::tracing::info!("\nMetrics:");
+        merlin_deps::tracing::info!("  Provider: {provider}", provider = response.provider);
+        merlin_deps::tracing::info!(
             "  Confidence: {confidence:.2}",
             confidence = response.confidence
         );
-        tracing::info!("  Latency: {latency}ms", latency = response.latency_ms);
-        tracing::info!("  Tokens:");
-        tracing::info!("    Input: {input}", input = response.tokens_used.input);
-        tracing::info!("    Output: {output}", output = response.tokens_used.output);
-        tracing::info!(
+        merlin_deps::tracing::info!("  Latency: {latency}ms", latency = response.latency_ms);
+        merlin_deps::tracing::info!("  Tokens:");
+        merlin_deps::tracing::info!("    Input: {input}", input = response.tokens_used.input);
+        merlin_deps::tracing::info!("    Output: {output}", output = response.tokens_used.output);
+        merlin_deps::tracing::info!(
             "    Cache Read: {cache_read}",
             cache_read = response.tokens_used.cache_read
         );
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "    Cache Write: {cache_write}",
             cache_write = response.tokens_used.cache_write
         );
-        tracing::info!("    Total: {total}", total = response.tokens_used.total());
+        merlin_deps::tracing::info!("    Total: {total}", total = response.tokens_used.total());
 
         let actual_cost = calculate_cost(&response.tokens_used);
-        tracing::info!("  Cost: ${actual_cost:.4}");
+        merlin_deps::tracing::info!("  Cost: ${actual_cost:.4}");
     }
 
     #[test]

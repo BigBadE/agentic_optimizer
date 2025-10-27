@@ -177,7 +177,7 @@ pub fn process_merged_chunks(
                 search_prioritized.push(PrioritizedFile::with_score(chunk_ctx, priority, score));
             }
             Err(extract_error) => {
-                tracing::warn!(
+                merlin_deps::tracing::warn!(
                     "Failed to extract chunk from {}: {extract_error}",
                     file_path.display()
                 );
@@ -208,7 +208,7 @@ pub fn process_search_results(
         })
         .collect();
 
-    tracing::info!(
+    merlin_deps::tracing::info!(
         "After quality filtering: {} chunks (removed {} low-quality)",
         filtered_matches.len(),
         semantic_matches.len() - filtered_matches.len()

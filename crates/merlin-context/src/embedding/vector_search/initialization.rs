@@ -1,5 +1,6 @@
 //! Vector search manager initialization logic.
 
+use merlin_deps::tracing::info;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::fs;
@@ -7,7 +8,6 @@ use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 use std::time::SystemTime;
 use tokio::spawn;
-use tracing::info;
 
 use crate::embedding::chunking::FileChunk;
 use crate::embedding::client::EmbeddingProvider;
@@ -54,7 +54,7 @@ impl InitializationHelper {
 
     /// Collect all source files in the project
     pub fn collect_source_files(project_root: &Path) -> Vec<PathBuf> {
-        use ignore::WalkBuilder;
+        use merlin_deps::ignore::WalkBuilder;
 
         let mut files = Vec::default();
 
@@ -137,13 +137,16 @@ impl InitializationHelper {
             let embedding_ops =
                 EmbeddingOperations::new(client.clone(), project_root.clone(), None);
 
-            tracing::info!("Background: Starting full embedding initialization...");
+            merlin_deps::tracing::info!("Background: Starting full embedding initialization...");
 
             let files = Self::collect_source_files(&project_root);
             let result = embedding_ops.embed_files(files).await;
 
             let Ok(chunk_results) = result else {
-                tracing::warn!("Background embedding generation failed: {:?}", result.err());
+                merlin_deps::tracing::warn!(
+                    "Background embedding generation failed: {:?}",
+                    result.err()
+                );
                 return;
             };
 
@@ -161,9 +164,11 @@ impl InitializationHelper {
             );
 
             if let Err(bg_error) = cache_ops.save_cache_async(entries).await {
-                tracing::warn!("Background: Failed to save cache: {bg_error}");
+                merlin_deps::tracing::warn!("Background: Failed to save cache: {bg_error}");
             } else {
-                tracing::info!("Background: Embedding generation completed successfully");
+                merlin_deps::tracing::info!(
+                    "Background: Embedding generation completed successfully"
+                );
             }
         });
     }

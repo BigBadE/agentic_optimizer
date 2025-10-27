@@ -2,9 +2,9 @@
 
 use crate::agent::AgentExecutionResult;
 use merlin_core::{Result, RoutingError, TaskId, ui::UiEvent};
+use merlin_deps::serde_json::from_value;
 use merlin_routing::UiChannel;
 use merlin_tooling::{ToolRegistry, TypeScriptRuntime};
-use serde_json::from_value;
 use std::sync::Arc;
 
 /// Extract TypeScript code from markdown code blocks
@@ -78,9 +78,9 @@ pub async fn execute_typescript_code(
     });
 
     // Execute code
-    tracing::debug!("Executing TypeScript code:\n{}", code);
+    merlin_deps::tracing::debug!("Executing TypeScript code:\n{}", code);
     let result_value = runtime.execute(code).await.map_err(|err| {
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "TypeScript execution failed. Code was:\n{}\n\nError: {}",
             code,
             err
@@ -105,7 +105,7 @@ pub async fn execute_typescript_code(
     } else {
         // Try to parse as structured AgentExecutionResult
         from_value(result_value.clone()).map_err(|err| {
-            tracing::info!(
+            merlin_deps::tracing::info!(
                 "Failed to parse execution result. Code was:\n{}\n\nReturned value: {:?}\n\nError: {}",
                 code,
                 result_value,
@@ -129,7 +129,7 @@ pub async fn execute_typescript_code(
         step_id: "typescript_execution".to_owned(),
     });
 
-    tracing::debug!("TypeScript execution result: {:?}", execution_result);
+    merlin_deps::tracing::debug!("TypeScript execution result: {:?}", execution_result);
 
     Ok(execution_result)
 }

@@ -198,7 +198,7 @@ impl ExecutorPool {
 mod tests {
     use super::*;
     use async_trait::async_trait;
-    use tempfile::TempDir;
+    use merlin_deps::tempfile::TempDir;
 
     use merlin_core::{Response, Task, ValidationResult};
     use merlin_routing::{Model, RoutingDecision};

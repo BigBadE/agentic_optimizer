@@ -18,11 +18,11 @@ pub fn spawn_background_embedding(project_root: PathBuf) {
         let mut bg_manager = VectorSearchManager::new(project_root);
         // Don't set progress callback - background task shouldn't update UI
 
-        tracing::info!("Background: Starting full embedding initialization...");
+        merlin_deps::tracing::info!("Background: Starting full embedding initialization...");
         if let Err(bg_error) = bg_manager.initialize().await {
-            tracing::warn!("Background embedding generation failed: {bg_error}");
+            merlin_deps::tracing::warn!("Background embedding generation failed: {bg_error}");
         } else {
-            tracing::info!("Background: Embedding generation completed successfully");
+            merlin_deps::tracing::info!("Background: Embedding generation completed successfully");
         }
     });
 }
@@ -35,10 +35,10 @@ pub async fn initialize_backend_with_timeout(
     use tokio::time::{Duration, timeout};
 
     let backend_task = spawn_blocking(move || {
-        tracing::info!("Initializing rust-analyzer...");
+        merlin_deps::tracing::info!("Initializing rust-analyzer...");
         let mut backend_mut = backend;
         if let Some(ref mut backend_ref) = backend_mut {
-            tracing::info!("Initializing language backend...");
+            merlin_deps::tracing::info!("Initializing language backend...");
             let result = backend_ref.initialize(&project_root);
             (backend_mut, result)
         } else {
@@ -50,11 +50,11 @@ pub async fn initialize_backend_with_timeout(
     match timeout(Duration::from_secs(30), backend_task).await {
         Ok(Ok(result)) => result,
         Ok(Err(join_error)) => {
-            tracing::error!("Backend task join error: {join_error}");
+            merlin_deps::tracing::error!("Backend task join error: {join_error}");
             (None, Err(Error::Other("Backend task panicked".into())))
         }
         Err(_timeout) => {
-            tracing::warn!("Backend initialization timed out after 30s");
+            merlin_deps::tracing::warn!("Backend initialization timed out after 30s");
             (
                 None,
                 Err(Error::Other("Backend initialization timeout".into())),
@@ -81,7 +81,7 @@ pub async fn initialize_systems_parallel(
         return Ok(());
     }
 
-    tracing::info!("Initializing systems in parallel...");
+    merlin_deps::tracing::info!("Initializing systems in parallel...");
 
     // Rust-analyzer initialization (CPU-bound, blocking) - spawn in background
     if needs_backend_init {
@@ -89,13 +89,17 @@ pub async fn initialize_systems_parallel(
         let project_root_clone = project_root.to_path_buf();
 
         spawn(async move {
-            tracing::info!("Background: Starting rust-analyzer initialization...");
+            merlin_deps::tracing::info!("Background: Starting rust-analyzer initialization...");
             let (_backend, result) =
                 initialize_backend_with_timeout(backend, project_root_clone).await;
             match result {
-                Ok(()) => tracing::info!("Background: rust-analyzer initialized successfully"),
+                Ok(()) => merlin_deps::tracing::info!(
+                    "Background: rust-analyzer initialized successfully"
+                ),
                 Err(error) => {
-                    tracing::warn!("Background: rust-analyzer initialization failed: {error}");
+                    merlin_deps::tracing::warn!(
+                        "Background: rust-analyzer initialization failed: {error}"
+                    );
                 }
             }
         });
@@ -107,7 +111,7 @@ pub async fn initialize_systems_parallel(
     // Vector search initialization (I/O-bound, async)
     // Truly non-blocking: loads cache if available, spawns background task otherwise
     if needs_vector_init {
-        tracing::info!("Loading embedding cache (non-blocking)...");
+        merlin_deps::tracing::info!("Loading embedding cache (non-blocking)...");
         let mut manager = VectorSearchManager::new(project_root.to_path_buf());
 
         if let Some(callback) = progress_callback {
@@ -117,11 +121,11 @@ pub async fn initialize_systems_parallel(
         // Try partial init first (fast, uses cache only)
         match manager.initialize_partial().await {
             Ok(()) => {
-                tracing::info!("Using cached embeddings immediately");
+                merlin_deps::tracing::info!("Using cached embeddings immediately");
                 *vector_manager = Some(manager);
             }
             Err(error) => {
-                tracing::warn!(
+                merlin_deps::tracing::warn!(
                     "No cache available, spawning background embedding generation: {error}"
                 );
                 spawn_background_embedding(project_root.to_path_buf());
@@ -132,6 +136,8 @@ pub async fn initialize_systems_parallel(
         }
     }
 
-    tracing::info!("Core systems initialized (backend and embeddings may continue in background)");
+    merlin_deps::tracing::info!(
+        "Core systems initialized (backend and embeddings may continue in background)"
+    );
     Ok(())
 }

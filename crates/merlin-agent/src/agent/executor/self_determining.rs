@@ -243,13 +243,13 @@ pub async fn execute_with_streaming(params: StreamingParams<'_>) -> Result<Respo
         .map_err(|err| RoutingError::Other(format!("Provider error: {err}")))?;
 
     // Log agent response to debug.log
-    tracing::debug!("Agent response text: {}", response.text);
+    merlin_deps::tracing::debug!("Agent response text: {}", response.text);
 
     // Extract TypeScript code from response
     let code = typescript::extract_typescript_code(&response.text);
 
     if let Some(typescript_code) = code {
-        tracing::debug!("Found TypeScript code, executing...");
+        merlin_deps::tracing::debug!("Found TypeScript code, executing...");
 
         // Execute TypeScript code and get result
         let execution_result = typescript::execute_typescript_code(
@@ -269,7 +269,7 @@ pub async fn execute_with_streaming(params: StreamingParams<'_>) -> Result<Respo
             });
         } else if let Some(next_task_desc) = execution_result.get_next_task() {
             // Task wants to continue - spawn new task
-            tracing::info!("Task requested continuation: {}", next_task_desc);
+            merlin_deps::tracing::info!("Task requested continuation: {}", next_task_desc);
             params.ui_channel.send(UiEvent::TaskOutput {
                 task_id: params.task_id,
                 output: format!("Continuing with: {next_task_desc}"),
@@ -279,7 +279,7 @@ pub async fn execute_with_streaming(params: StreamingParams<'_>) -> Result<Respo
         }
     } else {
         // No TypeScript code found - send response text as-is
-        tracing::debug!("No TypeScript code found in response");
+        merlin_deps::tracing::debug!("No TypeScript code found in response");
         params.ui_channel.send(UiEvent::TaskOutput {
             task_id: params.task_id,
             output: response.text.clone(),

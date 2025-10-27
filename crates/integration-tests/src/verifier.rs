@@ -6,9 +6,9 @@ use super::fixture::{FinalVerify, TestEvent, TestFixture, VerifyConfig};
 use super::ui_verifier::UiVerifier;
 use super::verification_result::VerificationResult;
 use merlin_cli::TuiApp;
+use merlin_deps::ratatui::backend::TestBackend;
+use merlin_deps::serde_json::Value;
 use merlin_tooling::ToolResult;
-use ratatui::backend::TestBackend;
-use serde_json::Value;
 use std::path::Path;
 use std::result::Result;
 

@@ -3,8 +3,10 @@
 //! This module provides an `InputEventSource` implementation that feeds events
 //! from test fixtures instead of reading from the terminal.
 
-use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
 use merlin_cli::InputEventSource;
+use merlin_deps::crossterm::event::{
+    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
+};
 use std::collections::VecDeque;
 use std::io;
 use std::time::Duration;

@@ -1,15 +1,15 @@
 #![allow(dead_code, reason = "Work in progress")]
 //! Command handlers for CLI operations
 
-use anyhow::Result;
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
+use merlin_deps::anyhow::Result;
+use merlin_deps::tracing_subscriber::{
+    EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
+};
 use merlin_routing::RoutingConfig;
 use std::fs;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
-use tracing_subscriber::{
-    EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
-};
 
 use crate::cli::Validation;
 use crate::interactive::run_tui_interactive;
@@ -54,8 +54,8 @@ pub async fn handle_interactive(
 
     // Load or create routing configuration from ~/.merlin/config.toml
     let mut config = RoutingConfig::load_or_create().unwrap_or_else(|error| {
-        tracing::warn!("Failed to load config from ~/.merlin/config.toml: {error}");
-        tracing::warn!("Using default configuration");
+        merlin_deps::tracing::warn!("Failed to load config from ~/.merlin/config.toml: {error}");
+        merlin_deps::tracing::warn!("Using default configuration");
         RoutingConfig::default()
     });
 

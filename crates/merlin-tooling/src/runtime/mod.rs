@@ -10,8 +10,8 @@ use std::fmt::Write as _;
 use std::sync::Arc;
 use std::time::Duration;
 
-use boa_engine::{Context, Source};
-use serde_json::Value;
+use merlin_deps::boa_engine::{Context, Source};
+use merlin_deps::serde_json::Value;
 use tokio::task::spawn_blocking;
 use tokio::time;
 
@@ -73,7 +73,7 @@ impl TypeScriptRuntime {
     /// - Tool calls fail to execute
     /// - Execution times out
     pub async fn execute(&self, code: &str) -> ToolResult<Value> {
-        tracing::debug!("TypeScriptRuntime::execute called");
+        merlin_deps::tracing::debug!("TypeScriptRuntime::execute called");
 
         let wrapped_code = wrap_code(code);
         let tools_clone = self.tools.clone();
@@ -100,7 +100,7 @@ impl TypeScriptRuntime {
     /// # Errors
     /// Returns error if execution fails
     fn execute_sync(code: &str, tools: &HashMap<String, Arc<dyn Tool>>) -> ToolResult<Value> {
-        tracing::debug!("Creating Boa context");
+        merlin_deps::tracing::debug!("Creating Boa context");
 
         // Create context - Boa 0.21 handles job queue internally
         let mut context = Context::default();
@@ -108,7 +108,7 @@ impl TypeScriptRuntime {
         // Register tools as global functions
         register_tool_functions(&mut context, tools)?;
 
-        tracing::debug!("Executing JavaScript code");
+        merlin_deps::tracing::debug!("Executing JavaScript code");
 
         // Execute the code
         let result = context
@@ -116,7 +116,7 @@ impl TypeScriptRuntime {
             .map_err(|err| ToolError::ExecutionFailed(format!("JavaScript error: {err}")))?;
 
         // Run all pending jobs (resolve Promises)
-        tracing::debug!("Running job queue to resolve Promises");
+        merlin_deps::tracing::debug!("Running job queue to resolve Promises");
         let _result = context.run_jobs();
 
         // Extract Promise value if result is a Promise
@@ -205,6 +205,6 @@ mod tests {
         let code = "const x = 42; x * 2";
         let result = runtime.execute(code).await;
         assert!(result.is_ok(), "Failed: {:?}", result.err());
-        assert_eq!(result.unwrap(), serde_json::json!(84));
+        assert_eq!(result.unwrap(), merlin_deps::serde_json::json!(84));
     }
 }

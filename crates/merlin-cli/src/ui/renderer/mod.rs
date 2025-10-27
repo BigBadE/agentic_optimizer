@@ -6,7 +6,7 @@ mod helpers;
 mod task_rendering;
 mod task_tree_builder;
 
-use ratatui::{
+use merlin_deps::ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -15,7 +15,7 @@ use ratatui::{
 
 use merlin_agent::ThreadStore;
 use merlin_core::{Thread, ThreadId};
-use ratatui::text::Line;
+use merlin_deps::ratatui::text::Line;
 
 use super::input::InputManager;
 use super::layout;
@@ -351,7 +351,7 @@ impl Renderer {
         selected_thread_id: Option<ThreadId>,
         focused: FocusedPane,
     ) -> Vec<Line<'static>> {
-        use ratatui::text::Span;
+        use merlin_deps::ratatui::text::Span;
 
         let mut lines = Vec::new();
 
@@ -391,7 +391,7 @@ impl Renderer {
         thread: &Thread,
         selected_thread_id: Option<ThreadId>,
     ) -> Line<'static> {
-        use ratatui::text::Span;
+        use merlin_deps::ratatui::text::Span;
 
         let is_selected = selected_thread_id == Some(thread.id);
         let mut spans = Vec::new();

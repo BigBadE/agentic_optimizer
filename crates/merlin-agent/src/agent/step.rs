@@ -80,7 +80,7 @@ mod tests {
 
     #[test]
     fn test_multiple_steps_for_task() {
-        use serde_json::json;
+        use merlin_deps::serde_json::json;
 
         let mut tracker = StepTracker::default();
         let task_id = TaskId::default();

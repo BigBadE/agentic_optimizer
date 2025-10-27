@@ -1,10 +1,10 @@
 use super::persistence::TaskPersistence;
 use super::state::{ConversationEntry, ConversationRole, UiState};
 use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo, TaskStepStatus};
+use merlin_deps::serde_json::Value;
+use merlin_deps::tracing::warn;
 use merlin_routing::{MessageLevel, TaskId, TaskProgress, TaskResult, UiEvent};
-use serde_json::Value;
 use std::time::{Instant, SystemTime};
-use tracing::warn;
 
 /// Handles UI events and updates task manager and state
 pub struct EventHandler<'handler> {

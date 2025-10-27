@@ -2,7 +2,7 @@
 //!
 //! Handles keyboard input events, pane navigation, and key combinations.
 
-use crossterm::event::{Event, KeyCode, KeyEvent};
+use merlin_deps::crossterm::event::{Event, KeyCode, KeyEvent};
 use merlin_routing::TaskId;
 use std::collections::HashSet;
 

@@ -243,7 +243,7 @@ impl WorkspaceSnapshot {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use tempfile::TempDir;
+    use merlin_deps::tempfile::TempDir;
 
     #[tokio::test]
     async fn test_workspace_concurrent_reads() {

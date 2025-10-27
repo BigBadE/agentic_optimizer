@@ -116,7 +116,7 @@ impl ModelRouter for StrategyRouter {
 
         let decision = RoutingDecision::new(model, reasoning);
 
-        tracing::info!(
+        merlin_deps::tracing::info!(
             "🎯 Routing decision: {} | Difficulty: {} | Cost: ${:.6} | Latency: {}ms",
             model,
             task.difficulty,

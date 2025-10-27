@@ -4,8 +4,8 @@ use std::collections::HashSet;
 use std::fs::read_to_string;
 use std::path::{Path, PathBuf};
 
-use ra_ap_ide::Analysis;
-use ra_ap_syntax::{AstNode as _, SyntaxKind, ast};
+use merlin_deps::ra_ap_ide::Analysis;
+use merlin_deps::ra_ap_syntax::{AstNode as _, SyntaxKind, ast};
 
 use crate::RustBackend;
 use merlin_core::{CoreResult as Result, Error, FileContext};

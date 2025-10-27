@@ -1,8 +1,8 @@
 //! Unique identifiers for conversation system entities.
 
+use merlin_deps::uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use std::fmt;
-use uuid::Uuid;
 
 /// Unique identifier for a thread
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]

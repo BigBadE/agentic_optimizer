@@ -1,8 +1,9 @@
 //! Merlin CLI - Interactive AI coding assistant command-line interface
 
-use anyhow::Result;
 use clap::Parser as _;
 use cli::Cli;
+use merlin_deps::anyhow::Result;
+use tokio;
 
 mod cli;
 mod handlers;

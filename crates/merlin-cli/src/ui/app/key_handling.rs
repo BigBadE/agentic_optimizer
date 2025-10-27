@@ -4,8 +4,8 @@ use super::input_handler;
 use super::tui_app::TuiApp;
 use crate::ui::app::navigation::{NavigationContext, navigate_tasks_down, navigate_tasks_up};
 use crate::ui::renderer::FocusedPane;
-use crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
-use ratatui::backend::Backend;
+use merlin_deps::crossterm::event::{KeyCode, KeyEvent, KeyModifiers};
+use merlin_deps::ratatui::backend::Backend;
 use std::collections::HashSet;
 use std::hash::Hash;
 

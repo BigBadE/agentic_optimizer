@@ -5,6 +5,7 @@
 
 // Core dependencies
 pub use anyhow;
+pub use async_trait;
 pub use boa_engine;
 pub use chrono;
 pub use console;

@@ -30,7 +30,7 @@
     {
       "type": "llm_response",
       "trigger": {
-        "pattern": "Add a comment",
+        "pattern": "Add a comment to the code",
         "match_type": "exact"
       },
       "response": {

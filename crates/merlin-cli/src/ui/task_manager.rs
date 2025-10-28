@@ -6,7 +6,10 @@ use std::time::{Instant, SystemTime};
 
 /// Status of a task
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(dead_code, reason = "Pending status will be used when dependency tracking is implemented")]
+#[allow(
+    dead_code,
+    reason = "Pending status will be used when dependency tracking is implemented"
+)]
 pub enum TaskStatus {
     /// Task is pending (waiting for dependencies or resources)
     Pending,
@@ -142,12 +145,6 @@ impl TaskManager {
     /// Gets the task order
     pub fn task_order(&self) -> &[TaskId] {
         &self.task_order
-    }
-
-    /// Checks if there are any tasks with active progress indicators
-    /// Used to determine if UI should force periodic updates
-    pub fn has_tasks_with_progress(&self) -> bool {
-        self.tasks.values().any(|task| task.progress.is_some())
     }
 }
 

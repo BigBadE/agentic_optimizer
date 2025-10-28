@@ -3,7 +3,7 @@
 use super::fixture::{MatchType, TriggerConfig};
 use async_trait::async_trait;
 use merlin_core::{Context, ModelProvider, Query, Response, Result, RoutingError, TokenUsage};
-use merlin_deps::regex::Regex;
+use merlin_deps::{regex::Regex, tracing};
 use merlin_routing::{Model, ModelRouter, RoutingDecision, Task as RoutingTask};
 use std::sync::{
     Arc, Mutex,
@@ -97,26 +97,55 @@ impl PatternMockProvider {
     ///
     /// # Errors
     /// Returns error if no matching pattern found
+    ///
+    /// # Panics
+    /// May panic if mutex is poisoned
     fn get_response(&self, query_text: &str) -> Result<String> {
+        tracing::debug!("Mock provider looking for pattern match for query: '{query_text}'");
+
         let mut responses = self
             .responses
             .lock()
             .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
+
+        // Log all available patterns for debugging
+        tracing::debug!("Available patterns:");
+        for (idx, resp) in responses.iter().enumerate() {
+            tracing::debug!(
+                "  [{}] pattern='{}' match_type={:?} used={} matches={}",
+                idx,
+                resp.pattern,
+                resp.match_type,
+                resp.used,
+                resp.matches(query_text)
+            );
+        }
 
         // Find first unused matching pattern
         let result = responses
             .iter_mut()
             .find(|resp| !resp.used && resp.matches(query_text))
             .map(|resp| {
+                tracing::debug!(
+                    "Matched pattern '{}' (match_type={:?})",
+                    resp.pattern,
+                    resp.match_type
+                );
                 resp.used = true;
                 resp.typescript.clone()
             });
 
         drop(responses);
 
-        result.ok_or_else(|| {
-            RoutingError::ExecutionFailed(format!("No matching pattern for query: {query_text}"))
-        })
+        result.map_or_else(
+            || {
+                tracing::warn!("No matching pattern found for query: '{query_text}'");
+                Err(RoutingError::ExecutionFailed(format!(
+                    "No matching pattern for query: {query_text}"
+                )))
+            },
+            Ok,
+        )
     }
 
     /// Reset all patterns to unused (for testing)

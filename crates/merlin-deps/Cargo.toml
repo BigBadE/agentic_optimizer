@@ -9,6 +9,7 @@ crate-type = ["dylib"]
 [dependencies]
 # Core dependencies
 anyhow = { workspace = true }
+async-trait = { workspace = true }
 boa_engine = { workspace = true }
 chrono = { workspace = true }
 console = { workspace = true }

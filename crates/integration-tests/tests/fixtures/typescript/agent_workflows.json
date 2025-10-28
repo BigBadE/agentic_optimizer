@@ -16,9 +16,6 @@
     "terminal_size": [
       80,
       24
-    ],
-    "tools": [
-      "BashTool"
     ]
   },
   "events": [

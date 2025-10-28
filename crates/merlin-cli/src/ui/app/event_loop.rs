@@ -3,8 +3,9 @@
 use merlin_deps::crossterm::event::{Event, KeyEventKind};
 use merlin_deps::ratatui::backend::Backend;
 use merlin_deps::tracing::warn;
+use merlin_routing::{Result, RoutingError, UiEvent};
 use std::sync::Arc;
-use std::time::{Duration, Instant};
+use std::time::Instant;
 
 use super::navigation;
 use super::tui_app::TuiApp;
@@ -12,128 +13,71 @@ use crate::ui::app::navigation::ScrollContext;
 use crate::ui::event_handler::EventHandler;
 use crate::ui::renderer::{FocusedPane, RenderCtx, UiCtx};
 use crate::ui::state::{ConversationEntry, ConversationRole};
-use merlin_routing::{Result, RoutingError};
 
 impl<B: Backend> TuiApp<B> {
-    /// Processes one tick of the event loop
+    /// Run the main event loop until quit
+    ///
+    /// This processes both input events (from crossterm `EventStream`) and UI events
+    /// (from the orchestrator) concurrently using `tokio::select`!.
     ///
     /// # Errors
-    /// Returns an error if polling or rendering the terminal fails.
-    pub fn tick(&mut self) -> Result<bool> {
-        let had_events = self.process_ui_events();
-
-        if had_events {
-            self.render()?;
-            self.last_render_time = Instant::now();
-        }
-
-        let has_event = self
-            .event_source
-            .poll(Duration::from_millis(50))
-            .map_err(|err| RoutingError::Other(err.to_string()))?;
-
-        if has_event {
-            let events = self.collect_input_events()?;
-            let should_quit = self.process_input_events(events);
-            self.render()?;
-            self.last_render_time = Instant::now();
-            return Ok(should_quit);
-        }
-
-        // Force periodic renders when there are active tasks with progress
-        // This ensures progress bars and timers update smoothly every tick (50ms)
-        let has_active_progress = self.task_manager.has_tasks_with_progress();
-        let time_since_render = self.last_render_time.elapsed();
-        let should_force_render =
-            has_active_progress && time_since_render >= Duration::from_millis(50);
-
-        // Unconditionally render once at the end of the tick loop to keep UI fresh.
-        // The previous conditional branches were identical.
-        let _ = should_force_render; // document the intent without branching
-        self.render()?;
-        self.last_render_time = Instant::now();
-
-        Ok(false)
-    }
-
-    /// Processes any pending UI events from the channel and updates state
-    pub(super) fn process_ui_events(&mut self) -> bool {
-        let mut had_events = false;
-
-        while let Ok(event) = self.event_receiver.try_recv() {
-            // Broadcast to test event tap if present
-            #[cfg(feature = "test-util")]
-            if let Some(ref tap) = self.test_event_tap {
-                drop(tap.send(event.clone()));
-            }
-
-            let persistence = self.persistence.as_ref();
-            let mut handler =
-                EventHandler::new(&mut self.task_manager, &mut self.state, persistence);
-            handler.handle_event(event);
-            had_events = true;
-        }
-
-        // Adjust scroll after processing events (in case tasks were added/removed)
-        if had_events {
-            self.adjust_task_list_scroll();
-        }
-
-        had_events
-    }
-
-    /// Collects input events from the terminal (via the configured event source).
-    ///
-    /// # Errors
-    /// Returns an error if reading events from the event source fails.
-    pub(super) fn collect_input_events(&mut self) -> Result<Vec<Event>> {
-        let mut events = Vec::default();
-
-        // blocking read of at least one event
-        let first = self
-            .event_source
-            .read()
-            .map_err(|err| RoutingError::Other(err.to_string()))?;
-        events.push(first);
-
-        // drain the buffer of any immediately available events
+    /// Returns an error if event processing or rendering fails.
+    pub async fn run_event_loop(&mut self) -> Result<()> {
         loop {
-            let has_event = self
-                .event_source
-                .poll(Duration::from_millis(0))
-                .map_err(|err| RoutingError::Other(err.to_string()))?;
+            tokio::select! {
+                // Wait for input event from async stream
+                event_result = self.event_source.next_event() => {
+                    match event_result {
+                        Ok(Some(event)) => {
+                            if self.handle_input(&event) {
+                                break; // Quit requested
+                            }
+                        }
+                        Ok(None) => {
+                            // Event source exhausted (shouldn't happen for crossterm)
+                            break;
+                        }
+                        Err(error) => {
+                            return Err(RoutingError::Other(error.to_string()));
+                        }
+                    }
+                }
 
-            if !has_event {
-                break;
+                // Wait for UI event from orchestrator
+                Some(ui_event) = self.event_receiver.recv() => {
+                    self.handle_ui_event(ui_event);
+                }
             }
 
-            let event = self
-                .event_source
-                .read()
-                .map_err(|err| RoutingError::Other(err.to_string()))?;
-            events.push(event);
+            // Render after processing any event
+            self.render()?;
+            self.last_render_time = Instant::now();
         }
 
-        Ok(events)
+        Ok(())
     }
 
-    /// Processes a batch of input events and returns true if the app should quit
-    pub(super) fn process_input_events(&mut self, events: Vec<Event>) -> bool {
-        let mut should_quit = false;
-
-        for event in events {
-            if let Event::Key(key) = &event {
-                if !matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat) {
-                    continue;
-                }
-
-                if self.handle_key_event(key) {
-                    should_quit = true;
-                }
-            }
+    /// Handle an input event and return true if the app should quit
+    fn handle_input(&mut self, event: &Event) -> bool {
+        if let Event::Key(key) = event
+            && matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat)
+        {
+            return self.handle_key_event(key);
         }
+        false
+    }
 
-        should_quit
+    /// Handle a UI event from the orchestrator
+    fn handle_ui_event(&mut self, ui_event: UiEvent) {
+        // Broadcast to observers
+        drop(self.ui_event_broadcast.send(ui_event.clone()));
+
+        // Handle the event
+        let persistence = self.persistence.as_ref();
+        let mut handler = EventHandler::new(&mut self.task_manager, &mut self.state, persistence);
+        handler.handle_event(ui_event);
+
+        self.adjust_task_list_scroll();
     }
 
     /// Submits the current input if non-empty and returns true if it indicates quitting

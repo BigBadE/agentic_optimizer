@@ -95,11 +95,8 @@ pub async fn run_tui_interactive(
         tasks_dir.display(),
     )?;
 
-    loop {
-        if tui_app.tick()? {
-            break;
-        }
-    }
+    // Run the event loop until quit
+    tui_app.run_event_loop().await?;
 
     tui_app.disable_raw_mode()?;
     writeln!(log_file, "=== Session ended ===")?;

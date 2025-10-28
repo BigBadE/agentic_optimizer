@@ -3,7 +3,7 @@
 //! This module provides the test runner that executes unified test fixtures
 //! by running the actual CLI with pattern-based mock LLM responses.
 
-use super::event_source::FixtureEventSource;
+use super::event_source::{FixtureEventController, FixtureEventSource};
 use super::execution_tracker::ExecutionResultTracker;
 use super::fixture::{TestEvent, TestFixture};
 use super::mock_provider::{MockRouter, PatternMockProvider};
@@ -17,22 +17,25 @@ use merlin_core::{
 use merlin_deps::ratatui::backend::TestBackend;
 use merlin_deps::serde_json::{Value as JsonValue, from_str};
 use merlin_deps::tempfile::TempDir;
-use merlin_routing::{Model, ProviderRegistry, RoutingConfig, UiEvent};
+use merlin_routing::{Model, ProviderRegistry, RoutingConfig, TaskId, UiEvent};
 use merlin_tooling::{ToolError, ToolResult};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
-use tokio::sync::mpsc;
-use tokio::time::{self as tokio_time, Duration as TokioDuration, timeout};
+use tokio::sync::broadcast;
+use tokio::time::{Duration as TokioDuration, sleep, timeout};
 
 /// Result type for task completion with captured outputs
 type TaskCompletionResult = (Box<TaskResult>, Vec<String>);
+
+/// Pending task result before being added to tracker
+type PendingTaskResult = (Box<TaskResult>, Vec<String>);
 
 /// Unified test runner
 pub struct UnifiedTestRunner {
     /// Test fixture
     fixture: TestFixture,
-    /// Workspace directory (owned TempDir for automatic cleanup)
+    /// Workspace directory (owned `TempDir` for automatic cleanup)
     _workspace_temp: Option<TempDir>,
     /// Workspace path
     workspace_path: PathBuf,
@@ -40,8 +43,8 @@ pub struct UnifiedTestRunner {
     provider: Arc<PatternMockProvider>,
     /// The actual TUI application under test
     tui_app: TuiApp<TestBackend>,
-    /// Event tap receiver for listening to task completions
-    event_receiver: mpsc::UnboundedReceiver<UiEvent>,
+    /// Fixture event controller
+    event_controller: FixtureEventController,
 }
 
 impl UnifiedTestRunner {
@@ -66,6 +69,9 @@ impl UnifiedTestRunner {
     }
 
     /// Internal constructor shared by both public constructors
+    ///
+    /// # Errors
+    /// Returns error if workspace setup fails
     fn new_internal(
         fixture: TestFixture,
         workspace_temp: Option<TempDir>,
@@ -95,7 +101,7 @@ impl UnifiedTestRunner {
 
         // Create routing config for test orchestrator
         let mut config = RoutingConfig::default();
-        config.workspace.root_path = workspace_path.clone();
+        config.workspace.root_path.clone_from(&workspace_path);
         config.execution.max_concurrent_tasks = 4;
         // Disable all real tiers
         config.tiers.local_enabled = false;
@@ -114,24 +120,20 @@ impl UnifiedTestRunner {
         let orchestrator =
             RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?;
 
-        // Create fixture-based event source
-        let event_source = Box::new(FixtureEventSource::new(&fixture));
+        // Create fixture-based event source with controller
+        let (event_source, event_controller) = FixtureEventSource::new(&fixture);
 
         // Create test backend with reasonable size
         let terminal_size = fixture.setup.terminal_size.unwrap_or((80, 24));
         let backend = TestBackend::new(terminal_size.0, terminal_size.1);
 
         // Create TUI app with test backend, fixture event source, and orchestrator
-        let mut tui_app = TuiApp::new_for_test(
+        let tui_app = TuiApp::new_for_test(
             backend,
-            event_source,
+            Box::new(event_source),
             Some(workspace_path.clone()),
             Some(Arc::new(orchestrator)),
         )?;
-
-        // Set up event tap for task completion monitoring
-        let (event_tx, event_rx) = mpsc::unbounded_channel();
-        tui_app.test_set_event_tap(event_tx);
 
         Ok(Self {
             fixture,
@@ -139,7 +141,7 @@ impl UnifiedTestRunner {
             workspace_path,
             provider,
             tui_app,
-            event_receiver: event_rx,
+            event_controller,
         })
     }
 
@@ -161,101 +163,69 @@ impl UnifiedTestRunner {
         &self.tui_app
     }
 
-    /// Process a submit event and await completion
+    /// Await task completion by listening to UI events
     ///
     /// Since we process one submit at a time sequentially, we wait for the next
-    /// `TaskCompleted` or `TaskFailed` event. We drain ALL `TaskOutput` events
-    /// from the channel during this wait to ensure we capture outputs from the
+    /// `TaskCompleted` or `TaskFailed` event. We capture ALL `TaskOutput` events
+    /// during this wait to ensure we capture outputs from the
     /// main task and any subtasks (like TypeScript tool executions).
     ///
     /// Returns the task result and any captured output from `TaskOutput` events.
     ///
     /// # Errors
-    /// Returns error if submission fails
-    async fn process_submit_and_await(&mut self) -> Result<TaskCompletionResult> {
-        // Tick once to trigger submission
-        self.tui_app.tick()?;
+    /// Returns error if task completion fails
+    async fn await_task_completion(
+        &mut self,
+        ui_events: &mut broadcast::Receiver<UiEvent>,
+    ) -> Result<TaskCompletionResult> {
+        let mut outputs = Vec::new();
 
-        // Wait for the task to complete (10 second timeout)
-        let result = timeout(TokioDuration::from_secs(10), async {
-            let mut outputs = Vec::new();
+        loop {
+            // Process any pending UI events first (this broadcasts them)
+            self.tui_app.test_process_ui_events()?;
 
-            loop {
-                // Tick to process any pending work
-                self.tui_app.tick()?;
+            // Try to receive broadcast event with timeout
+            let ui_event = timeout(TokioDuration::from_millis(50), ui_events.recv()).await;
 
-                // Event-driven wait: block until we receive an event from the channel
-                // This eliminates arbitrary polling intervals
-                let event = tokio::select! {
-                    // Wait for event from channel
-                    event = self.event_receiver.recv() => {
-                        match event {
-                            Some(e) => e,
-                            None => {
-                                // Channel closed unexpectedly
-                                return Err(RoutingError::ExecutionFailed(
-                                    "Event channel closed before task completion".to_owned()
-                                ));
-                            }
-                        }
-                    }
-                    // Also allow timeout for ticking (to process UI updates)
-                    _ = tokio_time::sleep(TokioDuration::from_millis(50)) => {
-                        continue; // No event, just tick again
-                    }
-                };
-
-                // Process the received event
-                match event {
+            match ui_event {
+                Ok(Ok(event)) => match event {
                     UiEvent::TaskCompleted { result, .. } => {
-                        // Drain any remaining output events
-                        while let Ok(UiEvent::TaskOutput { output, .. }) =
-                            self.event_receiver.try_recv()
-                        {
-                            outputs.push(output);
-                        }
                         return Ok((result, outputs));
                     }
                     UiEvent::TaskFailed { error, task_id } => {
-                        // Drain any remaining output events
-                        while let Ok(UiEvent::TaskOutput { output, .. }) =
-                            self.event_receiver.try_recv()
-                        {
-                            outputs.push(output);
-                        }
-
-                        // Create a failure result instead of returning an error
-                        // This allows fixtures to verify that expected errors occurred
-                        let task_result = TaskResult {
-                            task_id,
-                            response: Response {
-                                text: error,
-                                confidence: 0.0,
-                                tokens_used: TokenUsage::default(),
-                                provider: "mock".to_owned(),
-                                latency_ms: 0,
-                            },
-                            tier_used: "default".to_owned(),
-                            tokens_used: TokenUsage::default(),
-                            validation: ValidationResult::default(),
-                            duration_ms: 0,
-                            work_unit: None,
-                        };
-                        return Ok((Box::new(task_result), outputs));
+                        return Ok((
+                            Box::new(Self::create_failure_result(task_id, error)),
+                            outputs,
+                        ));
                     }
                     UiEvent::TaskOutput { output, .. } => {
-                        // Capture output and continue waiting
                         outputs.push(output);
                     }
                     _ => {
                         // Ignore other events (TaskStarted, TaskProgress, etc.)
                     }
+                },
+                Ok(Err(err)) => {
+                    return Err(RoutingError::ExecutionFailed(format!(
+                        "UI event channel error: {err}"
+                    )));
+                }
+                Err(_) => {
+                    // Timeout - loop will process more UI events
                 }
             }
-        })
-        .await;
+        }
+    }
 
-        result.map_err(|_| RoutingError::ExecutionFailed("Task execution timeout".to_owned()))?
+    /// Process input events from the event source
+    ///
+    /// # Errors
+    /// Returns error if input processing fails
+    async fn process_input_events(&mut self) -> Result<()> {
+        while let Some(evt) = self.tui_app.test_next_input_event().await? {
+            self.tui_app.test_handle_input(&evt)?;
+        }
+        Ok(())
     }
 
     /// Run the test
@@ -264,34 +234,62 @@ impl UnifiedTestRunner {
     /// Returns error if test execution or verification fails
     pub async fn run(&mut self) -> Result<VerificationResult> {
         let workspace_path = self.workspace_path.clone();
-
-        // Clone the events and final_verify to avoid borrowing issues
+        let mut ui_events = self.tui_app.test_subscribe_ui_events();
         let events = self.fixture.events.clone();
         let final_verify = self.fixture.final_verify.clone();
-
-        // Create single execution tracker for entire fixture run
         let mut execution_tracker = ExecutionResultTracker::new();
-
-        // Create single verifier instance that will use the tracker
         let mut verifier = UnifiedVerifier::new(&workspace_path);
+        let mut pending_task: Option<PendingTaskResult> = None;
 
         for event in &events {
             match event {
                 TestEvent::UserInput(input_event) if input_event.data.submit => {
-                    // Process submit and await completion with result capture
-                    let (task_result, outputs) = self.process_submit_and_await().await?;
+                    // Complete any pending task first
+                    Self::complete_pending_task(&mut pending_task, &mut execution_tracker);
 
-                    // Extract execution result and add to tracker
-                    let execution_result = Self::extract_execution_result(&task_result, &outputs);
-                    execution_tracker.add_result(execution_result, outputs, task_result);
+                    // Process all input events (characters + Enter)
+                    self.process_input_events().await?;
+
+                    // Verify user input event AFTER submission but BEFORE task completes
+                    verifier
+                        .verify_event(
+                            event,
+                            &input_event.verify,
+                            Some(&self.tui_app),
+                            &execution_tracker,
+                        )
+                        .map_err(RoutingError::ExecutionFailed)?;
+
+                    // Advance to next fixture event
+                    self.event_controller.advance();
+
+                    // Now await task completion
+                    let (task_result, outputs) = self.await_task_completion(&mut ui_events).await?;
+                    pending_task = Some((task_result, outputs));
                 }
-                TestEvent::UserInput(_) | TestEvent::KeyPress(_) => {
-                    // Non-submit input or key press
-                    self.tui_app.tick()?;
+                TestEvent::UserInput(input_event) => {
+                    // Non-submit input - process all input events
+                    self.process_input_events().await?;
+
+                    // Verify user input event AFTER processing
+                    verifier
+                        .verify_event(
+                            event,
+                            &input_event.verify,
+                            Some(&self.tui_app),
+                            &execution_tracker,
+                        )
+                        .map_err(RoutingError::ExecutionFailed)?;
+
+                    // Advance to next fixture event
+                    self.event_controller.advance();
+                }
+                TestEvent::KeyPress(_) => {
+                    self.process_input_events().await?;
+                    self.event_controller.advance();
                 }
                 TestEvent::LlmResponse(llm_event) => {
-                    // LLM response events are handled by the orchestrator internally
-                    // Just verify the results after processing
+                    Self::complete_pending_task(&mut pending_task, &mut execution_tracker);
                     verifier
                         .verify_event(
                             event,
@@ -300,24 +298,51 @@ impl UnifiedTestRunner {
                             &execution_tracker,
                         )
                         .map_err(RoutingError::ExecutionFailed)?;
+                    self.event_controller.advance();
                 }
                 TestEvent::Wait(wait_event) => {
-                    // Sleep for specified duration
-                    tokio_time::sleep(TokioDuration::from_millis(wait_event.data.duration_ms))
-                        .await;
-
-                    // Process any pending UI events during wait
-                    self.tui_app.tick()?;
+                    sleep(TokioDuration::from_millis(wait_event.data.duration_ms)).await;
+                    self.event_controller.advance();
                 }
             }
         }
 
-        // Verify final state (pass TUI app reference and execution tracker)
+        Self::complete_pending_task(&mut pending_task, &mut execution_tracker);
         verifier
             .verify_final(&final_verify, Some(&self.tui_app), &execution_tracker)
             .map_err(RoutingError::ExecutionFailed)?;
 
         Ok(verifier.result())
+    }
+
+    /// Complete a pending task by adding its result to the tracker
+    fn complete_pending_task(
+        pending_task: &mut Option<PendingTaskResult>,
+        execution_tracker: &mut ExecutionResultTracker,
+    ) {
+        if let Some((task_result, outputs)) = pending_task.take() {
+            let execution_result = Self::extract_execution_result(&task_result, &outputs);
+            execution_tracker.add_result(execution_result, outputs, task_result);
+        }
+    }
+
+    /// Create a failure task result for a failed task
+    fn create_failure_result(task_id: TaskId, error: String) -> TaskResult {
+        TaskResult {
+            task_id,
+            response: Response {
+                text: error,
+                confidence: 0.0,
+                tokens_used: TokenUsage::default(),
+                provider: "mock".to_owned(),
+                latency_ms: 0,
+            },
+            tier_used: "default".to_owned(),
+            tokens_used: TokenUsage::default(),
+            validation: ValidationResult::default(),
+            duration_ms: 0,
+            work_unit: None,
+        }
     }
 
     /// Extract execution result from `TaskResult` and captured outputs

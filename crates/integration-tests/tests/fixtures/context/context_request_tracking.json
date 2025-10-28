@@ -65,9 +65,6 @@
         ]
       },
       "verify": {
-        "state": {
-          "conversation_count": 4
-        },
         "execution": {}
       }
     },
@@ -125,6 +122,9 @@
   "final_verify": {
     "execution": {
       "all_tasks_completed": true
+    },
+    "state": {
+      "conversation_count": 8
     },
     "files": [
       {

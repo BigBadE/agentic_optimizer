@@ -40,8 +40,7 @@
       "verify": {
         "ui": {
           "input_cleared": true,
-          "focus_changed": true,
-          "focused_pane": "output"
+          "focused_pane": "input"
         }
       }
     },

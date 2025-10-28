@@ -1,35 +1,52 @@
-use merlin_deps::crossterm::event::{self, Event};
+use merlin_deps::async_trait::async_trait;
+use merlin_deps::crossterm::event::{Event, EventStream};
+use merlin_deps::futures::StreamExt as _;
 use std::io;
-use std::time::Duration;
 
 /// Abstraction over the input event source used by the TUI.
 ///
-/// Implementations must mirror crossterm's semantics:
-/// - `poll(timeout)` waits up to timeout for an event and returns whether one is available.
-/// - `read()` blocks until an event is available and returns it.
-pub trait InputEventSource: Send + Sync {
-    /// Wait up to `timeout` for an event to become available.
+/// Async trait for receiving input events. Implementations provide
+/// asynchronous event streams that can be awaited without polling.
+#[async_trait]
+pub trait InputEventSource: Send {
+    /// Wait for the next input event to arrive.
     ///
-    /// # Errors
-    /// Returns an error if the event polling operation fails.
-    fn poll(&mut self, timeout: Duration) -> io::Result<bool>;
-
-    /// Block until an input `Event` is available and return it.
+    /// Returns `None` when the event stream is exhausted (only for fixtures).
     ///
     /// # Errors
     /// Returns an error if reading the event fails.
-    fn read(&mut self) -> io::Result<Event>;
+    async fn next_event(&mut self) -> io::Result<Option<Event>>;
 }
 
 /// Default event source backed by crossterm.
-pub struct CrosstermEventSource;
+pub struct CrosstermEventSource {
+    /// Crossterm event stream
+    stream: EventStream,
+}
 
-impl InputEventSource for CrosstermEventSource {
-    fn poll(&mut self, timeout: Duration) -> io::Result<bool> {
-        event::poll(timeout)
+impl CrosstermEventSource {
+    /// Create new crossterm event source
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            stream: EventStream::new(),
+        }
     }
+}
 
-    fn read(&mut self) -> io::Result<Event> {
-        event::read()
+impl Default for CrosstermEventSource {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+#[async_trait]
+impl InputEventSource for CrosstermEventSource {
+    async fn next_event(&mut self) -> io::Result<Option<Event>> {
+        match self.stream.next().await {
+            Some(Ok(event)) => Ok(Some(event)),
+            Some(Err(error)) => Err(error),
+            None => Ok(None), // Stream ended (shouldn't happen in practice)
+        }
     }
 }

@@ -8,7 +8,7 @@ use std::io;
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 
 use super::tui_app::TuiApp;
 use crate::ui::event_source::CrosstermEventSource;
@@ -33,6 +33,7 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
         log_file: Option<fs::File>,
     ) -> Result<Self> {
         let (sender, receiver) = mpsc::unbounded_channel();
+        let (broadcast_sender, _) = broadcast::channel(100);
 
         let mut terminal = Terminal::new(CrosstermBackend::new(io::stdout()))
             .map_err(|err| RoutingError::Other(err.to_string()))?;
@@ -69,6 +70,7 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             terminal,
             event_receiver: receiver,
             event_sender: sender,
+            ui_event_broadcast: broadcast_sender,
             task_manager: TaskManager::default(),
             state,
             input_manager: InputManager::default(),
@@ -76,14 +78,12 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             focused_pane: FocusedPane::Input,
             pending_input: None,
             persistence,
-            event_source: Box::new(CrosstermEventSource),
+            event_source: Box::new(CrosstermEventSource::new()),
             last_render_time: Instant::now(),
             layout_cache: layout::LayoutCache::new(),
             thread_store,
             orchestrator,
             log_file,
-            #[cfg(feature = "test-util")]
-            test_event_tap: None,
         };
 
         Ok(app)

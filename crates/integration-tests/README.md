@@ -68,7 +68,10 @@ Fixtures are JSON files with the following structure:
 
 Tests instantiate the actual `TuiApp` from `merlin-cli` with:
 - `TestBackend` - ratatui test backend for headless TUI testing
-- `FixtureEventSource` - Injects fixture events into the TUI event loop
+- `FixtureEventSource` - Provides events on-demand, synchronized with test runner
+  - Uses shared state with `FixtureEventController` to advance through events
+  - Only provides crossterm events for the current fixture event
+  - Prevents event queue drainage issues by controlling event availability
 - Read-only access to TUI state for verification (via `test-util` feature)
 
 **No duplicate behavior**: The test runner does not re-implement any CLI logic.
@@ -123,11 +126,23 @@ provider.add_pattern("error handling", "Added error handling...");
 
 ## Testing Status
 
-**✅ Comprehensive**
+**✅ Comprehensive** (87% pass rate - 48/55 passing)
 
-- **All crates tested**: Via 54 fixtures
+- **All crates tested**: Via 55 fixtures
 - **Auto-discovery**: Single test runner
 - **Coverage verified**: Via `scripts/commit.sh`
+- **Conversation count verification**: Excludes system messages, only counts User/Assistant
+
+### Known Issues (7 fixtures)
+
+- **context_request_tracking.json**: Only processing 4/8 events (early termination)
+- **Pattern matching for decomposed tasks** (3 fixtures): Subtask queries don't match mock patterns
+  - conflict_detection.json
+  - analysis_decomposition.json
+  - complex_data_processing.json
+- **comprehensive_ui_verification.json**: UI focus/task count verification issues
+- **transactional_rollback.json**: File verification pattern mismatch
+- **query_context_extraction.json**: Execution timeout (potential performance issue)
 
 ## Code Quality
 

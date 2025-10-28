@@ -21,7 +21,7 @@ impl<B: Backend> TuiApp<B> {
     pub(super) fn handle_key_event(&mut self, key: &KeyEvent) -> bool {
         // Handle cancel/queue prompt keys if queued input exists
         if self.state.queued_input.is_some() {
-            match key.code {
+            return match key.code {
                 KeyCode::Char('c') => {
                     // Cancel current work and submit queued input
                     self.state.cancel_requested = true;
@@ -29,25 +29,25 @@ impl<B: Backend> TuiApp<B> {
                         self.state.processing_status = Some("[Cancelling work...]".to_string());
                         self.pending_input = Some(queued);
                     }
-                    return false;
+                    false
                 }
                 KeyCode::Char('a') => {
                     // Accept queue - just keep the queued input
                     self.state.processing_status =
                         Some("[Input queued, will run after current work]".to_string());
-                    return false;
+                    false
                 }
                 KeyCode::Esc => {
                     // Discard queued input
                     self.state.queued_input = None;
                     self.state.processing_status = None;
-                    return false;
+                    false
                 }
                 _ => {
                     // Ignore other keys when prompt is showing
-                    return false;
+                    false
                 }
-            }
+            };
         }
 
         match key.code {

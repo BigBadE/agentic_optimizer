@@ -69,7 +69,7 @@
     {
       "type": "llm_response",
       "trigger": {
-        "pattern": "Execute complex workflow with filtering and aggregation",
+        "pattern": "Execute complex workflow",
         "match_type": "contains"
       },
       "response": {

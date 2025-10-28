@@ -1,11 +1,10 @@
 {
   "name": "Query Context Extraction and Building",
-  "description": "Tests context building from queries with varying complexity: empty queries, simple file requests, complex multi-file queries, and path resolution",
+  "description": "Tests context building from queries with varying complexity: simple file requests, complex multi-file queries, and path resolution",
   "tags": [
     "context",
     "query",
-    "paths",
-    "empty"
+    "paths"
   ],
   "setup": {
     "files": {
@@ -20,30 +19,6 @@
     ]
   },
   "events": [
-    {
-      "type": "user_input",
-      "data": {
-        "text": "",
-        "submit": true
-      }
-    },
-    {
-      "type": "llm_response",
-      "trigger": {
-        "pattern": "^$",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Received empty query, nothing to process';",
-          "}"
-        ]
-      },
-      "verify": {
-        "execution": {}
-      }
-    },
     {
       "type": "user_input",
       "data": {

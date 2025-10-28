@@ -21,9 +21,10 @@ export MERLIN_FOLDER="${TARGET_DIR}/.merlin"
 mkdir -p benchmarks/data/coverage
 
 LLVM_COV_DIR="${TARGET_DIR}/llvm-cov-target"
-# Clean any existing prof files for a clean build
-rm -f "${LLVM_COV_DIR}/*.profdata" 2>/dev/null
-rm -f "${LLVM_COV_DIR}/*.profraw" 2>/dev/null
+# Clean any existing prof files and temp directories for a clean build
+rm -f "${LLVM_COV_DIR}"/*.profdata 2>/dev/null
+rm -f "${LLVM_COV_DIR}"/*.profraw 2>/dev/null
+rm -rf "${LLVM_COV_DIR}"/temp_lcov_* 2>/dev/null
 
 # Run coverage on all workspace crates
 # Excludes benchmark crates and test repositories from instrumentation
@@ -68,9 +69,8 @@ MERGE_TIME=$((MERGE_END - MERGE_START))
 PROFDATA_SIZE=$(du -sh "${PROFDATA_FILE}" 2>/dev/null | awk '{print $1}' || echo "unknown")
 echo "[coverage] Profraw files merged in ${MERGE_TIME}s (profdata size: ${PROFDATA_SIZE})"
 
-# Keep profraw files for grcov (will be cleaned up later)
-
-# Delete the profraw list file that cargo llvm-cov creates
+# Delete the prof files that cargo llvm-cov creates
+rm -f "${LLVM_COV_DIR}/*.profraw" 2>/dev/null
 rm -f "${LLVM_COV_DIR}/${PROJECT_NAME}-profraw-list" 2>/dev/null
 
 # Generate coverage reports using llvm-cov in parallel
@@ -97,19 +97,32 @@ IGNORE_PATTERN="test_repositories|\.cargo|\.rustup|/tests/|\\\\rustc\\\\|\\\\tar
 TEMP_COV_DIR="${LLVM_COV_DIR}/temp_lcov_$$"
 mkdir -p "$TEMP_COV_DIR"
 
+# Convert paths to Windows format if on MSYS/Windows (llvm-cov is a native Windows tool)
+if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+  PROFDATA_FILE_NATIVE="$(cygpath -w "${PROFDATA_FILE}")"
+else
+  PROFDATA_FILE_NATIVE="${PROFDATA_FILE}"
+fi
+
 # Run llvm-cov export in parallel (one thread per binary)
 echo "[coverage] Running llvm-cov in parallel (${#BINARIES[@]} threads)..."
 PIDS=()
 for i in "${!BINARIES[@]}"; do
   binary="${BINARIES[$i]}"
+  # Convert binary path to Windows format if needed
+  if [[ "$OSTYPE" == "msys" || "$OSTYPE" == "win32" ]]; then
+    binary_native="$(cygpath -w "${binary}")"
+  else
+    binary_native="${binary}"
+  fi
   output_file="${TEMP_COV_DIR}/cov_${i}.lcov"
 
   (
     llvm-cov export \
       -format=lcov \
-      -instr-profile="${PROFDATA_FILE}" \
+      -instr-profile="${PROFDATA_FILE_NATIVE}" \
       -ignore-filename-regex="${IGNORE_PATTERN}" \
-      "$binary" \
+      "$binary_native" \
       > "$output_file" 2>/dev/null
   ) &
   PIDS+=($!)
@@ -145,7 +158,3 @@ grcov benchmarks/data/coverage/latest.info \
 REPORT_END=$(date +%s)
 REPORT_TIME=$((REPORT_END - REPORT_START))
 echo "[coverage] Coverage reports generated in ${REPORT_TIME}s"
-
-# Clean up profraw files now that we're done
-echo "[coverage] Cleaning up profraw files..."
-find "${LLVM_COV_DIR}" -name "*.profraw" -delete 2>/dev/null

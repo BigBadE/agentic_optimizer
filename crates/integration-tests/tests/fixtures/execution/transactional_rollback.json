@@ -1,0 +1,124 @@
+{
+  "name": "Transactional File Operations with Rollback",
+  "description": "Tests transactional file operations with multiple edits and rollback on error",
+  "tags": [
+    "execution",
+    "transaction",
+    "rollback",
+    "error-handling"
+  ],
+  "setup": {
+    "files": {
+      "config.toml": "version = \"1.0\"\nname = \"test\"",
+      "data.json": "{\"count\": 0}",
+      "readme.md": "# Test Project"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Update multiple files: increment count in data.json, update version in config.toml, add note to readme.md",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Update multiple files",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Edit multiple files in sequence",
+          "  await editFile('data.json', '\"count\": 0', '\"count\": 1');",
+          "  await editFile('config.toml', 'version = \"1.0\"', 'version = \"1.1\"');",
+          "  await editFile('readme.md', '# Test Project', '# Test Project\\n\\nUpdated version to 1.1');",
+          "  ",
+          "  return 'Successfully updated all three files';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "data.json",
+            "exists": true,
+            "contains": ["\"count\": 1"]
+          },
+          {
+            "path": "config.toml",
+            "exists": true,
+            "contains": ["version = \"1.1\""]
+          },
+          {
+            "path": "readme.md",
+            "exists": true,
+            "contains": ["Updated version to 1.1"]
+          }
+        ],
+        "execution": {}
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Try to update files where one operation will fail",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "one operation will fail",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    // First edit should succeed",
+          "    await editFile('config.toml', 'version = \"1.1\"', 'version = \"2.0\"');",
+          "    ",
+          "    // This should fail - trying to edit non-existent file",
+          "    await editFile('nonexistent.txt', 'foo', 'bar');",
+          "    ",
+          "    return 'Unexpectedly succeeded';",
+          "  } catch (error) {",
+          "    // Note: No automatic rollback - first edit persists even though second failed",
+          "    const config = await readFile('config.toml');",
+          "    return `Error caught: ${error}. Config now has: ${config.includes('2.0') ? 'version 2.0' : 'unknown version'}`;",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "data.json",
+        "contains": ["\"count\": 1"]
+      },
+      {
+        "path": "config.toml",
+        "contains": ["version = \"2.0\""]
+      },
+      {
+        "path": "readme.md",
+        "contains": ["Updated version to 1.1"]
+      }
+    ]
+  }
+}

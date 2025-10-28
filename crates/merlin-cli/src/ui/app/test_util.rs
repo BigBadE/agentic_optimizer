@@ -15,12 +15,13 @@ use crate::ui::state::UiState;
 use crate::ui::task_manager::TaskManager;
 use crate::ui::theme::Theme;
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
+use merlin_deps::crossterm::event::{Event as CrosstermEvent, KeyEventKind};
 use merlin_deps::ratatui::Terminal;
 use merlin_routing::{Result, RoutingError, UiEvent};
 use std::path::PathBuf;
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 
 #[allow(dead_code, reason = "Temporary allow")]
 impl<B: Backend> TuiApp<B> {
@@ -37,6 +38,7 @@ impl<B: Backend> TuiApp<B> {
         orchestrator: Option<Arc<RoutingOrchestrator>>,
     ) -> Result<Self> {
         let (sender, receiver) = mpsc::unbounded_channel();
+        let (broadcast_sender, _) = broadcast::channel(100);
 
         let mut terminal =
             Terminal::new(backend).map_err(|err| RoutingError::Other(err.to_string()))?;
@@ -73,6 +75,7 @@ impl<B: Backend> TuiApp<B> {
             terminal,
             event_receiver: receiver,
             event_sender: sender,
+            ui_event_broadcast: broadcast_sender,
             task_manager: TaskManager::default(),
             state,
             input_manager: InputManager::default(),
@@ -86,18 +89,9 @@ impl<B: Backend> TuiApp<B> {
             thread_store,
             orchestrator,
             log_file: None,
-            test_event_tap: None,
         };
 
         Ok(app)
-    }
-
-    /// Set event tap for testing
-    ///
-    /// The event tap receives copies of all UI events processed by the app.
-    /// This allows tests to listen for task completion without polling.
-    pub fn test_set_event_tap(&mut self, sender: mpsc::UnboundedSender<UiEvent>) {
-        self.test_event_tap = Some(sender);
     }
 
     /// Get read-only access to UI state for testing
@@ -123,5 +117,63 @@ impl<B: Backend> TuiApp<B> {
     /// Get focused pane for testing
     pub fn test_focused_pane(&self) -> FocusedPane {
         self.focused_pane
+    }
+
+    /// Subscribe to UI events for testing
+    pub fn test_subscribe_ui_events(&self) -> broadcast::Receiver<UiEvent> {
+        self.ui_event_broadcast.subscribe()
+    }
+
+    /// Process pending UI events for testing (non-blocking)
+    ///
+    /// # Errors
+    /// Returns error if event processing fails
+    pub fn test_process_ui_events(&mut self) -> Result<()> {
+        while let Ok(ui_event) = self.event_receiver.try_recv() {
+            // Broadcast to observers
+            drop(self.ui_event_broadcast.send(ui_event.clone()));
+
+            // Handle the event
+            let persistence = self.persistence.as_ref();
+            let mut handler = crate::ui::event_handler::EventHandler::new(
+                &mut self.task_manager,
+                &mut self.state,
+                persistence,
+            );
+            handler.handle_event(ui_event);
+        }
+        Ok(())
+    }
+
+    /// Get next input event from fixture for testing
+    ///
+    /// # Errors
+    /// Returns error if reading event fails
+    pub async fn test_next_input_event(&mut self) -> Result<Option<CrosstermEvent>> {
+        self.event_source
+            .next_event()
+            .await
+            .map_err(|err| RoutingError::Other(err.to_string()))
+    }
+
+    /// Handle input event for testing
+    ///
+    /// # Errors
+    /// Returns error if event processing fails
+    pub fn test_handle_input(&mut self, event: &CrosstermEvent) -> Result<()> {
+        // Process any pending UI events first
+        self.test_process_ui_events()?;
+
+        // Handle the input
+        if let CrosstermEvent::Key(key) = event
+            && matches!(key.kind, KeyEventKind::Press | KeyEventKind::Repeat)
+        {
+            self.handle_key_event(key);
+        }
+
+        // Process any UI events triggered by the input
+        self.test_process_ui_events()?;
+
+        Ok(())
     }
 }

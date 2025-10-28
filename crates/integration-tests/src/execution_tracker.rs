@@ -37,7 +37,6 @@ impl ExecutionRecord {
     }
 
     /// Get execution result
-    #[must_use]
     pub fn result(&self) -> &ToolResult<Value> {
         &self.result
     }

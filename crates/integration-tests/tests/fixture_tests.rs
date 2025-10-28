@@ -17,7 +17,7 @@
     )
 )]
 
-use futures::stream::{self, StreamExt};
+use futures::stream::{self, StreamExt as _};
 use integration_tests::{UnifiedTestRunner, VerificationResult};
 use std::fs::read_dir;
 use std::path::PathBuf;
@@ -57,7 +57,7 @@ async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<(String, Result<VerificationRe
             let result = run_fixture(fixture_path).await;
             (fixture_name, result)
         })
-        .buffer_unordered(4) // Run 4 fixtures concurrently for best balance
+        .buffer_unordered(32) // High concurrency for fast fixture execution
         .collect()
         .await
 }
@@ -77,11 +77,17 @@ async fn test_all_fixtures() {
         .map(|entry| entry.path())
         .collect::<Vec<_>>();
 
-    let mut all_results = vec![];
-    for subdir in subdirs {
-        let results = run_fixtures_in_dir(subdir).await;
-        all_results.extend(results);
-    }
+    let subdir_count = subdirs.len();
+
+    // Run all subdirectories in parallel
+    let all_results: Vec<_> = stream::iter(subdirs)
+        .map(|subdir| async move { run_fixtures_in_dir(subdir).await })
+        .buffer_unordered(subdir_count.max(1)) // Process all subdirs concurrently
+        .collect::<Vec<_>>()
+        .await
+        .into_iter()
+        .flatten()
+        .collect();
 
     // Collect all results for final report
     let mut failures_with_details = vec![];

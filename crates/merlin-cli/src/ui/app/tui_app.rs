@@ -5,7 +5,7 @@ use merlin_deps::ratatui::backend::Backend;
 use std::fs;
 use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::mpsc;
+use tokio::sync::{broadcast, mpsc};
 
 use crate::ui::event_source::InputEventSource;
 use crate::ui::input::InputManager;
@@ -29,6 +29,8 @@ pub struct TuiApp<B: Backend> {
     pub(crate) event_receiver: mpsc::UnboundedReceiver<UiEvent>,
     /// Channel for sending UI events (kept internal)
     pub(crate) event_sender: mpsc::UnboundedSender<UiEvent>,
+    /// Broadcast channel for UI events (observers can subscribe)
+    pub(crate) ui_event_broadcast: broadcast::Sender<UiEvent>,
     /// Manages tasks and their ordering/visibility
     pub(crate) task_manager: TaskManager,
     /// Current UI state, including selections and flags
@@ -55,9 +57,6 @@ pub struct TuiApp<B: Backend> {
     pub(crate) orchestrator: Option<Arc<RoutingOrchestrator>>,
     /// Log file for task execution
     pub(crate) log_file: Option<fs::File>,
-    /// Event tap for testing - receives copies of all UI events
-    #[cfg(feature = "test-util")]
-    pub(crate) test_event_tap: Option<mpsc::UnboundedSender<UiEvent>>,
 }
 
 // Note: all input is sourced from `event_source` to allow test injection without

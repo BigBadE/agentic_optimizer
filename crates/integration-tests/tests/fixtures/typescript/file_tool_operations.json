@@ -12,11 +12,6 @@
     "terminal_size": [
       80,
       24
-    ],
-    "tools": [
-      "WriteFileTool",
-      "ReadFileTool",
-      "ListFilesTool"
     ]
   },
   "events": [
@@ -57,7 +52,7 @@
           {
             "path": "test.txt",
             "exists": true,
-            "content_matches": "Hello from TypeScript!"
+            "exact_content": "Hello from TypeScript!"
           }
         ]
       }

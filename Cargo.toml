@@ -51,7 +51,7 @@ uuid = { version = "1.18", features = ["v4", "serde"] }
 walkdir = "2.5"
 
 # TUI dependencies (carefully managed for compatibility)
-crossterm = "0.28"  # Cannot update to 0.29 - incompatible with tui-textarea 0.7
+crossterm = { version = "0.28", features = ["event-stream"] }  # Cannot update to 0.29 - incompatible with tui-textarea 0.7
 ratatui = "0.29"
 tui-textarea = "0.7"
 unicode-width = "0.2"

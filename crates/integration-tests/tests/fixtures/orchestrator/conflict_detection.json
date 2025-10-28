@@ -98,7 +98,7 @@
     {
       "type": "llm_response",
       "trigger": {
-        "pattern": "file_a\\.rs",
+        "pattern": "file_a.rs",
         "match_type": "contains"
       },
       "response": {
@@ -131,7 +131,7 @@
     {
       "type": "llm_response",
       "trigger": {
-        "pattern": "file_b\\.rs",
+        "pattern": "file_b.rs",
         "match_type": "contains"
       },
       "response": {

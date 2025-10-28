@@ -17,6 +17,7 @@
     )
 )]
 
+use futures::stream::{self, StreamExt};
 use integration_tests::{UnifiedTestRunner, VerificationResult};
 use std::fs::read_dir;
 use std::path::PathBuf;
@@ -40,23 +41,25 @@ async fn run_fixture(fixture_path: PathBuf) -> Result<VerificationResult, String
         .map_err(|error| format!("Failed to run fixture {fixture_name}: {error}"))
 }
 
-/// Helper to run all fixtures in a directory
+/// Helper to run all fixtures in a directory in parallel
 async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<(String, Result<VerificationResult, String>)> {
     let fixtures = UnifiedTestRunner::discover_fixtures(&dir).unwrap_or(vec![]);
-    let mut results = vec![];
 
-    for fixture_path in fixtures {
-        let fixture_name = fixture_path
-            .file_name()
-            .and_then(|name| name.to_str())
-            .unwrap_or("unknown")
-            .to_owned();
+    // Run fixtures in parallel with buffer_unordered
+    stream::iter(fixtures)
+        .map(|fixture_path| async move {
+            let fixture_name = fixture_path
+                .file_name()
+                .and_then(|name| name.to_str())
+                .unwrap_or("unknown")
+                .to_owned();
 
-        let result = run_fixture(fixture_path).await;
-        results.push((fixture_name, result));
-    }
-
-    results
+            let result = run_fixture(fixture_path).await;
+            (fixture_name, result)
+        })
+        .buffer_unordered(4) // Run 4 fixtures concurrently for best balance
+        .collect()
+        .await
 }
 
 /// Run all fixtures in the fixtures directory

@@ -1699,6 +1699,7 @@ name = "integration-tests"
 version = "0.1.0"
 dependencies = [
  "async-trait",
+ "futures",
  "merlin-agent",
  "merlin-cli",
  "merlin-context",

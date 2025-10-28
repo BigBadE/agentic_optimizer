@@ -29,6 +29,7 @@ pub struct TestFixture {
 
 /// Setup configuration
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct SetupConfig {
     /// Files to create before test
     #[serde(default)]
@@ -66,6 +67,7 @@ pub struct UserInputEvent {
 
 /// User input data
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct UserInputData {
     /// Text to input
     pub text: String,
@@ -86,6 +88,7 @@ pub struct KeyPressEvent {
 
 /// Key press data
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct KeyPressData {
     /// Key to press
     pub key: String,
@@ -105,6 +108,7 @@ pub struct LlmResponseEvent {
 
 /// Trigger configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TriggerConfig {
     /// Pattern to match
     pub pattern: String,
@@ -126,6 +130,7 @@ pub enum MatchType {
 
 /// Response configuration
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct ResponseConfig {
     /// TypeScript code lines
     pub typescript: Vec<String>,
@@ -140,6 +145,7 @@ pub struct WaitEvent {
 
 /// Wait data
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct WaitData {
     /// Duration in milliseconds
     pub duration_ms: u64,
@@ -149,6 +155,7 @@ pub struct WaitData {
 
 /// Verification configuration
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct VerifyConfig {
     /// Execution verification
     pub execution: Option<ExecutionVerify>,
@@ -181,6 +188,7 @@ pub struct ExecutionVerify {
 
 /// File verification
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FileVerify {
     /// File path (relative to workspace)
     pub path: String,
@@ -202,6 +210,7 @@ pub struct FileVerify {
 
 /// UI verification
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct UiVerify {
     /// Input text
     pub input_text: Option<String>,
@@ -276,6 +285,7 @@ pub struct UiVerify {
 
 /// State verification
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct StateVerify {
     /// Conversation count
     pub conversation_count: Option<usize>,
@@ -287,6 +297,7 @@ pub struct StateVerify {
 
 /// Final verification
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct FinalVerify {
     /// Execution verification
     pub execution: Option<ExecutionVerify>,
@@ -326,19 +337,21 @@ impl TestEvent {
     /// Get verification config
     #[must_use]
     pub fn verify_config(&self) -> &VerifyConfig {
+        /// Empty verification config for events without verification
+        const EMPTY_VERIFY: VerifyConfig = VerifyConfig {
+            execution: None,
+            files: None,
+            ui: None,
+            state: None,
+        };
+
         match self {
             Self::UserInput(event) => &event.verify,
             Self::KeyPress(event) => &event.verify,
             Self::LlmResponse(event) => &event.verify,
             Self::Wait(_) => {
                 // Wait events don't have verification
-                static EMPTY: VerifyConfig = VerifyConfig {
-                    execution: None,
-                    files: None,
-                    ui: None,
-                    state: None,
-                };
-                &EMPTY
+                &EMPTY_VERIFY
             }
         }
     }

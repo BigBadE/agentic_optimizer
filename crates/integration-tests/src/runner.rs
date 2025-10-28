@@ -32,8 +32,10 @@ type TaskCompletionResult = (Box<TaskResult>, Vec<String>);
 pub struct UnifiedTestRunner {
     /// Test fixture
     fixture: TestFixture,
-    /// Workspace directory
-    workspace: TempDir,
+    /// Workspace directory (owned TempDir for automatic cleanup)
+    _workspace_temp: Option<TempDir>,
+    /// Workspace path
+    workspace_path: PathBuf,
     /// Mock provider
     provider: Arc<PatternMockProvider>,
     /// The actual TUI application under test
@@ -43,19 +45,37 @@ pub struct UnifiedTestRunner {
 }
 
 impl UnifiedTestRunner {
-    /// Create new test runner
+    /// Create new test runner with auto-managed workspace
     ///
     /// # Errors
     /// Returns error if workspace setup fails
     pub fn new(fixture: TestFixture) -> Result<Self> {
         let workspace = TempDir::new()
             .map_err(|err| RoutingError::Other(format!("Failed to create workspace: {err}")))?;
+        let workspace_path = workspace.path().to_path_buf();
 
+        Self::new_internal(fixture, Some(workspace), workspace_path)
+    }
+
+    /// Create new test runner with provided workspace directory
+    ///
+    /// # Errors
+    /// Returns error if workspace setup fails
+    pub fn new_with_workspace(fixture: TestFixture, workspace_path: PathBuf) -> Result<Self> {
+        Self::new_internal(fixture, None, workspace_path)
+    }
+
+    /// Internal constructor shared by both public constructors
+    fn new_internal(
+        fixture: TestFixture,
+        workspace_temp: Option<TempDir>,
+        workspace_path: PathBuf,
+    ) -> Result<Self> {
         let provider = Arc::new(PatternMockProvider::new("test-mock"));
 
         // Setup files
         for (path, content) in &fixture.setup.files {
-            let file_path = workspace.path().join(path);
+            let file_path = workspace_path.join(path);
             if let Some(parent) = file_path.parent() {
                 fs::create_dir_all(parent).map_err(|err| {
                     RoutingError::Other(format!("Failed to create directory: {err}"))
@@ -75,7 +95,7 @@ impl UnifiedTestRunner {
 
         // Create routing config for test orchestrator
         let mut config = RoutingConfig::default();
-        config.workspace.root_path = workspace.path().to_path_buf();
+        config.workspace.root_path = workspace_path.clone();
         config.execution.max_concurrent_tasks = 4;
         // Disable all real tiers
         config.tiers.local_enabled = false;
@@ -105,7 +125,7 @@ impl UnifiedTestRunner {
         let mut tui_app = TuiApp::new_for_test(
             backend,
             event_source,
-            Some(workspace.path().to_path_buf()),
+            Some(workspace_path.clone()),
             Some(Arc::new(orchestrator)),
         )?;
 
@@ -115,7 +135,8 @@ impl UnifiedTestRunner {
 
         Ok(Self {
             fixture,
-            workspace,
+            _workspace_temp: workspace_temp,
+            workspace_path,
             provider,
             tui_app,
             event_receiver: event_rx,
@@ -125,7 +146,7 @@ impl UnifiedTestRunner {
     /// Get workspace path
     #[must_use]
     pub fn workspace_path(&self) -> &Path {
-        self.workspace.path()
+        &self.workspace_path
     }
 
     /// Get mock provider
@@ -160,17 +181,76 @@ impl UnifiedTestRunner {
             let mut outputs = Vec::new();
 
             loop {
-                // Keep ticking to process events
+                // Tick to process any pending work
                 self.tui_app.tick()?;
 
-                // Check for completion events and capture outputs
-                // Returns Some if task completed/failed, None if still running
-                if let Some(result) = self.process_completion_events(&mut outputs) {
-                    return result;
-                }
+                // Event-driven wait: block until we receive an event from the channel
+                // This eliminates arbitrary polling intervals
+                let event = tokio::select! {
+                    // Wait for event from channel
+                    event = self.event_receiver.recv() => {
+                        match event {
+                            Some(e) => e,
+                            None => {
+                                // Channel closed unexpectedly
+                                return Err(RoutingError::ExecutionFailed(
+                                    "Event channel closed before task completion".to_owned()
+                                ));
+                            }
+                        }
+                    }
+                    // Also allow timeout for ticking (to process UI updates)
+                    _ = tokio_time::sleep(TokioDuration::from_millis(50)) => {
+                        continue; // No event, just tick again
+                    }
+                };
 
-                // Small delay before next tick
-                tokio_time::sleep(TokioDuration::from_millis(10)).await;
+                // Process the received event
+                match event {
+                    UiEvent::TaskCompleted { result, .. } => {
+                        // Drain any remaining output events
+                        while let Ok(UiEvent::TaskOutput { output, .. }) =
+                            self.event_receiver.try_recv()
+                        {
+                            outputs.push(output);
+                        }
+                        return Ok((result, outputs));
+                    }
+                    UiEvent::TaskFailed { error, task_id } => {
+                        // Drain any remaining output events
+                        while let Ok(UiEvent::TaskOutput { output, .. }) =
+                            self.event_receiver.try_recv()
+                        {
+                            outputs.push(output);
+                        }
+
+                        // Create a failure result instead of returning an error
+                        // This allows fixtures to verify that expected errors occurred
+                        let task_result = TaskResult {
+                            task_id,
+                            response: Response {
+                                text: error,
+                                confidence: 0.0,
+                                tokens_used: TokenUsage::default(),
+                                provider: "mock".to_owned(),
+                                latency_ms: 0,
+                            },
+                            tier_used: "default".to_owned(),
+                            tokens_used: TokenUsage::default(),
+                            validation: ValidationResult::default(),
+                            duration_ms: 0,
+                            work_unit: None,
+                        };
+                        return Ok((Box::new(task_result), outputs));
+                    }
+                    UiEvent::TaskOutput { output, .. } => {
+                        // Capture output and continue waiting
+                        outputs.push(output);
+                    }
+                    _ => {
+                        // Ignore other events (TaskStarted, TaskProgress, etc.)
+                    }
+                }
             }
         })
         .await;
@@ -178,57 +258,12 @@ impl UnifiedTestRunner {
         result.map_err(|_| RoutingError::ExecutionFailed("Task execution timeout".to_owned()))?
     }
 
-    /// Process UI events and capture completion or output events
-    ///
-    /// Returns Some with result when task completes/fails, None if still running.
-    fn process_completion_events(
-        &mut self,
-        outputs: &mut Vec<String>,
-    ) -> Option<Result<TaskCompletionResult>> {
-        while let Ok(event) = self.event_receiver.try_recv() {
-            match event {
-                UiEvent::TaskCompleted { result, .. } => {
-                    return Some(Ok((result, outputs.clone())));
-                }
-                UiEvent::TaskFailed { error, task_id } => {
-                    // Create a failure result instead of returning an error
-                    // This allows fixtures to verify that expected errors occurred
-                    let task_result = TaskResult {
-                        task_id,
-                        response: Response {
-                            text: error,
-                            confidence: 0.0,
-                            tokens_used: TokenUsage::default(),
-                            provider: "mock".to_owned(),
-                            latency_ms: 0,
-                        },
-                        tier_used: "default".to_owned(),
-                        tokens_used: TokenUsage::default(),
-                        validation: ValidationResult::default(),
-                        duration_ms: 0,
-                        work_unit: None,
-                    };
-                    return Some(Ok((Box::new(task_result), outputs.clone())));
-                }
-                UiEvent::TaskOutput { output, .. } => {
-                    // Capture all outputs - they're scoped to this submit by the channel drain
-                    outputs.push(output);
-                }
-                _ => {
-                    // Ignore other events (TaskStarted, TaskProgress, etc.)
-                }
-            }
-        }
-        // No completion yet, continue looping
-        None
-    }
-
     /// Run the test
     ///
     /// # Errors
     /// Returns error if test execution or verification fails
     pub async fn run(&mut self) -> Result<VerificationResult> {
-        let workspace_path = self.workspace.path().to_path_buf();
+        let workspace_path = self.workspace_path.clone();
 
         // Clone the events and final_verify to avoid borrowing issues
         let events = self.fixture.events.clone();
@@ -247,8 +282,7 @@ impl UnifiedTestRunner {
                     let (task_result, outputs) = self.process_submit_and_await().await?;
 
                     // Extract execution result and add to tracker
-                    let execution_result =
-                        Self::extract_execution_result(&task_result, &outputs);
+                    let execution_result = Self::extract_execution_result(&task_result, &outputs);
                     execution_tracker.add_result(execution_result, outputs, task_result);
                 }
                 TestEvent::UserInput(_) | TestEvent::KeyPress(_) => {

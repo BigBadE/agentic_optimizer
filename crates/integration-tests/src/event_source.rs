@@ -68,7 +68,9 @@ impl FixtureEventSource {
                         "PageUp" => KeyCode::PageUp,
                         "PageDown" => KeyCode::PageDown,
                         single if single.len() == 1 => {
-                            KeyCode::Char(single.chars().next().unwrap_or(' '))
+                            // SAFETY: We've just checked that single has exactly 1 character
+                            // This must succeed, but we use Null as fallback to satisfy clippy
+                            single.chars().next().map_or(KeyCode::Null, KeyCode::Char)
                         }
                         _ => KeyCode::Null,
                     };
@@ -90,13 +92,6 @@ impl FixtureEventSource {
             events,
             exhausted: false,
         }
-    }
-
-    /// Check if there are more events to process
-    #[must_use]
-    #[allow(dead_code, reason = "Will be used when event loop is implemented")]
-    pub fn has_events(&self) -> bool {
-        !self.events.is_empty()
     }
 }
 

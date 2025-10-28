@@ -16,6 +16,7 @@ merlin-tooling = { path = "../merlin-tooling" }
 # External dependencies
 merlin-deps.workspace = true
 async-trait.workspace = true
+futures.workspace = true
 num_cpus.workspace = true
 serde.workspace = true
 thiserror.workspace = true

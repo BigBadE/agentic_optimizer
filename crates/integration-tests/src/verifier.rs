@@ -43,7 +43,9 @@ impl<'fixture> UnifiedVerifier<'fixture> {
         // Verify execution if specified
         if let Some(exec_verify) = &verify.execution {
             // Get the most recent execution result from tracker
-            let last_result = execution_tracker.last_result().map(|record| record.result());
+            let last_result = execution_tracker
+                .last_result()
+                .map(|record| record.result());
             ExecutionVerifier::verify_execution(&mut self.result, last_result, exec_verify);
         }
 
@@ -79,23 +81,70 @@ impl<'fixture> UnifiedVerifier<'fixture> {
     ) -> Result<(), String> {
         // Verify final execution state
         if let Some(exec_verify) = &verify.execution {
-            if let Some(expected) = exec_verify.all_tasks_completed
-                && expected
-            {
-                self.result.add_success("All tasks completed".to_owned());
+            // Verify all tasks completed if specified
+            if let Some(expected) = exec_verify.all_tasks_completed {
+                if let Some(app) = tui_app {
+                    let task_manager = app.test_task_manager();
+                    let total_tasks = task_manager.task_order().len();
+                    let completed_tasks = task_manager
+                        .task_order()
+                        .iter()
+                        .filter(|id| {
+                            task_manager.get_task(**id).is_some_and(|t| {
+                                matches!(
+                                    t.status,
+                                    merlin_cli::ui::task_manager::TaskStatus::Completed
+                                )
+                            })
+                        })
+                        .count();
+
+                    let all_completed = total_tasks > 0 && completed_tasks == total_tasks;
+                    if all_completed == expected {
+                        self.result.add_success(format!(
+                            "All tasks completed check passed: expected={expected}, actual={all_completed}"
+                        ));
+                    } else {
+                        self.result.add_failure(format!(
+                            "All tasks completed mismatch: expected={expected}, actual={all_completed} ({completed_tasks}/{total_tasks})"
+                        ));
+                    }
+                } else {
+                    self.result.add_failure(
+                        "Cannot verify all_tasks_completed without TUI app".to_owned(),
+                    );
+                }
             }
 
-            if let Some(expected) = exec_verify.validation_passed
-                && expected
-            {
-                self.result.add_success("Validation passed".to_owned());
+            // Verify validation passed if specified
+            if let Some(expected) = exec_verify.validation_passed {
+                // Check the last execution result's validation status
+                if let Some(record) = execution_tracker.last_result() {
+                    let task_result = record.task_result();
+                    let validation_passed = task_result.validation.passed;
+                    if validation_passed == expected {
+                        self.result.add_success(format!(
+                            "Validation passed check: expected={expected}, actual={validation_passed}"
+                        ));
+                    } else {
+                        self.result.add_failure(format!(
+                            "Validation passed mismatch: expected={expected}, actual={validation_passed}"
+                        ));
+                    }
+                } else {
+                    self.result.add_failure(
+                        "Cannot verify validation_passed: no execution results".to_owned(),
+                    );
+                }
             }
 
             // Verify return value for final execution if specified
             if exec_verify.return_value_matches.is_some()
                 || exec_verify.return_value_contains.is_some()
             {
-                let last_result = execution_tracker.last_result().map(|record| record.result());
+                let last_result = execution_tracker
+                    .last_result()
+                    .map(|record| record.result());
                 ExecutionVerifier::verify_execution(&mut self.result, last_result, exec_verify);
             }
         }

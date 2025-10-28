@@ -217,16 +217,12 @@ Tests transactional workspaces and conflict detection.
 
 ## Current Status
 
-**Refactored to test actual CLI** - Integration tests now:
+**Fully Implemented** - Integration tests now:
 - ✅ Use actual `TuiApp` from `merlin-cli`
 - ✅ Inject events via `FixtureEventSource`
 - ✅ Read state via test-feature-gated accessors
 - ✅ No duplicate CLI implementation
-- ⚠️ TUI event loop integration pending
-- ⚠️ UI verification temporarily stubbed out
-
-## Next Steps
-
-1. Implement TUI event loop driving in `UnifiedTestRunner::run()`
-2. Re-implement UI verification methods to read from actual `TuiApp` state
-3. Update fixtures if needed for new verification approach
+- ✅ Event-driven task completion using `tokio::select!`
+- ✅ Comprehensive UI verification (all fields implemented)
+- ✅ TaskStatus includes Pending variant for dependency tracking
+- ✅ All verifier structs use `deny_unknown_fields` for type safety

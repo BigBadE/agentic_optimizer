@@ -74,6 +74,7 @@ pub fn child_task_style(is_selected: bool, theme: Theme) -> Style {
 /// String slice with appropriate status icon
 pub fn task_status_icon(task: &TaskDisplay, is_active: bool) -> &'static str {
     match task.status {
+        TaskStatus::Pending => "⋯", // Pending/waiting for dependencies
         TaskStatus::Running => {
             // Check if task has output or progress
             if !task.output_lines.is_empty() || task.progress.is_some() {
@@ -81,7 +82,7 @@ pub fn task_status_icon(task: &TaskDisplay, is_active: bool) -> &'static str {
             } else if is_active {
                 "◉" // Active but no output yet
             } else {
-                " " // Pending/queued
+                " " // Running but no output
             }
         }
         TaskStatus::Completed => "✔",

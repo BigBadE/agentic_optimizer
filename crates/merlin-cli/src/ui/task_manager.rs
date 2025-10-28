@@ -6,7 +6,10 @@ use std::time::{Instant, SystemTime};
 
 /// Status of a task
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[allow(dead_code, reason = "Pending status will be used when dependency tracking is implemented")]
 pub enum TaskStatus {
+    /// Task is pending (waiting for dependencies or resources)
+    Pending,
     /// Task is currently running
     Running,
     /// Task has completed successfully

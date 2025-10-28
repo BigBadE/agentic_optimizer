@@ -111,14 +111,13 @@ pub async fn execute_typescript_code(
                 err
             );
             // Fall back to treating as plain object - use compact JSON serialization
-            let result_str = json_to_string(&result_value)
-                .unwrap_or_else(|_| result_value.to_string());
+            let result_str =
+                json_to_string(&result_value).unwrap_or_else(|_| result_value.to_string());
             AgentExecutionResult::done(result_str)
         })
     } else {
         // Plain value (object, array, number, etc.) - serialize to compact JSON and treat as "done"
-        let result_str = json_to_string(&result_value)
-            .unwrap_or_else(|_| result_value.to_string());
+        let result_str = json_to_string(&result_value).unwrap_or_else(|_| result_value.to_string());
         AgentExecutionResult::done(result_str)
     };
 

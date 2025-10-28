@@ -109,6 +109,11 @@ impl<B: Backend> TuiApp<B> {
         &self.thread_store
     }
 
+    /// Get read-only access to orchestrator for testing
+    pub fn test_orchestrator(&self) -> Option<&Arc<RoutingOrchestrator>> {
+        self.orchestrator.as_ref()
+    }
+
     /// Get read-only access to input manager for testing
     pub fn test_input_manager(&self) -> &InputManager {
         &self.input_manager
@@ -175,5 +180,20 @@ impl<B: Backend> TuiApp<B> {
         self.test_process_ui_events()?;
 
         Ok(())
+    }
+
+    /// Get read-only access to terminal backend for testing
+    ///
+    /// This allows tests to inspect the rendered buffer.
+    pub fn test_backend(&self) -> &B {
+        self.terminal.backend()
+    }
+
+    /// Render the UI for testing
+    ///
+    /// # Errors
+    /// Returns error if rendering fails
+    pub fn test_render(&mut self) -> Result<()> {
+        self.render()
     }
 }

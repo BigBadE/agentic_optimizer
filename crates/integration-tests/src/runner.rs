@@ -9,7 +9,8 @@ use super::fixture::{TestEvent, TestFixture};
 use super::mock_provider::{MockRouter, PatternMockProvider};
 use super::verification_result::VerificationResult;
 use super::verifier::UnifiedVerifier;
-use merlin_agent::RoutingOrchestrator;
+use super::workspace_setup::{create_files, get_test_workspace_path};
+use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_cli::TuiApp;
 use merlin_core::{
     ModelProvider, Response, Result, RoutingError, TaskResult, TokenUsage, ValidationResult,
@@ -21,7 +22,7 @@ use merlin_routing::{Model, ProviderRegistry, RoutingConfig, TaskId, UiEvent};
 use merlin_tooling::{ToolError, ToolResult};
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 use tokio::time::{Duration as TokioDuration, sleep, timeout};
 
@@ -79,17 +80,17 @@ impl UnifiedTestRunner {
     ) -> Result<Self> {
         let provider = Arc::new(PatternMockProvider::new("test-mock"));
 
-        // Setup files
-        for (path, content) in &fixture.setup.files {
-            let file_path = workspace_path.join(path);
-            if let Some(parent) = file_path.parent() {
-                fs::create_dir_all(parent).map_err(|err| {
-                    RoutingError::Other(format!("Failed to create directory: {err}"))
-                })?;
-            }
-            fs::write(&file_path, content)
-                .map_err(|err| RoutingError::Other(format!("Failed to write file: {err}")))?;
-        }
+        // Determine workspace setup strategy
+        let (final_workspace_path, workspace_temp, is_readonly) =
+            if let Some(workspace_name) = &fixture.setup.workspace {
+                // Use pre-made workspace read-only with pre-generated embeddings
+                let premade_path = get_test_workspace_path(workspace_name)?;
+                (premade_path, None, true)
+            } else {
+                // Non-workspace tests: always use temp workspace
+                create_files(&workspace_path, &fixture.setup.files)?;
+                (workspace_path, workspace_temp, false)
+            };
 
         // Setup LLM response patterns
         for event in &fixture.events {
@@ -101,7 +102,8 @@ impl UnifiedTestRunner {
 
         // Create routing config for test orchestrator
         let mut config = RoutingConfig::default();
-        config.workspace.root_path.clone_from(&workspace_path);
+        config.workspace.root_path.clone_from(&final_workspace_path);
+        config.workspace.read_only = is_readonly;
         config.execution.max_concurrent_tasks = 4;
         // Disable all real tiers
         config.tiers.local_enabled = false;
@@ -117,8 +119,15 @@ impl UnifiedTestRunner {
 
         // Create orchestrator with mock router and provider registry
         let router = Arc::new(MockRouter);
+
+        // Create thread store for conversation management
+        let thread_store_path = final_workspace_path.join("threads");
+        let thread_store = ThreadStore::new(thread_store_path)
+            .map_err(|err| RoutingError::Other(format!("Failed to create thread store: {err}")))?;
+
         let orchestrator =
-            RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?;
+            RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?
+                .with_thread_store(Arc::new(Mutex::new(thread_store)));
 
         // Create fixture-based event source with controller
         let (event_source, event_controller) = FixtureEventSource::new(&fixture);
@@ -131,14 +140,14 @@ impl UnifiedTestRunner {
         let tui_app = TuiApp::new_for_test(
             backend,
             Box::new(event_source),
-            Some(workspace_path.clone()),
+            Some(final_workspace_path.clone()),
             Some(Arc::new(orchestrator)),
         )?;
 
         Ok(Self {
             fixture,
             _workspace_temp: workspace_temp,
-            workspace_path,
+            workspace_path: final_workspace_path,
             provider,
             tui_app,
             event_controller,
@@ -250,6 +259,9 @@ impl UnifiedTestRunner {
                     // Process all input events (characters + Enter)
                     self.process_input_events().await?;
 
+                    // Render UI after processing input
+                    self.tui_app.test_render()?;
+
                     // Verify user input event AFTER submission but BEFORE task completes
                     verifier
                         .verify_event(
@@ -271,6 +283,9 @@ impl UnifiedTestRunner {
                     // Non-submit input - process all input events
                     self.process_input_events().await?;
 
+                    // Render UI after processing input
+                    self.tui_app.test_render()?;
+
                     // Verify user input event AFTER processing
                     verifier
                         .verify_event(
@@ -286,10 +301,12 @@ impl UnifiedTestRunner {
                 }
                 TestEvent::KeyPress(_) => {
                     self.process_input_events().await?;
+                    self.tui_app.test_render()?;
                     self.event_controller.advance();
                 }
                 TestEvent::LlmResponse(llm_event) => {
                     Self::complete_pending_task(&mut pending_task, &mut execution_tracker);
+                    self.tui_app.test_render()?;
                     verifier
                         .verify_event(
                             event,
@@ -308,6 +325,7 @@ impl UnifiedTestRunner {
         }
 
         Self::complete_pending_task(&mut pending_task, &mut execution_tracker);
+        self.tui_app.test_render()?;
         verifier
             .verify_final(&final_verify, Some(&self.tui_app), &execution_tracker)
             .map_err(RoutingError::ExecutionFailed)?;

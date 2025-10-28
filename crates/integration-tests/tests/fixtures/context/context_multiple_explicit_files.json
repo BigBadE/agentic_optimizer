@@ -1,0 +1,53 @@
+{
+  "name": "context_multiple_explicit_files",
+  "description": "Test that multiple explicitly mentioned files ARE all included",
+  "tags": ["context", "positive", "explicit", "multiple"],
+  "setup": {
+    "files": {
+      "src/models/user.rs": "pub struct User {\n    pub id: u64,\n    pub email: String,\n}",
+      "src/models/post.rs": "pub struct Post {\n    pub id: u64,\n    pub title: String,\n    pub content: String,\n}",
+      "src/models/comment.rs": "pub struct Comment {\n    pub id: u64,\n    pub post_id: u64,\n    pub text: String,\n}",
+      "src/handlers/auth.rs": "pub async fn login() -> Result<Token> {\n    Ok(Token::new())\n}"
+    }
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Review the data models in src/models/user.rs and src/models/post.rs",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "models",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Should include both user.rs and post.rs explicitly mentioned",
+          "  return 'Reviewed User and Post models';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_type": "string"
+        },
+        "ui": {
+          "output_contains": ["User", "Post"]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

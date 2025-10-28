@@ -1,0 +1,77 @@
+{
+  "name": "Task Dependency Resolution",
+  "description": "Tests dependency resolution and execution ordering",
+  "tags": [
+    "orchestrator",
+    "dependencies",
+    "resolution"
+  ],
+  "setup": {
+    "files": {
+      "step1.txt": "Step 1 data"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Execute dependent tasks",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "dependent",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const step1 = await readFile('step1.txt');",
+          "  await writeFile('step2.txt', `Depends on: ${step1}`);",
+          "  const step2 = await readFile('step2.txt');",
+          "  await writeFile('step3.txt', `Final: ${step2}`);",
+          "  return 'All dependencies resolved';",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "dependencies resolved"
+          ]
+        },
+        "files": [
+          {
+            "path": "step2.txt",
+            "exists": true,
+            "contains": [
+              "Depends on:",
+              "Step 1 data"
+            ]
+          },
+          {
+            "path": "step3.txt",
+            "exists": true,
+            "contains": [
+              "Final:",
+              "Depends on:"
+            ]
+          }
+        ],
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

@@ -1,0 +1,58 @@
+{
+  "name": "TypeScript Arrow Functions and Callbacks",
+  "description": "Tests arrow function syntax and callback patterns",
+  "tags": [
+    "typescript",
+    "functions",
+    "callbacks"
+  ],
+  "setup": {
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test arrow functions",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "arrow",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const add = (a: number, b: number) => a + b;",
+          "  const multiply = (x: number) => (y: number) => x * y;",
+          "  const numbers = [1, 2, 3, 4];",
+          "  const doubled = numbers.map(n => n * 2);",
+          "  return `Add: ${add(5, 3)}, Multiply: ${multiply(4)(5)}, Doubled: ${doubled.join(',')}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "Add: 8",
+            "Multiply: 20",
+            "Doubled: 2,4,6,8"
+          ]
+        },
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

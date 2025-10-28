@@ -3,10 +3,11 @@
 set -euo pipefail
 
 # Usage:
-#   ./scripts/verify.sh [--cov]
+#   ./scripts/verify.sh [--cov] [--fixture]
 #
 # Flags:
 #   --cov       Run coverage testing (delegates to coverage.sh)
+#   --fixture   Run only fixture tests with coverage, other tests normally
 #
 # Environment variables:
 #   MERLIN_CI   Set to skip clean step in CI environments
@@ -31,11 +32,16 @@ check_file_sizes() {
 }
 
 RUN_COVERAGE=false
+FIXTURE_ONLY=false
 
 for arg in "$@"; do
   case "$arg" in
     --cov)
       RUN_COVERAGE=true
+      shift
+      ;;
+    --fixture)
+      FIXTURE_ONLY=true
       shift
       ;;
     *)
@@ -56,7 +62,11 @@ cargo clippy --no-deps --lib --tests --all-features -- -D warnings
 
 # Delegate to coverage.sh if --cov is passed (skip normal tests)
 if [ "$RUN_COVERAGE" = true ]; then
-  exec "$(dirname "${BASH_SOURCE[0]}")/coverage.sh"
+  if [ "$FIXTURE_ONLY" = true ]; then
+    exec "$(dirname "${BASH_SOURCE[0]}")/coverage.sh" --fixture
+  else
+    exec "$(dirname "${BASH_SOURCE[0]}")/coverage.sh"
+  fi
 fi
 
 # Run full workspace tests

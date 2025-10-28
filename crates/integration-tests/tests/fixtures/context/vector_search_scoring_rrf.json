@@ -1,0 +1,51 @@
+{
+  "name": "vector_search_scoring_rrf",
+  "description": "Test reciprocal rank fusion scoring algorithm combining BM25 and vector search",
+  "tags": ["context", "vector_search", "scoring", "rrf"],
+  "setup": {
+    "files": {
+      "src/auth.rs": "pub fn authenticate_user(username: &str, password: &str) -> bool {\n    // Authentication logic\n    verify_credentials(username, password)\n}\n\nfn verify_credentials(user: &str, pass: &str) -> bool {\n    check_database(user, pass)\n}",
+      "src/user.rs": "pub struct User {\n    pub username: String,\n    pub email: String,\n}\n\nimpl User {\n    pub fn new(username: String, email: String) -> Self {\n        Self { username, email }\n    }\n}",
+      "src/login.rs": "use crate::auth::authenticate_user;\n\npub fn login(username: &str, password: &str) -> Result<Session> {\n    if authenticate_user(username, password) {\n        Ok(Session::new(username))\n    } else {\n        Err(Error::AuthFailed)\n    }\n}"
+    }
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Show me authentication and login code",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "authentication",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Found authentication in src/auth.rs and login in src/login.rs';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_type": "string"
+        },
+        "ui": {
+          "output_contains": ["authentication", "login"]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

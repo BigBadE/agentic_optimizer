@@ -31,7 +31,11 @@ pub struct TestFixture {
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct SetupConfig {
-    /// Files to create before test
+    /// Pre-made workspace name (from test-workspaces directory)
+    /// If specified, uses that workspace read-only
+    /// If not specified, creates temp workspace with files
+    pub workspace: Option<String>,
+    /// Files to create before test (only if workspace is not specified)
     #[serde(default)]
     pub files: HashMap<String, String>,
     /// Environment variables to set
@@ -281,6 +285,12 @@ pub struct UiVerify {
     pub queued_input_text: Option<String>,
     /// Cancel is requested
     pub cancel_requested: Option<bool>,
+    /// Rendered buffer contains these patterns
+    #[serde(default)]
+    pub rendered_buffer_contains: Vec<String>,
+    /// Rendered buffer does not contain these patterns
+    #[serde(default)]
+    pub rendered_buffer_not_contains: Vec<String>,
 }
 
 /// State verification

@@ -2,10 +2,61 @@
 
 use crate::fixture::UiVerify;
 use crate::verification_result::VerificationResult;
-use merlin_agent::ThreadStore;
 use merlin_cli::TuiApp;
 use merlin_cli::ui::state::UiState;
+use merlin_core::Thread;
 use merlin_deps::ratatui::backend::TestBackend;
+
+/// Helper to get thread count from either orchestrator or app thread store
+fn get_thread_count(app: &TuiApp<TestBackend>) -> usize {
+    app.test_orchestrator().map_or_else(
+        || {
+            // Fallback to app's thread store if no orchestrator
+            app.test_thread_store().active_threads().len()
+        },
+        |orchestrator| {
+            // Get from orchestrator's thread store (where threads are actually created during task execution)
+            orchestrator
+                .thread_store()
+                .and_then(|store_arc| {
+                    store_arc
+                        .lock()
+                        .ok()
+                        .map(|store| store.active_threads().len())
+                })
+                .unwrap_or(0)
+        },
+    )
+}
+
+/// Helper to get thread list from either orchestrator or app thread store
+fn get_threads(app: &TuiApp<TestBackend>) -> Vec<Thread> {
+    app.test_orchestrator().map_or_else(
+        || {
+            // Fallback to app's thread store
+            app.test_thread_store()
+                .active_threads()
+                .iter()
+                .map(|thread| (*thread).clone())
+                .collect()
+        },
+        |orchestrator| {
+            // Get from orchestrator's thread store
+            orchestrator
+                .thread_store()
+                .and_then(|store_arc| {
+                    store_arc.lock().ok().map(|store| {
+                        store
+                            .active_threads()
+                            .iter()
+                            .map(|thread| (*thread).clone())
+                            .collect()
+                    })
+                })
+                .unwrap_or_default()
+        },
+    )
+}
 
 /// Verify thread state (count, selected thread ID, thread names)
 pub fn verify_thread_state(
@@ -15,8 +66,8 @@ pub fn verify_thread_state(
     verify: &UiVerify,
 ) {
     if let Some(expected) = verify.thread_count {
-        let thread_store = app.test_thread_store();
-        let actual = thread_store.active_threads().len();
+        let actual = get_thread_count(app);
+
         if actual == expected {
             result.add_success(format!("Thread count matches: {expected}"));
         } else {
@@ -44,17 +95,18 @@ pub fn verify_thread_state(
     }
 
     if !verify.thread_names_visible.is_empty() {
-        verify_thread_names(result, app.test_thread_store(), verify);
+        verify_thread_names(result, app, verify);
     }
 }
 
 /// Verify thread names are visible
 fn verify_thread_names(
     result: &mut VerificationResult,
-    thread_store: &ThreadStore,
+    app: &TuiApp<TestBackend>,
     verify: &UiVerify,
 ) {
-    let threads = thread_store.active_threads();
+    let threads = get_threads(app);
+
     for expected_name in &verify.thread_names_visible {
         let found = threads
             .iter()

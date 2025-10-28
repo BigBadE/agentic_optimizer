@@ -136,7 +136,17 @@ Fixtures auto-discovered by `crates/integration-tests/tests/unified_tests.rs` an
 
 ### Test Modification Guidelines
 
-**NEVER delete tests that cover important behavior**, even if they're testing incorrect behavior:
+**CRITICAL: NEVER delete tests/fixtures that reveal bugs or issues:**
+- **If a test fails, it has discovered a problem - FIX THE CODE, not the test**
+- Failing tests are valuable - they show what's broken
+- Deleting a failing test destroys evidence of a bug
+- Examples:
+  - ✓ GOOD: Test fails because `thread_count` returns 0 → Investigate and fix thread tracking
+  - ✗ BAD: Delete test because `thread_count` verification doesn't work
+  - ✓ GOOD: Test expects error but gets success → Fix code to properly handle error case
+  - ✗ BAD: Remove error expectation because "error handling isn't implemented yet"
+
+**When test expectations need updating:**
 - If a test expects incorrect behavior, update it to expect the correct behavior
 - Changing test expectations to match correct behavior is allowed and encouraged
 - Only delete tests if they truly duplicate existing coverage or test non-existent features
@@ -145,6 +155,15 @@ Fixtures auto-discovered by `crates/integration-tests/tests/unified_tests.rs` an
   - ✗ BAD: Delete the test entirely because it was testing incorrect behavior
   - ✓ GOOD: Delete a test for `createIsolatedWorkspace()` function that was never implemented
   - ✗ BAD: Delete a test for error handling just because the current implementation doesn't handle errors correctly
+
+**If coverage doesn't increase after adding fixtures:**
+- This indicates the code path ISN'T REACHABLE from user actions
+- Investigate WHY the code isn't being executed
+- Possible causes:
+  - Dead code that should be removed
+  - Feature not wired up correctly
+  - Timing/async issue in test infrastructure
+- DO NOT delete the fixture - use it to guide investigation
 
 ### When to Add Tests
 

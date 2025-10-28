@@ -1,0 +1,59 @@
+{
+  "name": "Context Semantic Search Integration",
+  "description": "Tests semantic search functionality in context building",
+  "tags": [
+    "context",
+    "semantic-search"
+  ],
+  "setup": {
+    "files": {
+      "src/auth.rs": "pub fn authenticate_user(username: &str) -> Result<User, AuthError> { /* ... */ }",
+      "src/database.rs": "pub fn query_users(filter: &str) -> Vec<User> { /* ... */ }",
+      "src/validation.rs": "pub fn validate_email(email: &str) -> bool { /* ... */ }"
+    },
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Find authentication code",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "authentication",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Found authentication functions';",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "authentication"
+          ]
+        },
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

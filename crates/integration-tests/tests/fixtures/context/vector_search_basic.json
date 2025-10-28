@@ -1,0 +1,51 @@
+{
+  "name": "vector_search_basic",
+  "description": "Test basic vector search functionality with semantic similarity",
+  "tags": ["context", "vector_search", "semantic"],
+  "setup": {
+    "files": {
+      "src/database.rs": "pub struct Database {\n    connection: Connection,\n}\n\nimpl Database {\n    pub fn connect(url: &str) -> Result<Self> {\n        let connection = Connection::new(url)?;\n        Ok(Self { connection })\n    }\n    \n    pub fn query(&self, sql: &str) -> Result<Vec<Row>> {\n        self.connection.execute(sql)\n    }\n}",
+      "src/storage.rs": "pub struct Storage {\n    path: PathBuf,\n}\n\nimpl Storage {\n    pub fn new(path: PathBuf) -> Self {\n        Self { path }\n    }\n    \n    pub fn save(&self, data: &[u8]) -> Result<()> {\n        std::fs::write(&self.path, data)\n    }\n}",
+      "src/network.rs": "use tokio::net::TcpStream;\n\npub async fn connect_to_server(addr: &str) -> Result<TcpStream> {\n    TcpStream::connect(addr).await\n}"
+    }
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Find database connection code",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "database",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Found database connection in src/database.rs';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_type": "string"
+        },
+        "ui": {
+          "output_contains": ["database"]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

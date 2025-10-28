@@ -1,0 +1,80 @@
+{
+  "name": "Workspace Isolation Verification",
+  "description": "Tests that workspace changes don't affect parent directory",
+  "tags": [
+    "workspace",
+    "isolation",
+    "safety"
+  ],
+  "setup": {
+    "files": {
+      "safe.txt": "Original safe content"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create new workspace file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "workspace",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('workspace_file.txt', 'Workspace specific content');",
+          "  const safe = await readFile('safe.txt');",
+          "  return `Safe file intact: ${safe}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "Safe file intact",
+            "Original safe content"
+          ]
+        },
+        "files": [
+          {
+            "path": "safe.txt",
+            "exists": true,
+            "contains": [
+              "Original safe content"
+            ]
+          },
+          {
+            "path": "workspace_file.txt",
+            "exists": true,
+            "contains": [
+              "Workspace specific"
+            ]
+          }
+        ],
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "files": [
+      {
+        "path": "safe.txt",
+        "exists": true
+      }
+    ]
+  }
+}

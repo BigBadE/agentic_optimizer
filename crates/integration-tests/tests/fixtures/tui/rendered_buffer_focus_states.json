@@ -1,0 +1,75 @@
+{
+  "name": "Rendered Buffer Focus State Changes",
+  "description": "Tests that focus changes are correctly reflected in rendered buffer through border styling",
+  "tags": [
+    "tui",
+    "ui",
+    "rendering",
+    "focus"
+  ],
+  "setup": {
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test content",
+        "submit": false
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "input",
+          "input_text": "Test content",
+          "rendered_buffer_contains": [
+            "─── Input",
+            "Test content"
+          ]
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "tasks",
+          "rendered_buffer_contains": [
+            "─── Tasks",
+            "─── Input"
+          ]
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "input",
+          "rendered_buffer_contains": [
+            "─── Tasks",
+            "─── Input",
+            "Test content"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "ui": {
+      "focused_pane": "input",
+      "rendered_buffer_contains": [
+        "─── Input",
+        "─── Tasks"
+      ]
+    }
+  }
+}

@@ -1,0 +1,67 @@
+{
+  "name": "TypeScript Classes and Methods",
+  "description": "Tests class definitions, constructors, and method calls",
+  "tags": [
+    "typescript",
+    "classes",
+    "oop"
+  ],
+  "setup": {
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test class features",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "class",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  class Counter {",
+          "    private value: number;",
+          "    constructor(initial: number) {",
+          "      this.value = initial;",
+          "    }",
+          "    increment() {",
+          "      this.value++;",
+          "      return this;",
+          "    }",
+          "    getValue() {",
+          "      return this.value;",
+          "    }",
+          "  }",
+          "  const counter = new Counter(10);",
+          "  counter.increment().increment();",
+          "  return `Final value: ${counter.getValue()}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "Final value: 12"
+          ]
+        },
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

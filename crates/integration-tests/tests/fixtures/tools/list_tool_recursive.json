@@ -1,0 +1,60 @@
+{
+  "name": "List Tool Recursive Directory Listing",
+  "description": "Tests listing files recursively through directory structure",
+  "tags": [
+    "tools",
+    "list",
+    "recursive"
+  ],
+  "setup": {
+    "files": {
+      "root.txt": "Root file",
+      "dir1/file1.txt": "File 1",
+      "dir1/file2.txt": "File 2",
+      "dir2/nested/file3.txt": "File 3"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "List all files in directory structure",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "List all",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const files = await listFiles('.');",
+          "  return `Found ${files.length} entries`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "Found",
+            "entries"
+          ]
+        },
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

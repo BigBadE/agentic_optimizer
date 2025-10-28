@@ -208,6 +208,9 @@ pub struct WorkspaceConfig {
     pub enable_snapshots: bool,
     /// Whether transactional operations are enabled
     pub enable_transactions: bool,
+    /// Whether the workspace is read-only (prevents file modifications)
+    #[serde(default)]
+    pub read_only: bool,
 }
 
 impl Default for WorkspaceConfig {
@@ -216,6 +219,7 @@ impl Default for WorkspaceConfig {
             root_path: PathBuf::from("."),
             enable_snapshots: true,
             enable_transactions: true,
+            read_only: false,
         }
     }
 }

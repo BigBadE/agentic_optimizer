@@ -1,0 +1,75 @@
+{
+  "name": "Edit Tool Multiple Replacements",
+  "description": "Tests edit tool with multiple sequential replacements in same file",
+  "tags": [
+    "tools",
+    "edit",
+    "replacements"
+  ],
+  "setup": {
+    "files": {
+      "code.rs": "fn old_function() {\n    let old_var = 1;\n    println!(\"old\");\n}"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Refactor code names",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Refactor",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const original = await readFile('code.rs');",
+          "  const updated = original",
+          "    .replace('old_function', 'new_function')",
+          "    .replace('old_var', 'new_var')",
+          "    .replace('old', 'new');",
+          "  await writeFile('code.rs', updated);",
+          "  return 'Refactoring complete';",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "complete"
+          ]
+        },
+        "files": [
+          {
+            "path": "code.rs",
+            "exists": true,
+            "contains": [
+              "new_function",
+              "new_var"
+            ],
+            "not_contains": [
+              "old_function",
+              "old_var"
+            ]
+          }
+        ],
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

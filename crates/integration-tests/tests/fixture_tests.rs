@@ -57,7 +57,7 @@ async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<(String, Result<VerificationRe
             let result = run_fixture(fixture_path).await;
             (fixture_name, result)
         })
-        .buffer_unordered(32) // High concurrency for fast fixture execution
+        .buffer_unordered(16) // Balanced concurrency for optimal throughput
         .collect()
         .await
 }

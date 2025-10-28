@@ -1,0 +1,52 @@
+{
+  "name": "context_test_file_exclusion",
+  "description": "Test that test files are NOT included when searching for production code",
+  "tags": ["context", "conservative", "negative"],
+  "setup": {
+    "files": {
+      "src/validator.rs": "pub fn validate_email(email: &str) -> bool {\n    email.contains('@') && email.contains('.')\n}\n\npub fn validate_password(password: &str) -> bool {\n    password.len() >= 8\n}",
+      "tests/validator_tests.rs": "#[cfg(test)]\nmod tests {\n    use super::*;\n    \n    #[test]\n    fn test_validate_email() {\n        assert!(validate_email(\"test@example.com\"));\n        assert!(!validate_email(\"invalid\"));\n    }\n    \n    #[test]\n    fn test_validate_password() {\n        assert!(validate_password(\"password123\"));\n        assert!(!validate_password(\"short\"));\n    }\n}",
+      "tests/integration_test.rs": "// Integration tests for validation"
+    }
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Find the email validation function",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "email",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Should find src/validator.rs but NOT test files",
+          "  return 'Found email validation in src/validator.rs';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_type": "string"
+        },
+        "ui": {
+          "output_contains": ["email", "validation"]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

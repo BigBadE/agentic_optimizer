@@ -10,6 +10,7 @@ use merlin_deps::ratatui::backend::TestBackend;
 
 mod input;
 mod output;
+mod rendered_buffer;
 mod state;
 mod task_counts;
 mod task_details;
@@ -18,6 +19,7 @@ mod threads;
 
 use input::verify_input_related_fields;
 use output::verify_output_patterns;
+use rendered_buffer::verify_rendered_buffer;
 use task_counts::verify_task_counts;
 use task_details::verify_task_details;
 use task_selection::verify_selected_task;
@@ -50,6 +52,7 @@ impl UiVerifier {
         verify_output_patterns(result, task_manager, verify);
         Self::verify_ui_states(result, task_manager, input_manager, verify);
         verify_thread_state(result, app, state, verify);
+        verify_rendered_buffer(result, app, verify);
     }
 
     /// Verify focused pane

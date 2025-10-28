@@ -1,0 +1,54 @@
+{
+  "name": "context_conservative_unrelated_exclusion",
+  "description": "Test that context gathering conservatively EXCLUDES completely unrelated files",
+  "tags": ["context", "conservative", "negative"],
+  "setup": {
+    "files": {
+      "src/database.rs": "use sqlx::PgPool;\n\npub struct Database {\n    pool: PgPool,\n}\n\nimpl Database {\n    pub async fn connect(url: &str) -> Result<Self> {\n        let pool = PgPool::connect(url).await?;\n        Ok(Self { pool })\n    }\n    \n    pub async fn execute_query(&self, sql: &str) -> Result<Vec<Row>> {\n        let rows = sqlx::query(sql).fetch_all(&self.pool).await?;\n        Ok(rows)\n    }\n}",
+      "src/logging.rs": "use tracing::{info, error};\n\npub fn setup_logging() {\n    tracing_subscriber::fmt::init();\n}\n\npub fn log_error(msg: &str) {\n    error!(\"{}\", msg);\n}",
+      "src/config.rs": "use serde::Deserialize;\n\n#[derive(Deserialize)]\npub struct AppConfig {\n    pub port: u16,\n    pub host: String,\n}",
+      "tests/integration.rs": "mod tests {\n    #[test]\n    fn test_example() {\n        assert_eq!(2 + 2, 4);\n    }\n}",
+      "README.md": "# Project\n\nThis is a test project for context gathering."
+    }
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Show me the database connection code",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "database",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Should only find database.rs, NOT logging, config, tests, or README",
+          "  return 'Found database connection in src/database.rs';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_type": "string"
+        },
+        "ui": {
+          "output_contains": ["database"]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

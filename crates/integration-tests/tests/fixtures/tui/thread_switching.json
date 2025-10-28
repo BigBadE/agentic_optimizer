@@ -1,0 +1,56 @@
+{
+  "name": "Thread Switching Navigation",
+  "description": "Tests switching between multiple conversation threads using keyboard navigation",
+  "tags": ["tui", "threads", "navigation", "keyboard"],
+  "setup": {
+    "terminal_size": [100, 30]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Message in thread 1",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "thread 1",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Response from thread 1';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 1
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focus_changed": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

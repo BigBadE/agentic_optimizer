@@ -29,20 +29,47 @@ Fixtures are JSON files with the following structure:
 {
   "name": "Test name",
   "description": "Test description",
-  "input": {
-    "query": "User request",
-    "context": ["file1.rs", "file2.rs"]
+  "setup": {
+    "workspace": "simple-typescript",
+    "needs_write": false,
+    "terminal_size": [80, 24]
   },
-  "mock_responses": {
-    "pattern": "Expected response"
-  },
-  "verify": {
-    "success": true,
-    "output_contains": ["expected text"],
-    "files_modified": ["file.rs"],
-    "ui": {
-      "task_count": 1,
-      "completed_tasks": 1
+  "events": [
+    {
+      "type": "user_input",
+      "data": { "text": "What is 2 + 2?", "submit": true }
+    },
+    {
+      "type": "llm_response",
+      "trigger": { "pattern": "2 \\+ 2", "match_type": "regex" },
+      "response": { "typescript": ["return '4';"] },
+      "verify": { "execution": {} }
+    }
+  ],
+  "final_verify": {
+    "execution": { "all_tasks_completed": true }
+  }
+}
+```
+
+### Setup Configuration
+
+**Pre-made Workspaces** (Recommended):
+```json
+{
+  "setup": {
+    "workspace": "simple-typescript",
+    "needs_write": false
+  }
+}
+```
+
+**Legacy File-Based Setup**:
+```json
+{
+  "setup": {
+    "files": {
+      "src/main.rs": "fn main() { println!(\"Hello\"); }"
     }
   }
 }
@@ -50,19 +77,20 @@ Fixtures are JSON files with the following structure:
 
 ## Fixture Organization
 
-**54 JSON fixtures** organized by component:
+**74 JSON fixtures** organized by component:
 
 - `agent/` - Agent execution tests (4 fixtures)
 - `basic/` - Simple response tests (1 fixture)
-- `context/` - Context building (10 fixtures)
-- `execution/` - File operations (4 fixtures)
+- `context/` - Context building (11 fixtures)
+- `execution/` - File operations (5 fixtures)
 - `executor/` - Task execution (3 fixtures)
-- `orchestrator/` - Orchestration (6 fixtures)
-- `tools/` - Tool tests (6 fixtures)
-- `tui/` - TUI tests (4 fixtures)
-- `typescript/` - TypeScript runtime (9 fixtures)
+- `orchestrator/` - Orchestration (7 fixtures)
+- `threads/` - Thread management (1 fixture)
+- `tools/` - Tool tests (8 fixtures)
+- `tui/` - TUI tests (13 fixtures, including comprehensive rendered buffer verification)
+- `typescript/` - TypeScript runtime (11 fixtures)
 - `validation/` - Validation pipeline (3 fixtures)
-- `workspace/` - Workspace isolation (2 fixtures)
+- `workspace/` - Workspace isolation (3 fixtures)
 
 ## Architecture
 
@@ -75,6 +103,38 @@ Tests instantiate the actual `TuiApp` from `merlin-cli` with:
 - Read-only access to TUI state for verification (via `test-util` feature)
 
 **No duplicate behavior**: The test runner does not re-implement any CLI logic.
+
+### Pre-made Workspaces
+
+Located in `test-workspaces/` at repository root:
+
+**Benefits:**
+- **Speed**: Embeddings generated once, reused across all tests
+- **Consistency**: All tests use identical workspace state
+- **Read-only**: Prevents test pollution
+
+**Usage:**
+```json
+{
+  "setup": {
+    "workspace": "simple-typescript"
+  }
+}
+```
+
+**Writable Tests:**
+If fixtures need to write, don't specify a workspace:
+```json
+{
+  "setup": {
+    "files": {
+      "test.txt": "content"
+    }
+  }
+}
+```
+
+Non-workspace fixtures use temp directories and can write freely.
 
 ## Public API
 
@@ -126,23 +186,14 @@ provider.add_pattern("error handling", "Added error handling...");
 
 ## Testing Status
 
-**✅ Comprehensive** (87% pass rate - 48/55 passing)
+**✅ Comprehensive** (100% pass rate - 74/74 passing)
 
-- **All crates tested**: Via 55 fixtures
-- **Auto-discovery**: Single test runner
-- **Coverage verified**: Via `scripts/commit.sh`
+- **All crates tested**: Via 74 fixtures covering all major components
+- **Auto-discovery**: Single test runner with parallel execution
+- **Coverage verified**: Via `scripts/commit.sh` and `scripts/verify.sh`
 - **Conversation count verification**: Excludes system messages, only counts User/Assistant
-
-### Known Issues (7 fixtures)
-
-- **context_request_tracking.json**: Only processing 4/8 events (early termination)
-- **Pattern matching for decomposed tasks** (3 fixtures): Subtask queries don't match mock patterns
-  - conflict_detection.json
-  - analysis_decomposition.json
-  - complex_data_processing.json
-- **comprehensive_ui_verification.json**: UI focus/task count verification issues
-- **transactional_rollback.json**: File verification pattern mismatch
-- **query_context_extraction.json**: Execution timeout (potential performance issue)
+- **Rendered buffer verification**: UI elements verified through actual rendered output
+- **Edge case coverage**: Error handling, empty states, parallel execution, promise rejection
 
 ## Code Quality
 
@@ -208,7 +259,7 @@ Tests task decomposition, dependency tracking, and parallel execution.
 Tests individual tools (edit, delete, list, show, etc.).
 
 ### tui/ - Terminal UI
-Tests TUI navigation, task display, and event handling using `InputEventSource`.
+Tests TUI navigation, task display, event handling, and rendered buffer verification using `InputEventSource`. Includes comprehensive buffer rendering tests that verify UI elements are correctly displayed.
 
 ### typescript/ - TypeScript Runtime
 Tests TypeScript code execution with tool integration.
@@ -241,3 +292,5 @@ Tests transactional workspaces and conflict detection.
 - ✅ Comprehensive UI verification (all fields implemented)
 - ✅ TaskStatus includes Pending variant for dependency tracking
 - ✅ All verifier structs use `deny_unknown_fields` for type safety
+- ✅ Rendered buffer verification for UI elements (borders, content, layouts)
+- ✅ Automatic UI rendering after event processing for accurate verification

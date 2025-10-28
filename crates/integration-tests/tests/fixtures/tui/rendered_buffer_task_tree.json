@@ -1,0 +1,102 @@
+{
+  "name": "Rendered Buffer Task Tree Display",
+  "description": "Tests that task tree structure is correctly rendered in the buffer",
+  "tags": [
+    "tui",
+    "ui",
+    "rendering",
+    "task-tree"
+  ],
+  "setup": {
+    "files": {
+      "file1.txt": "Content 1",
+      "file2.txt": "Content 2"
+    },
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Process first file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Process first file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const content = await readFile('file1.txt');",
+          "  return `Processed: ${content}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "Processed",
+            "Content 1"
+          ],
+          "rendered_buffer_contains": [
+            "─── Tasks"
+          ]
+        },
+        "execution": {}
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Process second file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Process second file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const content = await readFile('file2.txt');",
+          "  return `Processed: ${content}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 2,
+          "output_contains": [
+            "Processed",
+            "Content 2"
+          ],
+          "rendered_buffer_contains": [
+            "─── Tasks"
+          ]
+        },
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "ui": {
+      "all_tasks_completed": true,
+      "tasks_displayed": 2,
+      "rendered_buffer_contains": [
+        "─── Tasks",
+        "─── Input"
+      ]
+    }
+  }
+}

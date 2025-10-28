@@ -1,0 +1,47 @@
+{
+  "name": "Thread Creation and Management",
+  "description": "Tests creating multiple conversation threads and managing them",
+  "tags": ["tui", "threads", "conversation"],
+  "setup": {
+    "terminal_size": [100, 30]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "First thread message",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "First thread",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Response in first thread';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "thread_count": 1,
+          "tasks_displayed": 1
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true,
+      "thread_count": 1
+    }
+  }
+}

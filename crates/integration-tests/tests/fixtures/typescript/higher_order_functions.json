@@ -1,0 +1,57 @@
+{
+  "name": "TypeScript Higher-Order Functions",
+  "description": "Tests functions that take or return other functions",
+  "tags": [
+    "typescript",
+    "functions",
+    "higher-order"
+  ],
+  "setup": {
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test higher-order functions",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "higher-order",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const compose = (f: Function, g: Function) => (x: any) => f(g(x));",
+          "  const add5 = (x: number) => x + 5;",
+          "  const multiply2 = (x: number) => x * 2;",
+          "  const composed = compose(add5, multiply2);",
+          "  const result = composed(10);",
+          "  return `Composed result: ${result}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "Composed result: 25"
+          ]
+        },
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

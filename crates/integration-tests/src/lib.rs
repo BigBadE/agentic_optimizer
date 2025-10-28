@@ -18,6 +18,7 @@ mod runner;
 mod ui_verifier;
 mod verification_result;
 mod verifier;
+mod workspace_setup;
 
 pub use fixture::{
     EventType, ExecutionVerify, FileVerify, FinalVerify, LlmResponseEvent, SetupConfig,

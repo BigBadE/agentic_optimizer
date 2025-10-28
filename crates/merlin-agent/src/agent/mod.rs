@@ -3,8 +3,6 @@
 //! This module provides the agent execution infrastructure for running LLM-powered
 //! agents with self-assessment capabilities and detailed step tracking.
 
-/// Command execution for task list exit commands
-pub mod command_runner;
 /// Conversation management for multi-turn interactions
 pub mod conversation;
 /// Execution result types for TypeScript-based agent system
@@ -19,7 +17,6 @@ pub mod step;
 pub mod task_coordinator;
 
 // Re-export context management from merlin-context
-pub use command_runner::{CommandResult, CommandRunner};
 pub use conversation::{ConversationManager, ConversationMessage, ConversationSummary};
 pub use execution_result::AgentExecutionResult;
 pub use executor::AgentExecutor;

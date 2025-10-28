@@ -3,13 +3,30 @@
 set -euo pipefail
 
 # Usage:
-#   ./scripts/coverage.sh
+#   ./scripts/coverage.sh [--fixture]
+#
+# Flags:
+#   --fixture   Run only fixture tests with coverage, other tests normally
 #
 # Environment variables:
 #   MERLIN_CI   Set to skip clean step in CI environments
 #
 # This script runs coverage instrumentation and generates a coverage report.
 # Run verify.sh first to ensure code quality (format, clippy, file sizes).
+
+# Parse arguments
+FIXTURE_ONLY=false
+for arg in "$@"; do
+  case "$arg" in
+    --fixture)
+      FIXTURE_ONLY=true
+      shift
+      ;;
+    *)
+      # ignore unknown args (forward compatibility)
+      ;;
+  esac
+done
 
 # Run workspace tests with coverage (excluding expensive crates)
 echo "[coverage] Running tests with coverage instrumentation..."
@@ -28,26 +45,61 @@ rm -rf "${LLVM_COV_DIR}"/temp_lcov_* 2>/dev/null
 
 # Run coverage on all workspace crates
 # Excludes benchmark crates and test repositories from instrumentation
-echo "[coverage] Running coverage on workspace crates..."
-
 # Set cargo profile with default
 CARGO_PROFILE="${CARGO_PROFILE:-dev}"
 
-LLVM_PROFILE_FILE_NAME="merlin-%m.profraw" \
-cargo llvm-cov \
-  --no-report \
-  --ignore-filename-regex "test_repositories|.cargo|.rustup" \
-  --all-features \
-  --workspace \
-  --exclude merlin-benchmarks-criterion \
-  --exclude merlin-benchmarks-gungraun \
-  --exclude merlin-benchmarks-quality \
-  --lib --tests \
-  --no-fail-fast \
-  --cargo-profile "${CARGO_PROFILE}" \
-  nextest
+if [ "$FIXTURE_ONLY" = true ]; then
+  echo "[coverage] Running fixture tests with coverage, other tests normally..."
 
-echo "[coverage] Nextest completed with exit code: $?"
+  # First run fixture tests with coverage
+  echo "[coverage] Running fixture tests with coverage instrumentation..."
+  LLVM_PROFILE_FILE_NAME="merlin-%m.profraw" \
+  cargo llvm-cov \
+    --no-report \
+    --ignore-filename-regex "test_repositories|.cargo|.rustup" \
+    --all-features \
+    --package integration-tests \
+    --lib --tests \
+    --no-fail-fast \
+    --cargo-profile "${CARGO_PROFILE}" \
+    nextest
+
+  COV_EXIT=$?
+  echo "[coverage] Fixture tests completed with exit code: $COV_EXIT"
+
+  # Then run all other tests normally (without coverage)
+  echo "[coverage] Running non-fixture tests without coverage..."
+  cargo nextest run \
+    --workspace \
+    --exclude integration-tests \
+    --run-ignored all
+
+  NORMAL_EXIT=$?
+  echo "[coverage] Non-fixture tests completed with exit code: $NORMAL_EXIT"
+
+  # Exit with failure if either failed
+  if [ $COV_EXIT -ne 0 ] || [ $NORMAL_EXIT -ne 0 ]; then
+    echo "[coverage] Tests failed (cov: $COV_EXIT, normal: $NORMAL_EXIT)"
+    exit 1
+  fi
+else
+  echo "[coverage] Running all tests with coverage instrumentation..."
+  LLVM_PROFILE_FILE_NAME="merlin-%m.profraw" \
+  cargo llvm-cov \
+    --no-report \
+    --ignore-filename-regex "test_repositories|.cargo|.rustup" \
+    --all-features \
+    --workspace \
+    --exclude merlin-benchmarks-criterion \
+    --exclude merlin-benchmarks-gungraun \
+    --exclude merlin-benchmarks-quality \
+    --lib --tests \
+    --no-fail-fast \
+    --cargo-profile "${CARGO_PROFILE}" \
+    nextest
+
+  echo "[coverage] Nextest completed with exit code: $?"
+fi
 
 # Check profraw files and disk usage
 PROFRAW_COUNT=$(find "${LLVM_COV_DIR}" -name "*.profraw" 2>/dev/null | wc -l || echo "0")
@@ -118,42 +170,61 @@ for i in "${!BINARIES[@]}"; do
   output_file="${TEMP_COV_DIR}/cov_${i}.lcov"
 
   (
-    llvm-cov export \
+    error_file="${TEMP_COV_DIR}/error_${i}.txt"
+    if llvm-cov export \
       -format=lcov \
       -instr-profile="${PROFDATA_FILE_NATIVE}" \
       -ignore-filename-regex="${IGNORE_PATTERN}" \
       "$binary_native" \
-      > "$output_file" 2>/dev/null
+      > "$output_file" 2>"$error_file"; then
+      # Success
+      exit 0
+    fi
+
+    # Failed - check if it's due to missing coverage data (benign)
+    if grep -q "no coverage data found" "$error_file" 2>/dev/null; then
+      # Create empty file to avoid merge issues
+      echo -n "" > "$output_file"
+      exit 0
+    fi
+
+    # Real error
+    echo "[coverage] ERROR: llvm-cov export failed for binary $i ($(basename "$binary")):" >&2
+    cat "$error_file" >&2
+    exit 1
   ) &
   PIDS+=($!)
 done
 
-# Wait for all parallel llvm-cov jobs
+# Wait for all parallel llvm-cov jobs and collect failures
+FAILED=0
 for pid in "${PIDS[@]}"; do
-  wait "$pid"
+  if ! wait "$pid"; then
+    FAILED=$((FAILED + 1))
+  fi
 done
 
-# Merge all lcov files
-if command -v lcov >/dev/null 2>&1; then
-  LCOV_ARGS=()
-  for lcovfile in "$TEMP_COV_DIR"/*.lcov; do
-    if [ -f "$lcovfile" ] && [ -s "$lcovfile" ]; then
-      LCOV_ARGS+=("-a" "$lcovfile")
-    fi
-  done
-  lcov "${LCOV_ARGS[@]}" -o benchmarks/data/coverage/latest.info 2>/dev/null
-else
-  cat "$TEMP_COV_DIR"/*.lcov > benchmarks/data/coverage/latest.info 2>/dev/null
+if [ $FAILED -gt 0 ]; then
+  echo "[coverage] ERROR: $FAILED llvm-cov export jobs failed" >&2
+  exit 1
 fi
+
+echo "[coverage] Merging reports..."
+# Merge all lcov files using simple concatenation
+# This is valid for lcov format and avoids lcov tool dependencies
+cat "$TEMP_COV_DIR"/*.lcov > benchmarks/data/coverage/latest.info 2>/dev/null
 
 rm -rf "$TEMP_COV_DIR"
 git add benchmarks/data/coverage/latest.info
 
 mkdir -p benchmarks/data/coverage
-grcov benchmarks/data/coverage/latest.info \
+if ! grcov benchmarks/data/coverage/latest.info \
   -s "${ROOT_DIR}" \
   -t html \
-  -o benchmarks/data/coverage 2>/dev/null
+  -o benchmarks/data/coverage 2>&1; then
+  echo "[coverage] ERROR: grcov failed to generate HTML report" >&2
+  exit 1
+fi
 
 REPORT_END=$(date +%s)
 REPORT_TIME=$((REPORT_END - REPORT_START))

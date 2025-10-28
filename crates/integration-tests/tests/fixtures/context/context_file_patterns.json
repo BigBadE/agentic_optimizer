@@ -1,0 +1,61 @@
+{
+  "name": "Context File Pattern Matching",
+  "description": "Tests pattern-based file inclusion in context",
+  "tags": [
+    "context",
+    "patterns",
+    "files"
+  ],
+  "setup": {
+    "files": {
+      "src/main.rs": "fn main() {}",
+      "src/lib.rs": "pub mod utils;",
+      "src/utils.rs": "pub fn helper() {}",
+      "tests/test.rs": "#[test] fn test() {}",
+      "README.md": "# Project"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "List Rust source files",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Rust",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const files = await listFiles('src');",
+          "  return `Found ${files.length} files: ${files.join(', ')}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "Found",
+            "files"
+          ]
+        },
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

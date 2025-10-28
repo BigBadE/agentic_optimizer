@@ -1,0 +1,51 @@
+{
+  "name": "semantic_similarity",
+  "description": "Test semantic similarity search finds conceptually related code even without exact keyword matches",
+  "tags": ["context", "semantic", "similarity"],
+  "setup": {
+    "files": {
+      "src/http_client.rs": "use reqwest::Client;\n\npub struct HttpClient {\n    client: Client,\n}\n\nimpl HttpClient {\n    pub async fn fetch(&self, url: &str) -> Result<String> {\n        let response = self.client.get(url).send().await?;\n        response.text().await\n    }\n}",
+      "src/api.rs": "pub struct ApiClient {\n    base_url: String,\n}\n\nimpl ApiClient {\n    pub async fn get_data(&self, endpoint: &str) -> Result<Value> {\n        let url = format!(\"{}/{}\", self.base_url, endpoint);\n        let response = make_request(&url).await?;\n        Ok(response)\n    }\n}",
+      "src/config.rs": "pub struct Config {\n    pub port: u16,\n    pub host: String,\n}"
+    }
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Find code that makes web requests",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "web",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Found HTTP client code in src/http_client.rs and API client in src/api.rs';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_type": "string"
+        },
+        "ui": {
+          "output_contains": ["HTTP", "API"]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

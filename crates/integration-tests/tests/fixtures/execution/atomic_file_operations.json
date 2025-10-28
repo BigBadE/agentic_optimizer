@@ -1,0 +1,70 @@
+{
+  "name": "Atomic File Operations",
+  "description": "Tests atomic write operations and file consistency",
+  "tags": [
+    "execution",
+    "atomic",
+    "consistency"
+  ],
+  "setup": {
+    "files": {
+      "atomic.txt": "Original content"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Perform atomic update",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "atomic",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const original = await readFile('atomic.txt');",
+          "  await writeFile('atomic.txt', `Updated: ${original}`);",
+          "  const updated = await readFile('atomic.txt');",
+          "  return `Result: ${updated}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "Result:",
+            "Updated:",
+            "Original content"
+          ]
+        },
+        "files": [
+          {
+            "path": "atomic.txt",
+            "exists": true,
+            "contains": [
+              "Updated:",
+              "Original content"
+            ]
+          }
+        ],
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

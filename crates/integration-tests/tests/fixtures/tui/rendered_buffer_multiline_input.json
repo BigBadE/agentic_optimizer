@@ -1,0 +1,58 @@
+{
+  "name": "Rendered Buffer Multiline Input",
+  "description": "Tests that multiline input text is correctly rendered in the buffer",
+  "tags": [
+    "tui",
+    "ui",
+    "rendering",
+    "input",
+    "multiline"
+  ],
+  "setup": {
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "First line",
+        "submit": false
+      },
+      "verify": {
+        "ui": {
+          "input_text": "First line",
+          "rendered_buffer_contains": [
+            "First line",
+            "─── Input"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "First line and more text",
+        "submit": false
+      },
+      "verify": {
+        "ui": {
+          "rendered_buffer_contains": [
+            "First line and more text",
+            "─── Input"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "ui": {
+      "rendered_buffer_contains": [
+        "─── Input",
+        "─── Tasks"
+      ]
+    }
+  }
+}

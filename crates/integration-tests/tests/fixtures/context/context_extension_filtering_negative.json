@@ -1,0 +1,53 @@
+{
+  "name": "context_extension_filtering_negative",
+  "description": "Test that files with irrelevant extensions are NOT included even if they contain keywords",
+  "tags": ["context", "conservative", "negative"],
+  "setup": {
+    "files": {
+      "src/server.rs": "use actix_web::{web, App, HttpServer};\n\npub async fn start_server() -> std::io::Result<()> {\n    HttpServer::new(|| {\n        App::new()\n            .route(\"/\", web::get().to(index))\n    })\n    .bind((\"127.0.0.1\", 8080))?\n    .run()\n    .await\n}",
+      "docs/server_setup.txt": "Server setup instructions:\n1. Install dependencies\n2. Run cargo build\n3. Start the server",
+      "notes/server_ideas.md": "# Server Ideas\n\n- Add rate limiting\n- Add authentication middleware\n- Add logging",
+      "config/server.yaml": "host: localhost\nport: 8080\ntimeout: 30"
+    }
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Show me the server implementation code",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "server",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  // Should find server.rs but NOT .txt, .md, or .yaml files",
+          "  return 'Found server implementation in src/server.rs';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_type": "string"
+        },
+        "ui": {
+          "output_contains": ["server"]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

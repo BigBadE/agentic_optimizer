@@ -1,0 +1,68 @@
+{
+  "name": "Concurrent File Operations",
+  "description": "Tests multiple file operations in single task execution",
+  "tags": [
+    "execution",
+    "concurrency",
+    "file-ops"
+  ],
+  "setup": {
+    "files": {
+      "a.txt": "Content A",
+      "b.txt": "Content B",
+      "c.txt": "Content C"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Read all files concurrently",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Read all",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const results = await Promise.all([",
+          "    readFile('a.txt'),",
+          "    readFile('b.txt'),",
+          "    readFile('c.txt')",
+          "  ]);",
+          "  return results.join(', ');",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "Content A",
+            "Content B",
+            "Content C"
+          ]
+        },
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    },
+    "ui": {
+      "all_tasks_completed": true,
+      "tasks_displayed": 1
+    }
+  }
+}

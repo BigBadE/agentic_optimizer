@@ -1,0 +1,63 @@
+{
+  "name": "Context Incremental Building",
+  "description": "Tests incremental context building across multiple operations",
+  "tags": [
+    "context",
+    "incremental",
+    "building"
+  ],
+  "setup": {
+    "files": {
+      "phase1.txt": "Phase 1 data",
+      "phase2.txt": "Phase 2 data",
+      "phase3.txt": "Phase 3 data"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Build context incrementally",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "incremental",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const p1 = await readFile('phase1.txt');",
+          "  const p2 = await readFile('phase2.txt');",
+          "  const p3 = await readFile('phase3.txt');",
+          "  return `Context built: ${p1} -> ${p2} -> ${p3}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": [
+            "Context built:",
+            "Phase 1",
+            "Phase 2",
+            "Phase 3"
+          ]
+        },
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "all_tasks_completed": true
+    }
+  }
+}

@@ -4,8 +4,10 @@
 //! It provides read-only access to internal TUI state for integration testing.
 
 use merlin_deps::ratatui::backend::Backend;
+use std::sync::{Arc, Mutex};
 
 use super::tui_app::TuiApp;
+use crate::config::ConfigManager;
 use crate::ui::event_source::InputEventSource;
 use crate::ui::input::InputManager;
 use crate::ui::layout;
@@ -13,13 +15,11 @@ use crate::ui::persistence::TaskPersistence;
 use crate::ui::renderer::{FocusedPane, Renderer};
 use crate::ui::state::UiState;
 use crate::ui::task_manager::TaskManager;
-use crate::ui::theme::Theme;
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_deps::crossterm::event::{Event as CrosstermEvent, KeyEventKind};
 use merlin_deps::ratatui::Terminal;
 use merlin_routing::{Result, RoutingError, UiEvent};
 use std::path::PathBuf;
-use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::{broadcast, mpsc};
 
@@ -31,7 +31,7 @@ impl<B: Backend> TuiApp<B> {
     ///
     /// # Errors
     /// Returns an error if terminal initialization fails.
-    pub fn new_for_test(
+    pub async fn new_for_test(
         backend: B,
         event_source: Box<dyn InputEventSource + Send>,
         tasks_dir: impl Into<Option<PathBuf>>,
@@ -54,22 +54,35 @@ impl<B: Backend> TuiApp<B> {
             state.loading_tasks = true;
         }
 
-        let theme = tasks_dir
-            .as_ref()
-            .and_then(|dir| Theme::load(dir).ok())
-            .unwrap_or_default();
+        // Initialize config manager for tests
+        let config_manager = ConfigManager::new().await.map_err(|err| {
+            RoutingError::Other(format!("Failed to create config manager: {err}"))
+        })?;
+
+        let theme = config_manager
+            .get()
+            .map_err(|err| RoutingError::Other(format!("Failed to read config: {err}")))?
+            .theme;
 
         let persistence = tasks_dir
             .as_ref()
             .map(|dir| TaskPersistence::new(dir.join(".merlin").join("tasks")));
 
-        let thread_storage_path = tasks_dir.as_ref().map_or_else(
-            || PathBuf::from(".merlin/threads"),
-            |dir| dir.join(".merlin").join("threads"),
-        );
+        // Use orchestrator's thread store if available, otherwise create new one
+        let thread_store = if let Some(ref orch) = orchestrator
+            && let Some(store_arc) = orch.thread_store()
+        {
+            Arc::clone(&store_arc)
+        } else {
+            let thread_storage_path = tasks_dir.as_ref().map_or_else(
+                || PathBuf::from(".merlin/threads"),
+                |dir| dir.join(".merlin").join("threads"),
+            );
 
-        let thread_store = ThreadStore::new(thread_storage_path)
-            .map_err(|err| RoutingError::Other(format!("Failed to create thread store: {err}")))?;
+            let store = ThreadStore::new(thread_storage_path)
+                .map_err(|err| RoutingError::Other(format!("Failed to create thread store: {err}")))?;
+            Arc::new(Mutex::new(store))
+        };
 
         let app = Self {
             terminal,
@@ -89,6 +102,7 @@ impl<B: Backend> TuiApp<B> {
             thread_store,
             orchestrator,
             log_file: None,
+            config_manager,
         };
 
         Ok(app)
@@ -105,7 +119,7 @@ impl<B: Backend> TuiApp<B> {
     }
 
     /// Get read-only access to thread store for testing
-    pub fn test_thread_store(&self) -> &ThreadStore {
+    pub fn test_thread_store(&self) -> &Arc<Mutex<ThreadStore>> {
         &self.thread_store
     }
 

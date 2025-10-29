@@ -10,7 +10,7 @@ use std::fs::{self as filesystem, File};
 use std::io::{self, Read as _, Write as _};
 use std::path::{Path, PathBuf};
 use std::time::{Instant, SystemTime};
-use tokio::task;
+use tokio::fs as async_fs;
 
 /// Serializable task representation for disk storage
 #[derive(Serialize, Deserialize)]
@@ -36,22 +36,40 @@ impl TaskPersistence {
         Self { tasks_dir }
     }
 
-    /// Gets the tasks directory
-    pub fn get_tasks_dir(&self) -> &PathBuf {
-        &self.tasks_dir
-    }
-
     /// Loads all tasks from disk
     ///
     /// # Errors
     ///
     /// Returns an error if the task directory cannot be read or task files cannot be deserialized
     pub async fn load_all_tasks(&self) -> io::Result<HashMap<TaskId, TaskDisplay>> {
-        let dir = self.tasks_dir.clone();
+        let mut tasks = HashMap::default();
 
-        task::spawn_blocking(move || Self::load_tasks_sync(&dir))
-            .await
-            .map_err(io::Error::other)?
+        // Check if directory exists using tokio async fs
+        if !async_fs::try_exists(&self.tasks_dir).await.unwrap_or(false) {
+            return Ok(tasks);
+        }
+
+        let mut entries = async_fs::read_dir(&self.tasks_dir).await?;
+
+        while let Some(entry) = entries.next_entry().await? {
+            let path = entry.path();
+
+            if !is_compressed_task_file(&path) {
+                continue;
+            }
+
+            match load_single_task(&path).await {
+                Ok(Some(task_display)) => {
+                    tasks.insert(task_display.0, task_display.1);
+                }
+                Ok(None) => {}
+                Err(error) => {
+                    merlin_deps::tracing::warn!("Failed to load task file {:?}: {}", path, error);
+                }
+            }
+        }
+
+        Ok(tasks)
     }
 
     /// Saves a task to disk
@@ -60,8 +78,10 @@ impl TaskPersistence {
     ///
     /// Returns an error if the task directory cannot be created or the task file cannot be written
     pub fn save_task(&self, task_id: TaskId, task: &TaskDisplay) -> io::Result<()> {
-        // Ensure the tasks directory exists
-        filesystem::create_dir_all(&self.tasks_dir)?;
+        // Ensure the tasks directory exists (only if not already present)
+        if !self.tasks_dir.exists() {
+            filesystem::create_dir_all(&self.tasks_dir)?;
+        }
 
         let status_str = task_status_to_string(task.status);
 
@@ -98,46 +118,6 @@ impl TaskPersistence {
         let task_file = self.tasks_dir.join(filename);
         filesystem::remove_file(task_file)
     }
-
-    // Private helpers
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if the task directory cannot be read or task files cannot be parsed
-    fn load_tasks_sync(tasks_dir: &PathBuf) -> io::Result<HashMap<TaskId, TaskDisplay>> {
-        let mut tasks = HashMap::default();
-
-        if !tasks_dir.exists() {
-            return Ok(tasks);
-        }
-
-        for entry in filesystem::read_dir(tasks_dir)? {
-            let entry = match entry {
-                Ok(val) => val,
-                Err(error) => {
-                    merlin_deps::tracing::warn!("Failed to read task dir entry: {}", error);
-                    continue;
-                }
-            };
-            let path = entry.path();
-
-            if !is_compressed_task_file(&path) {
-                continue;
-            }
-
-            match load_single_task(&path) {
-                Ok(Some(task_display)) => {
-                    tasks.insert(task_display.0, task_display.1);
-                }
-                Ok(None) => {}
-                Err(error) => {
-                    merlin_deps::tracing::warn!("Failed to load task file {:?}: {}", path, error);
-                }
-            }
-        }
-
-        Ok(tasks)
-    }
 }
 
 // Helper functions
@@ -152,9 +132,12 @@ type LoadedTask = Option<(TaskId, TaskDisplay)>;
 ///
 /// # Errors
 /// Returns an error if the file cannot be opened, the gzip decoding fails, or
-fn load_single_task(path: &Path) -> io::Result<LoadedTask> {
-    let file = File::open(path)?;
-    let mut decoder = GzDecoder::new(file);
+async fn load_single_task(path: &Path) -> io::Result<LoadedTask> {
+    // Read file asynchronously
+    let compressed_data = async_fs::read(path).await?;
+
+    // Decompress (this is CPU-bound but fast, so keep it sync)
+    let mut decoder = GzDecoder::new(&compressed_data[..]);
     let mut json_str = String::default();
     decoder.read_to_string(&mut json_str)?;
 

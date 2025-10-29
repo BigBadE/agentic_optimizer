@@ -22,15 +22,30 @@ struct WorkCompletionParams {
     duration_ms: u64,
 }
 
+/// Parameters for task execution
+pub struct TaskExecutionParams {
+    /// Orchestrator for task routing
+    pub orchestrator: Arc<RoutingOrchestrator>,
+    /// User input text
+    pub user_input: String,
+    /// Parent task ID if this is a subtask
+    pub parent_task_id: Option<TaskId>,
+    /// Conversation history
+    pub conversation_history: Vec<(String, String)>,
+    /// Thread ID for multi-turn conversations
+    pub thread_id: Option<ThreadId>,
+}
+
 impl<B: Backend> TuiApp<B> {
     /// Spawn task execution in background
-    pub(crate) fn spawn_task_execution(
-        &self,
-        orchestrator: Arc<RoutingOrchestrator>,
-        user_input: String,
-        parent_task_id: Option<TaskId>,
-        conversation_history: Vec<(String, String)>,
-    ) {
+    pub(crate) fn spawn_task_execution(&self, params: TaskExecutionParams) {
+        let TaskExecutionParams {
+            orchestrator,
+            user_input,
+            parent_task_id,
+            conversation_history,
+            thread_id,
+        } = params;
         let ui_channel = UiChannel::from_sender(self.event_sender.clone());
         let mut log_file = self.log_file.as_ref().and_then(|f| f.try_clone().ok());
 
@@ -43,9 +58,14 @@ impl<B: Backend> TuiApp<B> {
             let task_id = task.id;
 
             let (actual_thread_id, message_id) =
-                Self::create_or_continue_thread(&orchestrator, &user_input, None);
+                Self::create_or_continue_thread(&orchestrator, &user_input, thread_id);
 
-            ui_channel.task_started_with_parent(task_id, user_input.clone(), parent_task_id);
+            ui_channel.task_started_with_thread(
+                task_id,
+                user_input.clone(),
+                parent_task_id,
+                actual_thread_id,
+            );
             ui_channel.send(UiEvent::TaskOutput {
                 task_id,
                 output: format!("Prompt: {user_input}\n"),

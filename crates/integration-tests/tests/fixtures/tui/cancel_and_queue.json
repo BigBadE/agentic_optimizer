@@ -1,93 +1,85 @@
 {
-  "name": "Keyboard Navigation",
-  "description": "Tests keyboard navigation in TUI (arrow keys, tab, etc.)",
+  "name": "Cancel Current Work and Queue Input",
+  "description": "Tests cancelling in-progress work and queueing new input",
   "tags": [
     "tui",
-    "navigation",
+    "cancel",
+    "queue",
     "keyboard"
   ],
   "setup": {
-    "files": {},
     "terminal_size": [
-      120,
-      40
+      100,
+      30
     ]
   },
   "events": [
     {
       "type": "user_input",
       "data": {
-        "text": "First task",
+        "text": "Long running task",
         "submit": true
       }
     },
     {
       "type": "llm_response",
       "trigger": {
-        "pattern": "First task",
+        "pattern": "Long running",
         "match_type": "contains"
       },
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  return 'Task 1 completed';",
+          "  return 'Task is running...';",
           "}"
         ]
       },
       "verify": {
-        "execution": {}
-      }
-    },
-    {
-      "type": "key_press",
-      "data": {
-        "key": "Tab"
-      }
-    },
-    {
-      "type": "key_press",
-      "data": {
-        "key": "Down"
-      }
-    },
-    {
-      "type": "key_press",
-      "data": {
-        "key": "Up"
-      }
-    },
-    {
-      "type": "key_press",
-      "data": {
-        "key": "Tab"
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 1
+        }
       }
     },
     {
       "type": "user_input",
       "data": {
-        "text": "Second task after navigation",
+        "text": "Interrupting task",
         "submit": true
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "c"
+      },
+      "verify": {
+        "ui": {}
       }
     },
     {
       "type": "llm_response",
       "trigger": {
-        "pattern": "Second task",
+        "pattern": "Interrupting",
         "match_type": "contains"
       },
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  return 'Task 2 completed';",
+          "  return 'Queued task completed';",
           "}"
         ]
       },
       "verify": {
-        "execution": {}
+        "execution": {},
+        "ui": {}
       }
     }
   ],
   "final_verify": {
-    "execution": {}
+    "execution": {},
+    "ui": {
+      "all_tasks_completed": true
+    }
   }
 }

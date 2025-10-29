@@ -35,8 +35,8 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const files = await requestContext('**/*.rs');",
-          "  return `Found ${files.length} Rust files`;",
+          "  const result = await requestContext('**/*.rs', 'Finding all Rust source files');",
+          "  return `Found ${result.files.length} Rust files`;",
           "}"
         ]
       },
@@ -66,8 +66,8 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const files = await requestContext('src/*.rs');",
-          "  return `Found ${files.length} files in src`;",
+          "  const result = await requestContext('src/*.rs', 'Finding files in src directory');",
+          "  return `Found ${result.files.length} files in src`;",
           "}"
         ]
       },
@@ -97,8 +97,8 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  const files = await requestContext('README.md');",
-          "  return `Found README: ${files.length === 1}`;",
+          "  const result = await requestContext('README.md', 'Finding README file');",
+          "  return `Found README: ${result.files.length === 1}`;",
           "}"
         ]
       },

@@ -1,0 +1,117 @@
+{
+  "name": "Task Deletion via Backspace",
+  "description": "Tests deleting tasks using double-backspace in task pane",
+  "tags": [
+    "tui",
+    "tasks",
+    "deletion",
+    "keyboard"
+  ],
+  "setup": {
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "First task to delete",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "First task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'First task completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 1
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Second task to keep",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Second task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Second task completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 2
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "t",
+        "modifiers": ["ctrl"]
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "tasks"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Up"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Backspace"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Backspace"
+      },
+      "verify": {
+        "ui": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {},
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

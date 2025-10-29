@@ -2,12 +2,12 @@
 
 use merlin_deps::crossterm::event::{Event, KeyEventKind};
 use merlin_deps::ratatui::backend::Backend;
-use merlin_deps::tracing::warn;
 use merlin_routing::{Result, RoutingError, UiEvent};
 use std::sync::Arc;
 use std::time::Instant;
 
 use super::navigation;
+use super::task_execution::TaskExecutionParams;
 use super::tui_app::TuiApp;
 use crate::ui::app::navigation::ScrollContext;
 use crate::ui::event_handler::EventHandler;
@@ -123,12 +123,13 @@ impl<B: Backend> TuiApp<B> {
             let conversation_history = self.get_conversation_history();
             let parent_task_id = self.state.continuing_conversation_from;
 
-            self.spawn_task_execution(
-                Arc::clone(orchestrator),
-                input,
+            self.spawn_task_execution(TaskExecutionParams {
+                orchestrator: Arc::clone(orchestrator),
+                user_input: input,
                 parent_task_id,
                 conversation_history,
-            );
+                thread_id: self.state.active_thread_id,
+            });
         } else {
             self.pending_input = Some(input);
         }
@@ -137,17 +138,15 @@ impl<B: Backend> TuiApp<B> {
         false
     }
 
-    /// Cycles to the next theme and persists it on disk if persistence is enabled
+    /// Cycles to the next theme and auto-saves via `ConfigManager`
     pub(super) fn cycle_theme(&mut self) {
         let new_theme = self.renderer.theme().next();
         self.renderer.set_theme(new_theme);
 
-        if let Some(persistence) = &self.persistence {
-            let dir = persistence.get_tasks_dir();
-            if let Err(error) = new_theme.save(dir) {
-                warn!("Failed to save theme: {}", error);
-            }
-        }
+        // Update config (auto-saves when guard is dropped)
+        if let Ok(mut config) = self.config_manager.get_mut() {
+            config.theme = new_theme;
+        } // Drop happens here, triggering async save
     }
 
     /// Adjusts task list scroll to keep the selected task visible

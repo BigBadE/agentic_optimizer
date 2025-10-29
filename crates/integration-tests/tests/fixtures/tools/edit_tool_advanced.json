@@ -32,7 +32,7 @@
       "response": {
         "typescript": [
           "async function agent_code(): Promise<string> {",
-          "  await editFile('example.txt', 'Hello', 'Hi', true);",
+          "  await editFile('example.txt', 'Hello', 'Hi', { replace_all: true });",
           "  const content = await readFile('example.txt');",
           "  const count = (content.match(/Hi/g) || []).length;",
           "  return `Replaced all occurrences. Found ${count} instances of Hi`;",

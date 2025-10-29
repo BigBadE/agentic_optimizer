@@ -1,0 +1,295 @@
+{
+  "name": "Deeply Nested TaskList with Error Handling",
+  "description": "Tests 3-level nested decomposition with error recovery and retry logic",
+  "tags": [
+    "task_lists",
+    "decomposition",
+    "nested",
+    "error_handling"
+  ],
+  "setup": {
+    "files": {
+      "src/.gitkeep": "",
+      "tests/.gitkeep": ""
+    },
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Setup complex project structure",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Setup complex project",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "interface TaskList {",
+          "  title: string;",
+          "  steps: Array<{",
+          "    title: string;",
+          "    description: string;",
+          "    step_type: string;",
+          "    exit_requirement: {",
+          "      type: 'callback';",
+          "      function_name: string;",
+          "      args: Record<string, any>;",
+          "    };",
+          "  }>;",
+          "}",
+          "",
+          "async function agent_code(): Promise<TaskList> {",
+          "  return {",
+          "    title: 'Setup Complex Project',",
+          "    steps: [",
+          "      {",
+          "        title: 'Create Dir',",
+          "        description: 'Create directory structure',",
+          "        step_type: 'implementation',",
+          "        exit_requirement: { type: 'pattern', pattern: '.*' }",
+          "      },",
+          "      {",
+          "        title: 'Setup Deps',",
+          "        description: 'Setup dependencies',",
+          "        step_type: 'implementation',",
+          "        exit_requirement: { type: 'pattern', pattern: '.*' }",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 1
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create directory structure",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "interface TaskList {",
+          "  title: string;",
+          "  steps: Array<{",
+          "    title: string;",
+          "    description: string;",
+          "    step_type: string;",
+          "    exit_requirement: {",
+          "      type: 'callback';",
+          "      function_name: string;",
+          "      args: Record<string, any>;",
+          "    };",
+          "  }>;",
+          "}",
+          "",
+          "async function agent_code(): Promise<TaskList> {",
+          "  return {",
+          "    title: 'Create Directory Structure',",
+          "    steps: [",
+          "      {",
+          "        title: 'Create Src',",
+          "        description: 'Create src directory',",
+          "        step_type: 'implementation',",
+          "        exit_requirement: { type: 'pattern', pattern: '.*' }",
+          "      },",
+          "      {",
+          "        title: 'Create Tests',",
+          "        description: 'Create tests directory',",
+          "        step_type: 'implementation',",
+          "        exit_requirement: { type: 'pattern', pattern: '.*' }",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {}
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create src directory",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "interface TaskList {",
+          "  title: string;",
+          "  steps: Array<{",
+          "    title: string;",
+          "    description: string;",
+          "    step_type: string;",
+          "    exit_requirement: {",
+          "      type: 'callback';",
+          "      function_name: string;",
+          "      args: Record<string, any>;",
+          "    };",
+          "  }>;",
+          "}",
+          "",
+          "async function agent_code(): Promise<TaskList> {",
+          "  return {",
+          "    title: 'Create Source Files',",
+          "    steps: [",
+          "      {",
+          "        title: 'Create Lib',",
+          "        description: 'Create src/lib.rs',",
+          "        step_type: 'implementation',",
+          "        exit_requirement: { type: 'pattern', pattern: '.*' }",
+          "      },",
+          "      {",
+          "        title: 'Create Main',",
+          "        description: 'Create src/main.rs',",
+          "        step_type: 'implementation',",
+          "        exit_requirement: { type: 'pattern', pattern: '.*' }",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {}
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create src/lib.rs",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('src/lib.rs', 'pub fn hello() {}');",
+          "  return 'Created src/lib.rs';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "src/lib.rs",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create src/main.rs",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('src/main.rs', 'fn main() {}');",
+          "  return 'Created src/main.rs';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "src/main.rs",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create tests directory",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('tests/integration.rs', '#[test] fn test() {}');",
+          "  return 'Created tests directory';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "tests/integration.rs",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Setup dependencies",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('Cargo.toml', '[package]\\nname = \"test\"');",
+          "  return 'Setup dependencies complete';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "Cargo.toml",
+            "exists": true
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {},
+    "files": [
+      {
+        "path": "src/lib.rs",
+        "exists": true
+      },
+      {
+        "path": "src/main.rs",
+        "exists": true
+      },
+      {
+        "path": "tests/integration.rs",
+        "exists": true
+      },
+      {
+        "path": "Cargo.toml",
+        "exists": true
+      }
+    ],
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

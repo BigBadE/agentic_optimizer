@@ -1,6 +1,7 @@
 use super::persistence::TaskPersistence;
 use super::state::{ConversationEntry, ConversationRole, UiState};
 use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo, TaskStepStatus};
+use merlin_core::ThreadId;
 use merlin_deps::serde_json::Value;
 use merlin_deps::tracing::warn;
 use merlin_routing::{MessageLevel, TaskId, TaskProgress, TaskResult, UiEvent};
@@ -34,8 +35,9 @@ impl<'handler> EventHandler<'handler> {
             UiEvent::TaskStarted {
                 task_id,
                 description,
+                thread_id,
                 ..
-            } => self.handle_task_started(task_id, description),
+            } => self.handle_task_started(task_id, description, thread_id),
 
             UiEvent::TaskProgress { task_id, progress } => {
                 self.handle_task_progress(task_id, progress);
@@ -107,7 +109,12 @@ impl<'handler> EventHandler<'handler> {
 
     // Private event handlers
 
-    fn handle_task_started(&mut self, task_id: TaskId, description: String) {
+    fn handle_task_started(
+        &mut self,
+        task_id: TaskId,
+        description: String,
+        thread_id: Option<ThreadId>,
+    ) {
         let task_display = TaskDisplay {
             description,
             status: TaskStatus::Running,
@@ -115,7 +122,7 @@ impl<'handler> EventHandler<'handler> {
             output_lines: Vec::default(),
             created_at: SystemTime::now(),
             timestamp: Instant::now(),
-            thread_id: None,
+            thread_id,
             output: String::new(),
             steps: Vec::default(),
             current_step: None,
@@ -124,6 +131,11 @@ impl<'handler> EventHandler<'handler> {
 
         self.task_manager.add_task(task_id, task_display);
         self.state.active_running_tasks.insert(task_id);
+
+        // Update active_thread_id when a task with a thread starts
+        if let Some(tid) = thread_id {
+            self.state.active_thread_id = Some(tid);
+        }
 
         self.state.processing_status = None;
         self.select_task(task_id);

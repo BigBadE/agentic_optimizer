@@ -1,0 +1,175 @@
+{
+  "name": "Comprehensive Thread Navigation",
+  "description": "Tests creating threads, navigating between them, branching, and archiving using keyboard shortcuts",
+  "tags": [
+    "tui",
+    "threads",
+    "navigation",
+    "keyboard"
+  ],
+  "setup": {
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "First thread message",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "First thread",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Response in thread 1';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 1,
+          "thread_count": 1
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "t",
+        "modifiers": ["ctrl", "shift"]
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "threads"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "n"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "input"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Second thread message",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Second thread",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Response in thread 2';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "t",
+        "modifiers": ["ctrl", "shift"]
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "threads"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Up"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Down"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "b"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "k"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "j"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "d"
+      },
+      "verify": {
+        "ui": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {},
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

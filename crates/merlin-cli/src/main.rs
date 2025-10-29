@@ -18,6 +18,7 @@ use cli::Cli;
 use merlin_deps::anyhow::{Context as _, Result};
 
 mod cli;
+mod config;
 mod handlers;
 mod interactive;
 mod ui;

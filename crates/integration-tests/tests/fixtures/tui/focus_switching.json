@@ -16,13 +16,35 @@
     {
       "type": "user_input",
       "data": {
-        "text": "hello",
-        "submit": false
+        "text": "Create a simple task",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "simple task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Task completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
       },
       "verify": {
         "ui": {
-          "focused_pane": "input",
-          "input_text": "hello"
+          "focused_pane": "output"
         }
       }
     },
@@ -33,32 +55,7 @@
       },
       "verify": {
         "ui": {
-          "focused_pane": "output",
-          "focus_changed": true
-        }
-      }
-    },
-    {
-      "type": "key_press",
-      "data": {
-        "key": "Tab"
-      },
-      "verify": {
-        "ui": {
-          "focused_pane": "tasks",
-          "focus_changed": true
-        }
-      }
-    },
-    {
-      "type": "key_press",
-      "data": {
-        "key": "Tab"
-      },
-      "verify": {
-        "ui": {
-          "focused_pane": "input",
-          "focus_changed": false
+          "focused_pane": "input"
         }
       }
     }

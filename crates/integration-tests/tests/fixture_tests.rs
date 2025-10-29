@@ -21,6 +21,7 @@ use futures::stream::{self, StreamExt as _};
 use integration_tests::{UnifiedTestRunner, VerificationResult};
 use std::fs::read_dir;
 use std::path::PathBuf;
+use std::time::Instant;
 
 /// Run a single fixture
 async fn run_fixture(fixture_path: PathBuf) -> Result<VerificationResult, String> {
@@ -29,24 +30,38 @@ async fn run_fixture(fixture_path: PathBuf) -> Result<VerificationResult, String
         .and_then(|name| name.to_str())
         .ok_or_else(|| "Invalid fixture name".to_owned())?;
 
+    let start = Instant::now();
     let fixture = UnifiedTestRunner::load_fixture(&fixture_path)
         .map_err(|error| format!("Failed to load fixture {fixture_name}: {error}"))?;
 
     let mut runner = UnifiedTestRunner::new(fixture)
+        .await
         .map_err(|error| format!("Failed to create runner for {fixture_name}: {error}"))?;
 
-    runner
+    let result = runner
         .run()
         .await
-        .map_err(|error| format!("Failed to run fixture {fixture_name}: {error}"))
+        .map_err(|error| format!("Failed to run fixture {fixture_name}: {error}"));
+
+    let elapsed = start.elapsed();
+    if elapsed.as_secs() >= 1 {
+        tracing::debug!("[SLOW] {fixture_name} took {elapsed:?}");
+    }
+
+    result
 }
 
 /// Helper to run all fixtures in a directory in parallel
 async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<(String, Result<VerificationResult, String>)> {
+    let dir_name = dir
+        .file_name()
+        .and_then(|name| name.to_str())
+        .unwrap_or("unknown");
     let fixtures = UnifiedTestRunner::discover_fixtures(&dir).unwrap_or(vec![]);
+    let start = Instant::now();
 
     // Run fixtures in parallel with buffer_unordered
-    stream::iter(fixtures)
+    let results = stream::iter(fixtures)
         .map(|fixture_path| async move {
             let fixture_name = fixture_path
                 .file_name()
@@ -59,7 +74,12 @@ async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<(String, Result<VerificationRe
         })
         .buffer_unordered(16) // Balanced concurrency for optimal throughput
         .collect()
-        .await
+        .await;
+
+    let elapsed = start.elapsed();
+    tracing::debug!("[DIR] {dir_name} took {elapsed:?}");
+
+    results
 }
 
 /// Run all fixtures in the fixtures directory
@@ -112,27 +132,18 @@ async fn test_all_fixtures() {
 
     // Print complete summary at the end
     println!("\n=== Test Summary ===");
-    println!(
-        "Total fixtures: {}",
-        passed.len() + failures_with_details.len()
-    );
-    println!("Passed: {}", passed.len());
-    println!("Failed: {}", failures_with_details.len());
+    println!("{} passed", passed.len());
 
     if failures_with_details.is_empty() {
         println!("\nAll fixtures passed! ✓");
     } else {
-        println!("\n=== Failed Fixtures ===");
+        println!("{} failed\n", failures_with_details.len());
+        println!("=== Failed Fixtures ===");
         for (fixture_name, verification) in &failures_with_details {
             println!("\n{fixture_name}:");
             for failure in &verification.failures {
                 println!("  - {failure}");
             }
-        }
-
-        println!("\n=== Passed Fixtures ===");
-        for name in &passed {
-            println!("  ✓ {name}");
         }
 
         panic!("{} fixture(s) failed", failures_with_details.len());

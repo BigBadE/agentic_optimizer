@@ -1,6 +1,7 @@
 //! User interface event system for Merlin.
 //! Provides channel and event types for UI updates.
 
+use crate::conversation::ThreadId;
 use crate::task::{TaskId, TaskResult};
 use merlin_deps::tracing::warn;
 use merlin_tooling::ToolError;
@@ -38,6 +39,7 @@ impl UiChannel {
             task_id,
             description,
             parent_id: None,
+            thread_id: None,
         });
     }
 
@@ -52,6 +54,23 @@ impl UiChannel {
             task_id,
             description,
             parent_id,
+            thread_id: None,
+        });
+    }
+
+    /// Sends a task started event with parent and thread ID
+    pub fn task_started_with_thread(
+        &self,
+        task_id: TaskId,
+        description: String,
+        parent_id: Option<TaskId>,
+        thread_id: Option<ThreadId>,
+    ) {
+        self.send(UiEvent::TaskStarted {
+            task_id,
+            description,
+            parent_id,
+            thread_id,
         });
     }
 

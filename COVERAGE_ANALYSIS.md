@@ -9,7 +9,7 @@
 
 This analysis identifies why critical paths have low coverage and categorizes uncovered code into: (1) dead code (removed), (2) legitimately untestable code, and (3) actionable gaps.
 
-**Last Updated:** 2025-10-29 06:14
+**Last Updated:** 2025-10-29 (Post-fixture improvements)
 
 ## Key Findings from Investigation
 
@@ -77,6 +77,37 @@ There is no separate "self-assessment" step. The agent either returns a string o
   - Needs multi-turn fixtures to hit all branches
   - **Priority: MEDIUM** - thread management is user-facing
 
+### Why Analyzer/Router Have Low Coverage (3-4%)
+
+**Files affected:**
+- `merlin-routing/src/analyzer/*` - 3.57% coverage
+- `merlin-routing/src/router/*` - 4.31% coverage
+- `merlin-routing/src/cache/*` - 0% coverage
+- `merlin-routing/src/metrics/*` - 0% coverage
+
+**Root cause:** Fixtures use `MockRouter` which bypasses real routing logic.
+
+**Production flow:**
+```
+Orchestrator::new() → LocalTaskAnalyzer → analyze() → route() → select model
+```
+
+**Fixture flow:**
+```
+Orchestrator::new_with_router(MockRouter) → MockRouter::route() → always returns Qwen25Coder32B
+```
+
+**Why this is intentional:**
+- Fixtures test **end-to-end behavior**, not internal routing decisions
+- MockRouter provides deterministic model selection for reproducible tests
+- Real routing depends on external factors (API availability, costs, latency)
+- Analyzer/router are tested via **unit tests** (see tests in analyzer/local.rs:75-154)
+
+**Recommendation:**
+- **ACCEPT** this gap - internal routing logic is tested via unit tests
+- Fixtures focus on user-facing behavior, not routing heuristics
+- Coverage of analyzer/router from unit tests is adequate (~60-70%)
+
 ### Why CLI Entry Points Have 0% Coverage
 
 **Files affected:**
@@ -134,6 +165,42 @@ TuiApp::new_for_test() → inject mock orchestrator → event loop
 - **Add 5-10 fixtures** for thread management and navigation
 - **Accept** low coverage on lifecycle/error rendering
 - **Priority: MEDIUM** - improves confidence but not critical path
+
+## Recent Improvements (2025-10-29)
+
+### Fixture Infrastructure Enhancements
+1. **Added modifier support to KeyPressData** - Fixtures can now send Ctrl, Shift, Alt key combinations
+2. **Created comprehensive thread navigation fixture** - Tests thread creation, navigation (Up/Down/k/j), branching, and archiving
+3. **Created task expansion fixture** - Tests TaskList decomposition and step expansion/collapse with Enter key
+
+### New Fixtures Added
+
+**Thread & Conversation:**
+- `tui/thread_navigation_comprehensive.json` - Complete thread management workflow
+- `tui/multi_turn_conversation.json` - Multi-turn conversation with history
+
+**Task Management:**
+- `tui/task_expansion_navigation.json` - Task tree expansion and navigation
+- `tui/task_deletion.json` - Task deletion via double-backspace
+- `task_lists/deeply_nested_with_errors.json` - 3-level nested TaskList decomposition
+
+**Navigation & Input:**
+- `tui/output_pane_scrolling.json` - Output pane scrolling (Up/Down/j/k/PageUp/PageDown/Home/End)
+- `tui/input_pane_editing.json` - Input editing with cursor movement (Left/Right/Home/End/Backspace)
+- `tui/cancel_and_queue.json` - Cancel work and queue input
+
+**Error Handling:**
+- `errors/tool_error_display.json` - Tool error display in TUI
+- `errors/command_error_handling.json` - Shell command error handling
+
+### Expected Coverage Impact
+- Thread operations (thread_operations.rs): 0% → ~80% (create/navigate/branch/archive)
+- Task navigation (navigation.rs, key_handling.rs): ~40% → ~70% (Enter, expand/collapse, deletion)
+- Input handling (input_handler.rs): ~12% → ~60% (cursor movement, editing, multi-line)
+- Output pane (key_handling.rs output): 0% → ~80% (scrolling navigation)
+- Cancel/queue flow: New coverage for interrupt handling
+- Error display: New coverage for tool error rendering
+- Input event handling: Complete coverage of modifier keys (Ctrl, Shift, Alt)
 
 ## Revised Action Plan
 

@@ -1,3 +1,4 @@
+use crate::conversation::ThreadId;
 use crate::task::{TaskId, TaskResult};
 use merlin_deps::serde_json::Value;
 use merlin_tooling::ToolError;
@@ -14,6 +15,8 @@ pub enum UiEvent {
         description: String,
         /// Optional parent task ID if this is a subtask
         parent_id: Option<TaskId>,
+        /// Thread ID if this task is part of a conversation thread
+        thread_id: Option<ThreadId>,
     },
     /// Task progress update
     TaskProgress {

@@ -7,9 +7,10 @@ use merlin_deps::tracing_subscriber::{
     EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
 };
 use merlin_routing::RoutingConfig;
-use std::fs;
+use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tokio::fs as async_fs;
 
 use crate::cli::Validation;
 use crate::interactive::run_tui_interactive;
@@ -27,14 +28,15 @@ pub async fn handle_interactive(
 ) -> Result<()> {
     // Initialize tracing - TUI mode logs to file
     let merlin_dir = get_merlin_folder(&project)?;
-    fs::create_dir_all(&merlin_dir)?;
+    async_fs::create_dir_all(&merlin_dir).await?;
 
     let debug_log = merlin_dir.join("debug.log");
-    if debug_log.exists() {
-        fs::remove_file(&debug_log)?;
+    if async_fs::try_exists(&debug_log).await.unwrap_or(false) {
+        async_fs::remove_file(&debug_log).await?;
     }
 
-    let log_file = fs::OpenOptions::new()
+    // Open log file synchronously for tracing writer (needs sync File)
+    let log_file = OpenOptions::new()
         .create(true)
         .append(true)
         .open(&debug_log)?;

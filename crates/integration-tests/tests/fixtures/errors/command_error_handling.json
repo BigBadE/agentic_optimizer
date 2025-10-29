@@ -1,0 +1,57 @@
+{
+  "name": "Command Error Handling",
+  "description": "Tests error handling when shell commands fail",
+  "tags": [
+    "errors",
+    "tools",
+    "bash",
+    "error_handling"
+  ],
+  "setup": {
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Run a command that will fail",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "command.*fail",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    const result = await runCommand('false', []);",
+          "    return `Command succeeded: ${result.stdout}`;",
+          "  } catch (error) {",
+          "    return `Command failed as expected: ${error}`;",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": ["failed as expected"]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {},
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

@@ -23,6 +23,7 @@ use std::fs;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 use std::sync::{Arc, Mutex};
+use std::time::Instant;
 use tokio::sync::broadcast;
 use tokio::time::{Duration as TokioDuration, sleep, timeout};
 
@@ -53,27 +54,27 @@ impl UnifiedTestRunner {
     ///
     /// # Errors
     /// Returns error if workspace setup fails
-    pub fn new(fixture: TestFixture) -> Result<Self> {
+    pub async fn new(fixture: TestFixture) -> Result<Self> {
         let workspace = TempDir::new()
             .map_err(|err| RoutingError::Other(format!("Failed to create workspace: {err}")))?;
         let workspace_path = workspace.path().to_path_buf();
 
-        Self::new_internal(fixture, Some(workspace), workspace_path)
+        Self::new_internal(fixture, Some(workspace), workspace_path).await
     }
 
     /// Create new test runner with provided workspace directory
     ///
     /// # Errors
     /// Returns error if workspace setup fails
-    pub fn new_with_workspace(fixture: TestFixture, workspace_path: PathBuf) -> Result<Self> {
-        Self::new_internal(fixture, None, workspace_path)
+    pub async fn new_with_workspace(fixture: TestFixture, workspace_path: PathBuf) -> Result<Self> {
+        Self::new_internal(fixture, None, workspace_path).await
     }
 
     /// Internal constructor shared by both public constructors
     ///
     /// # Errors
     /// Returns error if workspace setup fails
-    fn new_internal(
+    async fn new_internal(
         fixture: TestFixture,
         workspace_temp: Option<TempDir>,
         workspace_path: PathBuf,
@@ -142,7 +143,8 @@ impl UnifiedTestRunner {
             Box::new(event_source),
             Some(final_workspace_path.clone()),
             Some(Arc::new(orchestrator)),
-        )?;
+        )
+        .await?;
 
         Ok(Self {
             fixture,
@@ -182,14 +184,23 @@ impl UnifiedTestRunner {
     /// Returns the task result and any captured output from `TaskOutput` events.
     ///
     /// # Errors
-    /// Returns error if task completion fails
+    /// Returns error if task completion fails or times out
     async fn await_task_completion(
         &mut self,
         ui_events: &mut broadcast::Receiver<UiEvent>,
     ) -> Result<TaskCompletionResult> {
         let mut outputs = Vec::new();
+        let overall_timeout = TokioDuration::from_secs(5);
+        let start = Instant::now();
 
         loop {
+            // Check overall timeout to prevent infinite hangs
+            if start.elapsed() >= overall_timeout {
+                return Err(RoutingError::ExecutionFailed(
+                    "Task completion timed out after 5 seconds - no TaskCompleted or TaskFailed event received".to_owned()
+                ));
+            }
+
             // Process any pending UI events first (this broadcasts them)
             self.tui_app.test_process_ui_events();
 
@@ -211,10 +222,17 @@ impl UnifiedTestRunner {
                         // Ignore other events (TaskStarted, TaskProgress, etc.)
                     }
                 },
-                Ok(Err(err)) => {
-                    return Err(RoutingError::ExecutionFailed(format!(
-                        "UI event channel error: {err}"
-                    )));
+                Ok(Err(broadcast::error::RecvError::Lagged(skipped))) => {
+                    // Channel lagged - some events were dropped
+                    // This is non-fatal, continue waiting for completion
+                    merlin_deps::tracing::warn!(
+                        "UI event channel lagged, skipped {skipped} events"
+                    );
+                }
+                Ok(Err(broadcast::error::RecvError::Closed)) => {
+                    return Err(RoutingError::ExecutionFailed(
+                        "UI event channel closed before task completion".to_owned(),
+                    ));
                 }
                 Err(_) => {
                     // Timeout - loop will process more UI events

@@ -91,6 +91,84 @@ impl StepExecutor {
         }
     }
 
+    /// Process a single execution attempt
+    ///
+    /// # Errors
+    /// Returns `Ok(Some(result))` if step completed successfully,
+    /// `Ok(None)` if validation failed and should retry,
+    /// `Err` if execution failed
+    async fn process_step_attempt(
+        params: &StepExecutionParams<'_>,
+        context: &Context,
+        attempt: &mut usize,
+        start: Instant,
+    ) -> Result<Option<StepResult>> {
+        let response = Self::execute_with_agent(
+            &params.step.description,
+            context,
+            params.provider,
+            params.tool_registry,
+            params.task_id,
+            params.ui_channel,
+        )
+        .await?;
+
+        merlin_deps::tracing::debug!(
+            "Step '{}' returned {}",
+            params.step.description,
+            match &response {
+                AgentResponse::DirectResult(_) => "DirectResult",
+                AgentResponse::TaskList(_) => "TaskList",
+            }
+        );
+
+        match response {
+            AgentResponse::DirectResult(result) => {
+                let validation = Self::validate_exit_requirement(
+                    &params.step.exit_requirement,
+                    &result,
+                    params.tool_registry,
+                );
+
+                if Self::handle_validation_error(validation, &params.step.title, attempt).is_ok() {
+                    Ok(Some(StepResult {
+                        text: result,
+                        duration_ms: start.elapsed().as_millis() as u64,
+                        success: true,
+                    }))
+                } else {
+                    Ok(None)
+                }
+            }
+
+            AgentResponse::TaskList(task_list) => {
+                let combined_result = Self::execute_task_list_impl(
+                    &task_list,
+                    context,
+                    params.provider,
+                    params.tool_registry,
+                    params.task_id,
+                    params.ui_channel,
+                    params.recursion_depth + 1,
+                )
+                .await?;
+
+                Self::validate_exit_requirement(
+                    &params.step.exit_requirement,
+                    &combined_result.text,
+                    params.tool_registry,
+                )
+                .map_err(|err| match err {
+                    ValidationErrorType::Hard(msg) | ValidationErrorType::Soft(msg) => {
+                        RoutingError::Other(format!("Task list result failed validation: {msg}"))
+                    }
+                })?;
+
+                Ok(Some(combined_result))
+            }
+        }
+    }
+
     /// Implementation of step execution
     ///
     /// # Errors
@@ -119,62 +197,16 @@ impl StepExecutor {
                 params.previous_results,
             );
 
-            let response = Self::execute_with_agent(
-                &params.step.description,
-                &context,
-                params.provider,
-                params.tool_registry,
-                params.task_id,
-                params.ui_channel,
-            )
-            .await?;
+            merlin_deps::tracing::debug!(
+                "Executing step '{}' (attempt {})",
+                params.step.description,
+                attempt + 1
+            );
 
-            match response {
-                AgentResponse::DirectResult(result) => {
-                    let validation = Self::validate_exit_requirement(
-                        &params.step.exit_requirement,
-                        &result,
-                        params.tool_registry,
-                    );
-
-                    if Self::handle_validation_error(validation, &params.step.title, &mut attempt)
-                        .is_ok()
-                    {
-                        return Ok(StepResult {
-                            text: result,
-                            duration_ms: start.elapsed().as_millis() as u64,
-                            success: true,
-                        });
-                    }
-                }
-
-                AgentResponse::TaskList(task_list) => {
-                    let combined_result = Self::execute_task_list_impl(
-                        &task_list,
-                        &context,
-                        params.provider,
-                        params.tool_registry,
-                        params.task_id,
-                        params.ui_channel,
-                        params.recursion_depth + 1,
-                    )
-                    .await?;
-
-                    Self::validate_exit_requirement(
-                        &params.step.exit_requirement,
-                        &combined_result.text,
-                        params.tool_registry,
-                    )
-                    .map_err(|err| match err {
-                        ValidationErrorType::Hard(msg) | ValidationErrorType::Soft(msg) => {
-                            RoutingError::Other(format!(
-                                "Task list result failed validation: {msg}"
-                            ))
-                        }
-                    })?;
-
-                    return Ok(combined_result);
-                }
+            if let Some(result) =
+                Self::process_step_attempt(&params, &context, &mut attempt, start).await?
+            {
+                return Ok(result);
             }
         }
     }
@@ -226,14 +258,15 @@ impl StepExecutor {
             let mut step_results = Vec::new();
             let mut combined_output = Vec::new();
 
-            merlin_deps::tracing::info!(
-                "Executing task list '{}' with {} steps",
+            merlin_deps::tracing::debug!(
+                "Executing task list '{}' with {} steps at depth {}",
                 task_list.title,
-                task_list.steps.len()
+                task_list.steps.len(),
+                recursion_depth
             );
 
             for (index, step) in task_list.steps.iter().enumerate() {
-                merlin_deps::tracing::info!(
+                merlin_deps::tracing::debug!(
                     "Executing step {}/{}: {}",
                     index + 1,
                     task_list.steps.len(),
@@ -321,9 +354,11 @@ impl StepExecutor {
     fn parse_agent_response(result: &str) -> AgentResponse {
         // Try parsing as JSON first (could be TaskList)
         if let Ok(task_list) = from_str::<TaskList>(result) {
+            merlin_deps::tracing::debug!("Parsed agent response as TaskList");
             return AgentResponse::TaskList(task_list);
         }
 
+        merlin_deps::tracing::debug!("Treating agent response as DirectResult");
         // Otherwise treat as direct string result
         AgentResponse::DirectResult(result.to_owned())
     }

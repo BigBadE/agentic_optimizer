@@ -1,0 +1,147 @@
+{
+  "name": "Output Pane Scrolling Navigation",
+  "description": "Tests scrolling through task output using keyboard navigation in output pane",
+  "tags": [
+    "tui",
+    "navigation",
+    "output",
+    "scrolling"
+  ],
+  "setup": {
+    "terminal_size": [
+      80,
+      20
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Generate long output",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "long output",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const lines: string[] = [];",
+          "  for (let i = 1; i <= 50; i++) {",
+          "    lines.push(`Line ${i}: This is a long output line to test scrolling`);",
+          "  }",
+          "  return lines.join('\\n');",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 1
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "output"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Down"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Down"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Up"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "j"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "k"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "PageDown"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "PageUp"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "End"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Home"
+      },
+      "verify": {
+        "ui": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {},
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

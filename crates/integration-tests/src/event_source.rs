@@ -93,9 +93,20 @@ impl FixtureEventState {
                     _ => KeyCode::Null,
                 };
 
+                // Parse modifiers
+                let mut modifiers = KeyModifiers::empty();
+                for modifier in &key_event.data.modifiers {
+                    match modifier.to_lowercase().as_str() {
+                        "ctrl" | "control" => modifiers.insert(KeyModifiers::CONTROL),
+                        "shift" => modifiers.insert(KeyModifiers::SHIFT),
+                        "alt" => modifiers.insert(KeyModifiers::ALT),
+                        _ => {}
+                    }
+                }
+
                 self.current_events.push_back(Event::Key(KeyEvent {
                     code,
-                    modifiers: KeyModifiers::empty(),
+                    modifiers,
                     kind: KeyEventKind::Press,
                     state: KeyEventState::empty(),
                 }));

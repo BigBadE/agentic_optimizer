@@ -1,0 +1,110 @@
+{
+  "name": "Multi-Turn Conversation with History",
+  "description": "Tests multiple back-and-forth messages in a single thread with conversation history",
+  "tags": [
+    "tui",
+    "conversation",
+    "threads",
+    "history"
+  ],
+  "setup": {
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "What is 2 + 2?",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "2 \\+ 2",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return '2 + 2 equals 4';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": ["equals 4"]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Now multiply that by 3",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "multiply.*3",
+        "match_type": "regex"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return '4 multiplied by 3 equals 12';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 2,
+          "output_contains": ["equals 12"]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "What was the first number I asked about?",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "first number",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'The first calculation was 2 + 2';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 3,
+          "output_contains": ["first calculation"]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {},
+    "ui": {
+      "all_tasks_completed": true,
+      "tasks_displayed": 3,
+      "thread_count": 1
+    }
+  }
+}

@@ -245,11 +245,11 @@ impl MockProvider {
                 .find(|response| !response.used && response.matches(candidate))
             {
                 tracing::debug!(
-                    "Matched pattern '{}' (match_type={:?}) against candidate #{} ({} chars)",
+                    "Matched pattern '{}' (match_type={:?}) against candidate #{} (first 80 chars: '{}')",
                     resp.pattern,
                     resp.match_type,
                     idx,
-                    candidate.len()
+                    candidate.chars().take(80).collect::<String>()
                 );
                 resp.used = true;
                 resp.captured_prompt = Some(candidate.clone());

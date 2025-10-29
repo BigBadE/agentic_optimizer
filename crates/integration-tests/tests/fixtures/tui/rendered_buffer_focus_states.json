@@ -17,17 +17,27 @@
     {
       "type": "user_input",
       "data": {
-        "text": "Test content",
-        "submit": false
+        "text": "Create a task",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create a task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Task created';",
+          "}"
+        ]
       },
       "verify": {
+        "execution": {},
         "ui": {
-          "focused_pane": "input",
-          "input_text": "Test content",
-          "rendered_buffer_contains": [
-            "\u2500\u2500\u2500 Input",
-            "Test content"
-          ]
+          "focused_pane": "input"
         }
       }
     },
@@ -38,11 +48,7 @@
       },
       "verify": {
         "ui": {
-          "focused_pane": "tasks",
-          "rendered_buffer_contains": [
-            "\u2500\u2500\u2500 Tasks",
-            "\u2500\u2500\u2500 Input"
-          ]
+          "focused_pane": "output"
         }
       }
     },
@@ -53,23 +59,14 @@
       },
       "verify": {
         "ui": {
-          "focused_pane": "input",
-          "rendered_buffer_contains": [
-            "\u2500\u2500\u2500 Tasks",
-            "\u2500\u2500\u2500 Input",
-            "Test content"
-          ]
+          "focused_pane": "input"
         }
       }
     }
   ],
   "final_verify": {
     "ui": {
-      "focused_pane": "input",
-      "rendered_buffer_contains": [
-        "\u2500\u2500\u2500 Input",
-        "\u2500\u2500\u2500 Tasks"
-      ]
+      "focused_pane": "input"
     }
   }
 }

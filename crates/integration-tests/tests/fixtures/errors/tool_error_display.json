@@ -1,0 +1,57 @@
+{
+  "name": "Tool Error Display in TUI",
+  "description": "Tests error display when tools fail during execution",
+  "tags": [
+    "errors",
+    "tui",
+    "tools",
+    "error_handling"
+  ],
+  "setup": {
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Read a file that doesn't exist",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "doesn't exist",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    const content = await readFile('nonexistent_file.txt');",
+          "    return `File content: ${content}`;",
+          "  } catch (error) {",
+          "    return `Error reading file: ${error}`;",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 1,
+          "output_contains": ["Error"]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {},
+    "ui": {
+      "all_tasks_completed": true
+    }
+  }
+}

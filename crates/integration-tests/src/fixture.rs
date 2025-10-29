@@ -102,6 +102,9 @@ pub struct KeyPressEvent {
 pub struct KeyPressData {
     /// Key to press
     pub key: String,
+    /// Optional key modifiers (ctrl, shift, alt)
+    #[serde(default)]
+    pub modifiers: Vec<String>,
 }
 
 /// LLM response event

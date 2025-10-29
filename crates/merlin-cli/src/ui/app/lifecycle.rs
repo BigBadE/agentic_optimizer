@@ -6,11 +6,12 @@ use merlin_deps::ratatui::backend::{Backend, CrosstermBackend};
 use std::fs;
 use std::io;
 use std::path::PathBuf;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tokio::sync::{broadcast, mpsc};
 
 use super::tui_app::TuiApp;
+use crate::config::ConfigManager;
 use crate::ui::event_source::CrosstermEventSource;
 use crate::ui::input::InputManager;
 use crate::ui::layout;
@@ -18,7 +19,6 @@ use crate::ui::persistence::TaskPersistence;
 use crate::ui::renderer::{FocusedPane, Renderer};
 use crate::ui::state::UiState;
 use crate::ui::task_manager::TaskManager;
-use crate::ui::theme::Theme;
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_routing::{Result, RoutingError};
 
@@ -27,7 +27,7 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
     ///
     /// # Errors
     /// Returns an error if terminal initialization or clearing fails.
-    pub fn new_with_storage(
+    pub async fn new_with_storage(
         tasks_dir: impl Into<Option<PathBuf>>,
         orchestrator: Option<Arc<RoutingOrchestrator>>,
         log_file: Option<fs::File>,
@@ -49,10 +49,15 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             state.loading_tasks = true;
         }
 
-        let theme = tasks_dir
-            .as_ref()
-            .and_then(|dir| Theme::load(dir).ok())
-            .unwrap_or_default();
+        // Initialize config manager and load theme from ~/.merlin/config.toml
+        let config_manager = ConfigManager::new().await.map_err(|err| {
+            RoutingError::Other(format!("Failed to create config manager: {err}"))
+        })?;
+
+        let theme = config_manager
+            .get()
+            .map_err(|err| RoutingError::Other(format!("Failed to read config: {err}")))?
+            .theme;
 
         let persistence = tasks_dir
             .as_ref()
@@ -63,8 +68,9 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             |dir| dir.join("threads"),
         );
 
-        let thread_store = ThreadStore::new(thread_storage_path)
+        let store = ThreadStore::new(thread_storage_path)
             .map_err(|err| RoutingError::Other(format!("Failed to create thread store: {err}")))?;
+        let thread_store = Arc::new(Mutex::new(store));
 
         let app = Self {
             terminal,
@@ -84,6 +90,7 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             thread_store,
             orchestrator,
             log_file,
+            config_manager,
         };
 
         Ok(app)
@@ -140,9 +147,13 @@ impl<B: Backend> TuiApp<B> {
     /// # Errors
     /// Returns an error if thread loading fails
     pub fn load_threads(&mut self) -> Result<()> {
-        let loaded_count = self.thread_store.active_threads().len();
-        self.thread_store.load_all()?;
-        let new_count = self.thread_store.active_threads().len();
+        let mut store = self
+            .thread_store
+            .lock()
+            .map_err(|err| RoutingError::Other(format!("Thread store lock error: {err}")))?;
+        let loaded_count = store.active_threads().len();
+        store.load_all()?;
+        let new_count = store.active_threads().len();
         merlin_deps::tracing::info!(
             "Loaded {} threads from disk ({} new)",
             new_count,

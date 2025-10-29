@@ -20,7 +20,7 @@
 // These modules are only used by main.rs (the binary), but need to be
 // included here so their unit tests are compiled and run
 mod cli;
-mod config;
+pub(crate) mod config;
 mod handlers;
 mod interactive;
 pub mod ui;

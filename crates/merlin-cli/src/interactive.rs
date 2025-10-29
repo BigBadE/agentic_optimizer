@@ -4,23 +4,25 @@ use merlin_agent::RoutingOrchestrator;
 use merlin_deps::anyhow::Result;
 
 use crate::ui::TuiApp;
-use std::fs;
 use std::io::Write as _;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
+use tokio::fs as async_fs;
 
 use crate::utils::{cleanup_old_tasks, get_merlin_folder};
+
+use std::fs::{File, OpenOptions};
 
 /// Initialize logging for TUI session
 ///
 /// # Errors
 /// Returns error if file operations fail
-fn init_tui_logging(merlin_dir: &Path, project: &Path, local_only: bool) -> Result<fs::File> {
+fn init_tui_logging(merlin_dir: &Path, project: &Path, local_only: bool) -> Result<File> {
     let debug_log = merlin_dir.join("debug.log");
 
     // Open existing debug.log (already created by handle_interactive)
-    let mut log_file = fs::OpenOptions::new().append(true).open(&debug_log)?;
+    let mut log_file = OpenOptions::new().append(true).open(&debug_log)?;
 
     writeln!(
         log_file,
@@ -51,21 +53,22 @@ pub async fn run_tui_interactive(
     local_only: bool,
 ) -> Result<()> {
     let merlin_dir = get_merlin_folder(&project)?;
-    fs::create_dir_all(&merlin_dir)?;
+    async_fs::create_dir_all(&merlin_dir).await?;
 
     let mut log_file = init_tui_logging(&merlin_dir, &project, local_only)?;
 
     cleanup_old_tasks(&merlin_dir)?;
 
     let tasks_dir = merlin_dir.join("tasks");
-    fs::create_dir_all(&tasks_dir)?;
+    async_fs::create_dir_all(&tasks_dir).await?;
 
     let log_clone = log_file.try_clone()?;
     let mut tui_app = TuiApp::new_with_storage(
         tasks_dir.clone(),
         Some(Arc::new(orchestrator)),
         Some(log_clone),
-    )?;
+    )
+    .await?;
 
     TuiApp::enable_raw_mode()?;
 
@@ -74,18 +77,24 @@ pub async fn run_tui_interactive(
         merlin_deps::tracing::warn!("Failed to load threads: {err}");
     }
 
-    let disk_task_files = fs::read_dir(&tasks_dir).map_or(0, |read_dir| {
-        read_dir
-            .filter_map(Result::ok)
-            .filter(|entry| {
-                entry
+    // Count .gz files asynchronously
+    let disk_task_files = async {
+        let mut count = 0;
+        if let Ok(mut entries) = async_fs::read_dir(&tasks_dir).await {
+            while let Ok(Some(entry)) = entries.next_entry().await {
+                if entry
                     .path()
                     .extension()
                     .and_then(|ext| ext.to_str())
                     .is_some_and(|ext_str| ext_str == "gz")
-            })
-            .count()
-    });
+                {
+                    count += 1;
+                }
+            }
+        }
+        count
+    }
+    .await;
     let parsed_tasks = tui_app.loaded_task_count();
     writeln!(
         log_file,

@@ -3,10 +3,11 @@
 use merlin_deps::ratatui::Terminal;
 use merlin_deps::ratatui::backend::Backend;
 use std::fs;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tokio::sync::{broadcast, mpsc};
 
+use crate::config::ConfigManager;
 use crate::ui::event_source::InputEventSource;
 use crate::ui::input::InputManager;
 use crate::ui::layout;
@@ -51,12 +52,14 @@ pub struct TuiApp<B: Backend> {
     pub(crate) last_render_time: Instant,
     /// Cache of actual rendered layout dimensions
     pub(crate) layout_cache: layout::LayoutCache,
-    /// Thread storage and management
-    pub(crate) thread_store: ThreadStore,
+    /// Thread storage and management (shared with orchestrator)
+    pub(crate) thread_store: Arc<Mutex<ThreadStore>>,
     /// Orchestrator for executing tasks
     pub(crate) orchestrator: Option<Arc<RoutingOrchestrator>>,
     /// Log file for task execution
     pub(crate) log_file: Option<fs::File>,
+    /// Configuration manager with auto-save
+    pub(crate) config_manager: ConfigManager,
 }
 
 // Note: all input is sourced from `event_source` to allow test injection without

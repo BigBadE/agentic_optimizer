@@ -1,9 +1,5 @@
 use merlin_deps::ratatui::style::Color;
-use merlin_deps::serde_json::{from_str, to_string};
 use serde::{Deserialize, Serialize};
-use std::fs::{read_to_string as read_file_to_string, write as write_file};
-use std::io;
-use std::path::Path;
 
 /// UI theme configuration
 #[derive(Default, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
@@ -76,45 +72,5 @@ impl Theme {
     /// Gets the highlight color
     pub fn highlight(self) -> Color {
         self.focused_border()
-    }
-
-    /// Loads theme from file
-    ///
-    /// # Errors
-    /// Returns an error if the theme file cannot be located, read, or parsed.
-    pub fn load(tasks_dir: &Path) -> io::Result<Self> {
-        let theme_file = tasks_dir
-            .parent()
-            .ok_or_else(|| io::Error::new(io::ErrorKind::NotFound, "No parent directory"))?
-            .join("theme.json");
-
-        if !theme_file.exists() {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "Theme file not found",
-            ));
-        }
-
-        let content = read_file_to_string(theme_file)?;
-        from_str(&content).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))
-    }
-
-    /// Saves theme to file
-    ///
-    /// # Errors
-    /// Returns an error if the theme cannot be serialized or written.
-    pub fn save(self, tasks_dir: &Path) -> io::Result<()> {
-        let Some(parent) = tasks_dir.parent() else {
-            return Err(io::Error::new(
-                io::ErrorKind::NotFound,
-                "No parent directory",
-            ));
-        };
-
-        let theme_file = parent.join("theme.json");
-        let json =
-            to_string(&self).map_err(|err| io::Error::new(io::ErrorKind::InvalidData, err))?;
-
-        write_file(theme_file, json)
     }
 }

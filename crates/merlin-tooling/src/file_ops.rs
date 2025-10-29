@@ -100,10 +100,19 @@ declare function writeFile(path: string, content: string): Promise<void>;"
         // Resolve and validate path
         let full_path = self.resolve_path(path)?;
 
+        merlin_deps::tracing::info!(
+            "WriteFileTool: writing {} bytes to {:?} (resolved from '{}')",
+            content.len(),
+            full_path,
+            path
+        );
+
         // Write file contents
         fs::write(&full_path, content).map_err(|err| {
             ToolError::ExecutionFailed(format!("Failed to write file '{path}': {err}"))
         })?;
+
+        merlin_deps::tracing::info!("WriteFileTool: successfully wrote file {:?}", full_path);
 
         Ok(ToolOutput::success(format!(
             "Wrote {} bytes to {path}",

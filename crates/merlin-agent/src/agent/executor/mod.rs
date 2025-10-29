@@ -162,6 +162,7 @@ impl AgentExecutor {
         // Handle response type
         match agent_response {
             AgentResponse::DirectResult(result) => {
+                merlin_deps::tracing::debug!("Agent returned DirectResult");
                 // Simple string response - create TaskResult
                 let response = Response {
                     text: result,
@@ -184,6 +185,10 @@ impl AgentExecutor {
                 })
             }
             AgentResponse::TaskList(task_list) => {
+                merlin_deps::tracing::debug!(
+                    "Agent returned TaskList with {} steps",
+                    task_list.steps.len()
+                );
                 // Execute task list with StepExecutor
                 let step_result = StepExecutor::execute_task_list(
                     &task_list,

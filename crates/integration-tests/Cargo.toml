@@ -21,6 +21,7 @@ num_cpus.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio = { workspace = true, features = ["full", "test-util"] }
+tracing.workspace = true
 
 [lib]
 name = "integration_tests"

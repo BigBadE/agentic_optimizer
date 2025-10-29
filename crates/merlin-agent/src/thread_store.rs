@@ -27,9 +27,12 @@ impl ThreadStore {
     /// # Errors
     /// Returns an error if the storage directory cannot be created
     pub fn new(storage_path: PathBuf) -> Result<Self> {
-        fs::create_dir_all(&storage_path).map_err(|err| {
-            RoutingError::Other(format!("Failed to create thread storage directory: {err}"))
-        })?;
+        // Only create directory if it doesn't exist to avoid slow Windows FS operations
+        if !storage_path.exists() {
+            fs::create_dir_all(&storage_path).map_err(|err| {
+                RoutingError::Other(format!("Failed to create thread storage directory: {err}"))
+            })?;
+        }
 
         Ok(Self {
             threads: HashMap::new(),

@@ -6,7 +6,10 @@ use merlin_deps::ratatui::backend::Backend;
 impl<B: Backend> TuiApp<B> {
     /// Navigates up in the thread list
     pub(super) fn navigate_threads_up(&mut self) {
-        let active_threads = self.thread_store.active_threads();
+        let Ok(store) = self.thread_store.lock() else {
+            return;
+        };
+        let active_threads = store.active_threads();
         if active_threads.is_empty() {
             return;
         }
@@ -28,7 +31,10 @@ impl<B: Backend> TuiApp<B> {
 
     /// Navigates down in the thread list
     pub(super) fn navigate_threads_down(&mut self) {
-        let active_threads = self.thread_store.active_threads();
+        let Ok(store) = self.thread_store.lock() else {
+            return;
+        };
+        let active_threads = store.active_threads();
         if active_threads.is_empty() {
             return;
         }
@@ -50,14 +56,18 @@ impl<B: Backend> TuiApp<B> {
 
     /// Creates a new thread
     pub(super) fn create_new_thread(&mut self) {
+        let Ok(mut store) = self.thread_store.lock() else {
+            return;
+        };
+
         // Get user input for thread name
         // For now, use a default name based on count
-        let count = self.thread_store.total_count() + 1;
-        let thread = self.thread_store.create_thread(format!("Thread {count}"));
+        let count = store.total_count() + 1;
+        let thread = store.create_thread(format!("Thread {count}"));
         let thread_id = thread.id;
 
         // Save the thread
-        if let Err(err) = self.thread_store.save_thread(&thread) {
+        if let Err(err) = store.save_thread(&thread) {
             merlin_deps::tracing::error!("Failed to save new thread: {err}");
             return;
         }
@@ -75,7 +85,11 @@ impl<B: Backend> TuiApp<B> {
             return;
         };
 
-        let Some(thread) = self.thread_store.get_thread(thread_id) else {
+        let Ok(mut store) = self.thread_store.lock() else {
+            return;
+        };
+
+        let Some(thread) = store.get_thread(thread_id) else {
             merlin_deps::tracing::warn!("Selected thread {thread_id} not found");
             return;
         };
@@ -89,16 +103,13 @@ impl<B: Backend> TuiApp<B> {
         let message_id = last_message.id;
 
         // Create branch
-        let count = self.thread_store.total_count() + 1;
-        match self
-            .thread_store
-            .create_branch(format!("Branch {count}"), thread_id, message_id)
-        {
+        let count = store.total_count() + 1;
+        match store.create_branch(format!("Branch {count}"), thread_id, message_id) {
             Ok(branch) => {
                 let branch_id = branch.id;
 
                 // Save the branch
-                if let Err(err) = self.thread_store.save_thread(&branch) {
+                if let Err(err) = store.save_thread(&branch) {
                     merlin_deps::tracing::error!("Failed to save branch: {err}");
                     return;
                 }
@@ -119,13 +130,18 @@ impl<B: Backend> TuiApp<B> {
             return;
         };
 
-        if let Err(err) = self.thread_store.archive_thread(thread_id) {
+        let Ok(mut store) = self.thread_store.lock() else {
+            return;
+        };
+
+        if let Err(err) = store.archive_thread(thread_id) {
             merlin_deps::tracing::error!("Failed to archive thread {thread_id}: {err}");
             return;
         }
 
         // Clear selection and move to next thread
         self.state.active_thread_id = None;
+        drop(store); // Release lock before navigating
         self.navigate_threads_down();
 
         merlin_deps::tracing::info!("Archived thread {thread_id}");

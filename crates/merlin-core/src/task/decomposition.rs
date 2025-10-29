@@ -16,6 +16,7 @@ pub enum AgentResponse {
 
 /// Task list with ordered steps
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TaskList {
     /// Overall objective of this task list
     pub title: String,
@@ -25,6 +26,7 @@ pub struct TaskList {
 
 /// Individual step in a task list
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
 pub struct TaskStep {
     /// Short step name
     pub title: String,

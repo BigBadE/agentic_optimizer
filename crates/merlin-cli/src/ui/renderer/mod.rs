@@ -53,8 +53,8 @@ pub struct RenderCtx<'ctx> {
     pub focused: FocusedPane,
     /// Layout cache to populate with actual rendered dimensions
     pub layout_cache: &'ctx mut layout::LayoutCache,
-    /// Thread store reference
-    pub thread_store: &'ctx ThreadStore,
+    /// Thread store reference (shared with orchestrator)
+    pub thread_store: &'ctx std::sync::Arc<std::sync::Mutex<ThreadStore>>,
 }
 
 impl Renderer {

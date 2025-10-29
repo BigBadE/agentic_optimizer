@@ -105,27 +105,6 @@ impl RoutingOrchestrator {
         })
     }
 
-    /// Sets a custom task analyzer.
-    #[must_use]
-    pub fn with_analyzer(mut self, analyzer: Arc<dyn TaskAnalyzer>) -> Self {
-        self.analyzer = analyzer;
-        self
-    }
-
-    /// Sets a custom model router.
-    #[must_use]
-    pub fn with_router(mut self, router: Arc<dyn ModelRouter>) -> Self {
-        self.router = router;
-        self
-    }
-
-    /// Sets a custom validator.
-    #[must_use]
-    pub fn with_validator(mut self, validator: Arc<dyn Validator>) -> Self {
-        self.validator = validator;
-        self
-    }
-
     /// Attaches thread storage for conversation management.
     #[must_use]
     pub fn with_thread_store(mut self, thread_store: Arc<Mutex<ThreadStore>>) -> Self {

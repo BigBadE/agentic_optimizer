@@ -1,19 +1,23 @@
 # Fixture Coverage Report
 
-**Overall Fixture Coverage: 25.57% lines (4105/16052), 8.66% functions (513/5926)**
+**Overall Fixture Coverage: 27.34% lines (4154/15195), 11.57% functions (513/4432)**
 
-**Last Updated:** 2025-10-29 05:04
+**Last Updated:** 2025-10-29 06:14
+
+**Recent Changes:**
+- ✅ Removed 857 lines of dead code (ConversationManager, TaskCoordinator)
+- ✅ Coverage improved from 25.57% → 27.34% after cleanup
 
 This document tracks which files are covered by the fixture-based integration tests. The fixture system tests end-to-end user interactions by simulating complete CLI sessions.
 
-**📊 See [COVERAGE_ANALYSIS.md](COVERAGE_ANALYSIS.md) for detailed analysis of why coverage is low and how to fix it.**
+**📊 See [COVERAGE_ANALYSIS.md](COVERAGE_ANALYSIS.md) for detailed analysis and action plan.**
 
 ## Key Findings
 
-- **Self-determination system (0% coverage)**: Never tested via fixtures. Needs assessment response fixtures.
-- **CLI entry points (0% coverage)**: Fixtures bypass CLI layer by creating TuiApp directly.
-- **Conversation history (0% coverage)**: No multi-turn fixtures exist.
-- **Orchestrator (48.7%)**: Only streaming execution path tested, not batch/analysis paths.
+- **Dead code removed**: ConversationManager (340 lines), TaskCoordinator (537 lines) - Never used in production
+- **CLI entry points (0% coverage)**: Fixtures bypass CLI layer by creating TuiApp directly - ACCEPTED GAP
+- **Thread management**: Basic creation works, switching/deletion untested - ACTIONABLE
+- **TUI navigation**: Text submission works, keyboard navigation untested - ACTIONABLE
 
 ## Files with Unexpectedly Low Coverage
 
@@ -25,10 +29,9 @@ These files should be hit by fixtures but have low coverage. Priority items at t
 - `crates/integration-tests/src/ui_verifier/` (58.59%, 365/623 lines)
 
 **merlin-agent - Core execution:**
-- `crates/merlin-agent/src/` (25.51%, 151/592 lines)
-- `crates/merlin-agent/src/agent/` (2.39%, 7/293 lines)
+- `crates/merlin-agent/src/` (21.99%, 148/673 lines) - Improved from dead code removal
+- `crates/merlin-agent/src/agent/` (7.29%, 7/96 lines) - Improved after removing ConversationManager/TaskCoordinator
 - `crates/merlin-agent/src/agent/executor/` (29.62%, 322/1087 lines)
-- `crates/merlin-agent/src/agent/task_coordinator/` (0%, 0/537 lines)
 - `crates/merlin-agent/src/executor/` (1.94%, 18/927 lines)
 - `crates/merlin-agent/src/validator/` (6.41%, 20/312 lines)
 - `crates/merlin-agent/src/validator/stages/` (45.19%, 61/135 lines)

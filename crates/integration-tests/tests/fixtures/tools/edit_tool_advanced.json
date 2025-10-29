@@ -1,0 +1,110 @@
+{
+  "name": "Edit Tool Advanced Usage",
+  "description": "Tests advanced edit tool features like replace_all and multiple replacements",
+  "tags": [
+    "tools",
+    "edit",
+    "file-operations"
+  ],
+  "setup": {
+    "files": {
+      "example.txt": "Hello world\nHello again\nHello there"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Replace all Hello with Hi",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Replace all",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await editFile('example.txt', 'Hello', 'Hi', true);",
+          "  const content = await readFile('example.txt');",
+          "  const count = (content.match(/Hi/g) || []).length;",
+          "  return `Replaced all occurrences. Found ${count} instances of Hi`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "example.txt",
+            "contains": [
+              "Hi world",
+              "Hi again",
+              "Hi there"
+            ]
+          }
+        ],
+        "ui": {
+          "output_contains": [
+            "Found 3 instances"
+          ]
+        },
+        "execution": {}
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Replace single occurrence",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "single occurrence",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await editFile('example.txt', 'Hi world', 'Greetings world');",
+          "  const content = await readFile('example.txt');",
+          "  return `File now contains: ${content.split('\\n')[0]}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "example.txt",
+            "contains": [
+              "Greetings world",
+              "Hi again"
+            ]
+          }
+        ],
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "example.txt",
+        "exists": true,
+        "contains": [
+          "Greetings",
+          "Hi"
+        ]
+      }
+    ],
+    "execution": {}
+  }
+}

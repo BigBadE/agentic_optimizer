@@ -80,12 +80,6 @@ impl Tool for EditFileTool {
         "editFile"
     }
 
-    fn description(&self) -> &'static str {
-        "Edits a file by replacing text. Use replace_all to replace all occurrences, \
-         otherwise only the first occurrence is replaced. Returns an error if the \
-         old_string appears multiple times and replace_all is false."
-    }
-
     fn typescript_signature(&self) -> &'static str {
         r"/**
  * Edits a file by replacing text.

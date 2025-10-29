@@ -65,10 +65,6 @@ impl Tool for DeleteFileTool {
         "deleteFile"
     }
 
-    fn description(&self) -> &'static str {
-        "Deletes a file from the filesystem (directories cannot be deleted)"
-    }
-
     fn typescript_signature(&self) -> &'static str {
         r"/**
  * Deletes a file from the filesystem.

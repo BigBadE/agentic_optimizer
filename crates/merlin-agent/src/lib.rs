@@ -65,9 +65,8 @@ pub mod thread_store;
 pub mod validator;
 
 pub use agent::{
-    AgentExecutionResult, AgentExecutor, ContextFetcher, ContextManager, ConversationManager,
-    ConversationMessage, ConversationSummary, CoordinatorStats, StepExecutionParams, StepExecutor,
-    StepResult, StepTracker, TaskCoordinator, TaskProgress as AgentTaskProgress, TaskStatus,
+    AgentExecutionResult, AgentExecutor, ContextFetcher, ContextManager, StepExecutionParams,
+    StepExecutor, StepResult, StepTracker,
 };
 pub use executor::{
     BuildResult, ConflictAwareTaskGraph, ConflictReport, ExecutorPool, FileConflict,

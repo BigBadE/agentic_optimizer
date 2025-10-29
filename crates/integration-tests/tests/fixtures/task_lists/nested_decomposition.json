@@ -1,0 +1,230 @@
+{
+  "name": "Nested Task Decomposition",
+  "description": "Tests nested task lists where a step itself returns a TaskList for further decomposition",
+  "tags": [
+    "task_lists",
+    "decomposition",
+    "nested"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Build a complete web API with auth and CRUD operations",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Build a complete web API",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "interface TaskList {",
+          "  id: string;",
+          "  title: string;",
+          "  steps: Array<{",
+          "    id: string;",
+          "    step_type: string;",
+          "    description: string;",
+          "    verification: string;",
+          "  }>;",
+          "}",
+          "",
+          "async function agent_code(): Promise<TaskList> {",
+          "  return {",
+          "    id: 'web_api',",
+          "    title: 'Build Complete Web API',",
+          "    steps: [",
+          "      {",
+          "        id: 'auth_system',",
+          "        step_type: 'Feature',",
+          "        description: 'Implement authentication system',",
+          "        verification: 'Auth tests pass'",
+          "      },",
+          "      {",
+          "        id: 'crud_operations',",
+          "        step_type: 'Feature',",
+          "        description: 'Implement CRUD operations',",
+          "        verification: 'CRUD tests pass'",
+          "      },",
+          "      {",
+          "        id: 'integration',",
+          "        step_type: 'Integration',",
+          "        description: 'Integrate all components',",
+          "        verification: 'End-to-end tests pass'",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Implement authentication system",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "interface TaskList {",
+          "  id: string;",
+          "  title: string;",
+          "  steps: Array<{",
+          "    id: string;",
+          "    step_type: string;",
+          "    description: string;",
+          "    verification: string;",
+          "  }>;",
+          "}",
+          "",
+          "async function agent_code(): Promise<TaskList> {",
+          "  return {",
+          "    id: 'auth_subtasks',",
+          "    title: 'Authentication System',",
+          "    steps: [",
+          "      {",
+          "        id: 'jwt_token',",
+          "        step_type: 'Feature',",
+          "        description: 'Create JWT token generation',",
+          "        verification: 'Token generation works'",
+          "      },",
+          "      {",
+          "        id: 'login_endpoint',",
+          "        step_type: 'Feature',",
+          "        description: 'Create login endpoint',",
+          "        verification: 'Login endpoint works'",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create JWT token generation",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('src/jwt.rs', 'pub fn generate_token() -> String { \"token\".to_string() }');",
+          "  return 'Created JWT token generation module';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "src/jwt.rs",
+            "exists": true
+          }
+        ],
+        "execution": {}
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create login endpoint",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('src/login.rs', 'pub fn login() { }');",
+          "  return 'Created login endpoint';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "src/login.rs",
+            "exists": true
+          }
+        ],
+        "execution": {}
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Implement CRUD operations",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('src/crud.rs', 'pub fn crud() { }');",
+          "  return 'Created CRUD operations module';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "src/crud.rs",
+            "exists": true
+          }
+        ],
+        "execution": {}
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Integrate all components",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const jwt = await readFile('src/jwt.rs');",
+          "  const login = await readFile('src/login.rs');",
+          "  const crud = await readFile('src/crud.rs');",
+          "  return `Integration complete. Found ${jwt.length + login.length + crud.length} bytes of code`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "src/jwt.rs",
+        "exists": true
+      },
+      {
+        "path": "src/login.rs",
+        "exists": true
+      },
+      {
+        "path": "src/crud.rs",
+        "exists": true
+      }
+    ],
+    "execution": {}
+  }
+}

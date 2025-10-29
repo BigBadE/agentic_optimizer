@@ -1,0 +1,96 @@
+{
+  "name": "Keyboard Navigation",
+  "description": "Tests keyboard navigation in TUI (arrow keys, tab, etc.)",
+  "tags": [
+    "tui",
+    "navigation",
+    "keyboard"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "First task",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "First task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Task 1 completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "execution": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Down"
+      },
+      "verify": {
+        "execution": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Up"
+      },
+      "verify": {
+        "execution": {}
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Second task after navigation",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Second task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Task 2 completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {}
+  }
+}

@@ -79,10 +79,6 @@ mod tests {
             self.name
         }
 
-        fn description(&self) -> &'static str {
-            "A mock tool for testing"
-        }
-
         fn typescript_signature(&self) -> &'static str {
             "/**\n * A mock tool for testing\n */\ndeclare function mockTool(params: any): Promise<any>;"
         }

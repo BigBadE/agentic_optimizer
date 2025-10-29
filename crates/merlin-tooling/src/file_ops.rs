@@ -72,10 +72,6 @@ impl Tool for WriteFileTool {
         "writeFile"
     }
 
-    fn description(&self) -> &'static str {
-        "Writes content to a file in the filesystem"
-    }
-
     fn typescript_signature(&self) -> &'static str {
         r"/**
  * Writes content to a file in the filesystem.
@@ -172,10 +168,6 @@ impl Tool for ReadFileTool {
         "readFile"
     }
 
-    fn description(&self) -> &'static str {
-        "Reads the contents of a file from the filesystem"
-    }
-
     fn typescript_signature(&self) -> &'static str {
         r"/**
  * Reads the contents of a file from the filesystem.
@@ -268,10 +260,6 @@ impl ListFilesTool {
 impl Tool for ListFilesTool {
     fn name(&self) -> &'static str {
         "listFiles"
-    }
-
-    fn description(&self) -> &'static str {
-        "Lists all files in a directory"
     }
 
     fn typescript_signature(&self) -> &'static str {

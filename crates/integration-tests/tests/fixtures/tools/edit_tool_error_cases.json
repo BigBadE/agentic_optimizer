@@ -1,0 +1,187 @@
+{
+  "name": "Edit Tool Error Handling",
+  "description": "Tests edit tool error cases: missing file, string not found, path traversal, missing args",
+  "tags": [
+    "tools",
+    "edit",
+    "error-handling",
+    "security"
+  ],
+  "setup": {
+    "files": {
+      "safe.txt": "content here",
+      "readonly.txt": "immutable content"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Edit a file that doesn't exist",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "doesn't exist",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    await editFile('nonexistent.txt', 'foo', 'bar');",
+          "    return 'ERROR: Should have failed';",
+          "  } catch (error) {",
+          "    return `Correctly failed: ${error}`;",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_value_matches": "Correctly failed"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Try to replace a string that doesn't exist",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "string that doesn't exist",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    await editFile('safe.txt', 'missing_text', 'replacement');",
+          "    return 'ERROR: Should have failed';",
+          "  } catch (error) {",
+          "    return `Correctly failed with not found error`;",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "safe.txt",
+            "exact_content": "content here"
+          }
+        ]
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Try path traversal attack",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "path traversal",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    await editFile('../../../etc/passwd', 'root', 'hacked');",
+          "    return 'SECURITY BREACH: Path traversal succeeded!';",
+          "  } catch (error) {",
+          "    return `Security check passed: ${error}`;",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_value_matches": "Security check passed"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Call editFile with missing arguments",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "missing arguments",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    // @ts-ignore - intentionally calling with wrong args",
+          "    await editFile('safe.txt', 'old');",
+          "    return 'ERROR: Should have failed';",
+          "  } catch (error) {",
+          "    return `Correctly rejected invalid call`;",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Use empty strings for old/new",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "empty strings",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  try {",
+          "    await editFile('safe.txt', '', 'something');",
+          "    return 'Handled empty old_string';",
+          "  } catch (error) {",
+          "    return `Error with empty string: ${error}`;",
+          "  }",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {},
+    "files": [
+      {
+        "path": "safe.txt",
+        "exact_content": "content here"
+      }
+    ]
+  }
+}

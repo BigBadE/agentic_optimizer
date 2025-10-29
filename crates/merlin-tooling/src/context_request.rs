@@ -197,12 +197,6 @@ impl Tool for ContextRequestTool {
         "requestContext"
     }
 
-    fn description(&self) -> &'static str {
-        "Request additional context files during task execution. \
-         Use this when you need more information that wasn't in the initial context. \
-         Provide a file pattern (glob or path) and a reason for the request."
-    }
-
     fn typescript_signature(&self) -> &'static str {
         r"/**
  * Request additional context files during task execution.

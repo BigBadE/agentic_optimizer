@@ -17,10 +17,6 @@ Implements recursive step-based execution where agents return either a String re
   - `typescript.rs` - TypeScript code extraction and execution
   - `context.rs` - Context building for tasks
 - `step.rs` - `StepTracker` for tracking execution steps
-- `task_coordinator.rs` - `TaskCoordinator` for coordinating multiple tasks
-- `task_list_executor.rs` - `TaskListExecutor` for workflow execution
-- `command_runner.rs` - Command execution utilities
-- `conversation.rs` - `ConversationManager` for managing conversations
 - `execution_result.rs` - Execution result types (string or TaskList)
 
 ### Executor System (`executor/`)
@@ -53,9 +49,7 @@ Implements recursive step-based execution where agents return either a String re
 - `StepExecutor` - Recursive step-based execution with exit requirements
 - `ExitRequirementValidators` - Built-in validators for step completion
 - `StepTracker` - Track execution steps
-- `TaskCoordinator` - Coordinate multiple tasks
-- `TaskListExecutor` - Execute multi-step workflows
-- `ConversationManager`, `ContextManager` - Conversation management
+- `ContextManager` - Context management
 - `AgentExecutionResult` - String result or continuation request
 
 **Executor System:**

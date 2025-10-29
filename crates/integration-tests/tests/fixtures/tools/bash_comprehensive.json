@@ -1,0 +1,250 @@
+{
+  "name": "Bash Tool Comprehensive Testing",
+  "description": "Tests bash tool: success, failure, pipes, stderr, exit codes, output parsing",
+  "tags": [
+    "tools",
+    "bash",
+    "comprehensive"
+  ],
+  "setup": {
+    "files": {
+      "data.txt": "line1\nline2\nline3\nfoo\nbar\nbaz\n",
+      "numbers.txt": "1\n2\n3\n4\n5\n"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Run successful echo command",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "successful echo",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await bash('echo Hello World');",
+          "  return `Output: ${result.stdout}, Exit: ${result.exit_code}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_value_matches": "Output: Hello World"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Run failing command",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "failing command",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await bash('exit 42');",
+          "  return `Failed with code: ${result.exit_code}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_value_matches": "Failed with code: 42"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Use echo and grep with pipe",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "echo and grep",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await bash('echo \"foo bar baz\" | grep foo');",
+          "  if (result.exit_code === 0) {",
+          "    return `Grep found: ${result.stdout.trim()}`;",
+          "  }",
+          "  return `Grep failed with code ${result.exit_code}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_value_matches": "Grep found: foo"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test stderr output",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "stderr output",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await bash('echo error message >&2');",
+          "  return `Stderr: ${result.stderr.trim()}, Exit: ${result.exit_code}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_value_matches": "Stderr: error message"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Count lines using wc",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Count lines",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await bash('echo -e \"1\\\\n2\\\\n3\\\\n4\\\\n5\" | wc -l');",
+          "  if (result.exit_code === 0) {",
+          "    const count = result.stdout.trim();",
+          "    return `Line count: ${count}`;",
+          "  }",
+          "  return `wc failed`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_value_matches": "Line count: 5"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Use command substitution",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "command substitution",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await bash('echo \"Current dir: $(pwd)\"');",
+          "  return `Result: ${result.stdout.trim()}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_value_matches": "Result: Current dir:"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test multiline output",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "multiline output",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await bash('echo -e \"line1\\\\nline2\\\\nline3\" | head -3');",
+          "  const lines = result.stdout.trim().split('\\n');",
+          "  return `Lines: ${lines.length}, First: ${lines[0]}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {
+          "return_value_matches": "Lines: 3, First: line1"
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test ls command",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "ls command",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await bash('ls');",
+          "  if (result.exit_code === 0) {",
+          "    const files = result.stdout.trim().split('\\n').filter(f => f);",
+          "    return `Found ${files.length} files`;",
+          "  }",
+          "  return `ls failed`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {}
+  }
+}

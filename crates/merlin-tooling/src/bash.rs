@@ -116,19 +116,6 @@ impl Tool for BashTool {
         "bash"
     }
 
-    fn description(&self) -> &'static str {
-        "Execute a shell command using bash. \n\
-         Usage: bash(\"command string\")\n\
-         Example: bash(\"ls -la\") or bash(\"grep -r TODO . --exclude-dir={.git,target,node_modules}\")\n\
-         \n\
-         IMPORTANT for grep/search commands:\n\
-         - Always exclude build artifacts: --exclude-dir={.git,target,node_modules,dist,build}\n\
-         - Exclude binary files: --binary-files=without-match or -I\n\
-         - Filter by file type using multiple --include flags (one per extension)\n\
-         - Example: bash(\"grep -r -I 'pattern' . --include='*.rs' --exclude-dir={.git,target}\")\n\
-         - Example: bash(\"grep -r 'TODO' . --include='*.rs' --include='*.toml' --exclude-dir={.git,target}\")"
-    }
-
     fn typescript_signature(&self) -> &'static str {
         "/**\n\
          * Execute a shell command using bash. \n\
@@ -243,10 +230,9 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_bash_tool_name_and_description() {
+    async fn test_bash_tool_name_and_signature() {
         let tool = BashTool;
         assert_eq!(tool.name(), "bash");
-        assert!(!tool.description().is_empty());
         assert!(!tool.typescript_signature().is_empty());
     }
 

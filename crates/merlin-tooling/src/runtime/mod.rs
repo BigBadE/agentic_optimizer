@@ -6,7 +6,6 @@ mod tool_registration;
 mod typescript;
 
 use std::collections::HashMap;
-use std::fmt::Write as _;
 use std::sync::Arc;
 use std::time::Duration;
 
@@ -125,30 +124,6 @@ impl TypeScriptRuntime {
         // Convert result to JSON
         js_value_to_json(&final_result, &mut context)
     }
-
-    /// Generate TypeScript type definitions for registered tools
-    ///
-    /// # Errors
-    /// Returns an error if formatting fails (should never happen in practice)
-    pub fn generate_type_definitions(&self) -> Result<String, ToolError> {
-        let mut defs = String::from("// Available tool functions\n\n");
-
-        for tool in self.tools.values() {
-            writeln!(defs, "/**\n * {}\n */", tool.description()).map_err(|err| {
-                ToolError::ExecutionFailed(format!("Failed to write type definitions: {err}"))
-            })?;
-            writeln!(
-                defs,
-                "declare function {}(params: any): any;\n",
-                tool.name()
-            )
-            .map_err(|err| {
-                ToolError::ExecutionFailed(format!("Failed to write type definitions: {err}"))
-            })?;
-        }
-
-        Ok(defs)
-    }
 }
 
 impl Default for TypeScriptRuntime {
@@ -170,10 +145,6 @@ mod tests {
     impl Tool for EchoTool {
         fn name(&self) -> &'static str {
             "echo"
-        }
-
-        fn description(&self) -> &'static str {
-            "Echoes back the input"
         }
 
         fn typescript_signature(&self) -> &'static str {

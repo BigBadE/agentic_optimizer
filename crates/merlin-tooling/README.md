@@ -66,8 +66,9 @@ This crate provides the tool system that enables agents to interact with the fil
 ### TypeScript Runtime
 - Execute TypeScript code in sandboxed environment
 - Natural function call syntax for LLMs
-- Tool integration
+- Tool integration with proper Promise handling
 - Type definition generation
+- Failed tool executions return resolved Promises (not rejected) for proper error handling
 
 ## Testing Status
 
@@ -76,8 +77,8 @@ This crate provides the tool system that enables agents to interact with the fil
 - **Unit tests**: 6 files with comprehensive coverage
   - `bash.rs`, `file_ops.rs`, `edit_tool.rs`
   - `context_request.rs`, `runtime.rs`, `signatures.rs`
-- **Fixture coverage**: 15+ fixtures
-  - `tools/` - Tool execution tests (delete, edit, list, show, file_size)
+- **Fixture coverage**: 17+ fixtures
+  - `tools/` - Tool execution tests (delete, edit, list, show, file_size, bash error handling, bash success cases)
   - `typescript/` - TypeScript runtime tests (9+ fixtures)
     - Basic execution, async execution, agent workflows, etc.
 

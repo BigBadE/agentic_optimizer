@@ -106,9 +106,6 @@ pub trait Tool: Send + Sync {
     /// Returns the unique identifier for this tool.
     fn name(&self) -> &'static str;
 
-    /// Returns a human-readable description of what this tool does and its parameters.
-    fn description(&self) -> &'static str;
-
     /// Returns the TypeScript function signature for this tool.
     ///
     /// This signature is used by the TypeScript runtime to provide proper type information.
@@ -168,10 +165,6 @@ mod tests {
             "mock_tool"
         }
 
-        fn description(&self) -> &'static str {
-            "A mock tool for testing"
-        }
-
         fn typescript_signature(&self) -> &'static str {
             "/**\n * A mock tool for testing\n */\ndeclare function mockTool(params: any): Promise<any>;"
         }
@@ -189,7 +182,6 @@ mod tests {
     async fn test_tool_trait_implementation() {
         let tool = MockTool;
         assert_eq!(tool.name(), "mock_tool");
-        assert_eq!(tool.description(), "A mock tool for testing");
 
         let input = ToolInput { params: json!({}) };
         let result = tool.execute(input).await;

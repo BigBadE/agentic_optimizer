@@ -1,4 +1,9 @@
 //! Tool registration and execution within JavaScript context.
+//!
+//! Tools are registered as native JavaScript functions that return Promises.
+//! Failed tool executions (success=false) return resolved Promises with their
+//! data object, NOT rejected Promises. This allows TypeScript code to inspect
+//! exit codes, error messages, and other failure details without try/catch.
 
 use std::collections::HashMap;
 use std::sync::Arc;
@@ -79,12 +84,11 @@ pub fn register_tool_functions(
                 .map_err(|err: String| JsNativeError::error().with_message(err))?;
 
                 // Convert result to JS value
-                if result.success {
-                    let data = result.data.unwrap_or(Value::String(result.message));
-                    json_to_js_value_static(&data, ctx)
-                } else {
-                    Err(JsNativeError::error().with_message(result.message).into())
-                }
+                // Always return the data, never reject the Promise
+                // Tools that fail (success=false) still return their data object
+                // so TypeScript can inspect exit codes, error messages, etc.
+                let data = result.data.unwrap_or(Value::String(result.message));
+                json_to_js_value_static(&data, ctx)
             })
         };
 

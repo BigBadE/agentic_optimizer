@@ -37,10 +37,6 @@ mod tests {
             "read_file"
         }
 
-        fn description(&self) -> &'static str {
-            "Reads a file from the filesystem"
-        }
-
         fn typescript_signature(&self) -> &'static str {
             "/**\n * Reads a file from the filesystem\n */\ndeclare function readFile(path: string): Promise<string>;"
         }

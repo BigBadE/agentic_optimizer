@@ -6,6 +6,14 @@ This file provides guidance when working with code in this repository.
 
 This is the most important rule.
 
+## DO NOT SIMPLIFY, RELAX, OR DELETE TESTS. EVER.
+## Error-Focused testing is always the strategy.
+
+Tests are meant to CATCH errors. If you delete them, simplify, relax, or ANY OTHER VARIATION of reducing test strictness,
+you remove the point of having tests in the first place. You want tests to error, that means you found a bug. Instead,
+analyze it, figure out the root cause, and fix it. You can modify the tests if they are incorrect, but do not simply
+delete or simplify them to get the error to go away. This is your number one priority directive, always, no matter what.
+
 ## Project Overview
 
 **Merlin** is an intelligent AI coding assistant with multi-model routing, automatic task decomposition, and comprehensive validation.
@@ -34,6 +42,7 @@ This is the most important rule.
 - Update module docs and any other relevant documentation with your changes
 - Add/verify testing covers those changes, preferrably with fixtures
 - Run verify.sh to confirm
+- Do not make new documentation files unless explicitly asked to
 
 ## Architecture
 
@@ -160,6 +169,13 @@ You can change them if necessary, but never make them less strict and lose out o
 **ALWAYS follow the fail by default stragety**. Tests should never pass with unexpected conditions. For example, if you're testing 
 the thread system, you should not test if thread_count > 0. Instead, check that thread_count == expected_thread_count.
 Failure in tests is ALWAYS better than a false pass, tests are designed to catch issues.
+
+**Fixtures are designed to find all paths users can find**. If something is out of scope or not reachable by fixtures,
+that likely means it can't be reached at all. Analyze any issues like that, determine if fixtures need to be expanded,
+or if the code its targetting isn't used, and go ahead with the proper fix. Do NOT just say something is "Out of scope"
+or "Unreachable" or "Should be unit tested instead".
+
+Fixture coverage can be tested by adding the --fixture flag and --cov flag to the verify script
 
 ### Test Modification Guidelines
 

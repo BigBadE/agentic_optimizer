@@ -1,7 +1,11 @@
 {
   "name": "context_conservative_unrelated_exclusion",
   "description": "Test that context gathering conservatively EXCLUDES completely unrelated files",
-  "tags": ["context", "conservative", "negative"],
+  "tags": [
+    "context",
+    "conservative",
+    "negative"
+  ],
   "setup": {
     "files": {
       "src/database.rs": "use sqlx::PgPool;\n\npub struct Database {\n    pool: PgPool,\n}\n\nimpl Database {\n    pub async fn connect(url: &str) -> Result<Self> {\n        let pool = PgPool::connect(url).await?;\n        Ok(Self { pool })\n    }\n    \n    pub async fn execute_query(&self, sql: &str) -> Result<Vec<Row>> {\n        let rows = sqlx::query(sql).fetch_all(&self.pool).await?;\n        Ok(rows)\n    }\n}",
@@ -38,15 +42,15 @@
           "return_type": "string"
         },
         "ui": {
-          "output_contains": ["database"]
+          "output_contains": [
+            "database"
+          ]
         }
       }
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

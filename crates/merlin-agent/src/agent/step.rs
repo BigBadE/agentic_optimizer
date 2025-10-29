@@ -1,23 +1,23 @@
 use merlin_core::{
     TaskId,
-    streaming::{StepType, TaskStep},
+    streaming::{ExecutionStep, ExecutionStepType},
 };
 use std::collections::HashMap;
 
 /// Tracks execution steps for tasks
 #[derive(Default, Clone)]
 pub struct StepTracker {
-    steps: HashMap<TaskId, Vec<TaskStep>>,
+    steps: HashMap<TaskId, Vec<ExecutionStep>>,
 }
 
 impl StepTracker {
     /// Add a step to the tracker
-    pub fn add_step(&mut self, step: TaskStep) {
+    pub fn add_step(&mut self, step: ExecutionStep) {
         self.steps.entry(step.task_id).or_default().push(step);
     }
 
     /// Get steps for a task
-    pub fn get_steps(&self, task_id: &TaskId) -> Option<&Vec<TaskStep>> {
+    pub fn get_steps(&self, task_id: &TaskId) -> Option<&Vec<ExecutionStep>> {
         self.steps.get(task_id)
     }
 
@@ -25,10 +25,10 @@ impl StepTracker {
     pub fn create_step(
         &mut self,
         task_id: TaskId,
-        step_type: StepType,
+        step_type: ExecutionStepType,
         content: String,
-    ) -> TaskStep {
-        let step = TaskStep::new(task_id, step_type, content);
+    ) -> ExecutionStep {
+        let step = ExecutionStep::new(task_id, step_type, content);
         self.add_step(step.clone());
         step
     }
@@ -48,7 +48,7 @@ mod tests {
     fn test_add_step() {
         let mut tracker = StepTracker::default();
         let task_id = TaskId::default();
-        let step = TaskStep::new(task_id, StepType::Thinking, "test".to_owned());
+        let step = ExecutionStep::new(task_id, ExecutionStepType::Thinking, "test".to_owned());
 
         tracker.add_step(step);
 
@@ -69,7 +69,11 @@ mod tests {
         let mut tracker = StepTracker::default();
         let task_id = TaskId::default();
 
-        let step = tracker.create_step(task_id, StepType::Thinking, "thinking content".to_owned());
+        let step = tracker.create_step(
+            task_id,
+            ExecutionStepType::Thinking,
+            "thinking content".to_owned(),
+        );
 
         assert_eq!(step.task_id, task_id);
         assert_eq!(step.content, "thinking content");
@@ -85,16 +89,16 @@ mod tests {
         let mut tracker = StepTracker::default();
         let task_id = TaskId::default();
 
-        tracker.create_step(task_id, StepType::Thinking, "step 1".to_owned());
+        tracker.create_step(task_id, ExecutionStepType::Thinking, "step 1".to_owned());
         tracker.create_step(
             task_id,
-            StepType::ToolCall {
+            ExecutionStepType::ToolCall {
                 tool: "bash".to_owned(),
                 args: json!({"command": "echo test"}),
             },
             "step 2".to_owned(),
         );
-        tracker.create_step(task_id, StepType::Thinking, "step 3".to_owned());
+        tracker.create_step(task_id, ExecutionStepType::Thinking, "step 3".to_owned());
 
         let steps = tracker.get_steps(&task_id).unwrap();
         assert_eq!(steps.len(), 3);
@@ -106,8 +110,8 @@ mod tests {
         let task1 = TaskId::default();
         let task2 = TaskId::default();
 
-        tracker.create_step(task1, StepType::Thinking, "task1 step".to_owned());
-        tracker.create_step(task2, StepType::Thinking, "task2 step".to_owned());
+        tracker.create_step(task1, ExecutionStepType::Thinking, "task1 step".to_owned());
+        tracker.create_step(task2, ExecutionStepType::Thinking, "task2 step".to_owned());
 
         assert_eq!(tracker.get_steps(&task1).unwrap().len(), 1);
         assert_eq!(tracker.get_steps(&task2).unwrap().len(), 1);
@@ -117,7 +121,7 @@ mod tests {
     fn test_clone_tracker() {
         let mut tracker = StepTracker::default();
         let task_id = TaskId::default();
-        tracker.create_step(task_id, StepType::Thinking, "test".to_owned());
+        tracker.create_step(task_id, ExecutionStepType::Thinking, "test".to_owned());
 
         let cloned = tracker.clone();
         assert_eq!(cloned.get_steps(&task_id).unwrap().len(), 1);

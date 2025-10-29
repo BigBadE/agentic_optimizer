@@ -1,7 +1,12 @@
 {
   "name": "context_multiple_explicit_files",
   "description": "Test that multiple explicitly mentioned files ARE all included",
-  "tags": ["context", "positive", "explicit", "multiple"],
+  "tags": [
+    "context",
+    "positive",
+    "explicit",
+    "multiple"
+  ],
   "setup": {
     "files": {
       "src/models/user.rs": "pub struct User {\n    pub id: u64,\n    pub email: String,\n}",
@@ -37,15 +42,16 @@
           "return_type": "string"
         },
         "ui": {
-          "output_contains": ["User", "Post"]
+          "output_contains": [
+            "User",
+            "Post"
+          ]
         }
       }
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

@@ -6,11 +6,11 @@ use serde::{Deserialize, Serialize};
 use thiserror::Error;
 
 /// Errors that can occur during tool execution.
-#[derive(Debug, Error)]
+#[derive(Debug, Clone, Serialize, Deserialize, Error)]
 pub enum ToolError {
     /// An I/O operation failed.
     #[error("IO error: {0}")]
-    Io(#[from] IoError),
+    Io(String),
 
     /// The provided input parameters were invalid or malformed.
     #[error("Invalid input: {0}")]
@@ -22,7 +22,32 @@ pub enum ToolError {
 
     /// Failed to serialize or deserialize data.
     #[error("Serialization error: {0}")]
-    Serialization(#[from] SerdeJsonError),
+    Serialization(String),
+}
+
+impl From<IoError> for ToolError {
+    fn from(err: IoError) -> Self {
+        Self::Io(err.to_string())
+    }
+}
+
+impl From<SerdeJsonError> for ToolError {
+    fn from(err: SerdeJsonError) -> Self {
+        Self::Serialization(err.to_string())
+    }
+}
+
+impl ToolError {
+    /// Get the user-facing error message
+    ///
+    /// Returns the full error message without truncation
+    #[must_use]
+    pub fn user_message(&self) -> String {
+        match self {
+            Self::InvalidInput(msg) | Self::ExecutionFailed(msg) => msg.clone(),
+            Self::Io(err) | Self::Serialization(err) => err.clone(),
+        }
+    }
 }
 
 /// Result type for tool operations.

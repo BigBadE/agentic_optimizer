@@ -3,6 +3,7 @@
 
 use crate::task::{TaskId, TaskResult};
 use merlin_deps::tracing::warn;
+use merlin_tooling::ToolError;
 use tokio::sync::mpsc;
 
 /// Event types for UI updates
@@ -80,8 +81,8 @@ impl UiChannel {
         });
     }
 
-    /// Sends task failed event
-    pub fn failed(&self, task_id: TaskId, error: String) {
+    /// Sends task failed event from a `ToolError`
+    pub fn failed(&self, task_id: TaskId, error: ToolError) {
         self.send(UiEvent::TaskFailed { task_id, error });
     }
 }

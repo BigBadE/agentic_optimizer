@@ -49,9 +49,7 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

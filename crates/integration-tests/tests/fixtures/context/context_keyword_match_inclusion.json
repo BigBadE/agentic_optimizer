@@ -1,7 +1,11 @@
 {
   "name": "context_keyword_match_inclusion",
   "description": "Test that files matching query keywords ARE included via BM25 search",
-  "tags": ["context", "positive", "keyword"],
+  "tags": [
+    "context",
+    "positive",
+    "keyword"
+  ],
   "setup": {
     "files": {
       "src/payment_processor.rs": "use stripe::PaymentIntent;\n\npub struct PaymentProcessor {\n    api_key: String,\n}\n\nimpl PaymentProcessor {\n    pub async fn process_payment(&self, amount: u64) -> Result<String> {\n        let payment = PaymentIntent::create(amount, \"usd\").await?;\n        Ok(payment.id)\n    }\n}",
@@ -36,15 +40,15 @@
           "return_type": "string"
         },
         "ui": {
-          "output_contains": ["payment"]
+          "output_contains": [
+            "payment"
+          ]
         }
       }
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

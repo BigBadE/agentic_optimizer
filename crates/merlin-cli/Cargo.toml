@@ -20,6 +20,7 @@ merlin-languages.workspace = true
 merlin-local.workspace = true
 merlin-providers.workspace = true
 merlin-routing.workspace = true
+merlin-tooling.workspace = true
 pico-args.workspace = true
 serde.workspace = true
 tokio.workspace = true

@@ -52,7 +52,11 @@
           {
             "path": "sequential.txt",
             "exists": true,
-            "contains": ["Task 1 data", "Task 2 data", "Task 3 data"]
+            "contains": [
+              "Task 1 data",
+              "Task 2 data",
+              "Task 3 data"
+            ]
           }
         ],
         "execution": {}
@@ -145,12 +149,16 @@
           {
             "path": "stage1.txt",
             "exists": true,
-            "contains": ["TASK 1 DATA"]
+            "contains": [
+              "TASK 1 DATA"
+            ]
           },
           {
             "path": "final_output.txt",
             "exists": true,
-            "contains": ["[PROCESSED] TASK 1 DATA"]
+            "contains": [
+              "[PROCESSED] TASK 1 DATA"
+            ]
           }
         ],
         "execution": {}
@@ -193,7 +201,9 @@
         ]
       },
       "verify": {
-        "execution": {}
+        "execution": {
+          "return_value_matches": "Caught error at top level"
+        }
       }
     },
     {
@@ -234,7 +244,9 @@
           {
             "path": "bash_processed.txt",
             "exists": true,
-            "contains": ["TASK 1 DATA"]
+            "contains": [
+              "TASK 1 DATA"
+            ]
           }
         ],
         "execution": {}
@@ -284,9 +296,7 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "files": [
       {
         "path": "sequential.txt",
@@ -299,7 +309,9 @@
       {
         "path": "final_output.txt",
         "exists": true,
-        "contains": ["[PROCESSED]"]
+        "contains": [
+          "[PROCESSED]"
+        ]
       },
       {
         "path": "bash_processed.txt",

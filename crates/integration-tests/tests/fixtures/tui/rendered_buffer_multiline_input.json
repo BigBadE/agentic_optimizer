@@ -26,7 +26,7 @@
           "input_text": "First line",
           "rendered_buffer_contains": [
             "First line",
-            "─── Input"
+            "\u2500\u2500\u2500 Input"
           ]
         }
       }
@@ -41,7 +41,7 @@
         "ui": {
           "rendered_buffer_contains": [
             "First line and more text",
-            "─── Input"
+            "\u2500\u2500\u2500 Input"
           ]
         }
       }
@@ -50,8 +50,8 @@
   "final_verify": {
     "ui": {
       "rendered_buffer_contains": [
-        "─── Input",
-        "─── Tasks"
+        "\u2500\u2500\u2500 Input",
+        "\u2500\u2500\u2500 Tasks"
       ]
     }
   }

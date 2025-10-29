@@ -7,6 +7,7 @@ use merlin_agent::RoutingOrchestrator;
 use merlin_core::{Message, MessageId, ThreadId, TokenUsage, WorkUnit};
 use merlin_deps::ratatui::backend::Backend;
 use merlin_routing::{Task, TaskId, UiChannel, UiEvent};
+use merlin_tooling::ToolError;
 use tokio::spawn;
 
 use super::tui_app::TuiApp;
@@ -66,6 +67,12 @@ impl<B: Backend> TuiApp<B> {
 
             match result {
                 Ok(result_data) => {
+                    // Emit the actual execution result as TaskOutput
+                    ui_channel.send(UiEvent::TaskOutput {
+                        task_id,
+                        output: result_data.response.text.clone(),
+                    });
+
                     ui_channel.completed(result_data.task_id, result_data.clone());
 
                     if let Some(ref mut log) = log_file {
@@ -95,7 +102,7 @@ impl<B: Backend> TuiApp<B> {
                     }
                 }
                 Err(error) => {
-                    ui_channel.failed(task_id, error.to_string());
+                    ui_channel.failed(task_id, ToolError::ExecutionFailed(error.to_string()));
 
                     if let (Some(tid), Some(msg_id)) = (actual_thread_id, message_id) {
                         Self::update_thread_work_failed(&orchestrator, tid, msg_id, task_id);

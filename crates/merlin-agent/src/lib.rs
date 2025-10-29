@@ -55,6 +55,8 @@
 pub mod agent;
 /// Task execution with workspace management
 pub mod executor;
+/// Exit requirement validators for V2 execution model
+pub mod exit_validators;
 /// High-level orchestration of routing components
 pub mod orchestrator;
 /// Thread persistence and management
@@ -63,15 +65,16 @@ pub mod thread_store;
 pub mod validator;
 
 pub use agent::{
-    AgentExecutor, ContextFetcher, ContextManager, ConversationManager, ConversationMessage,
-    ConversationSummary, CoordinatorStats, SelfAssessor, StepTracker, TaskCoordinator,
-    TaskProgress as AgentTaskProgress, TaskStatus,
+    AgentExecutionResult, AgentExecutor, ContextFetcher, ContextManager, ConversationManager,
+    ConversationMessage, ConversationSummary, CoordinatorStats, StepExecutionParams, StepExecutor,
+    StepResult, StepTracker, TaskCoordinator, TaskProgress as AgentTaskProgress, TaskStatus,
 };
 pub use executor::{
     BuildResult, ConflictAwareTaskGraph, ConflictReport, ExecutorPool, FileConflict,
     FileLockManager, IsolatedBuildEnv, LintResult, TaskGraph, TaskWorkspace, TestResult,
     WorkspaceSnapshot, WorkspaceState,
 };
+pub use exit_validators::ExitRequirementValidators;
 pub use orchestrator::RoutingOrchestrator;
 pub use thread_store::ThreadStore;
 pub use validator::{

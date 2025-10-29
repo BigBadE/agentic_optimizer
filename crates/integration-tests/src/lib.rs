@@ -13,7 +13,9 @@ mod execution_tracker;
 mod execution_verifier;
 mod file_verifier;
 mod fixture;
+mod fixture_loader;
 mod mock_provider;
+mod prompt_verifier;
 mod runner;
 mod ui_verifier;
 mod verification_result;
@@ -21,10 +23,11 @@ mod verifier;
 mod workspace_setup;
 
 pub use fixture::{
-    EventType, ExecutionVerify, FileVerify, FinalVerify, LlmResponseEvent, SetupConfig,
-    StateVerify, TestEvent, TestFixture, TriggerConfig, UiVerify, UserInputEvent, VerifyConfig,
+    EventType, ExecutionVerify, FileVerify, FinalVerify, LlmResponseEvent, PromptVerify,
+    SetupConfig, StateVerify, TestEvent, TestFixture, TriggerConfig, UiVerify, UserInputEvent,
+    VerifyConfig,
 };
-pub use mock_provider::PatternMockProvider;
+pub use mock_provider::MockProvider;
 pub use runner::UnifiedTestRunner;
 pub use verification_result::VerificationResult;
 pub use verifier::UnifiedVerifier;

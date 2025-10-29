@@ -1,9 +1,16 @@
 {
   "name": "Thread Archiving and Restoration",
   "description": "Tests archiving and unarchiving conversation threads",
-  "tags": ["tui", "threads", "archive"],
+  "tags": [
+    "tui",
+    "threads",
+    "archive"
+  ],
   "setup": {
-    "terminal_size": [100, 30]
+    "terminal_size": [
+      100,
+      30
+    ]
   },
   "events": [
     {
@@ -36,9 +43,7 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

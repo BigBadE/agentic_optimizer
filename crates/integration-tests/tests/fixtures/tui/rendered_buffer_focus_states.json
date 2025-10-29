@@ -25,7 +25,7 @@
           "focused_pane": "input",
           "input_text": "Test content",
           "rendered_buffer_contains": [
-            "─── Input",
+            "\u2500\u2500\u2500 Input",
             "Test content"
           ]
         }
@@ -40,8 +40,8 @@
         "ui": {
           "focused_pane": "tasks",
           "rendered_buffer_contains": [
-            "─── Tasks",
-            "─── Input"
+            "\u2500\u2500\u2500 Tasks",
+            "\u2500\u2500\u2500 Input"
           ]
         }
       }
@@ -55,8 +55,8 @@
         "ui": {
           "focused_pane": "input",
           "rendered_buffer_contains": [
-            "─── Tasks",
-            "─── Input",
+            "\u2500\u2500\u2500 Tasks",
+            "\u2500\u2500\u2500 Input",
             "Test content"
           ]
         }
@@ -67,8 +67,8 @@
     "ui": {
       "focused_pane": "input",
       "rendered_buffer_contains": [
-        "─── Input",
-        "─── Tasks"
+        "\u2500\u2500\u2500 Input",
+        "\u2500\u2500\u2500 Tasks"
       ]
     }
   }

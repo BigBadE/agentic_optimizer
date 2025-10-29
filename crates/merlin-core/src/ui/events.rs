@@ -1,5 +1,6 @@
 use crate::task::{TaskId, TaskResult};
 use merlin_deps::serde_json::Value;
+use merlin_tooling::ToolError;
 use serde::{Deserialize, Serialize};
 
 /// UI event that tasks send to update display.
@@ -39,8 +40,8 @@ pub enum UiEvent {
     TaskFailed {
         /// ID of the task
         task_id: TaskId,
-        /// Error message
-        error: String,
+        /// Error object with full type information
+        error: ToolError,
     },
     /// Task is retrying after a failure
     TaskRetrying {
@@ -48,8 +49,8 @@ pub enum UiEvent {
         task_id: TaskId,
         /// Current retry count (1 = first retry, 2 = second retry, etc.)
         retry_count: u32,
-        /// Error message from the failed attempt
-        error: String,
+        /// Error from the failed attempt
+        error: ToolError,
     },
     /// System-level message
     SystemMessage {

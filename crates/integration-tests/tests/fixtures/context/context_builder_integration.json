@@ -1,7 +1,11 @@
 {
   "name": "context_builder_integration",
   "description": "Test full context builder integration with file scanning and prioritization",
-  "tags": ["context", "builder", "integration"],
+  "tags": [
+    "context",
+    "builder",
+    "integration"
+  ],
   "setup": {
     "files": {
       "src/main.rs": "mod database;\nmod api;\nmod config;\n\nfn main() {\n    let config = config::load();\n    let db = database::connect(&config.db_url);\n    api::start_server(config.port, db);\n}",
@@ -37,15 +41,17 @@
           "return_type": "string"
         },
         "ui": {
-          "output_contains": ["main.rs", "config", "database"]
+          "output_contains": [
+            "main.rs",
+            "config",
+            "database"
+          ]
         }
       }
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

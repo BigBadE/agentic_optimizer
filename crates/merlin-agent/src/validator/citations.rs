@@ -11,14 +11,11 @@ use std::sync::LazyLock;
 use std::time::Instant;
 
 /// Regex pattern for matching citations in format `<file:line>` or `<file:line1-line2>`
-///
-/// # Panics
-/// Panics if the hardcoded regex pattern is invalid (should never happen)
 static CITATION_REGEX: LazyLock<Regex> =
     LazyLock::new(
         || match Regex::new(r"([a-zA-Z0-9_/\\.-]+\.[a-zA-Z0-9]+):(\d+)(?:-(\d+))?") {
             Ok(regex) => regex,
-            Err(err) => panic!("Invalid hardcoded citation regex pattern: {err}"),
+            Err(err) => panic!("Citation regex is invalid: {err}"),
         },
     );
 

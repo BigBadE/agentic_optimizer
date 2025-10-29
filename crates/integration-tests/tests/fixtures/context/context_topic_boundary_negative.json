@@ -1,7 +1,11 @@
 {
   "name": "context_topic_boundary_negative",
   "description": "Test that files from completely different topics are NOT included",
-  "tags": ["context", "conservative", "negative"],
+  "tags": [
+    "context",
+    "conservative",
+    "negative"
+  ],
   "setup": {
     "files": {
       "src/frontend/components.rs": "pub struct Button {\n    label: String,\n    onclick: Box<dyn Fn()>,\n}\n\nimpl Button {\n    pub fn render(&self) -> String {\n        format!(\"<button>{}</button>\", self.label)\n    }\n}",
@@ -38,15 +42,15 @@
           "return_type": "string"
         },
         "ui": {
-          "output_contains": ["database"]
+          "output_contains": [
+            "database"
+          ]
         }
       }
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

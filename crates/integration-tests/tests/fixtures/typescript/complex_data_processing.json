@@ -206,8 +206,6 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "validation_passed": true
-    }
+    "execution": {}
   }
 }

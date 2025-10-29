@@ -5,6 +5,7 @@ edition.workspace = true
 
 [dependencies]
 merlin-deps.workspace = true
+merlin-tooling = { path = "../merlin-tooling" }
 async-trait.workspace = true
 serde.workspace = true
 thiserror.workspace = true

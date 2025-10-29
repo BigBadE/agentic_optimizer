@@ -49,17 +49,23 @@
           {
             "path": "data.json",
             "exists": true,
-            "contains": ["\"count\": 1"]
+            "contains": [
+              "\"count\": 1"
+            ]
           },
           {
             "path": "config.toml",
             "exists": true,
-            "contains": ["version = \"1.1\""]
+            "contains": [
+              "version = \"1.1\""
+            ]
           },
           {
             "path": "readme.md",
             "exists": true,
-            "contains": ["Updated version to 1.1"]
+            "contains": [
+              "Updated version to 1.1"
+            ]
           }
         ],
         "execution": {}
@@ -98,26 +104,32 @@
         ]
       },
       "verify": {
-        "execution": {}
+        "execution": {
+          "return_value_matches": "Error caught"
+        }
       }
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "files": [
       {
         "path": "data.json",
-        "contains": ["\"count\": 1"]
+        "contains": [
+          "\"count\": 1"
+        ]
       },
       {
         "path": "config.toml",
-        "contains": ["version = \"2.0\""]
+        "contains": [
+          "version = \"2.0\""
+        ]
       },
       {
         "path": "readme.md",
-        "contains": ["Updated version to 1.1"]
+        "contains": [
+          "Updated version to 1.1"
+        ]
       }
     ]
   }

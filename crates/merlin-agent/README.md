@@ -6,17 +6,22 @@ Agent execution, task coordination, validation pipeline, and workspace managemen
 
 This crate provides the core agent execution engine with task coordination, multi-stage validation, workspace isolation, and transaction support.
 
+Implements recursive step-based execution where agents return either a String result or a TaskList for decomposition. Each step has exit requirements for validation and can recursively decompose further.
+
 ## Module Structure
 
 ### Agent Execution (`agent/`)
-- `executor.rs` - `AgentExecutor` for executing agent tasks
+- `executor/` - Agent execution system
+  - `mod.rs` - `AgentExecutor` for executing agent tasks with TypeScript code execution
+  - `step_executor.rs` - `StepExecutor` for recursive step-based execution
+  - `typescript.rs` - TypeScript code extraction and execution
+  - `context.rs` - Context building for tasks
 - `step.rs` - `StepTracker` for tracking execution steps
-- `self_assess.rs` - `SelfAssessor` for self-assessment
 - `task_coordinator.rs` - `TaskCoordinator` for coordinating multiple tasks
 - `task_list_executor.rs` - `TaskListExecutor` for workflow execution
 - `command_runner.rs` - Command execution utilities
 - `conversation.rs` - `ConversationManager` for managing conversations
-- `execution_result.rs` - Execution result types
+- `execution_result.rs` - Execution result types (string or TaskList)
 
 ### Executor System (`executor/`)
 - `state.rs` - `WorkspaceState` for state management
@@ -36,15 +41,22 @@ This crate provides the core agent execution engine with task coordination, mult
   - `test.rs` - Test execution
   - `build.rs` - Build validation
 
+### Exit Requirement Validators (`exit_validators.rs`)
+- Built-in callback validators for step completion
+- `file_exists`, `file_contains`, `command_succeeds`, `json_valid`, `no_errors_in`
+- Pattern matching and named validator integration
+
 ## Public API
 
 **Agent System:**
-- `AgentExecutor` - Execute agent tasks
-- `SelfAssessor` - Self-assessment capabilities
+- `AgentExecutor` - Execute agent tasks with TypeScript runtime
+- `StepExecutor` - Recursive step-based execution with exit requirements
+- `ExitRequirementValidators` - Built-in validators for step completion
 - `StepTracker` - Track execution steps
 - `TaskCoordinator` - Coordinate multiple tasks
 - `TaskListExecutor` - Execute multi-step workflows
 - `ConversationManager`, `ContextManager` - Conversation management
+- `AgentExecutionResult` - String result or continuation request
 
 **Executor System:**
 - `TaskGraph`, `ConflictAwareTaskGraph` - Dependency graphs
@@ -60,7 +72,13 @@ This crate provides the core agent execution engine with task coordination, mult
 ## Features
 
 ### Task Coordination
-- Multi-task execution
+
+- Agent returns `String | TaskList`
+- Recursive decomposition - steps can return TaskLists
+- Exit requirements validate each step completion
+- Retry logic with hard/soft error classification
+- Context specification per step (files, previous results, explicit content)
+- Full tool access at all times
 - Dependency tracking
 - Conflict detection
 - Parallel execution support
@@ -90,7 +108,10 @@ This crate provides the core agent execution engine with task coordination, mult
   - `executor.rs`, `step.rs`, `self_assess.rs`, `task_list_executor.rs`
   - `transaction.rs`, `state.rs`
 - **Fixture coverage**: 20+ fixtures
-  - `agent/` - Agent execution tests
+  - `agent/` - Agent execution tests, including TypeScript-based self-determination
+    - `self_determination_complete.json` - Complete action testing
+    - `self_determination_decompose.json` - Decompose action with subtasks
+    - `self_determination_gather.json` - GatherContext action
   - `executor/` - Task execution tests
   - `validation/` - Validation pipeline tests
   - `workspace/` - Workspace isolation tests

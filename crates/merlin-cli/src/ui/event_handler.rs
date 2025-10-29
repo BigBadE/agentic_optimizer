@@ -4,6 +4,7 @@ use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo, Ta
 use merlin_deps::serde_json::Value;
 use merlin_deps::tracing::warn;
 use merlin_routing::{MessageLevel, TaskId, TaskProgress, TaskResult, UiEvent};
+use merlin_tooling::ToolError;
 use std::time::{Instant, SystemTime};
 
 /// Handles UI events and updates task manager and state
@@ -181,13 +182,13 @@ impl<'handler> EventHandler<'handler> {
         });
     }
 
-    fn handle_task_failed(&mut self, task_id: TaskId, error: &str) {
+    fn handle_task_failed(&mut self, task_id: TaskId, error: &ToolError) {
         self.state.active_running_tasks.remove(&task_id);
 
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             task.status = TaskStatus::Failed;
 
-            let error_msg = format!("Error: {error}");
+            let error_msg = format!("Error: {}", error.user_message());
             if !task.output.is_empty() {
                 task.output.push('\n');
             }
@@ -202,7 +203,7 @@ impl<'handler> EventHandler<'handler> {
         }
     }
 
-    fn handle_task_retrying(&mut self, task_id: TaskId, retry_count: u32, _error: &str) {
+    fn handle_task_retrying(&mut self, task_id: TaskId, retry_count: u32, _error: &ToolError) {
         // Update retry count in task display
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             task.retry_count = retry_count;

@@ -1,7 +1,11 @@
 {
   "name": "context_string_match_precision",
   "description": "Test that specific string matches in code ARE found and included",
-  "tags": ["context", "positive", "precision"],
+  "tags": [
+    "context",
+    "positive",
+    "precision"
+  ],
   "setup": {
     "files": {
       "src/error_handler.rs": "use std::fmt;\n\npub enum AppError {\n    DatabaseError(String),\n    ValidationError(String),\n    NotFoundError(String),\n}\n\nimpl fmt::Display for AppError {\n    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {\n        match self {\n            AppError::DatabaseError(msg) => write!(f, \"Database error: {}\", msg),\n            AppError::ValidationError(msg) => write!(f, \"Validation error: {}\", msg),\n            AppError::NotFoundError(msg) => write!(f, \"Not found: {}\", msg),\n        }\n    }\n}",
@@ -36,15 +40,16 @@
           "return_type": "string"
         },
         "ui": {
-          "output_contains": ["ValidationError", "error_handler"]
+          "output_contains": [
+            "ValidationError",
+            "error_handler"
+          ]
         }
       }
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

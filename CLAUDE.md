@@ -2,6 +2,10 @@
 
 This file provides guidance when working with code in this repository.
 
+## DO NOT EVER USE ALLOWS WITHOUT EXPLICIT USER PERMISSION. EVER.
+
+This is the most important rule.
+
 ## Project Overview
 
 **Merlin** is an intelligent AI coding assistant with multi-model routing, automatic task decomposition, and comprehensive validation.
@@ -14,7 +18,11 @@ This file provides guidance when working with code in this repository.
 
 **Core Features:**
 - Multi-tier model routing with automatic escalation
-- Self-determining task decomposition with dependency tracking
+- **Recursive Step-Based Execution** (see EXECUTION_MODEL.md)
+  - Agent returns `String | TaskList`
+  - Full tool access at all times
+  - Exit requirements validate step completion
+  - Hard/soft error classification with retry logic
 - Parallel task execution with conflict detection
 - Multi-stage validation pipeline
 - Terminal UI with real-time progress monitoring
@@ -50,8 +58,20 @@ This file provides guidance when working with code in this repository.
 5. Escalate to higher tier on failure (up to 3 retries)
 
 **Task Execution:**
-- Complex tasks decomposed into subtasks with dependencies
-- Execution strategies: Sequential, Pipeline, Parallel, Hybrid
+- Agent decides: Return string OR decompose into TaskList
+- Recursive decomposition: Steps can themselves return TaskLists
+- Exit requirements: Each step validates completion
+  - Callback validators: `file_exists`, `file_contains`, `command_succeeds`, etc.
+  - Pattern matching: Regex validation
+  - Named validators: Integration with ValidationPipeline
+- Context specification per step
+  - File patterns (glob)
+  - Previous step results
+  - Explicit content injection
+- Retry logic:
+  - Hard errors → escalate model tier
+  - Soft errors → retry with feedback
+  - Max 3 attempts per step
 - Transactional file operations with rollback support
 - Conflict detection prevents concurrent file modifications
 
@@ -128,11 +148,18 @@ Located in `crates/<crate-name>/README.md`:
 
 Fixtures auto-discovered by `crates/integration-tests/tests/unified_tests.rs` and run with `UnifiedTestRunner`.
 
-**Tests should not be modified to match incorrect behavior**. This is not a production system, it will have issues, rely on tests to find them and fix them.
+**Tests should not be modified to match incorrect behavior**. This is not a production system, it will have issues, 
+rely on tests to find them and fix them.
 
-**Tests should NEVER duplicate behavior**. For example, the fixture runner shouldn't re-implement input handling, it should run the CLI and pass inputs to it.
+**Tests should NEVER duplicate behavior**. For example, the fixture runner shouldn't re-implement input handling, 
+it should run the CLI and pass inputs to it.
 
-**Tests should NEVER be relaxed**. Verification is the most important thing. Deleting/simplifying tests just to make them pass is never a good idea. You can change them if necessary, but never make them less strict and lose out on finding potential issues.
+**Tests should NEVER be relaxed**. Verification is the most important thing. Deleting/simplifying tests just to make them pass is never a good idea. 
+You can change them if necessary, but never make them less strict and lose out on finding potential issues.
+
+**ALWAYS follow the fail by default stragety**. Tests should never pass with unexpected conditions. For example, if you're testing 
+the thread system, you should not test if thread_count > 0. Instead, check that thread_count == expected_thread_count.
+Failure in tests is ALWAYS better than a false pass, tests are designed to catch issues.
 
 ### Test Modification Guidelines
 

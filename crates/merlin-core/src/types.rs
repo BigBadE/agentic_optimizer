@@ -93,6 +93,14 @@ impl Context {
         self
     }
 
+    /// Adds additional content to the system prompt.
+    #[must_use]
+    pub fn with_additional_content(mut self, content: &str) -> Self {
+        self.system_prompt.push_str("\n\n");
+        self.system_prompt.push_str(content);
+        self
+    }
+
     /// Formats all file contexts as a single string for inclusion in prompts.
     pub fn files_to_string(&self) -> String {
         self.files

@@ -6,31 +6,31 @@
 use super::event_source::{FixtureEventController, FixtureEventSource};
 use super::execution_tracker::ExecutionResultTracker;
 use super::fixture::{TestEvent, TestFixture};
-use super::mock_provider::{MockRouter, PatternMockProvider};
+use super::mock_provider::{MockProvider, MockRouter};
 use super::verification_result::VerificationResult;
 use super::verifier::UnifiedVerifier;
 use super::workspace_setup::{create_files, get_test_workspace_path};
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_cli::TuiApp;
-use merlin_core::{
-    ModelProvider, Response, Result, RoutingError, TaskResult, TokenUsage, ValidationResult,
-};
+use merlin_core::{ModelProvider, Result, RoutingError, TaskResult};
 use merlin_deps::ratatui::backend::TestBackend;
 use merlin_deps::serde_json::{Value as JsonValue, from_str};
 use merlin_deps::tempfile::TempDir;
-use merlin_routing::{Model, ProviderRegistry, RoutingConfig, TaskId, UiEvent};
-use merlin_tooling::{ToolError, ToolResult};
+use merlin_routing::{Model, ProviderRegistry, RoutingConfig, UiEvent};
+use merlin_tooling::ToolError;
+use merlin_tooling::ToolResult;
 use std::fs;
 use std::path::{Path, PathBuf};
+use std::result::Result as StdResult;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 use tokio::time::{Duration as TokioDuration, sleep, timeout};
 
 /// Result type for task completion with captured outputs
-type TaskCompletionResult = (Box<TaskResult>, Vec<String>);
+type TaskCompletionResult = StdResult<(TaskResult, Vec<String>), (ToolError, Vec<String>)>;
 
-/// Pending task result before being added to tracker
-type PendingTaskResult = (Box<TaskResult>, Vec<String>);
+/// Pending task result before being added to tracker - can be success or failure
+type PendingTaskResult = StdResult<(TaskResult, Vec<String>), (ToolError, Vec<String>)>;
 
 /// Unified test runner
 pub struct UnifiedTestRunner {
@@ -41,7 +41,7 @@ pub struct UnifiedTestRunner {
     /// Workspace path
     workspace_path: PathBuf,
     /// Mock provider
-    provider: Arc<PatternMockProvider>,
+    provider: Arc<MockProvider>,
     /// The actual TUI application under test
     tui_app: TuiApp<TestBackend>,
     /// Fixture event controller
@@ -78,7 +78,7 @@ impl UnifiedTestRunner {
         workspace_temp: Option<TempDir>,
         workspace_path: PathBuf,
     ) -> Result<Self> {
-        let provider = Arc::new(PatternMockProvider::new("test-mock"));
+        let provider = Arc::new(MockProvider::new("test-mock"));
 
         // Determine workspace setup strategy
         let (final_workspace_path, workspace_temp, is_readonly) =
@@ -121,7 +121,7 @@ impl UnifiedTestRunner {
         let router = Arc::new(MockRouter);
 
         // Create thread store for conversation management
-        let thread_store_path = final_workspace_path.join("threads");
+        let thread_store_path = final_workspace_path.join(".merlin").join("threads");
         let thread_store = ThreadStore::new(thread_store_path)
             .map_err(|err| RoutingError::Other(format!("Failed to create thread store: {err}")))?;
 
@@ -162,7 +162,7 @@ impl UnifiedTestRunner {
 
     /// Get mock provider
     #[must_use]
-    pub fn provider(&self) -> Arc<PatternMockProvider> {
+    pub fn provider(&self) -> Arc<MockProvider> {
         Arc::clone(&self.provider)
     }
 
@@ -191,7 +191,7 @@ impl UnifiedTestRunner {
 
         loop {
             // Process any pending UI events first (this broadcasts them)
-            self.tui_app.test_process_ui_events()?;
+            self.tui_app.test_process_ui_events();
 
             // Try to receive broadcast event with timeout
             let ui_event = timeout(TokioDuration::from_millis(50), ui_events.recv()).await;
@@ -199,13 +199,10 @@ impl UnifiedTestRunner {
             match ui_event {
                 Ok(Ok(event)) => match event {
                     UiEvent::TaskCompleted { result, .. } => {
-                        return Ok((result, outputs));
+                        return Ok(Ok((*result, outputs)));
                     }
-                    UiEvent::TaskFailed { error, task_id } => {
-                        return Ok((
-                            Box::new(Self::create_failure_result(task_id, error)),
-                            outputs,
-                        ));
+                    UiEvent::TaskFailed { error, .. } => {
+                        return Ok(Err((error, outputs)));
                     }
                     UiEvent::TaskOutput { output, .. } => {
                         outputs.push(output);
@@ -232,7 +229,7 @@ impl UnifiedTestRunner {
     /// Returns error if input processing fails
     async fn process_input_events(&mut self) -> Result<()> {
         while let Some(evt) = self.tui_app.test_next_input_event().await? {
-            self.tui_app.test_handle_input(&evt)?;
+            self.tui_app.test_handle_input(&evt);
         }
         Ok(())
     }
@@ -248,9 +245,10 @@ impl UnifiedTestRunner {
         let final_verify = self.fixture.final_verify.clone();
         let mut execution_tracker = ExecutionResultTracker::new();
         let mut verifier = UnifiedVerifier::new(&workspace_path);
-        let mut pending_task: Option<PendingTaskResult> = None;
+        let mut pending_task: Option<(PendingTaskResult, String)> = None;
 
-        for event in &events {
+        for (event_index, event) in events.iter().enumerate() {
+            let execution_id = Self::get_execution_id(event, event_index);
             match event {
                 TestEvent::UserInput(input_event) if input_event.data.submit => {
                     // Complete any pending task first
@@ -269,6 +267,7 @@ impl UnifiedTestRunner {
                             &input_event.verify,
                             Some(&self.tui_app),
                             &execution_tracker,
+                            Some(&self.provider),
                         )
                         .map_err(RoutingError::ExecutionFailed)?;
 
@@ -276,8 +275,8 @@ impl UnifiedTestRunner {
                     self.event_controller.advance();
 
                     // Now await task completion
-                    let (task_result, outputs) = self.await_task_completion(&mut ui_events).await?;
-                    pending_task = Some((task_result, outputs));
+                    let completion_result = self.await_task_completion(&mut ui_events).await?;
+                    pending_task = Some((completion_result, execution_id));
                 }
                 TestEvent::UserInput(input_event) => {
                     // Non-submit input - process all input events
@@ -293,6 +292,7 @@ impl UnifiedTestRunner {
                             &input_event.verify,
                             Some(&self.tui_app),
                             &execution_tracker,
+                            Some(&self.provider),
                         )
                         .map_err(RoutingError::ExecutionFailed)?;
 
@@ -313,6 +313,7 @@ impl UnifiedTestRunner {
                             &llm_event.verify,
                             Some(&self.tui_app),
                             &execution_tracker,
+                            Some(&self.provider),
                         )
                         .map_err(RoutingError::ExecutionFailed)?;
                     self.event_controller.advance();
@@ -330,36 +331,65 @@ impl UnifiedTestRunner {
             .verify_final(&final_verify, Some(&self.tui_app), &execution_tracker)
             .map_err(RoutingError::ExecutionFailed)?;
 
+        // Clean up test artifacts
+        self.cleanup_test_artifacts()?;
+
         Ok(verifier.result())
+    }
+
+    /// Clean up test artifacts (threads and tasks) after test completion
+    ///
+    /// # Errors
+    /// Returns error if cleanup fails
+    fn cleanup_test_artifacts(&self) -> Result<()> {
+        // Clean up threads directory
+        let threads_dir = self.workspace_path.join(".merlin").join("threads");
+        if threads_dir.exists() {
+            fs::remove_dir_all(&threads_dir).map_err(|err| {
+                RoutingError::Other(format!("Failed to cleanup threads directory: {err}"))
+            })?;
+        }
+
+        // Clean up tasks directory
+        let tasks_dir = self.workspace_path.join(".merlin").join("tasks");
+        if tasks_dir.exists() {
+            fs::remove_dir_all(&tasks_dir).map_err(|err| {
+                RoutingError::Other(format!("Failed to cleanup tasks directory: {err}"))
+            })?;
+        }
+
+        Ok(())
+    }
+
+    /// Get execution ID for an event
+    fn get_execution_id(event: &TestEvent, event_index: usize) -> String {
+        event
+            .id()
+            .map_or_else(|| format!("event_{event_index}"), ToString::to_string)
     }
 
     /// Complete a pending task by adding its result to the tracker
     fn complete_pending_task(
-        pending_task: &mut Option<PendingTaskResult>,
+        pending_task: &mut Option<(PendingTaskResult, String)>,
         execution_tracker: &mut ExecutionResultTracker,
     ) {
-        if let Some((task_result, outputs)) = pending_task.take() {
-            let execution_result = Self::extract_execution_result(&task_result, &outputs);
-            execution_tracker.add_result(execution_result, outputs, task_result);
-        }
-    }
-
-    /// Create a failure task result for a failed task
-    fn create_failure_result(task_id: TaskId, error: String) -> TaskResult {
-        TaskResult {
-            task_id,
-            response: Response {
-                text: error,
-                confidence: 0.0,
-                tokens_used: TokenUsage::default(),
-                provider: "mock".to_owned(),
-                latency_ms: 0,
-            },
-            tier_used: "default".to_owned(),
-            tokens_used: TokenUsage::default(),
-            validation: ValidationResult::default(),
-            duration_ms: 0,
-            work_unit: None,
+        if let Some((completion_result, execution_id)) = pending_task.take() {
+            match completion_result {
+                Ok((task_result, outputs)) => {
+                    // Successful task completion
+                    let execution_result = Self::extract_execution_result(&task_result, &outputs);
+                    execution_tracker.add_success(
+                        execution_id,
+                        execution_result,
+                        outputs,
+                        Box::new(task_result),
+                    );
+                }
+                Err((error, outputs)) => {
+                    // Task failed
+                    execution_tracker.add_failure(execution_id, error, outputs);
+                }
+            }
         }
     }
 
@@ -371,22 +401,12 @@ impl UnifiedTestRunner {
     /// The last output typically contains the result returned by the TypeScript code.
     ///
     /// # Errors
-    /// Returns error if task execution failed - this is expected and allows verification
+    /// Returns error if output parsing fails
     fn extract_execution_result(
         task_result: &TaskResult,
         outputs: &[String],
     ) -> ToolResult<JsonValue> {
-        // Check if the task result contains an error (from TaskFailed event)
-        // These errors are captured from TypeScript execution failures or other task errors
         let response_text = &task_result.response.text;
-
-        // If response contains error indicators, return as error
-        if response_text.contains("TypeScript execution failed")
-            || response_text.contains("Tool execution failed")
-            || response_text.contains("Task execution failed")
-        {
-            return Err(ToolError::ExecutionFailed(response_text.clone()));
-        }
 
         // Check if there were any outputs from TypeScript execution
         outputs.last().map_or_else(
@@ -410,15 +430,12 @@ impl UnifiedTestRunner {
         )
     }
 
-    /// Load fixture from file
+    /// Load a test fixture from a JSON file
     ///
     /// # Errors
     /// Returns error if file reading or parsing fails
     pub fn load_fixture(path: &Path) -> Result<TestFixture> {
-        let content = fs::read_to_string(path)
-            .map_err(|err| RoutingError::Other(format!("Failed to read fixture: {err}")))?;
-        from_str(&content)
-            .map_err(|err| RoutingError::Other(format!("Failed to parse fixture: {err}")))
+        super::fixture_loader::load_fixture(path)
     }
 
     /// Discover all fixtures in directory
@@ -426,29 +443,6 @@ impl UnifiedTestRunner {
     /// # Errors
     /// Returns error if directory reading fails
     pub fn discover_fixtures(dir: &Path) -> Result<Vec<PathBuf>> {
-        let mut fixtures = Vec::new();
-
-        if !dir.exists() {
-            return Ok(fixtures);
-        }
-
-        let entries = fs::read_dir(dir)
-            .map_err(|err| RoutingError::Other(format!("Failed to read directory: {err}")))?;
-
-        for entry in entries {
-            let entry =
-                entry.map_err(|err| RoutingError::Other(format!("Failed to read entry: {err}")))?;
-            let path = entry.path();
-
-            if path.is_file() && path.extension().is_some_and(|ext| ext == "json") {
-                fixtures.push(path);
-            } else if path.is_dir() {
-                // Recurse into subdirectories
-                let mut sub_fixtures = Self::discover_fixtures(&path)?;
-                fixtures.append(&mut sub_fixtures);
-            }
-        }
-
-        Ok(fixtures)
+        super::fixture_loader::discover_fixtures(dir)
     }
 }

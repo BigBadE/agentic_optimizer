@@ -116,7 +116,9 @@
         ]
       },
       "verify": {
-        "execution": {}
+        "execution": {
+          "return_value_matches": "Expected error"
+        }
       }
     },
     {
@@ -200,9 +202,7 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "files": [
       {
         "path": "src/lib.rs",

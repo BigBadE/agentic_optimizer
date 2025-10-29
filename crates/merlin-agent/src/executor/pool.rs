@@ -190,7 +190,7 @@ impl ExecutorPool {
         let (sender, _receiver) = mpsc::unbounded_channel();
         let ui_channel = UiChannel::from_sender(sender);
 
-        executor.execute_streaming(task, ui_channel).await
+        executor.execute_task(task, ui_channel).await
     }
 }
 

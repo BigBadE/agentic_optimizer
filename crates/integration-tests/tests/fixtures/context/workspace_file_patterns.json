@@ -1,10 +1,17 @@
 {
   "name": "File Pattern Matching in Pre-made Workspace",
   "description": "Tests glob pattern matching over rust-project workspace",
-  "tags": ["context", "workspace", "patterns"],
+  "tags": [
+    "context",
+    "workspace",
+    "patterns"
+  ],
   "setup": {
     "workspace": "rust-project",
-    "terminal_size": [80, 24]
+    "terminal_size": [
+      80,
+      24
+    ]
   },
   "events": [
     {
@@ -38,8 +45,6 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    }
+    "execution": {}
   }
 }

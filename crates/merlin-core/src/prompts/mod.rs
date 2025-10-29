@@ -6,7 +6,6 @@
 
 // Embed prompt files at compile time
 const CONTEXT_PLANNING_MD: &str = include_str!("../../../../prompts/context_planning.md");
-const TASK_ASSESSMENT_MD: &str = include_str!("../../../../prompts/task_assessment.md");
 const TYPESCRIPT_AGENT_MD: &str = include_str!("../../../../prompts/typescript_agent.md");
 
 /// Loads a prompt by name
@@ -16,7 +15,6 @@ const TYPESCRIPT_AGENT_MD: &str = include_str!("../../../../prompts/typescript_a
 pub fn load_prompt(name: &str) -> Result<String, String> {
     let content = match name {
         "context_planning" => CONTEXT_PLANNING_MD,
-        "task_assessment" => TASK_ASSESSMENT_MD,
         "typescript_agent" => TYPESCRIPT_AGENT_MD,
         _ => return Err(format!("Unknown prompt: {name}")),
     };
@@ -87,11 +85,11 @@ It can have multiple lines.
     }
 
     #[test]
-    fn test_load_task_assessment_prompt() {
-        let result = load_prompt("task_assessment");
+    fn test_load_typescript_agent_prompt() {
+        let result = load_prompt("typescript_agent");
         assert!(
             result.is_ok(),
-            "Failed to load task_assessment prompt: {:?}",
+            "Failed to load typescript_agent prompt: {:?}",
             result.err()
         );
         let prompt = result.unwrap();

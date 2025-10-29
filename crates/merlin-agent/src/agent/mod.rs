@@ -9,8 +9,6 @@ pub mod conversation;
 pub mod execution_result;
 /// Agent executor for running LLM-powered agents
 pub mod executor;
-/// Self-assessment functionality for agents to evaluate their own work
-pub mod self_assess;
 /// Step tracking for monitoring agent execution progress
 pub mod step;
 /// Task coordination for complex multi-step workflows
@@ -19,9 +17,8 @@ pub mod task_coordinator;
 // Re-export context management from merlin-context
 pub use conversation::{ConversationManager, ConversationMessage, ConversationSummary};
 pub use execution_result::AgentExecutionResult;
-pub use executor::AgentExecutor;
+pub use executor::{AgentExecutor, StepExecutionParams, StepExecutor, StepResult};
 pub use merlin_context::ContextFetcher;
 pub use merlin_context::context_inclusion::ContextManager;
-pub use self_assess::SelfAssessor;
 pub use step::StepTracker;
 pub use task_coordinator::{CoordinatorStats, TaskCoordinator, TaskProgress, TaskStatus};

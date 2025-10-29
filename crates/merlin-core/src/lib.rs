@@ -57,11 +57,36 @@ pub use conversation::{
 pub use routing_error::RoutingError;
 // Re-export Result from routing_error as the main Result (for backward compatibility with merlin-types)
 pub use routing_error::Result;
-pub use streaming::{StepId, StepType, StreamingChannel, StreamingEvent, TaskStep};
+pub use streaming::{ExecutionStep, ExecutionStepType, StepId, StreamingChannel, StreamingEvent};
 pub use task::{
-    CommandExecution, ContextRequirements, ExecutionContext, ExecutionMode, ExecutionStrategy,
-    FileChange, Priority, Severity, StageResult, Task, TaskAction, TaskAnalysis, TaskDecision,
-    TaskId, TaskResult, TaskState, ValidationError, ValidationResult,
+    // Task list execution model types
+    AgentResponse,
+    // Original types
+    CommandExecution,
+    ContextRequirements,
+    ContextSpec,
+    ExecutionContext,
+    ExecutionMode,
+    ExecutionStrategy,
+    ExitRequirement,
+    FileChange,
+    FilePattern,
+    Priority,
+    Severity,
+    StageResult,
+    StepType,
+    Task,
+    TaskAction,
+    TaskAnalysis,
+    TaskDecision,
+    TaskId,
+    TaskList,
+    TaskResult,
+    TaskState,
+    TaskStep,
+    ValidationError,
+    ValidationErrorType,
+    ValidationResult,
     ValidationStage as ValidationStageType,
 };
 pub use ui::{MessageLevel, TaskProgress, UiChannel, UiEvent};

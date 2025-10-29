@@ -39,7 +39,7 @@
           "tasks_displayed": 1
         },
         "execution": {
-          "error_occurred": "Test error"
+          "expected_failure": "Test error"
         }
       }
     }

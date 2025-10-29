@@ -281,7 +281,7 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
             message: message.clone(),
         };
 
-        let data = to_value(result).map_err(ToolError::Serialization)?;
+        let data = to_value(result).map_err(|error| ToolError::Serialization(error.to_string()))?;
 
         // Return success even if no files were read, so tests can check success=false
         Ok(ToolOutput::success_with_data(message, data))

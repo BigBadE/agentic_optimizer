@@ -61,11 +61,11 @@ impl<B: Backend> TuiApp<B> {
 
         let persistence = tasks_dir
             .as_ref()
-            .map(|dir| TaskPersistence::new(dir.clone()));
+            .map(|dir| TaskPersistence::new(dir.join(".merlin").join("tasks")));
 
         let thread_storage_path = tasks_dir.as_ref().map_or_else(
             || PathBuf::from(".merlin/threads"),
-            |dir| dir.join("threads"),
+            |dir| dir.join(".merlin").join("threads"),
         );
 
         let thread_store = ThreadStore::new(thread_storage_path)
@@ -130,10 +130,7 @@ impl<B: Backend> TuiApp<B> {
     }
 
     /// Process pending UI events for testing (non-blocking)
-    ///
-    /// # Errors
-    /// Returns error if event processing fails
-    pub fn test_process_ui_events(&mut self) -> Result<()> {
+    pub fn test_process_ui_events(&mut self) {
         while let Ok(ui_event) = self.event_receiver.try_recv() {
             // Broadcast to observers
             drop(self.ui_event_broadcast.send(ui_event.clone()));
@@ -147,7 +144,6 @@ impl<B: Backend> TuiApp<B> {
             );
             handler.handle_event(ui_event);
         }
-        Ok(())
     }
 
     /// Get next input event from fixture for testing
@@ -162,12 +158,9 @@ impl<B: Backend> TuiApp<B> {
     }
 
     /// Handle input event for testing
-    ///
-    /// # Errors
-    /// Returns error if event processing fails
-    pub fn test_handle_input(&mut self, event: &CrosstermEvent) -> Result<()> {
+    pub fn test_handle_input(&mut self, event: &CrosstermEvent) {
         // Process any pending UI events first
-        self.test_process_ui_events()?;
+        self.test_process_ui_events();
 
         // Handle the input
         if let CrosstermEvent::Key(key) = event
@@ -177,9 +170,7 @@ impl<B: Backend> TuiApp<B> {
         }
 
         // Process any UI events triggered by the input
-        self.test_process_ui_events()?;
-
-        Ok(())
+        self.test_process_ui_events();
     }
 
     /// Get read-only access to terminal backend for testing

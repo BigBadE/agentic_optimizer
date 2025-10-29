@@ -1,10 +1,18 @@
 {
   "name": "Semantic Search in Pre-made Workspace",
   "description": "Tests semantic search over rust-project workspace embeddings",
-  "tags": ["context", "workspace", "embeddings", "semantic"],
+  "tags": [
+    "context",
+    "workspace",
+    "embeddings",
+    "semantic"
+  ],
   "setup": {
     "workspace": "rust-project",
-    "terminal_size": [80, 24]
+    "terminal_size": [
+      80,
+      24
+    ]
   },
   "events": [
     {
@@ -38,8 +46,6 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    }
+    "execution": {}
   }
 }

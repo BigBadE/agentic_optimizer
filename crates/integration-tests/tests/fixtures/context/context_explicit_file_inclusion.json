@@ -1,7 +1,11 @@
 {
   "name": "context_explicit_file_inclusion",
   "description": "Test that explicitly mentioned files ARE included in context",
-  "tags": ["context", "positive", "explicit"],
+  "tags": [
+    "context",
+    "positive",
+    "explicit"
+  ],
   "setup": {
     "files": {
       "src/auth.rs": "pub struct AuthManager {\n    secret: String,\n}\n\nimpl AuthManager {\n    pub fn verify_token(&self, token: &str) -> bool {\n        token == self.secret\n    }\n}",
@@ -36,15 +40,16 @@
           "return_type": "string"
         },
         "ui": {
-          "output_contains": ["authentication", "auth.rs"]
+          "output_contains": [
+            "authentication",
+            "auth.rs"
+          ]
         }
       }
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

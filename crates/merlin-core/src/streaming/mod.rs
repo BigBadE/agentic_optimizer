@@ -25,15 +25,15 @@ impl Default for StepId {
     }
 }
 
-/// Individual step in task execution.
+/// Individual execution step in task execution streaming.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct TaskStep {
+pub struct ExecutionStep {
     /// Unique identifier for this step
     pub id: StepId,
     /// ID of the task this step belongs to
     pub task_id: TaskId,
     /// Type of step (thinking, tool call, etc.)
-    pub step_type: StepType,
+    pub step_type: ExecutionStepType,
     /// When this step started
     #[serde(skip, default = "Instant::now")]
     pub timestamp: Instant,
@@ -41,9 +41,9 @@ pub struct TaskStep {
     pub content: String,
 }
 
-impl TaskStep {
-    /// Creates a new task step with generated ID and current timestamp.
-    pub fn new(task_id: TaskId, step_type: StepType, content: String) -> Self {
+impl ExecutionStep {
+    /// Creates a new execution step with generated ID and current timestamp.
+    pub fn new(task_id: TaskId, step_type: ExecutionStepType, content: String) -> Self {
         Self {
             id: StepId::default(),
             task_id,
@@ -54,9 +54,9 @@ impl TaskStep {
     }
 }
 
-/// Type of execution step.
+/// Type of execution step for UI streaming.
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum StepType {
+pub enum ExecutionStepType {
     /// Agent is thinking/reasoning
     Thinking,
     /// Agent is calling a tool
@@ -90,14 +90,14 @@ pub enum StreamingEvent {
         /// ID of the task
         task_id: TaskId,
         /// The step that started
-        step: TaskStep,
+        step: ExecutionStep,
     },
     /// Task step completed
     StepCompleted {
         /// ID of the task
         task_id: TaskId,
         /// The step that completed
-        step: TaskStep,
+        step: ExecutionStep,
     },
     /// Tool call started
     ToolCallStarted {

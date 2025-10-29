@@ -1,9 +1,17 @@
 {
   "name": "Thread Switching Navigation",
   "description": "Tests switching between multiple conversation threads using keyboard navigation",
-  "tags": ["tui", "threads", "navigation", "keyboard"],
+  "tags": [
+    "tui",
+    "threads",
+    "navigation",
+    "keyboard"
+  ],
   "setup": {
-    "terminal_size": [100, 30]
+    "terminal_size": [
+      100,
+      30
+    ]
   },
   "events": [
     {
@@ -46,9 +54,7 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

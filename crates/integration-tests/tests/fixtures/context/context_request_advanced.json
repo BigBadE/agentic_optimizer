@@ -133,7 +133,9 @@
         ]
       },
       "verify": {
-        "execution": {}
+        "execution": {
+          "return_value_matches": "Caught error as expected"
+        }
       }
     },
     {
@@ -193,9 +195,7 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "files": [
       {
         "path": "src/lib.rs",

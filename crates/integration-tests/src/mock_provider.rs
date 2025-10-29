@@ -5,9 +5,12 @@ use async_trait::async_trait;
 use merlin_core::{Context, ModelProvider, Query, Response, Result, RoutingError, TokenUsage};
 use merlin_deps::{regex::Regex, tracing};
 use merlin_routing::{Model, ModelRouter, RoutingDecision, Task as RoutingTask};
-use std::sync::{
-    Arc, Mutex,
-    atomic::{AtomicUsize, Ordering},
+use std::{
+    collections::HashMap,
+    sync::{
+        Arc, Mutex,
+        atomic::{AtomicUsize, Ordering},
+    },
 };
 
 /// Pattern response configuration
@@ -22,6 +25,8 @@ struct PatternResponse {
     used: bool,
     /// Compiled regex (if `match_type` is Regex)
     regex: Option<Regex>,
+    /// The prompt that triggered this response (captured when matched)
+    captured_prompt: Option<String>,
 }
 
 impl PatternResponse {
@@ -43,6 +48,7 @@ impl PatternResponse {
             typescript,
             used: false,
             regex,
+            captured_prompt: None,
         })
     }
 
@@ -59,25 +65,111 @@ impl PatternResponse {
     }
 }
 
-/// Pattern-based mock provider
-pub struct PatternMockProvider {
+/// Type alias for event prompt mapping
+type EventPromptMap = HashMap<String, String>;
+
+/// Mock provider for testing
+pub struct MockProvider {
     /// Provider name
     name: &'static str,
     /// Pattern responses
     responses: Arc<Mutex<Vec<PatternResponse>>>,
     /// Call counter for debugging
     call_count: Arc<AtomicUsize>,
+    /// Captured prompts for verification
+    captured_prompts: Arc<Mutex<Vec<String>>>,
+    /// Event ID to prompt mapping for scoped verification
+    event_prompts: Arc<Mutex<EventPromptMap>>,
+    /// Verification errors (root cause messages only)
+    verification_errors: Arc<Mutex<Vec<String>>>,
 }
 
-impl PatternMockProvider {
-    /// Create new pattern mock provider
+impl MockProvider {
+    /// Create new mock provider
     #[must_use]
     pub fn new(name: &'static str) -> Self {
         Self {
             name,
             responses: Arc::new(Mutex::new(Vec::new())),
             call_count: Arc::new(AtomicUsize::new(0)),
+            captured_prompts: Arc::new(Mutex::new(Vec::new())),
+            event_prompts: Arc::new(Mutex::new(HashMap::new())),
+            verification_errors: Arc::new(Mutex::new(Vec::new())),
         }
+    }
+
+    /// Get prompt for specific event ID
+    ///
+    /// # Errors
+    /// Returns error if lock acquisition fails
+    pub fn get_prompt_for_event(&self, event_id: &str) -> Result<Option<String>> {
+        self.event_prompts
+            .lock()
+            .map(|prompts| prompts.get(event_id).cloned())
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))
+    }
+
+    /// Capture prompt for specific event ID
+    ///
+    /// # Errors
+    /// Returns error if lock acquisition fails
+    pub fn capture_prompt_for_event(&self, event_id: String, prompt: String) -> Result<()> {
+        self.event_prompts
+            .lock()
+            .map(|mut prompts| {
+                prompts.insert(event_id, prompt);
+            })
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))
+    }
+
+    /// Get all captured prompts
+    ///
+    /// # Errors
+    /// Returns error if lock acquisition fails
+    pub fn get_captured_prompts(&self) -> Result<Vec<String>> {
+        self.captured_prompts
+            .lock()
+            .map(|prompts| prompts.clone())
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))
+    }
+
+    /// Get the last captured prompt
+    ///
+    /// # Errors
+    /// Returns error if lock acquisition fails
+    pub fn get_last_prompt(&self) -> Result<Option<String>> {
+        self.captured_prompts
+            .lock()
+            .map(|prompts| prompts.last().cloned())
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))
+    }
+
+    /// Get the prompt that triggered the most recent matched response
+    ///
+    /// # Errors
+    /// Returns error if lock acquisition fails
+    pub fn get_last_matched_prompt(&self) -> Result<Option<String>> {
+        self.responses
+            .lock()
+            .map(|responses| {
+                responses
+                    .iter()
+                    .rev()
+                    .find(|resp| resp.used)
+                    .and_then(|resp| resp.captured_prompt.clone())
+            })
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))
+    }
+
+    /// Get all verification errors
+    ///
+    /// # Errors
+    /// Returns error if lock acquisition fails
+    pub fn get_verification_errors(&self) -> Result<Vec<String>> {
+        self.verification_errors
+            .lock()
+            .map(|errors| errors.clone())
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))
     }
 
     /// Add response pattern
@@ -91,61 +183,6 @@ impl PatternMockProvider {
             .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
             .push(response);
         Ok(())
-    }
-
-    /// Get matching response for query
-    ///
-    /// # Errors
-    /// Returns error if no matching pattern found
-    ///
-    /// # Panics
-    /// May panic if mutex is poisoned
-    fn get_response(&self, query_text: &str) -> Result<String> {
-        tracing::debug!("Mock provider looking for pattern match for query: '{query_text}'");
-
-        let mut responses = self
-            .responses
-            .lock()
-            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
-
-        // Log all available patterns for debugging
-        tracing::debug!("Available patterns:");
-        for (idx, resp) in responses.iter().enumerate() {
-            tracing::debug!(
-                "  [{}] pattern='{}' match_type={:?} used={} matches={}",
-                idx,
-                resp.pattern,
-                resp.match_type,
-                resp.used,
-                resp.matches(query_text)
-            );
-        }
-
-        // Find first unused matching pattern
-        let result = responses
-            .iter_mut()
-            .find(|resp| !resp.used && resp.matches(query_text))
-            .map(|resp| {
-                tracing::debug!(
-                    "Matched pattern '{}' (match_type={:?})",
-                    resp.pattern,
-                    resp.match_type
-                );
-                resp.used = true;
-                resp.typescript.clone()
-            });
-
-        drop(responses);
-
-        result.map_or_else(
-            || {
-                tracing::warn!("No matching pattern found for query: '{query_text}'");
-                Err(RoutingError::ExecutionFailed(format!(
-                    "No matching pattern for query: {query_text}"
-                )))
-            },
-            Ok,
-        )
     }
 
     /// Reset all patterns to unused (for testing)
@@ -163,12 +200,94 @@ impl PatternMockProvider {
             }
         }
         self.call_count.store(0, Ordering::SeqCst);
+        self.captured_prompts
+            .lock()
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
+            .clear();
+        self.event_prompts
+            .lock()
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
+            .clear();
+        self.verification_errors
+            .lock()
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
+            .clear();
         Ok(())
+    }
+
+    /// Find matching pattern from candidates
+    ///
+    /// # Errors
+    /// Returns error if no matching pattern found
+    fn find_matching_pattern(&self, candidates: &[String]) -> Result<(String, String)> {
+        let mut responses = self
+            .responses
+            .lock()
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
+
+        let mut matched_prompt = None;
+        let mut matched_response = None;
+
+        for (idx, candidate) in candidates.iter().enumerate() {
+            if candidate.is_empty() {
+                continue;
+            }
+
+            tracing::debug!(
+                "Trying candidate #{} ({} chars): {}",
+                idx,
+                candidate.len(),
+                candidate.chars().take(100).collect::<String>()
+            );
+
+            if let Some(resp) = responses
+                .iter_mut()
+                .find(|response| !response.used && response.matches(candidate))
+            {
+                tracing::debug!(
+                    "Matched pattern '{}' (match_type={:?}) against candidate #{} ({} chars)",
+                    resp.pattern,
+                    resp.match_type,
+                    idx,
+                    candidate.len()
+                );
+                resp.used = true;
+                resp.captured_prompt = Some(candidate.clone());
+                matched_prompt = Some(candidate.clone());
+                matched_response = Some(resp.typescript.clone());
+                break;
+            }
+
+            tracing::debug!("No match for candidate #{}", idx);
+        }
+
+        drop(responses);
+
+        if let (Some(prompt), Some(response)) = (matched_prompt, matched_response) {
+            Ok((prompt, response))
+        } else {
+            // Extract just the user query for error message
+            let user_query = candidates
+                .first()
+                .filter(|candidate| !candidate.is_empty())
+                .unwrap_or(&String::new())
+                .clone();
+
+            // Store clean error message for verification
+            self.verification_errors
+                .lock()
+                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
+                .push(user_query.clone());
+
+            Err(RoutingError::ExecutionFailed(format!(
+                "No matching pattern for query: {user_query}"
+            )))
+        }
     }
 }
 
 #[async_trait]
-impl ModelProvider for PatternMockProvider {
+impl ModelProvider for MockProvider {
     fn name(&self) -> &'static str {
         self.name
     }
@@ -177,22 +296,34 @@ impl ModelProvider for PatternMockProvider {
         true
     }
 
-    async fn generate(&self, query: &Query, _context: &Context) -> Result<Response> {
-        // Increment call count
+    async fn generate(&self, query: &Query, context: &Context) -> Result<Response> {
         self.call_count.fetch_add(1, Ordering::SeqCst);
 
-        // Get matching response
-        let typescript = self.get_response(&query.text)?;
+        // Try multiple prompt representations
+        let candidates = [
+            query.text.clone(),
+            context.system_prompt.clone(),
+            if !context.system_prompt.is_empty() && !query.text.is_empty() {
+                format!("{}\n\n{}", context.system_prompt, query.text)
+            } else {
+                String::new()
+            },
+        ];
 
-        // Wrap TypeScript in code block
-        let content = format!("```typescript\n{typescript}\n```");
+        let (prompt_for_matching, typescript_code) = self.find_matching_pattern(&candidates)?;
+
+        // Capture matched prompt
+        self.captured_prompts
+            .lock()
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
+            .push(prompt_for_matching);
 
         Ok(Response {
-            text: content,
+            text: format!("```typescript\n{typescript_code}\n```"),
             confidence: 1.0,
             tokens_used: TokenUsage {
                 input: query.text.len() as u64,
-                output: typescript.len() as u64,
+                output: typescript_code.len() as u64,
                 cache_read: 0,
                 cache_write: 0,
             },

@@ -113,9 +113,7 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "files": [
       {
         "path": "test_context.txt",

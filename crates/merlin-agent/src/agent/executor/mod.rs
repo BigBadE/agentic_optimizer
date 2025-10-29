@@ -2,33 +2,34 @@
 
 mod context;
 mod logging;
-mod query_intent;
-mod self_determining;
-mod typescript;
+mod step_executor;
+pub(crate) mod typescript;
 
 #[cfg(test)]
 mod tests;
 
 use context::{ContextBuilder, ConversationHistory};
 use logging::ContextLogger;
-use query_intent::QueryIntent;
-use self_determining::{
-    BoxedTaskFuture, SelfDeterminingExecutor, StreamingParams, execute_with_streaming,
-};
+pub use step_executor::{StepExecutionParams, StepExecutor, StepResult};
 
-use std::sync::Arc;
-use std::sync::atomic::{AtomicBool, Ordering};
-use std::time::Instant;
+use std::{
+    sync::{
+        Arc,
+        atomic::{AtomicBool, Ordering},
+    },
+    time::Instant,
+};
 use tokio::sync::Mutex;
 
 use crate::Validator;
 use merlin_context::ContextFetcher;
+use merlin_core::AgentResponse;
 use merlin_core::{
-    Context, ExecutionContext, ModelProvider, Query, Response, Result, RoutingConfig, RoutingError,
-    Subtask, Task, TaskAction, TaskId, TaskResult, TaskState, TokenUsage, ValidationResult,
-    ui::{TaskProgress, UiChannel, UiEvent},
+    Context, Response, Result, RoutingConfig, RoutingError, Task, TaskId, TaskResult, TokenUsage,
+    ValidationResult,
+    ui::{UiChannel, UiEvent},
 };
-use merlin_routing::{ModelRouter, ProviderRegistry, RoutingDecision};
+use merlin_routing::{ModelRouter, ProviderRegistry};
 use merlin_tooling::{ToolRegistry, generate_typescript_signatures};
 
 /// Parameters for creating an `AgentExecutor` with a custom provider registry
@@ -57,26 +58,6 @@ pub struct AgentExecutor {
     context_dump_enabled: Arc<AtomicBool>,
     /// Provider registry for accessing model providers
     provider_registry: Arc<ProviderRegistry>,
-}
-
-/// Parameters for task execution
-struct ExecutionParams<'life> {
-    task_id: TaskId,
-    #[allow(dead_code, reason = "May be used in future implementations")]
-    task: &'life Task,
-    provider: &'life Arc<dyn ModelProvider>,
-    context: &'life Context,
-    ui_channel: &'life UiChannel,
-    decision: &'life RoutingDecision,
-}
-
-/// Parameters for task decomposition
-struct DecompositionParams<'life> {
-    task_id: TaskId,
-    subtasks: Vec<Subtask>,
-    ui_channel: &'life UiChannel,
-    model: String,
-    start: Instant,
 }
 
 impl AgentExecutor {
@@ -147,16 +128,12 @@ impl AgentExecutor {
         conv_history.push((role, content));
     }
 
-    /// Execute a task with streaming updates
+    /// Execute a task using the task list execution model
     ///
     /// # Errors
     ///
     /// Returns an error if routing, provider creation, execution, or validation fails
-    pub async fn execute_streaming(
-        &mut self,
-        task: Task,
-        ui_channel: UiChannel,
-    ) -> Result<TaskResult> {
+    pub async fn execute_task(&mut self, task: Task, ui_channel: UiChannel) -> Result<TaskResult> {
         let start = Instant::now();
         let task_id = task.id;
 
@@ -164,37 +141,82 @@ impl AgentExecutor {
         let decision = self.router.route(&task).await?;
         let provider = self.provider_registry.get_provider(decision.model)?;
 
-        // Build context and log
+        // Build context with tool signatures
         let context = self
             .build_context_and_log(&task, &ui_channel, task_id)
             .await?;
 
-        // Execute with streaming
-        let response = self
-            .execute_task_with_provider(ExecutionParams {
-                task_id,
-                task: &task,
-                provider: &provider,
-                context: &context,
-                ui_channel: &ui_channel,
-                decision: &decision,
-            })
-            .await?;
-
-        // Validate response
-        let validation = self.validate_response(&response, &task).await?;
+        // Execute agent - returns String | TaskList
+        let agent_response = StepExecutor::execute_with_agent(
+            &task.description,
+            &context,
+            &provider,
+            &self.tool_registry,
+            task_id,
+            &ui_channel,
+        )
+        .await?;
 
         let duration_ms = start.elapsed().as_millis() as u64;
 
-        Ok(TaskResult {
-            task_id,
-            response,
-            tier_used: decision.model.to_string(),
-            tokens_used: TokenUsage::default(),
-            validation,
-            duration_ms,
-            work_unit: None,
-        })
+        // Handle response type
+        match agent_response {
+            AgentResponse::DirectResult(result) => {
+                // Simple string response - create TaskResult
+                let response = Response {
+                    text: result,
+                    confidence: 1.0,
+                    tokens_used: TokenUsage::default(),
+                    provider: decision.model.to_string(),
+                    latency_ms: duration_ms,
+                };
+
+                let validation = self.validate_response(&response, &task).await?;
+
+                Ok(TaskResult {
+                    task_id,
+                    response,
+                    tier_used: decision.model.to_string(),
+                    tokens_used: TokenUsage::default(),
+                    validation,
+                    duration_ms,
+                    work_unit: None,
+                })
+            }
+            AgentResponse::TaskList(task_list) => {
+                // Execute task list with StepExecutor
+                let step_result = StepExecutor::execute_task_list(
+                    &task_list,
+                    &context,
+                    &provider,
+                    &self.tool_registry,
+                    task_id,
+                    &ui_channel,
+                    0, // recursion_depth
+                )
+                .await?;
+
+                let response = Response {
+                    text: step_result.text,
+                    confidence: 1.0,
+                    tokens_used: TokenUsage::default(),
+                    provider: decision.model.to_string(),
+                    latency_ms: step_result.duration_ms,
+                };
+
+                let validation = self.validate_response(&response, &task).await?;
+
+                Ok(TaskResult {
+                    task_id,
+                    response,
+                    tier_used: decision.model.to_string(),
+                    tokens_used: TokenUsage::default(),
+                    validation,
+                    duration_ms: step_result.duration_ms,
+                    work_unit: None,
+                })
+            }
+        }
     }
 
     /// Build context and log
@@ -238,37 +260,6 @@ impl AgentExecutor {
         Ok(context)
     }
 
-    /// Execute task with provider and stream results
-    ///
-    /// # Errors
-    /// Returns an error if task execution fails
-    async fn execute_task_with_provider(&self, params: ExecutionParams<'_>) -> Result<Response> {
-        params.ui_channel.send(UiEvent::TaskStepStarted {
-            task_id: params.task_id,
-            step_id: "model_execution".to_owned(),
-            step_type: "tool_call".to_owned(),
-            content: format!("Executing with {}", params.decision.model),
-        });
-
-        let query = Query::new(params.task.description.clone());
-        let response = execute_with_streaming(StreamingParams {
-            provider: params.provider,
-            query: &query,
-            context: params.context,
-            tool_registry: &self.tool_registry,
-            task_id: params.task_id,
-            ui_channel: params.ui_channel,
-        })
-        .await?;
-
-        params.ui_channel.send(UiEvent::TaskStepCompleted {
-            task_id: params.task_id,
-            step_id: "model_execution".to_owned(),
-        });
-
-        Ok(response)
-    }
-
     /// Validate response and log failures
     ///
     /// # Errors
@@ -289,202 +280,5 @@ impl AgentExecutor {
                 );
                 validation_error
             })
-    }
-
-    /// Handle task decomposition action
-    ///
-    /// # Errors
-    /// Returns an error if subtask execution fails
-    async fn handle_decomposition(
-        &mut self,
-        params: DecompositionParams<'_>,
-    ) -> Result<TaskResult> {
-        let subtask_results = self
-            .execute_subtasks_sequentially(params.task_id, params.subtasks, params.ui_channel)
-            .await?;
-
-        let combined_response = subtask_results
-            .iter()
-            .map(|result| result.response.text.as_str())
-            .collect::<Vec<_>>()
-            .join("\n\n");
-
-        let duration_ms = params.start.elapsed().as_millis() as u64;
-
-        Ok(TaskResult {
-            task_id: params.task_id,
-            response: Response {
-                text: combined_response,
-                confidence: 1.0,
-                tokens_used: TokenUsage::default(),
-                provider: params.model,
-                latency_ms: duration_ms,
-            },
-            tier_used: "decomposed".to_owned(),
-            tokens_used: TokenUsage::default(),
-            validation: ValidationResult::default(),
-            duration_ms,
-            work_unit: None,
-        })
-    }
-
-    /// Handle context gathering action
-    fn handle_context_gathering(
-        task_id: TaskId,
-        needs: &[String],
-        ui_channel: &UiChannel,
-        exec_context: &mut ExecutionContext,
-    ) {
-        ui_channel.send(UiEvent::TaskProgress {
-            task_id,
-            progress: TaskProgress {
-                stage: "Gathering Context".to_owned(),
-                current: 0,
-                total: Some(needs.len() as u64),
-                message: format!("Fetching: {}", needs.join(", ")),
-            },
-        });
-
-        ui_channel.send(UiEvent::TaskOutput {
-            task_id,
-            output: format!("Gathering context: {}", needs.join(", ")),
-        });
-
-        SelfDeterminingExecutor::gather_context(exec_context, needs);
-    }
-
-    /// Execute subtasks sequentially with progress tracking
-    ///
-    /// # Errors
-    /// Returns an error if any subtask execution fails
-    async fn execute_subtasks_sequentially(
-        &mut self,
-        task_id: TaskId,
-        subtasks: Vec<Subtask>,
-        ui_channel: &UiChannel,
-    ) -> Result<Vec<TaskResult>> {
-        let mut subtask_results = Vec::new();
-        let total_subtasks = subtasks.len();
-
-        ui_channel.send(UiEvent::TaskProgress {
-            task_id,
-            progress: TaskProgress {
-                stage: "Decomposing".to_owned(),
-                current: 0,
-                total: Some(subtasks.len() as u64),
-                message: format!("Breaking into {} subtasks", subtasks.len()),
-            },
-        });
-
-        for (index, subtask_spec) in subtasks.into_iter().enumerate() {
-            let subtask = Task::new(subtask_spec.description.clone())
-                .with_difficulty(subtask_spec.difficulty);
-
-            ui_channel.send(UiEvent::TaskProgress {
-                task_id,
-                progress: TaskProgress {
-                    stage: "Executing".to_owned(),
-                    current: index as u64,
-                    total: Some(total_subtasks as u64),
-                    message: format!("Subtask {}/{}", index + 1, total_subtasks),
-                },
-            });
-
-            let result = self
-                .execute_self_determining(subtask, ui_channel.clone())
-                .await?;
-            subtask_results.push(result);
-        }
-
-        Ok(subtask_results)
-    }
-
-    /// Execute a task with self-determination (Phase 5.1)
-    /// The task assesses itself and decides whether to complete, decompose, or gather context
-    ///
-    /// # Errors
-    ///
-    /// Returns an error if routing, provider creation, execution, or validation fails
-    pub fn execute_self_determining(
-        &mut self,
-        mut task: Task,
-        ui_channel: UiChannel,
-    ) -> BoxedTaskFuture<'_> {
-        Box::pin(async move {
-            let task_id = task.id;
-            let start = Instant::now();
-            let mut exec_context = ExecutionContext::new(task.description.clone());
-
-            // Check if this is a simple request that doesn't need assessment
-            let is_simple = QueryIntent::is_simple(&task.description);
-
-            if is_simple {
-                // Skip assessment for simple requests, execute directly
-                task.state = TaskState::Executing;
-                return self.execute_streaming(task, ui_channel).await;
-            }
-
-            // Self-determination loop
-            loop {
-                // Update task state
-                task.state = TaskState::Assessing;
-
-                // Route and get provider
-                let decision_result = self.router.route(&task).await?;
-                let provider = self.provider_registry.get_provider(decision_result.model)?;
-
-                // Assess the task
-                let Ok(decision) = SelfDeterminingExecutor::assess_task_with_provider(
-                    &provider,
-                    &task,
-                    &ui_channel,
-                    task_id,
-                )
-                .await
-                else {
-                    // Fallback to streaming execution if assessment fails
-                    task.state = TaskState::Executing;
-                    return self.execute_streaming(task, ui_channel).await;
-                };
-
-                // Record decision
-                task.decision_history.push(decision.clone());
-
-                // Execute based on decision
-                match decision.action {
-                    TaskAction::Complete { result } => {
-                        let duration_ms = start.elapsed().as_millis() as u64;
-                        return Ok(SelfDeterminingExecutor::create_completion_result(
-                            task_id,
-                            result,
-                            decision_result.model.to_string(),
-                            duration_ms,
-                        ));
-                    }
-
-                    TaskAction::Decompose { subtasks, .. } => {
-                        return self
-                            .handle_decomposition(DecompositionParams {
-                                task_id,
-                                subtasks,
-                                ui_channel: &ui_channel,
-                                model: decision_result.model.to_string(),
-                                start,
-                            })
-                            .await;
-                    }
-
-                    TaskAction::GatherContext { needs } => {
-                        Self::handle_context_gathering(
-                            task_id,
-                            &needs,
-                            &ui_channel,
-                            &mut exec_context,
-                        );
-                        // Continue loop to re-assess with new context
-                    }
-                }
-            }
-        })
     }
 }

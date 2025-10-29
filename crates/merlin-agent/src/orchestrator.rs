@@ -251,9 +251,10 @@ impl RoutingOrchestrator {
         self.setup_conversation_history(&mut executor, params.conversation_history)
             .await;
 
-        // Execute the task and get the response
+        // Use self-determining execution which includes assessment step
+        // For simple tasks, this will skip assessment and execute directly
         let result = executor
-            .execute_streaming(params.task.clone(), params.ui_channel.clone())
+            .execute_task(params.task.clone(), params.ui_channel.clone())
             .await?;
 
         Ok(result)

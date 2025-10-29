@@ -209,10 +209,7 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true,
-      "validation_passed": true
-    },
+    "execution": {},
     "files": [
       {
         "path": "shared.rs",

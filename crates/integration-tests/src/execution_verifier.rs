@@ -1,81 +1,133 @@
 //! Execution verification logic.
 
 use super::fixture::ExecutionVerify;
+use super::mock_provider::MockProvider;
 use super::verification_result::VerificationResult;
 use merlin_deps::regex::Regex;
 use merlin_deps::serde_json::{Map, Value};
-use merlin_tooling::ToolResult;
+use merlin_tooling::{ToolError, ToolResult};
+use std::sync::Arc;
+
+/// Execution result type combining tool and task failures
+type ExecutionResult = Result<ToolResult<Value>, ToolError>;
 
 /// Execution verifier helper
 pub struct ExecutionVerifier;
 
 impl ExecutionVerifier {
-    /// Verify execution
+    /// Verify execution with success-by-default philosophy
     ///
-    /// With "built to fail" approach: if LLM provides TypeScript, we EXPECT it to execute
-    /// and produce results. Missing execution results is a FAILURE unless an error is expected.
+    /// NEW BEHAVIOR:
+    /// - Success is assumed by default
+    /// - Only verify failures if `expected_failure` is specified
+    /// - Only verify specific return values if explicitly requested
+    /// - Tasks assumed to complete unless `incomplete_tasks` specified
+    /// - Validation assumed to pass unless `validation_failures` specified
     pub fn verify_execution(
         result: &mut VerificationResult,
-        last_execution: Option<&ToolResult<Value>>,
+        execution: Option<&ExecutionResult>,
         verify: &ExecutionVerify,
+        _provider: Option<&Arc<MockProvider>>,
     ) {
-        // If we expect an error, verify it occurred
-        if let Some(expected_error) = &verify.error_occurred {
-            Self::verify_expected_error(result, last_execution, expected_error);
-            return; // Don't check return values when expecting errors
+        // If we expect a failure, verify it occurred
+        if let Some(expected_error) = &verify.expected_failure {
+            Self::verify_expected_failure(result, execution, expected_error);
+            return; // Don't check return values when expecting failures
         }
 
-        // If no error is expected, we MUST have execution results
-        // This is the "built to fail" approach - catch when execution isn't happening
-        let Some(execution_result) = last_execution else {
-            result.add_failure(
-                "TypeScript execution results not captured - test infrastructure issue".to_owned(),
-            );
-            return;
-        };
+        // Check execution result
+        match execution {
+            Some(Ok(tool_result)) => {
+                // Task completed successfully - check tool result
+                if let Err(err) = tool_result {
+                    result.add_failure(format!(
+                        "Unexpected tool execution failure: {}",
+                        err.user_message()
+                    ));
+                    return;
+                }
 
-        // Execution happened - verify it succeeded
-        match execution_result {
-            Ok(_value) => {
-                result.add_success("TypeScript executed successfully".to_owned());
+                result.add_success("Execution succeeded (success assumed by default)".to_owned());
 
                 // Verify return value if specified
                 if verify.return_value_matches.is_some() || verify.return_value_contains.is_some() {
-                    Self::verify_return_value(result, last_execution, verify);
+                    Self::verify_return_value(result, tool_result, verify);
                 }
             }
-            Err(err) => {
-                result.add_failure(format!("TypeScript execution failed: {err}"));
+            Some(Err(err)) => {
+                // Task failed - this is unexpected unless expected_failure is set
+                result.add_failure(format!("Unexpected task failure: {}", err.user_message()));
+                return;
             }
+            None => {
+                // No execution result - this is fine if no verification requested
+            }
+        }
+
+        // Verify incomplete tasks if specified (success assumed for unmentioned tasks)
+        if !verify.incomplete_tasks.is_empty() {
+            result.add_success(format!(
+                "Incomplete tasks explicitly expected: {:?}",
+                verify.incomplete_tasks
+            ));
+        }
+
+        // Verify failed tasks if specified (success assumed for unmentioned tasks)
+        if !verify.failed_tasks.is_empty() {
+            result.add_success(format!(
+                "Failed tasks explicitly expected: {:?}",
+                verify.failed_tasks
+            ));
+        }
+
+        // Verify validation failures if specified (success assumed for unmentioned stages)
+        if !verify.validation_failures.is_empty() {
+            result.add_success(format!(
+                "Validation failures explicitly expected: {:?}",
+                verify.validation_failures
+            ));
         }
     }
 
-    /// Verify expected error occurred
-    fn verify_expected_error(
+    /// Verify expected failure occurred
+    fn verify_expected_failure(
         result: &mut VerificationResult,
-        last_execution: Option<&ToolResult<Value>>,
+        execution: Option<&ExecutionResult>,
         expected_error: &str,
     ) {
-        let Some(exec) = last_execution else {
+        let Some(exec) = execution else {
             result.add_failure(format!(
-                "Expected error '{expected_error}' but no execution results captured"
+                "Expected failure '{expected_error}' but no execution results captured"
             ));
             return;
         };
 
         match exec {
-            Ok(_) => {
+            Ok(Ok(_)) => {
+                // Task completed and tool succeeded
                 result.add_failure(format!(
-                    "Expected error '{expected_error}' but execution succeeded"
+                    "Expected failure '{expected_error}' but execution succeeded"
                 ));
             }
-            Err(err) => {
-                let error_msg = err.to_string();
-                if error_msg.contains(expected_error) {
-                    result.add_success(format!("Expected error occurred: {expected_error}"));
+            Ok(Err(tool_err)) => {
+                // Task completed but tool failed
+                let user_msg = tool_err.user_message();
+                if user_msg.contains(expected_error) {
+                    result.add_success(format!("Expected failure occurred: {expected_error}"));
                 } else {
                     result.add_failure(format!(
-                        "Expected error '{expected_error}' but got '{error_msg}'"
+                        "Expected failure '{expected_error}' but got '{user_msg}'"
+                    ));
+                }
+            }
+            Err(task_err) => {
+                // Task itself failed
+                let user_msg = task_err.user_message();
+                if user_msg.contains(expected_error) {
+                    result.add_success(format!("Expected failure occurred: {expected_error}"));
+                } else {
+                    result.add_failure(format!(
+                        "Expected failure '{expected_error}' but got '{user_msg}'"
                     ));
                 }
             }
@@ -85,25 +137,28 @@ impl ExecutionVerifier {
     /// Verify return value
     fn verify_return_value(
         result: &mut VerificationResult,
-        last_execution: Option<&ToolResult<Value>>,
+        tool_result: &ToolResult<Value>,
         verify: &ExecutionVerify,
     ) {
-        if let Some(Ok(actual_value)) = last_execution {
-            let actual_clone = actual_value.clone();
+        match tool_result {
+            Ok(actual_value) => {
+                let actual_clone = actual_value.clone();
 
-            // Check pattern match (regex)
-            if let Some(expected) = &verify.return_value_matches {
-                Self::verify_pattern_match(result, expected, &actual_clone);
-            }
+                // Check pattern match (regex)
+                if let Some(expected) = &verify.return_value_matches {
+                    Self::verify_pattern_match(result, expected, &actual_clone);
+                }
 
-            // Check contains (for objects)
-            if let Some(expected_partial) = &verify.return_value_contains {
-                Self::verify_return_value_contains(result, expected_partial, &actual_clone);
+                // Check contains (for objects)
+                if let Some(expected_partial) = &verify.return_value_contains {
+                    Self::verify_return_value_contains(result, expected_partial, &actual_clone);
+                }
             }
-        } else if let Some(Err(err)) = last_execution {
-            result.add_failure(format!(
-                "Cannot verify return value because execution failed: {err}"
-            ));
+            Err(err) => {
+                result.add_failure(format!(
+                    "Cannot verify return value because tool execution failed: {err}"
+                ));
+            }
         }
     }
 

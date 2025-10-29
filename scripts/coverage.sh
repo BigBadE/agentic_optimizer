@@ -6,7 +6,7 @@ set -euo pipefail
 #   ./scripts/coverage.sh [--fixture]
 #
 # Flags:
-#   --fixture   Run only fixture tests with coverage, other tests normally
+#   --fixture   Generate coverage only for fixture tests
 #
 # Environment variables:
 #   MERLIN_CI   Set to skip clean step in CI environments
@@ -30,32 +30,29 @@ done
 
 # Run workspace tests with coverage (excluding expensive crates)
 echo "[coverage] Running tests with coverage instrumentation..."
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 
 # Respect CARGO_TARGET_DIR if set externally, otherwise use default
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
 TARGET_DIR="${CARGO_TARGET_DIR:-${ROOT_DIR}/target}"
-export MERLIN_FOLDER="${TARGET_DIR}/.merlin"
-mkdir -p benchmarks/data/coverage
-
 LLVM_COV_DIR="${TARGET_DIR}/llvm-cov-target"
-# Clean any existing prof files and temp directories for a clean build
-rm -f "${LLVM_COV_DIR}"/*.profdata 2>/dev/null
-rm -f "${LLVM_COV_DIR}"/*.profraw 2>/dev/null
-rm -rf "${LLVM_COV_DIR}"/temp_lcov_* 2>/dev/null
-
-# Run coverage on all workspace crates
-# Excludes benchmark crates and test repositories from instrumentation
-# Set cargo profile with default
 CARGO_PROFILE="${CARGO_PROFILE:-dev}"
 
-if [ "$FIXTURE_ONLY" = true ]; then
-  echo "[coverage] Running fixture tests with coverage, other tests normally..."
+# Clean any existing prof files and temp directories for a clean build
+rm -rf benchmarks/data/coverage 2>/dev/null
+rm -f "${LLVM_COV_DIR}"/*.prof* 2>/dev/null
+rm -f "${LLVM_COV_DIR}"/*-profraw-list 2>/dev/null
+rm -rf "${LLVM_COV_DIR}"/temp_lcov_* 2>/dev/null
+mkdir -p benchmarks/data/coverage
 
-  # First run fixture tests with coverage
-  echo "[coverage] Running fixture tests with coverage instrumentation..."
+if [ "$FIXTURE_ONLY" = true ]; then
+  echo "[coverage] Generating coverage for fixture tests only..."
+
+  # Run fixture tests with coverage and generate lcov directly
   LLVM_PROFILE_FILE_NAME="merlin-%m.profraw" \
   cargo llvm-cov \
-    --no-report \
+    --no-clean \
+    --lcov \
+    --output-path benchmarks/data/coverage/latest_fixtures_only.info \
     --ignore-filename-regex "test_repositories|.cargo|.rustup" \
     --all-features \
     --package integration-tests \
@@ -64,24 +61,19 @@ if [ "$FIXTURE_ONLY" = true ]; then
     --cargo-profile "${CARGO_PROFILE}" \
     nextest
 
-  COV_EXIT=$?
-  echo "[coverage] Fixture tests completed with exit code: $COV_EXIT"
+  echo "[coverage] Fixture test coverage completed with exit code: $?"
+  echo "[coverage] Generating HTML report..."
+  grcov benchmarks/data/coverage/latest_fixtures_only.info \
+    -s "${ROOT_DIR}" \
+    -t html \
+    -o benchmarks/data/coverage/html\
 
-  # Then run all other tests normally (without coverage)
-  echo "[coverage] Running non-fixture tests without coverage..."
-  cargo nextest run \
-    --workspace \
-    --exclude integration-tests \
-    --run-ignored all
+  # Delete the prof files that cargo llvm-cov creates
+  rm -f "${LLVM_COV_DIR}/"*.profraw 2>/dev/null
+  rm -f "${LLVM_COV_DIR}/"*-profraw-list 2>/dev/null
 
-  NORMAL_EXIT=$?
-  echo "[coverage] Non-fixture tests completed with exit code: $NORMAL_EXIT"
-
-  # Exit with failure if either failed
-  if [ $COV_EXIT -ne 0 ] || [ $NORMAL_EXIT -ne 0 ]; then
-    echo "[coverage] Tests failed (cov: $COV_EXIT, normal: $NORMAL_EXIT)"
-    exit 1
-  fi
+  echo "[coverage] Coverage report generated at benchmarks/data/coverage/html/index.html"
+  exit 0
 else
   echo "[coverage] Running all tests with coverage instrumentation..."
   LLVM_PROFILE_FILE_NAME="merlin-%m.profraw" \
@@ -101,7 +93,7 @@ else
   echo "[coverage] Nextest completed with exit code: $?"
 fi
 
-# Check profraw files and disk usage
+# Check profraw files and disk usage for full coverage mode
 PROFRAW_COUNT=$(find "${LLVM_COV_DIR}" -name "*.profraw" 2>/dev/null | wc -l || echo "0")
 PROFRAW_SIZE=$(find "${LLVM_COV_DIR}" -name "*.profraw" -exec du -ch {} + 2>/dev/null | tail -1 | awk '{print $1}' || echo "unknown")
 LLVM_COV_SIZE=$(du -sh "${LLVM_COV_DIR}" 2>/dev/null | awk '{print $1}' || echo "unknown")
@@ -122,8 +114,8 @@ PROFDATA_SIZE=$(du -sh "${PROFDATA_FILE}" 2>/dev/null | awk '{print $1}' || echo
 echo "[coverage] Profraw files merged in ${MERGE_TIME}s (profdata size: ${PROFDATA_SIZE})"
 
 # Delete the prof files that cargo llvm-cov creates
-rm -f "${LLVM_COV_DIR}/*.profraw" 2>/dev/null
-rm -f "${LLVM_COV_DIR}/${PROJECT_NAME}-profraw-list" 2>/dev/null
+rm -f "${LLVM_COV_DIR}"/*.profraw 2>/dev/null
+rm -f "${LLVM_COV_DIR}"/*-profraw-list 2>/dev/null
 
 # Generate coverage reports using llvm-cov in parallel
 echo "[coverage] Generating coverage reports..."

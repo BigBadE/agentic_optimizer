@@ -63,6 +63,11 @@ cargo clippy --no-deps --lib --tests --all-features -- -D warnings
 # Delegate to coverage.sh if --cov is passed (skip normal tests)
 if [ "$RUN_COVERAGE" = true ]; then
   if [ "$FIXTURE_ONLY" = true ]; then
+    # Run all tests first to ensure everything passes
+    echo "[verify] Running all tests..."
+    cargo nextest run --run-ignored all
+
+    # Then generate coverage for fixtures only
     exec "$(dirname "${BASH_SOURCE[0]}")/coverage.sh" --fixture
   else
     exec "$(dirname "${BASH_SOURCE[0]}")/coverage.sh"
@@ -72,7 +77,6 @@ fi
 # Run full workspace tests
 echo "[verify] Running tests..."
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
-export MERLIN_FOLDER="${ROOT_DIR}/target/.merlin"
 
 # Run main tests
 cargo nextest run --run-ignored all

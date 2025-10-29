@@ -101,6 +101,10 @@ Tests instantiate the actual `TuiApp` from `merlin-cli` with:
   - Only provides crossterm events for the current fixture event
   - Prevents event queue drainage issues by controlling event availability
 - Read-only access to TUI state for verification (via `test-util` feature)
+- **Automatic cleanup**: Thread and task files are cleaned up after each test completes
+  - Threads stored in `workspace/.merlin/threads/`
+  - Tasks stored in `workspace/.merlin/tasks/`
+  - Both directories removed after test execution
 
 **No duplicate behavior**: The test runner does not re-implement any CLI logic.
 

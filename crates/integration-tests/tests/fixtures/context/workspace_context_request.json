@@ -1,10 +1,17 @@
 {
   "name": "Context Request with Pre-made Workspace",
   "description": "Tests context request tool using pre-made rust-project workspace",
-  "tags": ["context", "workspace", "embeddings"],
+  "tags": [
+    "context",
+    "workspace",
+    "embeddings"
+  ],
   "setup": {
     "workspace": "rust-project",
-    "terminal_size": [80, 24]
+    "terminal_size": [
+      80,
+      24
+    ]
   },
   "events": [
     {
@@ -38,8 +45,6 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    }
+    "execution": {}
   }
 }

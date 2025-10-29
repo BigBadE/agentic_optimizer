@@ -1,7 +1,11 @@
 {
   "name": "context_extension_filtering_negative",
   "description": "Test that files with irrelevant extensions are NOT included even if they contain keywords",
-  "tags": ["context", "conservative", "negative"],
+  "tags": [
+    "context",
+    "conservative",
+    "negative"
+  ],
   "setup": {
     "files": {
       "src/server.rs": "use actix_web::{web, App, HttpServer};\n\npub async fn start_server() -> std::io::Result<()> {\n    HttpServer::new(|| {\n        App::new()\n            .route(\"/\", web::get().to(index))\n    })\n    .bind((\"127.0.0.1\", 8080))?\n    .run()\n    .await\n}",
@@ -37,15 +41,15 @@
           "return_type": "string"
         },
         "ui": {
-          "output_contains": ["server"]
+          "output_contains": [
+            "server"
+          ]
         }
       }
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

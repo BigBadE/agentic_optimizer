@@ -1,7 +1,11 @@
 {
   "name": "vector_search_basic",
   "description": "Test basic vector search functionality with semantic similarity",
-  "tags": ["context", "vector_search", "semantic"],
+  "tags": [
+    "context",
+    "vector_search",
+    "semantic"
+  ],
   "setup": {
     "files": {
       "src/database.rs": "pub struct Database {\n    connection: Connection,\n}\n\nimpl Database {\n    pub fn connect(url: &str) -> Result<Self> {\n        let connection = Connection::new(url)?;\n        Ok(Self { connection })\n    }\n    \n    pub fn query(&self, sql: &str) -> Result<Vec<Row>> {\n        self.connection.execute(sql)\n    }\n}",
@@ -35,15 +39,15 @@
           "return_type": "string"
         },
         "ui": {
-          "output_contains": ["database"]
+          "output_contains": [
+            "database"
+          ]
         }
       }
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

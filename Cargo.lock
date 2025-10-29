@@ -1978,6 +1978,7 @@ dependencies = [
  "merlin-local",
  "merlin-providers",
  "merlin-routing",
+ "merlin-tooling",
  "pico-args",
  "predicates",
  "serde",
@@ -2002,6 +2003,7 @@ version = "0.1.0"
 dependencies = [
  "async-trait",
  "merlin-deps",
+ "merlin-tooling",
  "serde",
  "thiserror",
  "tokio",

@@ -25,8 +25,8 @@
           "tasks_displayed": 0,
           "focused_pane": "input",
           "rendered_buffer_contains": [
-            "─── Input",
-            "─── Tasks"
+            "\u2500\u2500\u2500 Input",
+            "\u2500\u2500\u2500 Tasks"
           ]
         }
       }
@@ -36,8 +36,8 @@
     "ui": {
       "tasks_displayed": 0,
       "rendered_buffer_contains": [
-        "─── Input",
-        "─── Tasks"
+        "\u2500\u2500\u2500 Input",
+        "\u2500\u2500\u2500 Tasks"
       ]
     }
   }

@@ -62,6 +62,9 @@ pub enum TestEvent {
 /// User input event
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct UserInputEvent {
+    /// Optional event ID for explicit tracking and verification
+    #[serde(default)]
+    pub id: Option<String>,
     /// Event data
     pub data: UserInputData,
     /// Optional verification
@@ -83,6 +86,9 @@ pub struct UserInputData {
 /// Key press event
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct KeyPressEvent {
+    /// Optional event ID for explicit tracking and verification
+    #[serde(default)]
+    pub id: Option<String>,
     /// Event data
     pub data: KeyPressData,
     /// Optional verification
@@ -101,6 +107,9 @@ pub struct KeyPressData {
 /// LLM response event
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct LlmResponseEvent {
+    /// Optional event ID for explicit tracking and verification
+    #[serde(default)]
+    pub id: Option<String>,
     /// Trigger configuration
     pub trigger: TriggerConfig,
     /// Response configuration
@@ -108,6 +117,9 @@ pub struct LlmResponseEvent {
     /// Optional verification
     #[serde(default)]
     pub verify: VerifyConfig,
+    /// Capture the prompt sent to the LLM (for verification)
+    #[serde(skip)]
+    pub captured_prompt: Option<String>,
 }
 
 /// Trigger configuration
@@ -169,25 +181,34 @@ pub struct VerifyConfig {
     pub ui: Option<UiVerify>,
     /// State verification
     pub state: Option<StateVerify>,
+    /// Prompt verification
+    pub prompt: Option<PromptVerify>,
 }
 
 /// Execution verification
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
 pub struct ExecutionVerify {
+    /// Execution ID to verify (defaults to current event's ID)
+    pub execution_id: Option<String>,
     /// Return type
     pub return_type: Option<String>,
     /// Return value matches exactly (for arrays and primitives)
     pub return_value_matches: Option<Value>,
     /// Return value contains these key-value pairs (for objects)
     pub return_value_contains: Option<Value>,
-    /// Error occurred (error message substring expected)
+    /// Expected failure message (if test expects execution to fail)
     #[serde(default)]
-    pub error_occurred: Option<String>,
-    /// All tasks completed
-    pub all_tasks_completed: Option<bool>,
-    /// Validation passed
-    pub validation_passed: Option<bool>,
+    pub expected_failure: Option<String>,
+    /// Specific tasks that should have failed (success assumed for all others)
+    #[serde(default)]
+    pub failed_tasks: Vec<String>,
+    /// Specific tasks that should be incomplete (success assumed for all others)
+    #[serde(default)]
+    pub incomplete_tasks: Vec<String>,
+    /// Validation stages that should have failed (success assumed for all others)
+    #[serde(default)]
+    pub validation_failures: Vec<String>,
 }
 
 /// File verification
@@ -305,6 +326,27 @@ pub struct StateVerify {
     pub vector_cache_status: Option<String>,
 }
 
+/// Prompt verification
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct PromptVerify {
+    /// Prompt file name (e.g., `task_assessment`, `typescript_agent`)
+    /// Will check that the captured prompt matches the header from `prompts/{prompt_file}.md`
+    pub prompt_file: Option<String>,
+    /// Patterns that should be in the prompt
+    #[serde(default)]
+    pub contains: Vec<String>,
+    /// Patterns that should NOT be in the prompt
+    #[serde(default)]
+    pub not_contains: Vec<String>,
+    /// Tool signatures that should be present
+    #[serde(default)]
+    pub has_tool_signatures: Vec<String>,
+    /// Type definitions that should be present
+    #[serde(default)]
+    pub has_type_definitions: Vec<String>,
+}
+
 /// Final verification
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -344,6 +386,17 @@ impl TestEvent {
         }
     }
 
+    /// Get event ID if present
+    #[must_use]
+    pub fn id(&self) -> Option<&str> {
+        match self {
+            Self::UserInput(event) => event.id.as_deref(),
+            Self::KeyPress(event) => event.id.as_deref(),
+            Self::LlmResponse(event) => event.id.as_deref(),
+            Self::Wait(_) => None,
+        }
+    }
+
     /// Get verification config
     #[must_use]
     pub fn verify_config(&self) -> &VerifyConfig {
@@ -353,6 +406,7 @@ impl TestEvent {
             files: None,
             ui: None,
             state: None,
+            prompt: None,
         };
 
         match self {

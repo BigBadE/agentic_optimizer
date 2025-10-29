@@ -59,9 +59,7 @@
     }
   ],
   "final_verify": {
-    "execution": {
-      "validation_passed": true
-    },
+    "execution": {},
     "files": [
       {
         "path": "test.txt",

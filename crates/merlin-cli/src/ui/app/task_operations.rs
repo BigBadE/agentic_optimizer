@@ -45,6 +45,7 @@ impl<B: Backend> TuiApp<B> {
     }
 
     /// Gets the selected task ID
+    #[cfg(any(test, feature = "test-util"))]
     pub fn get_selected_task_id(&self) -> Option<TaskId> {
         self.state.active_task_id
     }

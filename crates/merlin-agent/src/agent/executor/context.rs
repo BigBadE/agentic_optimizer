@@ -10,8 +10,6 @@ use std::mem::replace;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
-use super::query_intent::QueryIntent;
-
 /// Type alias for conversation history
 pub type ConversationHistory = Vec<(String, String)>;
 
@@ -41,16 +39,10 @@ impl ContextBuilder {
     /// # Errors
     /// Returns an error if context building fails
     pub async fn build_context(&self, task: &Task, ui_channel: &UiChannel) -> Result<Context> {
-        let intent = QueryIntent::classify(&task.description);
         let query = Query::new(task.description.clone());
         let task_id = task.id;
 
-        // For conversational queries, return empty context (prompt added later)
-        if intent == QueryIntent::Conversational {
-            return Ok(Context::new(String::new()));
-        }
-
-        // For code queries, fetch file context as normal
+        // Always fetch file context (self-assessor will handle simple tasks)
         let ui_clone = ui_channel.clone();
 
         let progress_callback = Arc::new(move |stage: &str, current: u64, total: Option<u64>| {
@@ -120,28 +112,22 @@ impl ContextBuilder {
     ) -> Result<Context> {
         use merlin_core::prompts::load_prompt;
 
+        const TOOL_SIGNATURES_PLACEHOLDER: &str = "{tool_signatures}";
+
         // Load TypeScript agent prompt template
         let prompt_template = load_prompt("typescript_agent").map_err(|err| {
             RoutingError::Other(format!("Failed to load typescript_agent prompt: {err}"))
         })?;
 
         // Replace placeholder with actual signatures
-        let system_prompt = prompt_template.replace("{TOOL_SIGNATURES}", tool_signatures);
+        let system_prompt = prompt_template.replace(TOOL_SIGNATURES_PLACEHOLDER, tool_signatures);
 
-        // Build base context (may include file context if relevant)
-        let intent = QueryIntent::classify(&task.description);
+        // Always get file context (self-assessor handles simple tasks before we get here)
+        let base_context = self.build_context(task, ui_channel).await?;
 
-        let mut context = if intent == QueryIntent::Conversational {
-            Context::new(system_prompt)
-        } else {
-            // Get file context if needed
-            let base_context = self.build_context(task, ui_channel).await?;
-
-            // Combine TypeScript prompt with file context
-            let mut combined = Context::new(system_prompt);
-            combined.files = base_context.files;
-            combined
-        };
+        // Combine TypeScript prompt with file context
+        let mut context = Context::new(system_prompt);
+        context.files = base_context.files;
 
         // Add conversation history if present
         let conv_history = self.conversation_history.lock().await;

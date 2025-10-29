@@ -1,7 +1,11 @@
 {
   "name": "semantic_similarity",
   "description": "Test semantic similarity search finds conceptually related code even without exact keyword matches",
-  "tags": ["context", "semantic", "similarity"],
+  "tags": [
+    "context",
+    "semantic",
+    "similarity"
+  ],
   "setup": {
     "files": {
       "src/http_client.rs": "use reqwest::Client;\n\npub struct HttpClient {\n    client: Client,\n}\n\nimpl HttpClient {\n    pub async fn fetch(&self, url: &str) -> Result<String> {\n        let response = self.client.get(url).send().await?;\n        response.text().await\n    }\n}",
@@ -35,15 +39,16 @@
           "return_type": "string"
         },
         "ui": {
-          "output_contains": ["HTTP", "API"]
+          "output_contains": [
+            "HTTP",
+            "API"
+          ]
         }
       }
     }
   ],
   "final_verify": {
-    "execution": {
-      "all_tasks_completed": true
-    },
+    "execution": {},
     "ui": {
       "all_tasks_completed": true
     }

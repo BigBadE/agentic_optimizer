@@ -5,40 +5,81 @@
 
 use merlin_core::TaskResult;
 use merlin_deps::serde_json::Value;
-use merlin_tooling::ToolResult;
+use merlin_tooling::{ToolError, ToolResult};
+use std::collections::HashMap;
 
 /// Record of a single test execution
 pub struct ExecutionRecord {
+    /// Execution ID (from event ID, or generated)
+    execution_id: String,
     /// Test index (0-based, incremented for each submit)
     test_index: usize,
-    /// Execution result from TypeScript
-    result: ToolResult<Value>,
+    /// Execution result from TypeScript - Ok for success, Err for `TaskFailed`
+    result: Result<ToolResult<Value>, ToolError>,
     /// Captured output events
     outputs: Vec<String>,
-    /// Task result metadata
-    task_result: Box<TaskResult>,
+    /// Task result metadata (only present for successful completions)
+    task_result: Option<Box<TaskResult>>,
 }
 
 impl ExecutionRecord {
-    /// Create new execution record
+    /// Create new execution record from successful task completion
     #[must_use]
-    pub fn new(
+    pub fn success(
+        execution_id: String,
         test_index: usize,
         result: ToolResult<Value>,
         outputs: Vec<String>,
         task_result: Box<TaskResult>,
     ) -> Self {
         Self {
+            execution_id,
             test_index,
-            result,
+            result: Ok(result),
             outputs,
-            task_result,
+            task_result: Some(task_result),
         }
     }
 
+    /// Create new execution record from task failure
+    #[must_use]
+    pub fn failure(
+        execution_id: String,
+        test_index: usize,
+        error: ToolError,
+        outputs: Vec<String>,
+    ) -> Self {
+        Self {
+            execution_id,
+            test_index,
+            result: Err(error),
+            outputs,
+            task_result: None,
+        }
+    }
+
+    /// Get execution ID
+    #[must_use]
+    pub fn execution_id(&self) -> &str {
+        &self.execution_id
+    }
+
     /// Get execution result
-    pub fn result(&self) -> &ToolResult<Value> {
+    pub fn result(&self) -> &Result<ToolResult<Value>, ToolError> {
         &self.result
+    }
+
+    /// Get the execution result as a `ToolResult` for compatibility
+    ///
+    /// Converts task failures into `ToolError::ExecutionFailed`
+    ///
+    /// # Errors
+    /// Returns `ToolError` if the task failed or tool execution failed
+    pub fn as_tool_result(&self) -> ToolResult<&Value> {
+        match &self.result {
+            Ok(Ok(value)) => Ok(value),
+            Ok(Err(tool_err)) | Err(tool_err) => Err(tool_err.clone()),
+        }
     }
 
     /// Get captured outputs
@@ -47,10 +88,10 @@ impl ExecutionRecord {
         &self.outputs
     }
 
-    /// Get task result
+    /// Get task result (only available for successful completions)
     #[must_use]
-    pub fn task_result(&self) -> &TaskResult {
-        &self.task_result
+    pub fn task_result(&self) -> Option<&TaskResult> {
+        self.task_result.as_deref()
     }
 
     /// Get test index
@@ -64,6 +105,8 @@ impl ExecutionRecord {
 pub struct ExecutionResultTracker {
     /// All execution records in chronological order
     records: Vec<ExecutionRecord>,
+    /// ID-based lookup for executions
+    records_by_id: HashMap<String, usize>,
     /// Current test index (incremented after each submit)
     current_test_index: usize,
 }
@@ -74,20 +117,51 @@ impl ExecutionResultTracker {
     pub fn new() -> Self {
         Self {
             records: Vec::new(),
+            records_by_id: HashMap::new(),
             current_test_index: 0,
         }
     }
 
-    /// Add execution result for current test
-    pub fn add_result(
+    /// Add successful execution result for current test
+    pub fn add_success(
         &mut self,
+        execution_id: String,
         result: ToolResult<Value>,
         outputs: Vec<String>,
         task_result: Box<TaskResult>,
     ) {
-        let record = ExecutionRecord::new(self.current_test_index, result, outputs, task_result);
+        let record = ExecutionRecord::success(
+            execution_id.clone(),
+            self.current_test_index,
+            result,
+            outputs,
+            task_result,
+        );
+        let index = self.records.len();
+        self.records_by_id.insert(execution_id, index);
         self.records.push(record);
         self.current_test_index += 1;
+    }
+
+    /// Add failed execution result for current test
+    pub fn add_failure(&mut self, execution_id: String, error: ToolError, outputs: Vec<String>) {
+        let record = ExecutionRecord::failure(
+            execution_id.clone(),
+            self.current_test_index,
+            error,
+            outputs,
+        );
+        let index = self.records.len();
+        self.records_by_id.insert(execution_id, index);
+        self.records.push(record);
+        self.current_test_index += 1;
+    }
+
+    /// Get execution result by ID
+    #[must_use]
+    pub fn get_by_id(&self, execution_id: &str) -> Option<&ExecutionRecord> {
+        let &index = self.records_by_id.get(execution_id)?;
+        self.records.get(index)
     }
 
     /// Get the most recent execution result

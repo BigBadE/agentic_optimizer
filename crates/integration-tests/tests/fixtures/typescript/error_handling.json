@@ -61,7 +61,7 @@
       },
       "verify": {
         "execution": {
-          "error_occurred": "error"
+          "expected_failure": "SyntaxError: expected token '(', got '{' in method definition"
         }
       }
     },
@@ -90,7 +90,7 @@
       },
       "verify": {
         "execution": {
-          "error_occurred": "error"
+          "expected_failure": "SyntaxError: expected one of ',' or '}', got 'return' in object literal"
         }
       }
     },
@@ -116,7 +116,7 @@
       },
       "verify": {
         "execution": {
-          "error_occurred": "error"
+          "expected_failure": "ReferenceError: undefinedVariable is not defined"
         }
       }
     },
@@ -143,7 +143,7 @@
       },
       "verify": {
         "execution": {
-          "error_occurred": "error"
+          "expected_failure": "TypeError: cannot convert 'null' or 'undefined' to object"
         }
       }
     },
@@ -285,7 +285,7 @@
       },
       "verify": {
         "execution": {
-          "error_occurred": "error"
+          "expected_failure": "SyntaxError: key must be a string"
         }
       }
     },
@@ -338,7 +338,7 @@
       },
       "verify": {
         "execution": {
-          "error_occurred": "Promise rejected"
+          "expected_failure": "Promise rejected"
         }
       }
     },
@@ -415,16 +415,12 @@
           "}"
         ]
       },
-      "verify": {
-        "execution": {
-          "error_occurred": "error"
-        }
-      }
+      "verify": {}
     }
   ],
   "final_verify": {
     "execution": {
-      "validation_passed": true
+      "expected_failure": "unexpected token 'return', reserved word cannot be an identifier"
     }
   }
 }

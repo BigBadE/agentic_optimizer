@@ -173,16 +173,12 @@
           "return { done: true };"
         ]
       },
-      "verify": {
-        "execution": {
-          "error_occurred": "error"
-        }
-      }
+      "verify": {}
     }
   ],
   "final_verify": {
     "execution": {
-      "validation_passed": true
+      "expected_failure": "expected token '(', got '{' in method definition"
     }
   }
 }

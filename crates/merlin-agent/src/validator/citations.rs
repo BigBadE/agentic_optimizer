@@ -246,31 +246,48 @@ pub struct CitationStatistics {
 mod tests {
     use super::*;
 
+    /// Tests parsing a simple citation with file path and line number.
+    ///
+    /// # Panics
+    /// Panics if citation parsing fails or parsed values don't match expected values.
     #[test]
     fn test_parse_citation_simple() {
         let citation = Citation::parse("src/lib.rs:42");
-        assert!(citation.is_some());
+        assert!(citation.is_some(), "Citation should parse successfully");
 
-        let parsed = citation.expect("Citation should parse");
-        assert_eq!(parsed.file_path, PathBuf::from("src/lib.rs"));
-        assert_eq!(parsed.start_line, Some(42));
-        assert_eq!(parsed.end_line, None);
+        if let Some(parsed) = citation {
+            assert_eq!(parsed.file_path, PathBuf::from("src/lib.rs"));
+            assert_eq!(parsed.start_line, Some(42));
+            assert_eq!(parsed.end_line, None);
+        }
     }
 
+    /// Tests parsing a citation with a line range.
+    ///
+    /// # Panics
+    /// Panics if citation parsing fails or parsed values don't match expected values.
     #[test]
     fn test_parse_citation_range() {
         let citation = Citation::parse("crates/merlin-core/src/lib.rs:10-20");
-        assert!(citation.is_some());
-
-        let parsed = citation.expect("Citation should parse");
-        assert_eq!(
-            parsed.file_path,
-            PathBuf::from("crates/merlin-core/src/lib.rs")
+        assert!(
+            citation.is_some(),
+            "Citation with range should parse successfully"
         );
-        assert_eq!(parsed.start_line, Some(10));
-        assert_eq!(parsed.end_line, Some(20));
+
+        if let Some(parsed) = citation {
+            assert_eq!(
+                parsed.file_path,
+                PathBuf::from("crates/merlin-core/src/lib.rs")
+            );
+            assert_eq!(parsed.start_line, Some(10));
+            assert_eq!(parsed.end_line, Some(20));
+        }
     }
 
+    /// Tests extracting all citations from text.
+    ///
+    /// # Panics
+    /// Panics if citation extraction fails or extracted citations don't match expected values.
     #[test]
     fn test_extract_all_citations() {
         let text = "See src/lib.rs:10 and src/main.rs:20-30 for details.";
@@ -284,6 +301,10 @@ mod tests {
         assert_eq!(citations[1].end_line, Some(30));
     }
 
+    /// Tests that citation validator produces warnings without enforcement.
+    ///
+    /// # Panics
+    /// Panics if validation results don't match expected behavior.
     #[test]
     fn test_citation_validator_warnings() {
         let context_files = vec![PathBuf::from("src/lib.rs"), PathBuf::from("src/main.rs")];
@@ -301,6 +322,10 @@ mod tests {
         assert!(result_with_citation.score > 0.5);
     }
 
+    /// Tests that citation validator fails with enforcement enabled.
+    ///
+    /// # Panics
+    /// Panics if validation results don't match expected behavior.
     #[test]
     fn test_citation_validator_enforcement() {
         let context_files = vec![PathBuf::from("src/lib.rs")];
@@ -314,6 +339,10 @@ mod tests {
         assert!(!result.passed);
     }
 
+    /// Tests citation statistics collection from response text.
+    ///
+    /// # Panics
+    /// Panics if statistics don't match expected values.
     #[test]
     fn test_citation_statistics() {
         let context_files = vec![PathBuf::from("src/lib.rs"), PathBuf::from("src/main.rs")];

@@ -72,8 +72,8 @@ pub struct TaskListExecutionParams<'params> {
 
 /// Parameters for agent execution
 pub struct AgentExecutionParams<'params> {
-    /// Task description
-    pub description: &'params str,
+    /// The step to execute
+    pub step: &'params TaskStep,
     /// Context for execution
     pub context: &'params Context,
     /// Provider for execution
@@ -136,14 +136,14 @@ impl StepExecutor {
         attempt: &mut usize,
         start: Instant,
     ) -> Result<Option<StepResult>> {
-        let response = Self::execute_with_agent(
-            &params.step.description,
+        let response = Self::execute_with_agent(AgentExecutionParams {
+            step: params.step,
             context,
-            params.provider,
-            params.tool_registry,
-            params.task_id,
-            params.ui_channel,
-        )
+            provider: params.provider,
+            tool_registry: params.tool_registry,
+            task_id: params.task_id,
+            ui_channel: params.ui_channel,
+        })
         .await?;
 
         merlin_deps::tracing::debug!(
@@ -175,15 +175,15 @@ impl StepExecutor {
             }
 
             AgentResponse::TaskList(task_list) => {
-                let combined_result = Self::execute_task_list_impl(
-                    &task_list,
-                    context,
-                    params.provider,
-                    params.tool_registry,
-                    params.task_id,
-                    params.ui_channel,
-                    params.recursion_depth + 1,
-                )
+                let combined_result = Self::execute_task_list_impl(&TaskListExecutionParams {
+                    task_list: &task_list,
+                    base_context: context,
+                    provider: params.provider,
+                    tool_registry: params.tool_registry,
+                    task_id: params.task_id,
+                    ui_channel: params.ui_channel,
+                    recursion_depth: params.recursion_depth + 1,
+                })
                 .await?;
 
                 Self::validate_exit_requirement(
@@ -248,15 +248,17 @@ impl StepExecutor {
     ///
     /// # Errors
     /// Returns an error if any step fails
-    pub fn execute_task_list<'list>(params: TaskListExecutionParams<'list>) -> StepFuture<'list> {
-        Box::pin(async move { Self::execute_task_list_impl(params).await })
+    pub fn execute_task_list(params: TaskListExecutionParams<'_>) -> StepFuture<'_> {
+        Box::pin(async move { Self::execute_task_list_impl(&params).await })
     }
 
     /// Implementation of task list execution
     ///
     /// # Errors
     /// Returns an error if any step fails
-    fn execute_task_list_impl<'list>(params: TaskListExecutionParams<'list>) -> StepFuture<'list> {
+    fn execute_task_list_impl<'task_params>(
+        params: &'task_params TaskListExecutionParams<'task_params>,
+    ) -> StepFuture<'task_params> {
         Box::pin(async move {
             let start = Instant::now();
             let mut step_results = Vec::new();
@@ -310,7 +312,16 @@ impl StepExecutor {
     ///
     /// # Errors
     /// Returns an error if execution or parsing fails
-    pub(crate) async fn execute_with_agent(params: AgentExecutionParams<'_>) -> Result<AgentResponse> {
+    pub(crate) async fn execute_with_agent(
+        params: AgentExecutionParams<'_>,
+    ) -> Result<AgentResponse> {
+        let description = params.step.description.as_str();
+        let context = params.context;
+        let provider = params.provider;
+        let tool_registry = params.tool_registry;
+        let task_id = params.task_id;
+        let ui_channel = params.ui_channel;
+
         let query = Query::new(description.to_owned());
 
         // Execute query with provider

@@ -88,8 +88,8 @@ OPTIONS:
     -h, --help                   Print help information
 ";
     // Help text is printed to stdout by convention for CLI tools
-
     {
-        print!("{HELP_TEXT}");
+        use std::io::{Write as _, stdout};
+        drop(stdout().write_all(HELP_TEXT.as_bytes()));
     }
 }

@@ -83,6 +83,8 @@ mod tests {
     use super::*;
     use merlin_core::Task;
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_task_graph_ready_tasks() {
         let task_a = Task::new("Task A".to_owned());
@@ -101,6 +103,8 @@ mod tests {
         assert_eq!(ready_after[0].id, task_b.id);
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_task_graph_cycle_detection() {
         let task_a = Task::new("Task A".to_owned());

@@ -10,7 +10,9 @@ mod tests;
 
 use context::{ContextBuilder, ConversationHistory};
 use logging::ContextLogger;
-pub use step_executor::{StepExecutionParams, StepExecutor, StepResult};
+pub use step_executor::{
+    AgentExecutionParams, StepExecutionParams, StepExecutor, StepResult, TaskListExecutionParams,
+};
 
 use std::{
     sync::{
@@ -24,13 +26,48 @@ use tokio::sync::Mutex;
 use crate::Validator;
 use merlin_context::ContextFetcher;
 use merlin_core::AgentResponse;
+use merlin_core::ModelProvider;
 use merlin_core::{
-    Context, Response, Result, RoutingConfig, RoutingError, Task, TaskId, TaskResult, TokenUsage,
-    ValidationResult,
+    Context, ExitRequirement, Response, Result, RoutingConfig, RoutingError, StepType, Task,
+    TaskId, TaskResult, TaskStep, TokenUsage, ValidationResult,
     ui::{UiChannel, UiEvent},
 };
-use merlin_routing::{ModelRouter, ProviderRegistry};
+use merlin_routing::{ModelRouter, ProviderRegistry, RoutingDecision};
 use merlin_tooling::{ToolRegistry, generate_typescript_signatures};
+
+/// Parameters for executing with step executor
+struct ExecutorParams<'exec> {
+    /// Task to execute
+    task: &'exec Task,
+    /// Context for execution
+    context: &'exec Context,
+    /// Provider for execution
+    provider: &'exec Arc<dyn ModelProvider>,
+    /// Task ID
+    task_id: TaskId,
+    /// UI channel for events
+    ui_channel: &'exec UiChannel,
+}
+
+/// Parameters for processing agent response
+struct ResponseProcessingParams<'resp> {
+    /// Agent response to process
+    agent_response: AgentResponse,
+    /// Task ID
+    task_id: TaskId,
+    /// Task being executed
+    task: &'resp Task,
+    /// Routing decision
+    decision: &'resp RoutingDecision,
+    /// Context used
+    context: &'resp Context,
+    /// Provider used
+    provider: &'resp Arc<dyn ModelProvider>,
+    /// Duration in milliseconds
+    duration_ms: u64,
+    /// UI channel for events
+    ui_channel: &'resp UiChannel,
+}
 
 /// Parameters for creating an `AgentExecutor` with a custom provider registry
 pub struct AgentExecutorParams {
@@ -147,40 +184,89 @@ impl AgentExecutor {
             .await?;
 
         // Execute agent - returns String | TaskList
-        let agent_response = StepExecutor::execute_with_agent(
-            &task.description,
-            &context,
-            &provider,
-            &self.tool_registry,
-            task_id,
-            &ui_channel,
-        )
-        .await?;
+        let agent_response = self
+            .execute_with_step_executor(ExecutorParams {
+                task: &task,
+                context: &context,
+                provider: &provider,
+                task_id,
+                ui_channel: &ui_channel,
+            })
+            .await?;
 
         let duration_ms = start.elapsed().as_millis() as u64;
 
         // Handle response type
-        match agent_response {
+        self.process_agent_response(ResponseProcessingParams {
+            agent_response,
+            task_id,
+            task: &task,
+            decision: &decision,
+            context: &context,
+            provider: &provider,
+            duration_ms,
+            ui_channel: &ui_channel,
+        })
+        .await
+    }
+
+    /// Execute agent with step executor
+    ///
+    /// # Errors
+    /// Returns an error if agent execution fails
+    async fn execute_with_step_executor(
+        &self,
+        params: ExecutorParams<'_>,
+    ) -> Result<AgentResponse> {
+        let temp_step = TaskStep {
+            title: params.task.description.clone(),
+            description: params.task.description.clone(),
+            step_type: StepType::Implementation,
+            exit_requirement: ExitRequirement::Pattern {
+                pattern: String::from(".*"), // Match anything - no validation
+            },
+            context: None,
+        };
+
+        StepExecutor::execute_with_agent(AgentExecutionParams {
+            step: &temp_step,
+            context: params.context,
+            provider: params.provider,
+            tool_registry: &self.tool_registry,
+            task_id: params.task_id,
+            ui_channel: params.ui_channel,
+        })
+        .await
+    }
+
+    /// Process agent response and create task result
+    ///
+    /// # Errors
+    /// Returns an error if validation or task list execution fails
+    async fn process_agent_response(
+        &self,
+        params: ResponseProcessingParams<'_>,
+    ) -> Result<TaskResult> {
+        match params.agent_response {
             AgentResponse::DirectResult(result) => {
                 merlin_deps::tracing::debug!("Agent returned DirectResult");
-                // Simple string response - create TaskResult
                 let response = Response {
                     text: result,
                     confidence: 1.0,
                     tokens_used: TokenUsage::default(),
-                    provider: decision.model.to_string(),
-                    latency_ms: duration_ms,
+                    provider: params.decision.model.to_string(),
+                    latency_ms: params.duration_ms,
                 };
 
-                let validation = self.validate_response(&response, &task).await?;
+                let validation = self.validate_response(&response, params.task).await?;
 
                 Ok(TaskResult {
-                    task_id,
+                    task_id: params.task_id,
                     response,
-                    tier_used: decision.model.to_string(),
+                    tier_used: params.decision.model.to_string(),
                     tokens_used: TokenUsage::default(),
                     validation,
-                    duration_ms,
+                    duration_ms: params.duration_ms,
                     work_unit: None,
                 })
             }
@@ -189,32 +275,31 @@ impl AgentExecutor {
                     "Agent returned TaskList with {} steps",
                     task_list.steps.len()
                 );
-                // Execute task list with StepExecutor
-                let step_result = StepExecutor::execute_task_list(
-                    &task_list,
-                    &context,
-                    &provider,
-                    &self.tool_registry,
-                    task_id,
-                    &ui_channel,
-                    0, // recursion_depth
-                )
+                let step_result = StepExecutor::execute_task_list(TaskListExecutionParams {
+                    task_list: &task_list,
+                    base_context: params.context,
+                    provider: params.provider,
+                    tool_registry: &self.tool_registry,
+                    task_id: params.task_id,
+                    ui_channel: params.ui_channel,
+                    recursion_depth: 0,
+                })
                 .await?;
 
                 let response = Response {
                     text: step_result.text,
                     confidence: 1.0,
                     tokens_used: TokenUsage::default(),
-                    provider: decision.model.to_string(),
+                    provider: params.decision.model.to_string(),
                     latency_ms: step_result.duration_ms,
                 };
 
-                let validation = self.validate_response(&response, &task).await?;
+                let validation = self.validate_response(&response, params.task).await?;
 
                 Ok(TaskResult {
-                    task_id,
+                    task_id: params.task_id,
                     response,
-                    tier_used: decision.model.to_string(),
+                    tier_used: params.decision.model.to_string(),
                     tokens_used: TokenUsage::default(),
                     validation,
                     duration_ms: step_result.duration_ms,

@@ -238,17 +238,24 @@ impl ExitRequirementValidators {
 mod tests {
     use super::*;
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_pattern_validation_success() {
-        ExitRequirementValidators::validate_pattern(r"Success: \d+", "Success: 42").unwrap();
+        let result = ExitRequirementValidators::validate_pattern(r"Success: \d+", "Success: 42");
+        assert!(result.is_ok(), "Pattern validation should succeed");
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_pattern_validation_failure() {
         let result = ExitRequirementValidators::validate_pattern(r"Success: \d+", "Failed: 42");
         assert!(result.is_err());
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_json_valid_success() {
         let mut args = HashMap::new();
@@ -256,9 +263,12 @@ mod tests {
             "content".to_owned(),
             Value::String(r#"{"key": "value"}"#.to_owned()),
         );
-        ExitRequirementValidators::validator_json_valid(&args).unwrap();
+        let result = ExitRequirementValidators::validator_json_valid(&args);
+        assert!(result.is_ok(), "JSON validation should succeed");
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_json_valid_failure() {
         let mut args = HashMap::new();
@@ -270,6 +280,8 @@ mod tests {
         assert!(result.is_err());
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_no_errors_in_success() {
         let mut args = HashMap::new();
@@ -277,9 +289,12 @@ mod tests {
             "output".to_owned(),
             Value::String("All tests passed successfully".to_owned()),
         );
-        ExitRequirementValidators::validator_no_errors_in(&args).unwrap();
+        let result = ExitRequirementValidators::validator_no_errors_in(&args);
+        assert!(result.is_ok(), "No errors validation should succeed");
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_no_errors_in_failure() {
         let mut args = HashMap::new();

@@ -223,13 +223,24 @@ mod tests {
     use super::*;
     use merlin_deps::tempfile::TempDir;
 
+    /// # Panics
+    /// Helper function - panics indicate test environment failure
     fn create_test_store() -> (ThreadStore, TempDir) {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
-        let store =
-            ThreadStore::new(temp_dir.path().to_path_buf()).expect("Failed to create thread store");
+        let temp_dir = match TempDir::new() {
+            Ok(dir) => dir,
+            Err(err) => panic!("Failed to create temp dir: {err}"),
+        };
+
+        let store = match ThreadStore::new(temp_dir.path().to_path_buf()) {
+            Ok(store) => store,
+            Err(err) => panic!("Failed to create thread store: {err}"),
+        };
+
         (store, temp_dir)
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_create_thread() {
         let (mut store, _temp) = create_test_store();
@@ -242,6 +253,8 @@ mod tests {
         assert_ne!(thread1.color, thread2.color); // Different colors
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_save_and_load_thread() {
         let (mut store, _temp) = create_test_store();
@@ -249,18 +262,24 @@ mod tests {
         let thread = store.create_thread("Test".to_owned());
         let thread_id = thread.id;
 
-        store.save_thread(&thread).expect("Failed to save thread");
+        assert!(store.save_thread(&thread).is_ok(), "Failed to save thread");
 
         // Create new store to test loading
-        let mut new_store =
-            ThreadStore::new(store.storage_path.clone()).expect("Failed to create new store");
-        new_store.load_all().expect("Failed to load threads");
+        let mut new_store = match ThreadStore::new(store.storage_path.clone()) {
+            Ok(store) => store,
+            Err(err) => panic!("Failed to create new store: {err}"),
+        };
+        assert!(new_store.load_all().is_ok(), "Failed to load threads");
 
         let loaded = new_store.get_thread(thread_id);
-        assert!(loaded.is_some());
-        assert_eq!(loaded.unwrap().name, "Test");
+        assert!(loaded.is_some(), "Expected thread to exist");
+        if let Some(loaded) = loaded {
+            assert_eq!(loaded.name, "Test");
+        }
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_delete_thread() {
         let (mut store, _temp) = create_test_store();
@@ -268,15 +287,18 @@ mod tests {
         let thread = store.create_thread("Delete Me".to_owned());
         let thread_id = thread.id;
 
-        store.save_thread(&thread).expect("Failed to save thread");
-        store
-            .delete_thread(thread_id)
-            .expect("Failed to delete thread");
+        assert!(store.save_thread(&thread).is_ok(), "Failed to save thread");
+        assert!(
+            store.delete_thread(thread_id).is_ok(),
+            "Failed to delete thread"
+        );
 
         assert!(store.get_thread(thread_id).is_none());
         assert!(!store.thread_path(thread_id).exists());
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_archive_thread() {
         let (mut store, _temp) = create_test_store();
@@ -284,16 +306,21 @@ mod tests {
         let thread = store.create_thread("Archive Test".to_owned());
         let thread_id = thread.id;
 
-        store.save_thread(&thread).expect("Failed to save thread");
-        store.archive_thread(thread_id).expect("Failed to archive");
+        assert!(store.save_thread(&thread).is_ok(), "Failed to save thread");
+        assert!(store.archive_thread(thread_id).is_ok(), "Failed to archive");
 
-        let archived = store.get_thread(thread_id).expect("Thread not found");
-        assert!(archived.archived);
+        let archived = store.get_thread(thread_id);
+        assert!(archived.is_some(), "Thread not found");
+        if let Some(archived) = archived {
+            assert!(archived.archived);
+        }
 
         assert_eq!(store.active_threads().len(), 0);
         assert_eq!(store.archived_threads().len(), 1);
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_unarchive_thread() {
         let (mut store, _temp) = create_test_store();
@@ -301,37 +328,49 @@ mod tests {
         let thread = store.create_thread("Unarchive Test".to_owned());
         let thread_id = thread.id;
 
-        store.save_thread(&thread).expect("Failed to save thread");
-        store.archive_thread(thread_id).expect("Failed to archive");
-        store
-            .unarchive_thread(thread_id)
-            .expect("Failed to unarchive");
+        assert!(store.save_thread(&thread).is_ok(), "Failed to save thread");
+        assert!(store.archive_thread(thread_id).is_ok(), "Failed to archive");
+        assert!(
+            store.unarchive_thread(thread_id).is_ok(),
+            "Failed to unarchive"
+        );
 
-        let unarchived = store.get_thread(thread_id).expect("Thread not found");
-        assert!(!unarchived.archived);
+        let unarchived = store.get_thread(thread_id);
+        assert!(unarchived.is_some(), "Thread not found");
+        if let Some(unarchived) = unarchived {
+            assert!(!unarchived.archived);
+        }
 
         assert_eq!(store.active_threads().len(), 1);
         assert_eq!(store.archived_threads().len(), 0);
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_create_branch() {
         let (mut store, _temp) = create_test_store();
 
         let parent = store.create_thread("Parent".to_owned());
         let parent_id = parent.id;
-        store.save_thread(&parent).expect("Failed to save parent");
+        assert!(store.save_thread(&parent).is_ok(), "Failed to save parent");
 
         let msg_id = MessageId::default();
-        let branch = store
-            .create_branch("Branch".to_owned(), parent_id, msg_id)
-            .expect("Failed to create branch");
+        let branch_result = store.create_branch("Branch".to_owned(), parent_id, msg_id);
+        assert!(branch_result.is_ok(), "Failed to create branch");
+        let branch = match branch_result {
+            Ok(branch) => branch,
+            Err(err) => panic!("Failed to create branch: {err}"),
+        };
 
         assert!(branch.parent_thread.is_some());
-        let branch_point = branch.parent_thread.unwrap();
-        assert_eq!(branch_point.thread_id, parent_id);
+        if let Some(branch_point) = branch.parent_thread {
+            assert_eq!(branch_point.thread_id, parent_id);
+        }
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_color_cycling() {
         let (mut store, _temp) = create_test_store();

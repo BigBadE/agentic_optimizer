@@ -38,12 +38,16 @@ impl StepTracker {
 mod tests {
     use super::*;
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_step_tracker_default() {
         let tracker = StepTracker::default();
         assert!(tracker.steps.is_empty());
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_add_step() {
         let mut tracker = StepTracker::default();
@@ -52,11 +56,16 @@ mod tests {
 
         tracker.add_step(step);
 
-        let steps = tracker.get_steps(&task_id).unwrap();
-        assert_eq!(steps.len(), 1);
-        assert_eq!(steps[0].task_id, task_id);
+        let steps = tracker.get_steps(&task_id);
+        assert!(steps.is_some(), "Expected steps to exist");
+        if let Some(steps) = steps {
+            assert_eq!(steps.len(), 1);
+            assert_eq!(steps[0].task_id, task_id);
+        }
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_get_steps_none() {
         let tracker = StepTracker::default();
@@ -64,6 +73,8 @@ mod tests {
         assert!(tracker.get_steps(&task_id).is_none());
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_create_step() {
         let mut tracker = StepTracker::default();
@@ -78,10 +89,15 @@ mod tests {
         assert_eq!(step.task_id, task_id);
         assert_eq!(step.content, "thinking content");
 
-        let steps = tracker.get_steps(&task_id).unwrap();
-        assert_eq!(steps.len(), 1);
+        let steps = tracker.get_steps(&task_id);
+        assert!(steps.is_some(), "Expected steps to exist");
+        if let Some(steps) = steps {
+            assert_eq!(steps.len(), 1);
+        }
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_multiple_steps_for_task() {
         use merlin_deps::serde_json::json;
@@ -100,10 +116,15 @@ mod tests {
         );
         tracker.create_step(task_id, ExecutionStepType::Thinking, "step 3".to_owned());
 
-        let steps = tracker.get_steps(&task_id).unwrap();
-        assert_eq!(steps.len(), 3);
+        let steps = tracker.get_steps(&task_id);
+        assert!(steps.is_some(), "Expected steps to exist");
+        if let Some(steps) = steps {
+            assert_eq!(steps.len(), 3);
+        }
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_multiple_tasks() {
         let mut tracker = StepTracker::default();
@@ -113,10 +134,21 @@ mod tests {
         tracker.create_step(task1, ExecutionStepType::Thinking, "task1 step".to_owned());
         tracker.create_step(task2, ExecutionStepType::Thinking, "task2 step".to_owned());
 
-        assert_eq!(tracker.get_steps(&task1).unwrap().len(), 1);
-        assert_eq!(tracker.get_steps(&task2).unwrap().len(), 1);
+        let steps1 = tracker.get_steps(&task1);
+        assert!(steps1.is_some(), "Expected steps for task1 to exist");
+        if let Some(steps1) = steps1 {
+            assert_eq!(steps1.len(), 1);
+        }
+
+        let steps2 = tracker.get_steps(&task2);
+        assert!(steps2.is_some(), "Expected steps for task2 to exist");
+        if let Some(steps2) = steps2 {
+            assert_eq!(steps2.len(), 1);
+        }
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_clone_tracker() {
         let mut tracker = StepTracker::default();
@@ -124,6 +156,10 @@ mod tests {
         tracker.create_step(task_id, ExecutionStepType::Thinking, "test".to_owned());
 
         let cloned = tracker.clone();
-        assert_eq!(cloned.get_steps(&task_id).unwrap().len(), 1);
+        let steps = cloned.get_steps(&task_id);
+        assert!(steps.is_some(), "Expected steps to exist");
+        if let Some(steps) = steps {
+            assert_eq!(steps.len(), 1);
+        }
     }
 }

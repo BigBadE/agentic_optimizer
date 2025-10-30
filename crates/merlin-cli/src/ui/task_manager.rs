@@ -130,7 +130,6 @@ impl TaskManager {
     }
 
     /// Iterates over all tasks
-
     pub fn iter_tasks(&self) -> impl Iterator<Item = (TaskId, &TaskDisplay)> {
         self.tasks.iter().map(|(&id, task)| (id, task))
     }

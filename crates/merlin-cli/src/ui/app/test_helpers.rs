@@ -128,7 +128,6 @@ impl<B: Backend> TuiApp<B> {
     ///
     /// # Testing Only
     /// Use this to verify task thread membership in tests.
-
     pub fn get_selected_task_thread(&self) -> Option<ThreadId> {
         let selected_task_id = self.get_selected_task_id()?;
         self.task_manager.get_task(selected_task_id)?.thread_id

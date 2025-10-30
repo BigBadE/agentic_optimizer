@@ -174,6 +174,13 @@ mod tests {
         }
     }
 
+    /// Tests that pipeline passes when all stages pass.
+    ///
+    /// # Errors
+    /// Returns an error if validation fails.
+    ///
+    /// # Panics
+    /// Panics if validation results don't match expected behavior.
     #[tokio::test]
     async fn test_pipeline_all_pass() -> Result<()> {
         let stages: Vec<Arc<dyn ValidationStage>> = vec![
@@ -203,6 +210,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests that pipeline exits early when a stage fails.
+    ///
+    /// # Errors
+    /// Returns an error if validation fails.
+    ///
+    /// # Panics
+    /// Panics if validation results don't match expected behavior.
     #[tokio::test]
     async fn test_pipeline_early_exit() -> Result<()> {
         let stages: Vec<Arc<dyn ValidationStage>> = vec![

@@ -209,6 +209,8 @@ mod tests {
     use super::*;
     use merlin_deps::toml::to_string_pretty;
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_config_default() {
         let config = Config::default();
@@ -217,6 +219,8 @@ mod tests {
         assert_eq!(config.theme, Theme::default());
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_providers_config_default() {
         let config = ProvidersConfig::default();
@@ -224,38 +228,58 @@ mod tests {
         assert!(config.medium_model.is_some());
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_config_serialization() {
         let config = Config::default();
-        let toml_str = to_string_pretty(&config).expect("Failed to serialize");
+        let toml_str = match to_string_pretty(&config) {
+            Ok(str) => str,
+            Err(err) => panic!("Failed to serialize: {err}"),
+        };
         assert!(toml_str.contains("providers"));
         assert!(toml_str.contains("theme"));
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[tokio::test]
     async fn test_config_manager_new() {
-        let manager = ConfigManager::new()
-            .await
-            .expect("Failed to create manager");
-        let config = manager.get().expect("Failed to get config");
+        let manager = match ConfigManager::new().await {
+            Ok(mgr) => mgr,
+            Err(err) => panic!("Failed to create manager: {err}"),
+        };
+        let config = match manager.get() {
+            Ok(cfg) => cfg,
+            Err(err) => panic!("Failed to get config: {err}"),
+        };
         assert!(config.providers.high_model.is_some());
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[tokio::test]
     async fn test_config_manager_get_mut() {
-        let manager = ConfigManager::new()
-            .await
-            .expect("Failed to create manager");
+        let manager = match ConfigManager::new().await {
+            Ok(mgr) => mgr,
+            Err(err) => panic!("Failed to create manager: {err}"),
+        };
 
         {
-            let mut config_guard = manager.get_mut().expect("Failed to get mutable config");
+            let mut config_guard = match manager.get_mut() {
+                Ok(guard) => guard,
+                Err(err) => panic!("Failed to get mutable config: {err}"),
+            };
             config_guard.theme = Theme::Nord;
         } // Drop happens here, triggering auto-save
 
         // Give async save a moment to complete
         sleep(Duration::from_millis(100)).await;
 
-        let config = manager.get().expect("Failed to get config");
+        let config = match manager.get() {
+            Ok(cfg) => cfg,
+            Err(err) => panic!("Failed to get config: {err}"),
+        };
         assert_eq!(config.theme, Theme::Nord);
     }
 }

@@ -21,9 +21,9 @@ use crate::utils::get_merlin_folder;
 /// Returns an error if the orchestrator fails to initialize or process requests
 pub async fn handle_interactive(
     project: PathBuf,
-    validation: Validation,
+    _validation: Validation,
     local_only: bool,
-    context_dump: bool,
+    _context_dump: bool,
 ) -> Result<()> {
     // Initialize tracing - TUI mode logs to file
     let merlin_dir = get_merlin_folder(&project)?;
@@ -59,10 +59,6 @@ pub async fn handle_interactive(
         merlin_deps::tracing::warn!("Using default configuration");
         RoutingConfig::default()
     });
-
-    config.validation.enabled = !matches!(validation, Validation::Disabled);
-    config.workspace.root_path.clone_from(&project);
-    config.execution.context_dump = context_dump;
 
     if local_only {
         config.tiers.groq_enabled = false;

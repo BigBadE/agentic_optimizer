@@ -185,16 +185,11 @@ mod tests {
         let config = RoutingConfig::default();
 
         // Try to create registry - will fail without API keys
-        let result = ProviderRegistry::new(config);
-
         // Without API keys, groq and premium providers can't be created
         // This is expected behavior
-        let registry = match result {
-            Ok(registry) => registry,
-            Err(_) => {
-                // Expected when API keys aren't available
-                return;
-            }
+        let Ok(registry) = ProviderRegistry::new(config) else {
+            // Expected when API keys aren't available
+            return;
         };
 
         // If we have API keys, verify registry was created
@@ -207,12 +202,9 @@ mod tests {
         config.tiers.groq_enabled = false;
         config.tiers.premium_enabled = false;
 
-        let registry = match ProviderRegistry::new(config) {
-            Ok(registry) => registry,
-            Err(_) => {
-                // Local providers not available
-                return;
-            }
+        let Ok(registry) = ProviderRegistry::new(config) else {
+            // Local providers not available
+            return;
         };
 
         let models = registry.registered_models();
@@ -230,16 +222,16 @@ mod tests {
         config.tiers.groq_enabled = false;
         config.tiers.premium_enabled = false;
 
-        let registry = match ProviderRegistry::new(config) {
-            Ok(registry) => registry,
-            Err(_) => {
-                // Local providers not available
-                return;
-            }
+        let Ok(registry) = ProviderRegistry::new(config) else {
+            // Local providers not available
+            return;
         };
 
         // Try to get a Groq model when Groq is disabled
         let result = registry.get_provider(Model::Llama318BInstant);
-        result.unwrap_err();
+        assert!(
+            result.is_err(),
+            "Expected error when getting disabled provider"
+        );
     }
 }

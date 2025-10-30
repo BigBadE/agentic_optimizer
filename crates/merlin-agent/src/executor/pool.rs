@@ -232,11 +232,16 @@ mod tests {
         }
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[tokio::test]
     async fn test_executor_pool_basic() {
         let router = Arc::new(MockRouter);
         let validator = Arc::new(MockValidator);
-        let tmp_dir = TempDir::new().expect("create temp dir");
+        let tmp_dir = match TempDir::new() {
+            Ok(dir) => dir,
+            Err(err) => panic!("create temp dir: {err}"),
+        };
         let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
 
         // Test pool creation - actual execution requires provider registry

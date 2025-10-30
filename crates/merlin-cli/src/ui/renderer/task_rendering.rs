@@ -343,7 +343,6 @@ pub fn truncate_text(text: &str, max_width: usize) -> String {
 ///
 /// This function is currently unused in the flat task system but kept for future
 /// when thread-based grouping is implemented.
-
 pub fn add_child_task_lines(
     area: Rect,
     lines: &mut Vec<Line<'static>>,

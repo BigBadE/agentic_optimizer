@@ -207,15 +207,21 @@ mod tests {
     fn test_invalid_difficulty() {
         let registry = ModelRegistry::with_defaults();
 
-        registry.select_model(0).unwrap_err();
-        registry.select_model(11).unwrap_err();
+        assert!(
+            registry.select_model(0).is_err(),
+            "Expected error for difficulty 0"
+        );
+        assert!(
+            registry.select_model(11).is_err(),
+            "Expected error for difficulty 11"
+        );
     }
 
     #[test]
     fn test_empty_registry() {
         let registry = ModelRegistry::new();
         let result = registry.select_model(5);
-        result.unwrap_err();
+        assert!(result.is_err(), "Expected error for empty registry");
     }
 
     #[test]

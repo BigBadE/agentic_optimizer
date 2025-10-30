@@ -6,6 +6,7 @@ use std::env;
 use std::fs;
 use std::fs::canonicalize;
 use std::io::Write as _;
+use std::iter::Iterator as _;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 
@@ -230,7 +231,10 @@ mod tests {
     /// Panics if temp directory creation or cleanup fails
     #[test]
     fn test_cleanup_old_tasks_no_directory() {
-        let temp = TempDir::new().expect("Failed to create temp dir");
+        let temp = match TempDir::new() {
+            Ok(dir) => dir,
+            Err(err) => panic!("Failed to create temp dir: {err}"),
+        };
         let merlin_dir = temp.path().join(".merlin");
         let result = cleanup_old_tasks(&merlin_dir);
         assert!(
@@ -246,21 +250,30 @@ mod tests {
     #[test]
     fn test_cleanup_old_tasks_under_limit() {
         const NUM_TASKS: usize = 5;
-        let temp = TempDir::new().expect("Failed to create temp dir");
+        let temp = match TempDir::new() {
+            Ok(dir) => dir,
+            Err(err) => panic!("Failed to create temp dir: {err}"),
+        };
         let tasks_dir = temp.path().join(".merlin").join("tasks");
-        fs::create_dir_all(&tasks_dir).expect("Failed to create tasks dir");
+        assert!(
+            fs::create_dir_all(&tasks_dir).is_ok(),
+            "Failed to create tasks dir"
+        );
 
         for task_num in 0..NUM_TASKS {
             let task_file = tasks_dir.join(format!("task_{task_num}.gz"));
-            fs::write(&task_file, b"test").expect("Failed to write task file");
+            assert!(
+                fs::write(&task_file, b"test").is_ok(),
+                "Failed to write task file"
+            );
         }
 
         let result = cleanup_old_tasks(temp.path().join(".merlin").as_path());
         assert!(result.is_ok(), "Cleanup should succeed");
 
-        let remaining = fs::read_dir(&tasks_dir)
-            .expect("Failed to read tasks dir")
-            .count();
+        let remaining_result = fs::read_dir(&tasks_dir);
+        assert!(remaining_result.is_ok(), "Failed to read tasks dir");
+        let remaining = remaining_result.map(Iterator::count).unwrap_or(0);
         assert_eq!(
             remaining, NUM_TASKS,
             "All tasks should remain when under limit"
@@ -275,26 +288,38 @@ mod tests {
     fn test_cleanup_old_tasks_over_limit() {
         const OVER_LIMIT: usize = MAX_TASKS + 10;
 
-        let temp = TempDir::new().expect("Failed to create temp dir");
+        let temp = match TempDir::new() {
+            Ok(dir) => dir,
+            Err(err) => panic!("Failed to create temp dir: {err}"),
+        };
         let tasks_dir = temp.path().join(".merlin").join("tasks");
-        fs::create_dir_all(&tasks_dir).expect("Failed to create tasks dir");
+        assert!(
+            fs::create_dir_all(&tasks_dir).is_ok(),
+            "Failed to create tasks dir"
+        );
 
         // Create files with explicitly set timestamps (no sleep needed)
         for task_num in 0..OVER_LIMIT {
             let task_file = tasks_dir.join(format!("task_{task_num}.gz"));
-            fs::write(&task_file, b"test").expect("Failed to write task file");
+            assert!(
+                fs::write(&task_file, b"test").is_ok(),
+                "Failed to write task file"
+            );
 
             // Set mtime to task_num seconds ago (older files have lower numbers)
             let mtime = FileTime::from_unix_time(1_000_000 + task_num as i64, 0);
-            set_file_mtime(&task_file, mtime).expect("Failed to set mtime");
+            assert!(
+                set_file_mtime(&task_file, mtime).is_ok(),
+                "Failed to set mtime"
+            );
         }
 
         let result = cleanup_old_tasks(temp.path().join(".merlin").as_path());
         assert!(result.is_ok(), "Cleanup should succeed");
 
-        let remaining = fs::read_dir(&tasks_dir)
-            .expect("Failed to read tasks dir")
-            .count();
+        let remaining_result = fs::read_dir(&tasks_dir);
+        assert!(remaining_result.is_ok(), "Failed to read tasks dir");
+        let remaining = remaining_result.map(Iterator::count).unwrap_or(0);
         assert_eq!(remaining, MAX_TASKS, "Should keep exactly MAX_TASKS tasks");
     }
 
@@ -308,26 +333,38 @@ mod tests {
         const NUM_OTHER_FILES: usize = 2;
         const EXPECTED_TOTAL: usize = NUM_GZ_TASKS + NUM_OTHER_FILES;
 
-        let temp = TempDir::new().expect("Failed to create temp dir");
+        let temp = match TempDir::new() {
+            Ok(dir) => dir,
+            Err(err) => panic!("Failed to create temp dir: {err}"),
+        };
         let tasks_dir = temp.path().join(".merlin").join("tasks");
-        fs::create_dir_all(&tasks_dir).expect("Failed to create tasks dir");
+        assert!(
+            fs::create_dir_all(&tasks_dir).is_ok(),
+            "Failed to create tasks dir"
+        );
 
         for task_num in 0..NUM_GZ_TASKS {
             let task_file = tasks_dir.join(format!("task_{task_num}.gz"));
-            fs::write(&task_file, b"test").expect("Failed to write task file");
+            assert!(
+                fs::write(&task_file, b"test").is_ok(),
+                "Failed to write task file"
+            );
         }
 
         for other_num in 0..NUM_OTHER_FILES {
             let other_file = tasks_dir.join(format!("other_{other_num}.txt"));
-            fs::write(&other_file, b"not gz").expect("Failed to write other file");
+            assert!(
+                fs::write(&other_file, b"not gz").is_ok(),
+                "Failed to write other file"
+            );
         }
 
         let result = cleanup_old_tasks(temp.path().join(".merlin").as_path());
         assert!(result.is_ok(), "Cleanup should succeed");
 
-        let total_files = fs::read_dir(&tasks_dir)
-            .expect("Failed to read tasks dir")
-            .count();
+        let total_files_result = fs::read_dir(&tasks_dir);
+        assert!(total_files_result.is_ok(), "Failed to read tasks dir");
+        let total_files = total_files_result.map(Iterator::count).unwrap_or(0);
         assert_eq!(total_files, EXPECTED_TOTAL, "Should preserve non-gz files");
     }
 
@@ -340,56 +377,75 @@ mod tests {
         const NUM_GZ_FILES: usize = 30;
         const NUM_JSON_FILES: usize = 15;
 
-        let temp = TempDir::new().expect("Failed to create temp dir");
+        let temp = match TempDir::new() {
+            Ok(dir) => dir,
+            Err(err) => panic!("Failed to create temp dir: {err}"),
+        };
         let tasks_dir = temp.path().join(".merlin").join("tasks");
-        fs::create_dir_all(&tasks_dir).expect("Failed to create tasks dir");
+        assert!(
+            fs::create_dir_all(&tasks_dir).is_ok(),
+            "Failed to create tasks dir"
+        );
 
         // Create gz files with explicit timestamps
         for file_num in 0..NUM_GZ_FILES {
             let file_path = tasks_dir.join(format!("task_{file_num}.gz"));
-            fs::write(&file_path, b"gz data").expect("Failed to write gz file");
+            assert!(
+                fs::write(&file_path, b"gz data").is_ok(),
+                "Failed to write gz file"
+            );
 
             // Set mtime to file_num seconds in the future
             let mtime = FileTime::from_unix_time(1_000_000 + file_num as i64, 0);
-            set_file_mtime(&file_path, mtime).expect("Failed to set mtime");
+            assert!(
+                set_file_mtime(&file_path, mtime).is_ok(),
+                "Failed to set mtime"
+            );
         }
 
         for file_num in 0..NUM_JSON_FILES {
             let file_path = tasks_dir.join(format!("data_{file_num}.json"));
-            fs::write(&file_path, b"{}").expect("Failed to write json file");
+            assert!(
+                fs::write(&file_path, b"{}").is_ok(),
+                "Failed to write json file"
+            );
         }
 
         let result = cleanup_old_tasks(temp.path().join(".merlin").as_path());
         assert!(result.is_ok(), "Cleanup should succeed");
 
-        let gz_count = fs::read_dir(&tasks_dir)
-            .expect("Failed to read dir")
-            .filter_map(StdResult::ok)
-            .filter(|entry| {
-                entry
-                    .path()
-                    .extension()
-                    .and_then(|ext| ext.to_str())
-                    .is_some_and(|ext| ext == "gz")
-            })
-            .count();
+        let gz_count_result = fs::read_dir(&tasks_dir);
+        assert!(gz_count_result.is_ok(), "Failed to read dir");
+        let gz_count = gz_count_result.ok().map_or(0, |dir| {
+            dir.filter_map(StdResult::ok)
+                .filter(|entry| {
+                    entry
+                        .path()
+                        .extension()
+                        .and_then(|ext| ext.to_str())
+                        .is_some_and(|ext| ext == "gz")
+                })
+                .count()
+        });
 
         assert_eq!(
             gz_count, NUM_GZ_FILES,
             "Should keep all gz files under limit"
         );
 
-        let json_count = fs::read_dir(&tasks_dir)
-            .expect("Failed to read dir")
-            .filter_map(StdResult::ok)
-            .filter(|entry| {
-                entry
-                    .path()
-                    .extension()
-                    .and_then(|ext| ext.to_str())
-                    .is_some_and(|ext| ext == "json")
-            })
-            .count();
+        let json_count_result = fs::read_dir(&tasks_dir);
+        assert!(json_count_result.is_ok(), "Failed to read dir");
+        let json_count = json_count_result.ok().map_or(0, |dir| {
+            dir.filter_map(StdResult::ok)
+                .filter(|entry| {
+                    entry
+                        .path()
+                        .extension()
+                        .and_then(|ext| ext.to_str())
+                        .is_some_and(|ext| ext == "json")
+                })
+                .count()
+        });
 
         assert_eq!(json_count, NUM_JSON_FILES, "Should preserve all json files");
     }

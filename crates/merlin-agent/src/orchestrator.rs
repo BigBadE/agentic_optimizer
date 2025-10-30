@@ -349,6 +349,8 @@ impl RoutingOrchestrator {
 mod tests {
     use super::*;
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[tokio::test]
     async fn test_orchestrator_creation() {
         let config = RoutingConfig::default();
@@ -358,6 +360,8 @@ mod tests {
         // Test passes even if provider initialization fails
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[tokio::test]
     async fn test_analyze_request() {
         let config = RoutingConfig::default();
@@ -373,6 +377,8 @@ mod tests {
         }
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[tokio::test]
     #[ignore = "Requires GROQ_API_KEY environment variable"]
     async fn test_process_simple_request() {

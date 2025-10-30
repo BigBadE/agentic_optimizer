@@ -185,6 +185,8 @@ mod tests {
     use super::*;
     use std::slice::from_ref;
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[tokio::test]
     async fn test_write_lock_exclusive() {
         let manager = Arc::new(FileLockManager::default());
@@ -201,6 +203,8 @@ mod tests {
         assert!(result.is_err());
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[tokio::test]
     async fn test_read_locks_shared() {
         let manager = Arc::new(FileLockManager::default());
@@ -218,6 +222,8 @@ mod tests {
         };
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[tokio::test]
     async fn test_write_blocks_read() {
         let manager = Arc::new(FileLockManager::default());

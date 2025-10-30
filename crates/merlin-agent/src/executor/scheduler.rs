@@ -82,6 +82,8 @@ mod tests {
     use super::*;
     use merlin_core::{ContextRequirements, Task};
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_conflict_detection() {
         let file = PathBuf::from("test.rs");
@@ -118,6 +120,8 @@ mod tests {
         );
     }
 
+    /// # Panics
+    /// Test function - panics indicate test failure
     #[test]
     fn test_no_conflict_different_files() {
         let task_a = Task::new("Task A".to_owned())

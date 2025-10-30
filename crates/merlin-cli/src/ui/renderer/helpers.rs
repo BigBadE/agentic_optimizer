@@ -42,24 +42,6 @@ pub fn selection_style(is_selected: bool, theme: Theme) -> Style {
     }
 }
 
-/// Calculates the text style for child tasks
-///
-/// # Arguments
-/// * `is_selected` - Whether the child task is selected
-/// * `theme` - Current theme
-///
-/// # Returns
-/// Ratatui `Style` with appropriate colors for child tasks
-pub fn child_task_style(is_selected: bool, theme: Theme) -> Style {
-    if is_selected {
-        Style::default()
-            .fg(theme.highlight())
-            .add_modifier(Modifier::BOLD)
-    } else {
-        Style::default().fg(Color::DarkGray)
-    }
-}
-
 /// Gets status icon for task based on state and activity
 ///
 /// # Arguments
@@ -70,7 +52,6 @@ pub fn child_task_style(is_selected: bool, theme: Theme) -> Style {
 /// String slice with appropriate status icon
 pub fn task_status_icon(task: &TaskDisplay, is_active: bool) -> &'static str {
     match task.status {
-        TaskStatus::Pending => "⋯", // Pending/waiting for dependencies
         TaskStatus::Running => {
             // Check if task has output or progress
             if !task.output_lines.is_empty() || task.progress.is_some() {

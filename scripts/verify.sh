@@ -96,9 +96,7 @@ check_allows
 
 # Format, lint, and test
 cargo fmt -q
-# Check libs and tests only (not bins) to avoid false-positive dead code warnings
-# for feature-gated test utilities that are only used by integration tests
-cargo clippy --no-deps --lib --tests --all-features -- -D warnings
+cargo clippy --no-deps --bins --lib --tests --all-features -- -D warnings
 
 # Delegate to coverage.sh if --cov is passed (skip normal tests)
 if [ "$RUN_COVERAGE" = true ]; then

@@ -89,12 +89,8 @@ fn build_focused_task_lines(ctx: &FocusedTaskLinesContext<'_>, lines: &mut Vec<L
     } = *ctx;
     let max_width = area.width.saturating_sub(2) as usize;
 
-    // Determine which root task to display as primary
-    let primary_root_task_id = if root_tasks.is_empty() {
-        TaskId::default()
-    } else {
-        task_rendering::determine_root_task_to_display(all_tasks, root_tasks, ui_ctx)
-    };
+    // Note: In the flat task system, we don't track a primary root task anymore.
+    // All tasks are displayed equally in a flat list.
 
     // Build flat list of visible items (roots + expanded children) in display order
     let mut visible_items: Vec<(TaskId, bool)> = Vec::new();
@@ -134,7 +130,6 @@ fn build_focused_task_lines(ctx: &FocusedTaskLinesContext<'_>, lines: &mut Vec<L
         items_to_show: &items_to_show,
         all_tasks,
         ui_ctx,
-        primary_root_task_id,
         max_width,
         theme,
     };
@@ -219,13 +214,10 @@ fn build_unfocused_task_lines(ctx: &UnfocusedTaskLinesContext<'_>, lines: &mut V
     render_unfocused_root_and_children(
         &UnfocusedRootContext {
             root_task,
-            all_tasks,
-            primary_root_task_id,
             is_active,
             is_selected,
             is_primary_expanded,
             area,
-            ui_ctx,
             theme,
         },
         lines,
@@ -235,13 +227,10 @@ fn build_unfocused_task_lines(ctx: &UnfocusedTaskLinesContext<'_>, lines: &mut V
 /// Context for rendering unfocused root task and children
 struct UnfocusedRootContext<'ctx> {
     root_task: &'ctx TaskDisplay,
-    all_tasks: &'ctx [(TaskId, &'ctx TaskDisplay)],
-    primary_root_task_id: TaskId,
     is_active: bool,
     is_selected: bool,
     is_primary_expanded: bool,
     area: Rect,
-    ui_ctx: &'ctx UiCtx<'ctx>,
     theme: Theme,
 }
 
@@ -257,7 +246,6 @@ fn render_unfocused_root_and_children(
         is_primary_expanded,
         area,
         theme,
-        ..
     } = *ctx;
     let status_icon = render_helpers::task_status_icon(root_task, is_active);
 

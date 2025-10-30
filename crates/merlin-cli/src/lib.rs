@@ -10,15 +10,11 @@
     )
 )]
 
-// Include all modules so their unit tests run
-// These modules are only used by main.rs (the binary), but need to be
-// included here so their unit tests are compiled and run
-mod cli;
+// Modules needed by the UI (pub(crate) so lib can use them)
 pub(crate) mod config;
-mod handlers;
-mod interactive;
+
+// UI module is public for integration testing
 pub mod ui;
-mod utils;
 
 // Public API exports for integration testing
 pub use ui::TuiApp;

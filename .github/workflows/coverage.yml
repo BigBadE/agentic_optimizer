@@ -16,7 +16,9 @@ jobs:
   coverage:
     name: Coverage on Ubuntu
     runs-on: ubuntu-latest
-    container: ghcr.io/bigbade/agentic_optimizer/ci:latest
+    container:
+      image: ghcr.io/bigbade/agentic_optimizer/ci:latest
+      options: --user root
 
     steps:
       - name: Checkout repository

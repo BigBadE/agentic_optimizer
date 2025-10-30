@@ -38,8 +38,6 @@ pub struct UiState {
     pub auto_scroll_output_to_bottom: bool,
     /// Currently active thread
     pub active_thread_id: Option<ThreadId>,
-    /// Thread list scroll offset (for future use)
-    pub thread_list_scroll_offset: usize,
     /// Which panel is focused (thread list vs work details)
     pub focused_panel: PanelFocus,
     /// Pending user input waiting for running work to finish

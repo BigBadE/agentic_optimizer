@@ -7,8 +7,6 @@ use std::time::{Instant, SystemTime};
 /// Status of a task
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskStatus {
-    /// Task is pending (waiting for dependencies or resources)
-    Pending,
     /// Task is currently running
     Running,
     /// Task has completed successfully
@@ -127,11 +125,6 @@ impl TaskManager {
         for (task_id, _) in all_tasks {
             self.task_order.push(task_id);
         }
-    }
-
-    /// Iterates over all tasks
-    pub fn iter_tasks(&self) -> impl Iterator<Item = (TaskId, &TaskDisplay)> {
-        self.tasks.iter().map(|(&id, task)| (id, task))
     }
 
     /// Gets the task order

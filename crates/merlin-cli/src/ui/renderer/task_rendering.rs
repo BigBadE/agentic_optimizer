@@ -4,7 +4,6 @@
 //! and individual task items with their status and progress indicators.
 
 use merlin_deps::ratatui::{
-    layout::Rect,
     style::{Color, Style},
     text::{Line, Span},
 };
@@ -59,8 +58,6 @@ pub struct RenderTasksContext<'ctx> {
     pub all_tasks: &'ctx [(TaskId, &'ctx TaskDisplay)],
     /// UI context with state and task manager
     pub ui_ctx: &'ctx UiCtx<'ctx>,
-    /// Primary root task ID
-    pub primary_root_task_id: TaskId,
     /// Maximum width for rendering
     pub max_width: usize,
     /// Theme for styling
@@ -73,7 +70,6 @@ pub fn render_visible_tasks(ctx: &RenderTasksContext<'_>, lines: &mut Vec<Line<'
         items_to_show,
         all_tasks,
         ui_ctx,
-        primary_root_task_id,
         max_width,
         theme,
     } = ctx;
@@ -85,7 +81,6 @@ pub fn render_visible_tasks(ctx: &RenderTasksContext<'_>, lines: &mut Vec<Line<'
         let is_active = ui_ctx.state.active_running_tasks.contains(&task_id);
         let status_icon = render_helpers::task_status_icon(task, is_active);
         let is_selected = ui_ctx.state.active_task_id == Some(task_id);
-        let is_primary = task_id == *primary_root_task_id;
 
         if is_child {
             render_child_task(
@@ -107,9 +102,7 @@ pub fn render_visible_tasks(ctx: &RenderTasksContext<'_>, lines: &mut Vec<Line<'
                     task_id,
                     status_icon,
                     is_selected,
-                    _is_primary: is_primary,
                     ui_ctx,
-                    all_tasks,
                     max_width: *max_width,
                     theme: *theme,
                 },
@@ -195,9 +188,7 @@ struct RootTaskContext<'ctx> {
     task_id: TaskId,
     status_icon: &'ctx str,
     is_selected: bool,
-    _is_primary: bool,
     ui_ctx: &'ctx UiCtx<'ctx>,
-    all_tasks: &'ctx [(TaskId, &'ctx TaskDisplay)],
     max_width: usize,
     theme: Theme,
 }
@@ -209,11 +200,9 @@ fn render_root_task(ctx: &RootTaskContext<'_>, lines: &mut Vec<Line<'static>>) {
         task_id,
         status_icon,
         is_selected,
-        _is_primary,
         ui_ctx,
         max_width,
         theme,
-        ..
     } = *ctx;
     // In the new flat system, tasks don't have children
     // Expansion is now used for showing steps or thread messages
@@ -337,43 +326,4 @@ pub fn truncate_text(text: &str, max_width: usize) -> String {
 
     result.push_str("...");
     result
-}
-
-/// Adds lines for child tasks
-///
-/// This function is currently unused in the flat task system but kept for future
-/// when thread-based grouping is implemented.
-pub fn add_child_task_lines(
-    area: Rect,
-    lines: &mut Vec<Line<'static>>,
-    children: &[&(TaskId, &TaskDisplay)],
-    ui_ctx: &UiCtx<'_>,
-    theme: Theme,
-) {
-    let max_width = area.width.saturating_sub(2) as usize;
-
-    for (index, (child_id, child_task)) in children.iter().enumerate() {
-        let is_active = ui_ctx.state.active_running_tasks.contains(child_id);
-        let child_icon = render_helpers::task_status_icon(child_task, is_active);
-        let is_last = index == children.len() - 1;
-        let prefix = if is_last { " └─" } else { " ├─" };
-        let is_selected = Some(*child_id) == ui_ctx.state.active_task_id;
-
-        let child_line = format!("{prefix} [{child_icon}] {}", child_task.description);
-        let truncated_line = truncate_text(&child_line, max_width);
-
-        let style = render_helpers::child_task_style(is_selected, theme);
-
-        lines.push(Line::from(vec![Span::styled(truncated_line, style)]));
-
-        // Render current step for this child if present
-        if let Some(step) = &child_task.current_step {
-            let connector = if is_last { "    " } else { " │  " };
-            let step_icon = render_helpers::step_type_icon(&step.step_type);
-            let step_line = format!("{connector}└─ {} {}", step_icon, step.content);
-            let truncated_step = truncate_text(&step_line, max_width);
-            let step_style = render_helpers::step_style_with_status(&step.step_type, step.status);
-            lines.push(Line::from(vec![Span::styled(truncated_step, step_style)]));
-        }
-    }
 }

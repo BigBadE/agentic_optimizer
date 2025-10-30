@@ -203,7 +203,6 @@ fn write_compressed_task(path: &Path, serializable: &SerializableTask) -> io::Re
 /// Converts task status to string
 fn task_status_to_string(status: TaskStatus) -> &'static str {
     match status {
-        TaskStatus::Pending => "Pending",
         TaskStatus::Running => "Running",
         TaskStatus::Completed => "Completed",
         TaskStatus::Failed => "Failed",

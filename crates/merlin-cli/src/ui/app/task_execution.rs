@@ -48,17 +48,30 @@ pub struct TaskExecutionParams {
     pub thread_id: Option<ThreadId>,
 }
 
-/// Execute a task and handle its result
-async fn execute_and_handle_task(
+/// Internal parameters for task execution including runtime state
+struct InternalExecutionParams {
     orchestrator: Arc<RoutingOrchestrator>,
     user_input: String,
     parent_task_id: Option<TaskId>,
     conversation_history: Vec<(String, String)>,
     thread_id: Option<ThreadId>,
     ui_channel: UiChannel,
-    mut log_file: Option<File>,
+    log_file: Option<File>,
     forwarder_done_rx: oneshot::Receiver<()>,
-) {
+}
+
+/// Execute a task and handle its result
+async fn execute_and_handle_task(params: InternalExecutionParams) {
+    let InternalExecutionParams {
+        orchestrator,
+        user_input,
+        parent_task_id,
+        conversation_history,
+        thread_id,
+        ui_channel,
+        mut log_file,
+        forwarder_done_rx,
+    } = params;
     if let Some(ref mut log) = log_file {
         let _ignored = writeln!(log, "User: {user_input}");
     }
@@ -278,7 +291,6 @@ fn update_thread_work_failed(
 }
 
 impl<B: Backend> TuiApp<B> {
-
     /// Spawns an event forwarder that duplicates events to both task-specific and global channels
     fn spawn_event_forwarder(
         mut internal_rx: mpsc::Receiver<UiEvent>,
@@ -340,7 +352,7 @@ impl<B: Backend> TuiApp<B> {
         let ui_channel = UiChannel::from_sender(internal_tx);
         let log_file = self.log_file.as_ref().and_then(|f| f.try_clone().ok());
 
-        spawn(execute_and_handle_task(
+        spawn(execute_and_handle_task(InternalExecutionParams {
             orchestrator,
             user_input,
             parent_task_id,
@@ -349,7 +361,7 @@ impl<B: Backend> TuiApp<B> {
             ui_channel,
             log_file,
             forwarder_done_rx,
-        ));
+        }));
 
         // Store receiver for test access
         #[cfg(feature = "test-util")]

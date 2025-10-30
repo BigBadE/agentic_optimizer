@@ -10,7 +10,7 @@ use super::mock_provider::{MockProvider, MockRouter};
 use super::verification_result::VerificationResult;
 use super::verifier::UnifiedVerifier;
 use super::workspace_setup::{create_files, get_test_workspace_path};
-use merlin_agent::RoutingOrchestrator;
+use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_cli::TuiApp;
 use merlin_core::{ModelProvider, Result, RoutingError, TaskResult};
 use merlin_deps::ratatui::backend::TestBackend;
@@ -22,9 +22,10 @@ use merlin_tooling::ToolResult;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
-use std::sync::Arc;
+use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tokio::sync::mpsc;
+use tokio::task::yield_now;
 use tokio::time::{Duration as TokioDuration, sleep, timeout};
 
 /// Result type for task completion with captured outputs
@@ -121,11 +122,16 @@ impl UnifiedTestRunner {
         // Create orchestrator with mock router and provider registry
         let router = Arc::new(MockRouter);
 
-        // Create thread store for conversation management
-        // Don't create thread store for tests - it forces thread mode UI which breaks
-        // fixtures expecting classic mode. Thread-specific fixtures will need special handling.
-        let orchestrator =
-            RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?;
+        // Create thread store for conversation management if fixture uses threads
+        let needs_threads = fixture.tags.contains(&"threads".to_owned());
+        let orchestrator = if needs_threads {
+            let store = ThreadStore::new(final_workspace_path.clone())?;
+            let thread_store = Arc::new(Mutex::new(store));
+            RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?
+                .with_thread_store(thread_store)
+        } else {
+            RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?
+        };
 
         // Create fixture-based event source with controller
         let (event_source, event_controller) = FixtureEventSource::new(&fixture);
@@ -247,7 +253,7 @@ impl UnifiedTestRunner {
                 }
                 Err(_) => {
                     // Timeout - explicitly yield to allow other tasks to run
-                    tokio::task::yield_now().await;
+                    yield_now().await;
                 }
             }
         }

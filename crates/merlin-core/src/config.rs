@@ -10,16 +10,22 @@ use std::path::{Path, PathBuf};
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct RoutingConfig {
     /// Model tier configuration
+    #[serde(default)]
     pub tiers: TierConfig,
     /// API keys for model providers
+    #[serde(default)]
     pub api_keys: ApiKeys,
     /// Validation configuration
+    #[serde(default)]
     pub validation: ValidationConfig,
     /// Execution configuration
+    #[serde(default)]
     pub execution: ExecutionConfig,
     /// Workspace configuration
+    #[serde(default)]
     pub workspace: WorkspaceConfig,
     /// Cache configuration
+    #[serde(default)]
     pub cache: CacheConfig,
 }
 

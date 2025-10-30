@@ -10,7 +10,7 @@ use super::mock_provider::{MockProvider, MockRouter};
 use super::verification_result::VerificationResult;
 use super::verifier::UnifiedVerifier;
 use super::workspace_setup::{create_files, get_test_workspace_path};
-use merlin_agent::{RoutingOrchestrator, ThreadStore};
+use merlin_agent::RoutingOrchestrator;
 use merlin_cli::TuiApp;
 use merlin_core::{ModelProvider, Result, RoutingError, TaskResult};
 use merlin_deps::ratatui::backend::TestBackend;
@@ -22,9 +22,9 @@ use merlin_tooling::ToolResult;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
-use std::sync::{Arc, Mutex};
+use std::sync::Arc;
 use std::time::Instant;
-use tokio::sync::broadcast;
+use tokio::sync::mpsc;
 use tokio::time::{Duration as TokioDuration, sleep, timeout};
 
 /// Result type for task completion with captured outputs
@@ -122,13 +122,10 @@ impl UnifiedTestRunner {
         let router = Arc::new(MockRouter);
 
         // Create thread store for conversation management
-        let thread_store_path = final_workspace_path.join(".merlin").join("threads");
-        let thread_store = ThreadStore::new(thread_store_path)
-            .map_err(|err| RoutingError::Other(format!("Failed to create thread store: {err}")))?;
-
+        // Don't create thread store for tests - it forces thread mode UI which breaks
+        // fixtures expecting classic mode. Thread-specific fixtures will need special handling.
         let orchestrator =
-            RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?
-                .with_thread_store(Arc::new(Mutex::new(thread_store)));
+            RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?;
 
         // Create fixture-based event source with controller
         let (event_source, event_controller) = FixtureEventSource::new(&fixture);
@@ -174,12 +171,13 @@ impl UnifiedTestRunner {
         &self.tui_app
     }
 
-    /// Await task completion by listening to UI events
+    /// Await task completion by listening to dedicated task-specific UI events
     ///
-    /// Since we process one submit at a time sequentially, we wait for the next
-    /// `TaskCompleted` or `TaskFailed` event. We capture ALL `TaskOutput` events
-    /// during this wait to ensure we capture outputs from the
-    /// main task and any subtasks (like TypeScript tool executions).
+    /// Uses a per-task event channel to receive only events for this specific task,
+    /// preventing event mixing from concurrent tasks.
+    ///
+    /// We capture ALL `TaskOutput` events during this wait to ensure we capture outputs
+    /// from the main task and any subtasks (like TypeScript tool executions).
     ///
     /// Returns the task result and any captured output from `TaskOutput` events.
     ///
@@ -187,51 +185,53 @@ impl UnifiedTestRunner {
     /// Returns error if task completion fails or times out
     async fn await_task_completion(
         &mut self,
-        ui_events: &mut broadcast::Receiver<UiEvent>,
+        task_events: &mut mpsc::UnboundedReceiver<UiEvent>,
     ) -> Result<TaskCompletionResult> {
         let mut outputs = Vec::new();
         let overall_timeout = TokioDuration::from_secs(5);
         let start = Instant::now();
+        let mut events_received = 0;
+        let mut last_event_time = Instant::now();
 
         loop {
             // Check overall timeout to prevent infinite hangs
             if start.elapsed() >= overall_timeout {
-                return Err(RoutingError::ExecutionFailed(
-                    "Task completion timed out after 5 seconds - no TaskCompleted or TaskFailed event received".to_owned()
-                ));
+                let idle_time = last_event_time.elapsed().as_millis();
+                return Err(RoutingError::ExecutionFailed(format!(
+                    "Task completion timed out after 5 seconds - {events_received} events received, idle for {idle_time}ms"
+                )));
             }
 
             // Process any pending UI events first (this broadcasts them)
             self.tui_app.test_process_ui_events();
 
-            // Try to receive broadcast event with timeout
-            let ui_event = timeout(TokioDuration::from_millis(50), ui_events.recv()).await;
+            // Try to receive task-specific event with timeout
+            let ui_event = timeout(TokioDuration::from_millis(50), task_events.recv()).await;
 
             match ui_event {
-                Ok(Ok(event)) => match event {
-                    UiEvent::TaskCompleted { result, .. } => {
-                        return Ok(Ok((*result, outputs)));
+                Ok(Some(event)) => {
+                    events_received += 1;
+                    last_event_time = Instant::now();
+
+                    match event {
+                        UiEvent::TaskCompleted { result, .. } => {
+                            return Ok(Ok((*result, outputs)));
+                        }
+                        UiEvent::TaskFailed { error, .. } => {
+                            return Ok(Err((error, outputs)));
+                        }
+                        UiEvent::TaskOutput { output, .. } => {
+                            outputs.push(output);
+                        }
+                        _ => {
+                            // Ignore other events (TaskStarted, TaskProgress, etc.)
+                        }
                     }
-                    UiEvent::TaskFailed { error, .. } => {
-                        return Ok(Err((error, outputs)));
-                    }
-                    UiEvent::TaskOutput { output, .. } => {
-                        outputs.push(output);
-                    }
-                    _ => {
-                        // Ignore other events (TaskStarted, TaskProgress, etc.)
-                    }
-                },
-                Ok(Err(broadcast::error::RecvError::Lagged(skipped))) => {
-                    // Channel lagged - some events were dropped
-                    // This is non-fatal, continue waiting for completion
-                    merlin_deps::tracing::warn!(
-                        "UI event channel lagged, skipped {skipped} events"
-                    );
                 }
-                Ok(Err(broadcast::error::RecvError::Closed)) => {
+                Ok(None) => {
+                    // Channel closed before task completion
                     return Err(RoutingError::ExecutionFailed(
-                        "UI event channel closed before task completion".to_owned(),
+                        "Task event channel closed before task completion".to_owned(),
                     ));
                 }
                 Err(_) => {
@@ -258,7 +258,6 @@ impl UnifiedTestRunner {
     /// Returns error if test execution or verification fails
     pub async fn run(&mut self) -> Result<VerificationResult> {
         let workspace_path = self.workspace_path.clone();
-        let mut ui_events = self.tui_app.test_subscribe_ui_events();
         let events = self.fixture.events.clone();
         let final_verify = self.fixture.final_verify.clone();
         let mut execution_tracker = ExecutionResultTracker::new();
@@ -292,8 +291,11 @@ impl UnifiedTestRunner {
                     // Advance to next fixture event
                     self.event_controller.advance();
 
-                    // Now await task completion
-                    let completion_result = self.await_task_completion(&mut ui_events).await?;
+                    // Get the per-task event receiver from spawn_task_execution
+                    let mut task_events = self.tui_app.test_get_task_receiver()?;
+
+                    // Now await task completion using dedicated per-task channel
+                    let completion_result = self.await_task_completion(&mut task_events).await?;
                     pending_task = Some((completion_result, execution_id));
                 }
                 TestEvent::UserInput(input_event) => {

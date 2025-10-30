@@ -91,6 +91,8 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             orchestrator,
             log_file,
             config_manager,
+            #[cfg(feature = "test-util")]
+            last_task_receiver: None,
         };
 
         Ok(app)
@@ -146,7 +148,7 @@ impl<B: Backend> TuiApp<B> {
     ///
     /// # Errors
     /// Returns an error if thread loading fails
-    pub fn load_threads(&mut self) -> Result<()> {
+    pub fn load_threads(&self) -> Result<()> {
         let mut store = self
             .thread_store
             .lock()
@@ -154,6 +156,7 @@ impl<B: Backend> TuiApp<B> {
         let loaded_count = store.active_threads().len();
         store.load_all()?;
         let new_count = store.active_threads().len();
+        drop(store);
         merlin_deps::tracing::info!(
             "Loaded {} threads from disk ({} new)",
             new_count,

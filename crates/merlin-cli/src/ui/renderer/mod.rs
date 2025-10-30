@@ -13,6 +13,8 @@ use merlin_deps::ratatui::{
     widgets::{Block, Borders, Padding, Paragraph, Wrap},
 };
 
+use std::sync::{Arc, Mutex};
+
 use merlin_agent::ThreadStore;
 use merlin_core::{Thread, ThreadId};
 use merlin_deps::ratatui::text::Line;
@@ -54,7 +56,7 @@ pub struct RenderCtx<'ctx> {
     /// Layout cache to populate with actual rendered dimensions
     pub layout_cache: &'ctx mut layout::LayoutCache,
     /// Thread store reference (shared with orchestrator)
-    pub thread_store: &'ctx std::sync::Arc<std::sync::Mutex<ThreadStore>>,
+    pub thread_store: &'ctx Arc<Mutex<ThreadStore>>,
 }
 
 impl Renderer {
@@ -327,8 +329,10 @@ impl Renderer {
             self.theme.unfocused_border()
         };
 
-        let threads = thread_store.active_threads();
-        let lines = self.build_thread_list_lines(&threads, selected_thread_id, focused);
+        let lines = thread_store.lock().ok().map_or_else(Vec::new, |store| {
+            let threads = store.active_threads();
+            self.build_thread_list_lines(&threads, selected_thread_id, focused)
+        });
 
         let paragraph = Paragraph::new(lines)
             .style(Style::default().fg(self.theme.text()))

@@ -79,8 +79,9 @@ impl<B: Backend> TuiApp<B> {
                 |dir| dir.join(".merlin").join("threads"),
             );
 
-            let store = ThreadStore::new(thread_storage_path)
-                .map_err(|err| RoutingError::Other(format!("Failed to create thread store: {err}")))?;
+            let store = ThreadStore::new(thread_storage_path).map_err(|err| {
+                RoutingError::Other(format!("Failed to create thread store: {err}"))
+            })?;
             Arc::new(Mutex::new(store))
         };
 
@@ -103,6 +104,7 @@ impl<B: Backend> TuiApp<B> {
             orchestrator,
             log_file: None,
             config_manager,
+            last_task_receiver: None,
         };
 
         Ok(app)
@@ -200,5 +202,17 @@ impl<B: Backend> TuiApp<B> {
     /// Returns error if rendering fails
     pub fn test_render(&mut self) -> Result<()> {
         self.render()
+    }
+
+    /// Get the last task-specific event receiver for testing
+    ///
+    /// This returns the receiver created by the most recent `spawn_task_execution` call.
+    ///
+    /// # Errors
+    /// Returns error if no task has been spawned yet
+    pub fn test_get_task_receiver(&mut self) -> Result<mpsc::UnboundedReceiver<UiEvent>> {
+        self.last_task_receiver.take().ok_or_else(|| {
+            RoutingError::Other("No task receiver available - did you spawn a task?".to_owned())
+        })
     }
 }

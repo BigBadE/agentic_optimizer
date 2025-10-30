@@ -1,14 +1,16 @@
 //! Task execution and orchestration logic
 
+use std::fs::File;
 use std::io::Write as _;
 use std::sync::Arc;
 
 use merlin_agent::RoutingOrchestrator;
-use merlin_core::{Message, MessageId, ThreadId, TokenUsage, WorkUnit};
+use merlin_core::{Message, MessageId, TaskResult, ThreadId, TokenUsage, WorkUnit};
 use merlin_deps::ratatui::backend::Backend;
-use merlin_routing::{Task, TaskId, UiChannel, UiEvent};
+use merlin_routing::{RoutingError, Task, TaskId, UiChannel, UiEvent};
 use merlin_tooling::ToolError;
 use tokio::spawn;
+use tokio::sync::{mpsc, oneshot};
 
 use super::tui_app::TuiApp;
 
@@ -20,6 +22,16 @@ struct WorkCompletionParams {
     tier_used: String,
     tokens_used: TokenUsage,
     duration_ms: u64,
+}
+
+/// Context for task result handling
+struct TaskResultContext<'ctx> {
+    task_id: TaskId,
+    ui_channel: &'ctx UiChannel,
+    log_file: &'ctx mut Option<File>,
+    orchestrator: &'ctx RoutingOrchestrator,
+    actual_thread_id: Option<ThreadId>,
+    message_id: Option<MessageId>,
 }
 
 /// Parameters for task execution
@@ -37,8 +49,82 @@ pub struct TaskExecutionParams {
 }
 
 impl<B: Backend> TuiApp<B> {
+    /// Handle successful task completion
+    fn handle_task_success(result_data: &TaskResult, ctx: &mut TaskResultContext<'_>) {
+        // Emit the actual execution result as TaskOutput
+        ctx.ui_channel.send(UiEvent::TaskOutput {
+            task_id: ctx.task_id,
+            output: result_data.response.text.clone(),
+        });
+
+        ctx.ui_channel
+            .completed(result_data.task_id, result_data.clone());
+
+        if let Some(log) = ctx.log_file {
+            let _response_write = writeln!(log, "Response: {}", result_data.response.text);
+            let _metrics_write = writeln!(
+                log,
+                "Tier: {} | Duration: {}ms | Tokens: {}",
+                result_data.tier_used,
+                result_data.duration_ms,
+                result_data.response.tokens_used.total()
+            );
+        }
+
+        if let (Some(tid), Some(msg_id)) = (ctx.actual_thread_id, ctx.message_id) {
+            Self::update_thread_work_completed(
+                ctx.orchestrator,
+                WorkCompletionParams {
+                    thread_id: tid,
+                    message_id: msg_id,
+                    task_id: ctx.task_id,
+                    tier_used: result_data.tier_used.clone(),
+                    tokens_used: result_data.response.tokens_used.clone(),
+                    duration_ms: result_data.duration_ms,
+                },
+            );
+        }
+    }
+
+    /// Handle task execution failure
+    fn handle_task_failure(error: &RoutingError, ctx: &TaskResultContext<'_>) {
+        ctx.ui_channel
+            .failed(ctx.task_id, ToolError::ExecutionFailed(error.to_string()));
+
+        if let (Some(tid), Some(msg_id)) = (ctx.actual_thread_id, ctx.message_id) {
+            Self::update_thread_work_failed(ctx.orchestrator, tid, msg_id, ctx.task_id);
+        }
+    }
+
+    /// Spawns an event forwarder that duplicates events to both task-specific and global channels
+    fn spawn_event_forwarder(
+        mut internal_rx: mpsc::UnboundedReceiver<UiEvent>,
+        task_event_tx: mpsc::UnboundedSender<UiEvent>,
+        global_ui_sender: mpsc::UnboundedSender<UiEvent>,
+        forwarder_done_tx: oneshot::Sender<()>,
+    ) {
+        spawn(async move {
+            while let Some(event) = internal_rx.recv().await {
+                // Send to task-specific channel (test waits on this)
+                if task_event_tx.send(event.clone()).is_err() {
+                    break;
+                }
+                // Send to global UI channel (UI updates from this)
+                if global_ui_sender.send(event).is_err() {
+                    break;
+                }
+            }
+            // Signal that forwarding is complete
+            if forwarder_done_tx.send(()).is_err() {
+                merlin_deps::tracing::warn!("Forwarder completion signal receiver was dropped");
+            }
+        });
+    }
+
     /// Spawn task execution in background
-    pub(crate) fn spawn_task_execution(&self, params: TaskExecutionParams) {
+    ///
+    /// In test mode, stores a receiver for task-specific events in `last_task_receiver`.
+    pub(crate) fn spawn_task_execution(&mut self, params: TaskExecutionParams) {
         let TaskExecutionParams {
             orchestrator,
             user_input,
@@ -46,7 +132,28 @@ impl<B: Backend> TuiApp<B> {
             conversation_history,
             thread_id,
         } = params;
-        let ui_channel = UiChannel::from_sender(self.event_sender.clone());
+
+        // Create per-task event channel for isolated event delivery
+        let (task_event_tx, task_event_rx) = mpsc::unbounded_channel();
+
+        // Clone global UI channel for broadcasting to UI
+        let global_ui_sender = self.event_sender.clone();
+
+        // Create internal channel for task execution
+        let (internal_tx, internal_rx) = mpsc::unbounded_channel::<UiEvent>();
+
+        // Create oneshot channel to signal when forwarder is done
+        let (forwarder_done_tx, forwarder_done_rx) = oneshot::channel();
+
+        // Spawn forwarder that duplicates events to both channels
+        Self::spawn_event_forwarder(
+            internal_rx,
+            task_event_tx,
+            global_ui_sender,
+            forwarder_done_tx,
+        );
+
+        let ui_channel = UiChannel::from_sender(internal_tx);
         let mut log_file = self.log_file.as_ref().and_then(|f| f.try_clone().ok());
 
         spawn(async move {
@@ -85,51 +192,49 @@ impl<B: Backend> TuiApp<B> {
                     .await
             };
 
-            match result {
-                Ok(result_data) => {
-                    // Emit the actual execution result as TaskOutput
-                    ui_channel.send(UiEvent::TaskOutput {
-                        task_id,
-                        output: result_data.response.text.clone(),
-                    });
+            // Handle result in a scope to ensure ctx is dropped before we drop ui_channel
+            {
+                let mut ctx = TaskResultContext {
+                    task_id,
+                    ui_channel: &ui_channel,
+                    log_file: &mut log_file,
+                    orchestrator: &orchestrator,
+                    actual_thread_id,
+                    message_id,
+                };
 
-                    ui_channel.completed(result_data.task_id, result_data.clone());
-
-                    if let Some(ref mut log) = log_file {
-                        let _response_write =
-                            writeln!(log, "Response: {}", result_data.response.text);
-                        let _metrics_write = writeln!(
-                            log,
-                            "Tier: {} | Duration: {}ms | Tokens: {}",
-                            result_data.tier_used,
-                            result_data.duration_ms,
-                            result_data.response.tokens_used.total()
-                        );
+                match result {
+                    Ok(ref result_data) => {
+                        Self::handle_task_success(result_data, &mut ctx);
                     }
-
-                    if let (Some(tid), Some(msg_id)) = (actual_thread_id, message_id) {
-                        Self::update_thread_work_completed(
-                            &orchestrator,
-                            WorkCompletionParams {
-                                thread_id: tid,
-                                message_id: msg_id,
-                                task_id,
-                                tier_used: result_data.tier_used.clone(),
-                                tokens_used: result_data.response.tokens_used.clone(),
-                                duration_ms: result_data.duration_ms,
-                            },
-                        );
+                    Err(ref error) => {
+                        Self::handle_task_failure(error, &ctx);
                     }
                 }
-                Err(error) => {
-                    ui_channel.failed(task_id, ToolError::ExecutionFailed(error.to_string()));
+            } // ctx is dropped here, releasing the reference to ui_channel
 
-                    if let (Some(tid), Some(msg_id)) = (actual_thread_id, message_id) {
-                        Self::update_thread_work_failed(&orchestrator, tid, msg_id, task_id);
-                    }
-                }
+            // Drop ui_channel to close internal_tx, signaling forwarder to finish
+            drop(ui_channel);
+
+            // Wait for forwarder to finish processing all events
+            if forwarder_done_rx.await.is_err() {
+                merlin_deps::tracing::warn!(
+                    "Forwarder completion signal sender was dropped before signaling"
+                );
             }
         });
+
+        // Store receiver for test access
+        #[cfg(feature = "test-util")]
+        {
+            self.last_task_receiver = Some(task_event_rx);
+        }
+
+        // Return the task-specific receiver for isolated event waiting
+        #[cfg(not(feature = "test-util"))]
+        {
+            drop(task_event_rx); // Not used in production
+        }
     }
 
     fn create_or_continue_thread(

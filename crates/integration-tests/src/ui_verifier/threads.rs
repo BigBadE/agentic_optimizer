@@ -12,7 +12,10 @@ fn get_thread_count(app: &TuiApp<TestBackend>) -> usize {
     app.test_orchestrator().map_or_else(
         || {
             // Fallback to app's thread store if no orchestrator
-            app.test_thread_store().active_threads().len()
+            app.test_thread_store()
+                .lock()
+                .ok()
+                .map_or(0, |store| store.active_threads().len())
         },
         |orchestrator| {
             // Get from orchestrator's thread store (where threads are actually created during task execution)
@@ -35,10 +38,15 @@ fn get_threads(app: &TuiApp<TestBackend>) -> Vec<Thread> {
         || {
             // Fallback to app's thread store
             app.test_thread_store()
-                .active_threads()
-                .iter()
-                .map(|thread| (*thread).clone())
-                .collect()
+                .lock()
+                .ok()
+                .map_or_else(Vec::new, |store| {
+                    store
+                        .active_threads()
+                        .iter()
+                        .map(|thread| (*thread).clone())
+                        .collect()
+                })
         },
         |orchestrator| {
             // Get from orchestrator's thread store

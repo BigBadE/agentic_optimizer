@@ -187,7 +187,7 @@ impl ExecutorPool {
         let config = RoutingConfig::default();
         let mut executor =
             AgentExecutor::new(router, validator, tool_registry, context_fetcher, &config)?;
-        let (sender, _receiver) = mpsc::unbounded_channel();
+        let (sender, _receiver) = mpsc::channel(128);
         let ui_channel = UiChannel::from_sender(sender);
 
         executor.execute_task(task, ui_channel).await

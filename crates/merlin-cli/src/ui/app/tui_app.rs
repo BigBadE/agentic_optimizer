@@ -62,7 +62,7 @@ pub struct TuiApp<B: Backend> {
     pub(crate) config_manager: ConfigManager,
     /// Latest task-specific event receiver for testing
     #[cfg(feature = "test-util")]
-    pub(crate) last_task_receiver: Option<mpsc::UnboundedReceiver<UiEvent>>,
+    pub(crate) last_task_receiver: Option<mpsc::Receiver<UiEvent>>,
 }
 
 // Note: all input is sourced from `event_source` to allow test injection without

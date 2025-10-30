@@ -185,28 +185,30 @@ impl UnifiedTestRunner {
     /// Returns error if task completion fails or times out
     async fn await_task_completion(
         &mut self,
-        task_events: &mut mpsc::UnboundedReceiver<UiEvent>,
+        task_events: &mut mpsc::Receiver<UiEvent>,
     ) -> Result<TaskCompletionResult> {
         let mut outputs = Vec::new();
         let overall_timeout = TokioDuration::from_secs(5);
         let start = Instant::now();
         let mut events_received = 0;
         let mut last_event_time = Instant::now();
+        let mut task_started = false;
 
         loop {
             // Check overall timeout to prevent infinite hangs
             if start.elapsed() >= overall_timeout {
                 let idle_time = last_event_time.elapsed().as_millis();
                 return Err(RoutingError::ExecutionFailed(format!(
-                    "Task completion timed out after 5 seconds - {events_received} events received, idle for {idle_time}ms"
+                    "Task completion timed out after 5 seconds - {events_received} events received, \
+                     task_started: {task_started}, idle for {idle_time}ms"
                 )));
             }
 
             // Process any pending UI events first (this broadcasts them)
             self.tui_app.test_process_ui_events();
 
-            // Try to receive task-specific event with timeout
-            let ui_event = timeout(TokioDuration::from_millis(50), task_events.recv()).await;
+            // Try to receive task-specific event with timeout (increased to reduce CPU thrashing)
+            let ui_event = timeout(TokioDuration::from_millis(100), task_events.recv()).await;
 
             match ui_event {
                 Ok(Some(event)) => {
@@ -214,6 +216,9 @@ impl UnifiedTestRunner {
                     last_event_time = Instant::now();
 
                     match event {
+                        UiEvent::TaskStarted { .. } => {
+                            task_started = true;
+                        }
                         UiEvent::TaskCompleted { result, .. } => {
                             return Ok(Ok((*result, outputs)));
                         }
@@ -224,18 +229,25 @@ impl UnifiedTestRunner {
                             outputs.push(output);
                         }
                         _ => {
-                            // Ignore other events (TaskStarted, TaskProgress, etc.)
+                            // Ignore other events (TaskProgress, etc.)
                         }
                     }
                 }
                 Ok(None) => {
-                    // Channel closed before task completion
+                    // Channel closed - check if we got completion
+                    if task_started {
+                        return Err(RoutingError::ExecutionFailed(format!(
+                            "Task event channel closed after {events_received} events \
+                             without TaskCompleted/TaskFailed"
+                        )));
+                    }
                     return Err(RoutingError::ExecutionFailed(
-                        "Task event channel closed before task completion".to_owned(),
+                        "Task event channel closed before task started".to_owned(),
                     ));
                 }
                 Err(_) => {
-                    // Timeout - loop will process more UI events
+                    // Timeout - explicitly yield to allow other tasks to run
+                    tokio::task::yield_now().await;
                 }
             }
         }

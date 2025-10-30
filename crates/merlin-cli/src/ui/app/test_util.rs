@@ -210,7 +210,7 @@ impl<B: Backend> TuiApp<B> {
     ///
     /// # Errors
     /// Returns error if no task has been spawned yet
-    pub fn test_get_task_receiver(&mut self) -> Result<mpsc::UnboundedReceiver<UiEvent>> {
+    pub fn test_get_task_receiver(&mut self) -> Result<mpsc::Receiver<UiEvent>> {
         self.last_task_receiver.take().ok_or_else(|| {
             RoutingError::Other("No task receiver available - did you spawn a task?".to_owned())
         })

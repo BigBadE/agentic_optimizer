@@ -5,6 +5,7 @@ use crate::conversation::ThreadId;
 use crate::task::{TaskId, TaskResult};
 use merlin_deps::tracing::warn;
 use merlin_tooling::ToolError;
+use tokio::spawn;
 use tokio::sync::mpsc;
 
 /// Event types for UI updates
@@ -16,21 +17,24 @@ pub use events::{MessageLevel, TaskProgress, UiEvent};
 /// UI update channel - REQUIRED for all task execution
 #[derive(Clone)]
 pub struct UiChannel {
-    /// Sender used to deliver `UiEvent`s to the UI thread
-    sender: mpsc::UnboundedSender<UiEvent>,
+    /// Sender used to deliver `UiEvent`s to the UI thread (bounded for backpressure)
+    sender: mpsc::Sender<UiEvent>,
 }
 
 impl UiChannel {
-    /// Creates a UI channel from an existing sender (for testing)
-    pub fn from_sender(sender: mpsc::UnboundedSender<UiEvent>) -> Self {
+    /// Creates a UI channel from an existing bounded sender
+    pub fn from_sender(sender: mpsc::Sender<UiEvent>) -> Self {
         Self { sender }
     }
 
-    /// Sends a UI event
+    /// Sends a UI event (spawns a task to avoid blocking the caller)
     pub fn send(&self, event: UiEvent) {
-        if let Err(error) = self.sender.send(event) {
-            warn!("Failed to send UI event: {}", error);
-        }
+        let sender = self.sender.clone();
+        spawn(async move {
+            if let Err(error) = sender.send(event).await {
+                warn!("Failed to send UI event: {}", error);
+            }
+        });
     }
 
     /// Sends a task started event

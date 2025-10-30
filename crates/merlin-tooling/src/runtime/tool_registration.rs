@@ -21,10 +21,6 @@ use crate::{Tool, ToolInput, ToolOutput, ToolResult};
 ///
 /// # Errors
 /// Returns error if registration fails
-#[allow(
-    clippy::too_many_lines,
-    reason = "Tool registration requires handling each tool type"
-)]
 pub fn register_tool_functions(
     context: &mut Context,
     tools: &HashMap<String, Arc<dyn Tool>>,

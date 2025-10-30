@@ -39,7 +39,6 @@ pub struct UiState {
     /// Currently active thread
     pub active_thread_id: Option<ThreadId>,
     /// Thread list scroll offset (for future use)
-    #[allow(dead_code, reason = "Reserved for scroll position persistence")]
     pub thread_list_scroll_offset: usize,
     /// Which panel is focused (thread list vs work details)
     pub focused_panel: PanelFocus,

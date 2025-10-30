@@ -23,7 +23,6 @@ use std::path::PathBuf;
 use std::time::Instant;
 use tokio::sync::{broadcast, mpsc};
 
-#[allow(dead_code, reason = "Temporary allow")]
 impl<B: Backend> TuiApp<B> {
     /// Creates a new `TuiApp` for testing with custom backend and event source
     ///

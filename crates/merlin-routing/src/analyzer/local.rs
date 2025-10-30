@@ -107,14 +107,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_complexity_estimation() {
+    async fn test_complexity_estimation() -> Result<()> {
         let analyzer = LocalTaskAnalyzer::default();
 
         // Test simple task
-        let simple_analysis = analyzer
-            .analyze("Add a comment")
-            .await
-            .expect("Analysis failed");
+        let simple_analysis = analyzer.analyze("Add a comment").await?;
         assert!(!simple_analysis.tasks.is_empty());
         let simple_difficulty = simple_analysis.tasks[0].difficulty;
         assert!(
@@ -123,16 +120,15 @@ mod tests {
         );
 
         // Test complex task
-        let complex_analysis = analyzer
-            .analyze("Refactor the entire architecture")
-            .await
-            .expect("Analysis failed");
+        let complex_analysis = analyzer.analyze("Refactor the entire architecture").await?;
         assert!(!complex_analysis.tasks.is_empty());
         let complex_difficulty = complex_analysis.tasks[0].difficulty;
         assert!(
             complex_difficulty >= 5,
             "Complex tasks should have medium to high difficulty, got {complex_difficulty}"
         );
+
+        Ok(())
     }
 
     #[tokio::test]

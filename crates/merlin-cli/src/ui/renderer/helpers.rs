@@ -50,10 +50,6 @@ pub fn selection_style(is_selected: bool, theme: Theme) -> Style {
 ///
 /// # Returns
 /// Ratatui `Style` with appropriate colors for child tasks
-#[allow(
-    dead_code,
-    reason = "Used by add_child_task_lines, kept for future thread-based grouping"
-)]
 pub fn child_task_style(is_selected: bool, theme: Theme) -> Style {
     if is_selected {
         Style::default()

@@ -5,15 +5,9 @@
 #![cfg_attr(
     test,
     allow(
-        dead_code,
-        clippy::expect_used,
-        clippy::unwrap_used,
-        clippy::panic,
         clippy::missing_panics_doc,
         clippy::missing_errors_doc,
-        clippy::print_stdout,
-        clippy::print_stderr,
-        reason = "Test allows"
+        reason = "Allow for tests"
     )
 )]
 
@@ -48,7 +42,8 @@ pub use types::{Context, FileContext, Query, Response, TokenUsage};
 
 // Re-export types from merged modules (formerly merlin-types)
 pub use config::{
-    CacheConfig, ExecutionConfig, RoutingConfig, TierConfig, ValidationConfig, WorkspaceConfig,
+    ProjectConfig, RoutingConfig, TierConfig, ValidationCheckType, ValidationChecks,
+    ValidationConfig,
 };
 pub use conversation::{
     BranchPoint, Message, MessageId, Subtask, SubtaskId, SubtaskStatus, Thread, ThreadColor,

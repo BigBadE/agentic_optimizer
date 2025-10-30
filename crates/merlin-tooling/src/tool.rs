@@ -134,6 +134,7 @@ pub trait Tool: Send + Sync {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use merlin_deps::anyhow::Result;
     use merlin_deps::serde_json::{Value as JsonValue, json};
 
     // REMOVED: test_tool_error_display - Low value trait test
@@ -179,24 +180,27 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_tool_trait_implementation() {
+    async fn test_tool_trait_implementation() -> Result<()> {
         let tool = MockTool;
         assert_eq!(tool.name(), "mock_tool");
 
         let input = ToolInput { params: json!({}) };
-        let result = tool.execute(input).await;
-        assert!(result.is_ok());
-        assert!(result.unwrap().success);
+        let result = tool.execute(input).await?;
+        assert!(result.success);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_tool_trait_error_handling() {
+    async fn test_tool_trait_error_handling() -> Result<()> {
         let tool = MockTool;
         let input = ToolInput {
             params: json!({"fail": true}),
         };
         let result = tool.execute(input).await;
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), ToolError::ExecutionFailed(_)));
+        if let Err(err) = result {
+            assert!(matches!(err, ToolError::ExecutionFailed(_)));
+        }
+        Ok(())
     }
 }

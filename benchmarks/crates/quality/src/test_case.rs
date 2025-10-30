@@ -99,12 +99,7 @@ mod tests {
     use toml::from_str;
 
     #[test]
-    #[allow(
-        clippy::unwrap_used,
-        clippy::missing_panics_doc,
-        reason = "Test code can use unwrap"
-    )]
-    fn test_priority_parsing() {
+    fn test_priority_parsing() -> Result<()> {
         let toml_content = r#"
             name = "Test"
             query = "test query"
@@ -121,9 +116,11 @@ mod tests {
             reason = "test"
         "#;
 
-        let test_case: TestCase = from_str(toml_content).unwrap();
+        let test_case: TestCase = from_str(toml_content)?;
         assert_eq!(test_case.expected.len(), 2);
         assert_eq!(test_case.expected[0].priority, Priority::Critical);
         assert_eq!(test_case.expected[1].priority, Priority::High);
+
+        Ok(())
     }
 }

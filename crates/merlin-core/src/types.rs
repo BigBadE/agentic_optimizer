@@ -148,6 +148,7 @@ impl FileContext {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use merlin_deps::anyhow::Result;
     use merlin_deps::serde_json::{from_str, to_string};
     use merlin_deps::tempfile::TempDir;
     use std::fs::write;
@@ -162,12 +163,13 @@ mod tests {
     }
 
     #[test]
-    fn test_query_serialization() {
+    fn test_query_serialization() -> Result<()> {
         let query = Query::new("test query").with_files(vec![PathBuf::from("test.rs")]);
-        let json = to_string(&query).unwrap();
-        let deserialized: Query = from_str(&json).unwrap();
+        let json = to_string(&query)?;
+        let deserialized: Query = from_str(&json)?;
         assert_eq!(query.text, deserialized.text);
         assert_eq!(query.files_context, deserialized.files_context);
+        Ok(())
     }
 
     #[test]
@@ -221,14 +223,15 @@ mod tests {
     // REMOVED: test_file_context_new - Constructor test
 
     #[test]
-    fn test_file_context_from_path() {
-        let temp_dir = TempDir::new().unwrap();
+    fn test_file_context_from_path() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let file_path = temp_dir.path().join("test.txt");
-        write(&file_path, "test content").unwrap();
+        write(&file_path, "test content")?;
 
-        let file_context = FileContext::from_path(&file_path).unwrap();
+        let file_context = FileContext::from_path(&file_path)?;
         assert_eq!(file_context.path, file_path);
         assert_eq!(file_context.content, "test content");
+        Ok(())
     }
 
     #[test]
@@ -236,11 +239,13 @@ mod tests {
         let path = PathBuf::from("nonexistent.txt");
         let result = FileContext::from_path(&path);
         assert!(result.is_err());
-        assert!(matches!(result.unwrap_err(), Error::FileNotFound(_)));
+        if let Err(err) = result {
+            assert!(matches!(err, Error::FileNotFound(_)));
+        }
     }
 
     #[test]
-    fn test_response_serialization() {
+    fn test_response_serialization() -> Result<()> {
         let response = Response {
             text: "response text".to_owned(),
             confidence: 0.95,
@@ -254,10 +259,11 @@ mod tests {
             latency_ms: 250,
         };
 
-        let json = to_string(&response).unwrap();
-        let deserialized: Response = from_str(&json).unwrap();
+        let json = to_string(&response)?;
+        let deserialized: Response = from_str(&json)?;
         assert_eq!(response.text, deserialized.text);
         assert!((response.confidence - deserialized.confidence).abs() < f64::EPSILON);
         assert_eq!(response.provider, deserialized.provider);
+        Ok(())
     }
 }

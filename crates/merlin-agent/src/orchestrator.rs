@@ -1,7 +1,8 @@
+use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    AgentExecutor, ConflictAwareTaskGraph, ContextFetcher, ExecutorPool, TaskGraph, ThreadStore,
+    AgentExecutor, ConflictAwareTaskGraph, ContextFetcher, ExecutorPool, ThreadStore,
     ValidationPipeline, Validator, WorkspaceState,
 };
 use merlin_core::{Result, RoutingConfig, RoutingError, Task, TaskResult, ThreadId, UiChannel};
@@ -45,19 +46,18 @@ impl RoutingOrchestrator {
     /// # Errors
     /// Returns an error if provider registry initialization fails (e.g., missing API keys).
     pub fn new(config: RoutingConfig) -> Result<Self> {
-        let analyzer = Arc::new(
-            LocalTaskAnalyzer::default().with_max_parallel(config.execution.max_concurrent_tasks),
-        );
+        // No max concurrent task limit - parallelization is always enabled
+        let analyzer = Arc::new(LocalTaskAnalyzer::default());
 
         // Create provider registry and router
         let provider_registry = ProviderRegistry::new(config.clone())?;
         let router = Arc::new(StrategyRouter::new(provider_registry));
 
-        let validator = Arc::new(
-            ValidationPipeline::with_default_stages().with_early_exit(config.validation.early_exit),
-        );
+        // Validation with default stages, early exit disabled
+        let validator = Arc::new(ValidationPipeline::with_default_stages());
 
-        let workspace = WorkspaceState::new(config.workspace.root_path.clone());
+        // Workspace uses current directory
+        let workspace = WorkspaceState::new(PathBuf::from("."));
 
         Ok(Self {
             config,
@@ -84,15 +84,14 @@ impl RoutingOrchestrator {
         router: Arc<dyn ModelRouter>,
         provider_registry: Arc<ProviderRegistry>,
     ) -> Result<Self> {
-        let analyzer = Arc::new(
-            LocalTaskAnalyzer::default().with_max_parallel(config.execution.max_concurrent_tasks),
-        );
+        // No max concurrent task limit - parallelization is always enabled
+        let analyzer = Arc::new(LocalTaskAnalyzer::default());
 
-        let validator = Arc::new(
-            ValidationPipeline::with_default_stages().with_early_exit(config.validation.early_exit),
-        );
+        // Validation with default stages, early exit disabled
+        let validator = Arc::new(ValidationPipeline::with_default_stages());
 
-        let workspace = WorkspaceState::new(config.workspace.root_path.clone());
+        // Workspace uses current directory
+        let workspace = WorkspaceState::new(PathBuf::from("."));
 
         Ok(Self {
             config,
@@ -257,7 +256,7 @@ impl RoutingOrchestrator {
         let tool_registry = Arc::new(tool_registry);
         let context_fetcher = ContextFetcher::new(workspace_root.clone());
 
-        let mut executor = if let Some(ref registry) = self.provider_registry {
+        let executor = if let Some(ref registry) = self.provider_registry {
             // Use injected provider registry (for testing)
             use crate::agent::executor::AgentExecutorParams;
             AgentExecutor::with_provider_registry(AgentExecutorParams {
@@ -279,10 +278,7 @@ impl RoutingOrchestrator {
             )?
         };
 
-        if self.config.execution.context_dump {
-            executor.enable_context_dump();
-        }
-
+        // Context dump is disabled by default
         Ok(executor)
     }
 
@@ -310,33 +306,22 @@ impl RoutingOrchestrator {
     /// # Errors
     /// Returns an error if conflict detection or task execution fails
     pub async fn execute_tasks(&self, tasks: Vec<Task>) -> Result<Vec<TaskResult>> {
-        if self.config.execution.enable_conflict_detection {
-            let graph = ConflictAwareTaskGraph::from_tasks(&tasks);
+        // Conflict detection is always enabled with file locking
+        let graph = ConflictAwareTaskGraph::from_tasks(&tasks);
 
-            if graph.has_cycles() {
-                return Err(RoutingError::CyclicDependency);
-            }
-
-            let executor = ExecutorPool::new(
-                Arc::clone(&self.router),
-                Arc::clone(&self.validator),
-                self.config.execution.max_concurrent_tasks,
-                Arc::clone(&self.workspace),
-            );
-
-            executor.execute_conflict_aware_graph(graph).await
-        } else {
-            let graph = TaskGraph::from_tasks(&tasks);
-
-            let executor = ExecutorPool::new(
-                Arc::clone(&self.router),
-                Arc::clone(&self.validator),
-                self.config.execution.max_concurrent_tasks,
-                Arc::clone(&self.workspace),
-            );
-
-            executor.execute_graph(graph).await
+        if graph.has_cycles() {
+            return Err(RoutingError::CyclicDependency);
         }
+
+        // No max concurrent task limit - full parallelization
+        let executor = ExecutorPool::new(
+            Arc::clone(&self.router),
+            Arc::clone(&self.validator),
+            usize::MAX,
+            Arc::clone(&self.workspace),
+        );
+
+        executor.execute_conflict_aware_graph(graph).await
     }
 
     /// Complete workflow: analyze request → execute tasks → return results

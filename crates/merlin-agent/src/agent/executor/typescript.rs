@@ -1,8 +1,7 @@
 //! TypeScript code extraction and execution
 
-use crate::agent::AgentExecutionResult;
-use merlin_core::{Result, RoutingError, TaskId, ui::UiEvent};
-use merlin_deps::serde_json::{from_value, to_string as json_to_string};
+use merlin_core::{AgentResponse, Result, RoutingError, TaskId, TaskList, ui::UiEvent};
+use merlin_deps::serde_json::{from_str, to_string as json_to_string};
 use merlin_routing::UiChannel;
 use merlin_tooling::{ToolRegistry, TypeScriptRuntime};
 use std::sync::Arc;
@@ -45,6 +44,8 @@ pub fn extract_typescript_code(text: &str) -> Option<String> {
 
 /// Execute TypeScript code using the TypeScript runtime
 ///
+/// Returns either a String (task completed) or a `TaskList` (decompose into subtasks)
+///
 /// # Errors
 /// Returns an error if code execution fails or result parsing fails
 pub async fn execute_typescript_code(
@@ -52,7 +53,7 @@ pub async fn execute_typescript_code(
     task_id: TaskId,
     code: &str,
     ui_channel: &UiChannel,
-) -> Result<AgentExecutionResult> {
+) -> Result<AgentResponse> {
     // Create TypeScript runtime and register tools
     let mut runtime = TypeScriptRuntime::new();
 
@@ -96,30 +97,18 @@ pub async fn execute_typescript_code(
         RoutingError::Other(format!("TypeScript execution failed: {err}"))
     })?;
 
-    // Parse result as AgentExecutionResult
-    // Handle both structured results and plain values
-    let execution_result: AgentExecutionResult = if result_value.is_string() {
-        // Plain string result - treat as "done" with the string as the result
-        let result_str = result_value.as_str().unwrap_or("").to_owned();
-        AgentExecutionResult::done(result_str)
-    } else if result_value.is_object() && result_value.get("done").is_some() {
-        // Try to parse as structured AgentExecutionResult (has "done" field)
-        // If parsing fails, fall back to treating as plain object
-        from_value(result_value.clone()).unwrap_or_else(|err| {
-            merlin_deps::tracing::debug!(
-                "Could not parse as AgentExecutionResult, treating as plain value: {}",
-                err
-            );
-            // Fall back to treating as plain object - use compact JSON serialization
-            let result_str =
-                json_to_string(&result_value).unwrap_or_else(|_| result_value.to_string());
-            AgentExecutionResult::done(result_str)
-        })
+    // Parse result as String or TaskList
+    let result_str = if result_value.is_string() {
+        // Plain string result
+        result_value.as_str().unwrap_or("").to_owned()
     } else {
-        // Plain value (object, array, number, etc.) - serialize to compact JSON and treat as "done"
-        let result_str = json_to_string(&result_value).unwrap_or_else(|_| result_value.to_string());
-        AgentExecutionResult::done(result_str)
+        // Serialize to JSON for parsing
+        json_to_string(&result_value)
+            .map_err(|err| RoutingError::Other(format!("Failed to serialize result: {err}")))?
     };
+
+    // Try parsing as TaskList, otherwise treat as String result
+    let agent_response = parse_agent_response(&result_str)?;
 
     // Send step completed event
     ui_channel.send(UiEvent::TaskStepCompleted {
@@ -127,7 +116,42 @@ pub async fn execute_typescript_code(
         step_id: "typescript_execution".to_owned(),
     });
 
-    merlin_deps::tracing::debug!("TypeScript execution result: {:?}", execution_result);
+    merlin_deps::tracing::debug!("TypeScript execution result: {:?}", agent_response);
 
-    Ok(execution_result)
+    Ok(agent_response)
+}
+
+/// Parse agent result as String or `TaskList`
+///
+/// # Errors
+/// Returns error if result looks like a `TaskList` but fails to parse
+fn parse_agent_response(result: &str) -> Result<AgentResponse> {
+    let trimmed = result.trim();
+
+    // Check if result looks like a TaskList (has both "title" and "steps" fields)
+    let looks_like_tasklist = trimmed.contains("\"title\"") && trimmed.contains("\"steps\"");
+
+    // Try parsing as TaskList if it looks like one
+    match from_str::<TaskList>(trimmed) {
+        Ok(task_list) => {
+            merlin_deps::tracing::debug!("Parsed agent response as TaskList");
+            Ok(AgentResponse::TaskList(task_list))
+        }
+        Err(err) if looks_like_tasklist => {
+            // If it looks like a TaskList but failed to parse, that's an error
+            merlin_deps::tracing::error!(
+                "Failed to parse TaskList: {}\nJSON was:\n{}",
+                err,
+                result
+            );
+            Err(RoutingError::Other(format!(
+                "Result looks like TaskList but failed to parse: {err}"
+            )))
+        }
+        Err(_) => {
+            // Doesn't look like a TaskList, treat as direct string result
+            merlin_deps::tracing::debug!("Treating agent response as DirectResult");
+            Ok(AgentResponse::DirectResult(result.to_owned()))
+        }
+    }
 }

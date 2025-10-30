@@ -3,23 +3,13 @@
 //! Allows defining canned responses for specific queries, enabling
 //! end-to-end testing of agent workflows without real API calls.
 
-#![allow(
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::option_if_let_else,
-    clippy::explicit_iter_loop,
-    clippy::must_use_candidate,
-    clippy::missing_panics_doc,
-    clippy::type_complexity,
-    clippy::significant_drop_tightening,
-    clippy::return_self_not_must_use,
-    reason = "Mock provider is for testing only"
-)]
-
 use async_trait::async_trait;
 use merlin_core::{Context, ModelProvider, Query, Response, Result, TokenUsage};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
+
+/// Response storage type
+type ResponseMap = Arc<Mutex<HashMap<String, String>>>;
 
 /// Mock provider that returns pre-defined responses based on query patterns.
 ///
@@ -29,7 +19,7 @@ pub struct MockProvider {
     /// Name of this mock provider
     name: String,
     /// Predefined responses keyed by query text
-    responses: Arc<Mutex<HashMap<String, String>>>,
+    responses: ResponseMap,
     /// Default response if no match found
     default_response: Arc<Mutex<Option<String>>>,
     /// Call history for verification
@@ -49,58 +39,103 @@ impl MockProvider {
     }
 
     /// Add a pattern-based response to the mock provider.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
+    #[must_use]
     pub fn with_response(self, pattern: impl Into<String>, response: impl Into<String>) -> Self {
-        let mut responses = self.responses.lock().expect("Lock poisoned");
-        responses.insert(pattern.into(), response.into());
-        drop(responses);
+        match self.responses.lock() {
+            Ok(mut responses) => {
+                responses.insert(pattern.into(), response.into());
+            }
+            Err(err) => panic!("Lock poisoned: {err}"),
+        }
         self
     }
 
     /// Set a default response for queries that don't match any pattern.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
+    #[must_use]
     pub fn with_default_response(self, response: impl Into<String>) -> Self {
-        let mut default = self.default_response.lock().expect("Lock poisoned");
-        *default = Some(response.into());
-        drop(default);
+        match self.default_response.lock() {
+            Ok(mut default) => {
+                *default = Some(response.into());
+            }
+            Err(err) => panic!("Lock poisoned: {err}"),
+        }
         self
     }
 
     /// Clear the call history (used for testing).
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
     pub fn clear_history(&self) {
-        let mut history = self.call_history.lock().expect("Lock poisoned");
-        history.clear();
+        match self.call_history.lock() {
+            Ok(mut history) => history.clear(),
+            Err(err) => panic!("Lock poisoned: {err}"),
+        }
     }
 
     /// Get the call history (list of all queries made).
     ///
-    /// # Errors
-    /// Returns error if lock is poisoned.
-    pub fn get_call_history(&self) -> Result<Vec<String>> {
-        let history = self.call_history.lock().expect("Lock poisoned");
-        Ok(history.clone())
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
+    #[must_use]
+    pub fn get_call_history(&self) -> Vec<String> {
+        match self.call_history.lock() {
+            Ok(history) => history.clone(),
+            Err(err) => panic!("Lock poisoned: {err}"),
+        }
     }
 
     /// Get the number of calls made.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
+    #[must_use]
     pub fn call_count(&self) -> usize {
-        let history = self.call_history.lock().expect("Lock poisoned");
-        history.len()
+        match self.call_history.lock() {
+            Ok(history) => history.len(),
+            Err(err) => panic!("Lock poisoned: {err}"),
+        }
     }
 
     /// Find a matching response for the given query text.
+    ///
+    /// # Panics
+    ///
+    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
     fn find_response(&self, query_text: &str) -> Option<String> {
-        let responses = self.responses.lock().expect("Lock poisoned");
+        let responses = match self.responses.lock() {
+            Ok(res) => res,
+            Err(err) => panic!("Lock poisoned: {err}"),
+        };
 
         // Try exact match first
         if let Some(response) = responses.get(query_text) {
-            return Some(response.clone());
+            let result = response.clone();
+            drop(responses);
+            return Some(result);
         }
 
         // Try substring match
-        for (pattern, response) in responses.iter() {
+        for (pattern, response) in &*responses {
             if query_text.contains(pattern) {
-                return Some(response.clone());
+                let result = response.clone();
+                drop(responses);
+                return Some(result);
             }
         }
 
+        drop(responses);
         None
     }
 }
@@ -119,19 +154,21 @@ impl ModelProvider for MockProvider {
 
     async fn generate(&self, query: &Query, _context: &Context) -> Result<Response> {
         // Record the call
-        let mut history = self.call_history.lock().expect("Lock poisoned");
-        history.push(query.text.clone());
-        drop(history);
+        match self.call_history.lock() {
+            Ok(mut history) => history.push(query.text.clone()),
+            Err(err) => panic!("Lock poisoned: {err}"),
+        }
 
         // Find matching response
-        let text = if let Some(response) = self.find_response(&query.text) {
-            response
-        } else {
-            let default = self.default_response.lock().expect("Lock poisoned");
+        let text = self.find_response(&query.text).unwrap_or_else(|| {
+            let default = match self.default_response.lock() {
+                Ok(def) => def,
+                Err(err) => panic!("Lock poisoned: {err}"),
+            };
             default
                 .clone()
                 .unwrap_or_else(|| format!("Mock response for query: {}", query.text))
-        };
+        });
 
         Ok(Response {
             text,
@@ -163,8 +200,11 @@ mod tests {
         let query = Query::new("hello".to_owned());
         let context = Context::new("test");
 
-        let response = provider.generate(&query, &context).await.expect("Failed");
-        assert_eq!(response.text, "world");
+        let response = provider.generate(&query, &context).await;
+        assert!(response.is_ok(), "Failed to generate response");
+        if let Ok(resp) = response {
+            assert_eq!(resp.text, "world");
+        }
     }
 
     #[tokio::test]
@@ -175,8 +215,11 @@ mod tests {
         let query = Query::new("Please implement a new login system".to_owned());
         let context = Context::new("test");
 
-        let response = provider.generate(&query, &context).await.expect("Failed");
-        assert_eq!(response.text, "I will implement that feature");
+        let response = provider.generate(&query, &context).await;
+        assert!(response.is_ok(), "Failed to generate response");
+        if let Ok(resp) = response {
+            assert_eq!(resp.text, "I will implement that feature");
+        }
     }
 
     #[tokio::test]
@@ -186,8 +229,11 @@ mod tests {
         let query = Query::new("unmatched query".to_owned());
         let context = Context::new("test");
 
-        let response = provider.generate(&query, &context).await.expect("Failed");
-        assert_eq!(response.text, "Default response");
+        let response = provider.generate(&query, &context).await;
+        assert!(response.is_ok(), "Failed to generate response");
+        if let Ok(resp) = response {
+            assert_eq!(resp.text, "Default response");
+        }
     }
 
     #[tokio::test]
@@ -198,10 +244,12 @@ mod tests {
         let query2 = Query::new("second query".to_owned());
         let context = Context::new("test");
 
-        provider.generate(&query1, &context).await.expect("Failed");
-        provider.generate(&query2, &context).await.expect("Failed");
+        let res1 = provider.generate(&query1, &context).await;
+        assert!(res1.is_ok(), "Failed to generate first response");
+        let res2 = provider.generate(&query2, &context).await;
+        assert!(res2.is_ok(), "Failed to generate second response");
 
-        let history = provider.get_call_history().expect("Failed");
+        let history = provider.get_call_history();
         assert_eq!(history.len(), 2);
         assert_eq!(history[0], "first query");
         assert_eq!(history[1], "second query");
@@ -214,7 +262,8 @@ mod tests {
         let query = Query::new("test".to_owned());
         let context = Context::new("test");
 
-        provider.generate(&query, &context).await.expect("Failed");
+        let res = provider.generate(&query, &context).await;
+        assert!(res.is_ok(), "Failed to generate response");
         assert_eq!(provider.call_count(), 1);
 
         provider.clear_history();

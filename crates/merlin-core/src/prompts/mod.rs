@@ -47,9 +47,10 @@ fn extract_prompt_section(content: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use merlin_deps::anyhow::Result;
 
     #[test]
-    fn test_extract_prompt_section() {
+    fn test_extract_prompt_section() -> Result<()> {
         let markdown = r"# Test Prompt
 
 ## Usage
@@ -63,38 +64,32 @@ This is the actual prompt content.
 It can have multiple lines.
 ";
 
-        let result = extract_prompt_section(markdown).unwrap();
+        let result = extract_prompt_section(markdown)
+            .map_err(|err| merlin_deps::anyhow::anyhow!("{err}"))?;
         assert_eq!(
             result,
             "This is the actual prompt content.\n\nIt can have multiple lines."
         );
+        Ok(())
     }
 
     #[test]
-    fn test_load_context_planning_prompt() {
-        let result = load_prompt("context_planning");
-        assert!(
-            result.is_ok(),
-            "Failed to load context_planning prompt: {:?}",
-            result.err()
-        );
-        let prompt = result.unwrap();
+    fn test_load_context_planning_prompt() -> Result<()> {
+        let prompt =
+            load_prompt("context_planning").map_err(|err| merlin_deps::anyhow::anyhow!("{err}"))?;
         // Ensure Usage section is not included in the extracted prompt
         assert!(!prompt.contains("## Usage"));
         assert!(!prompt.contains("When used:"));
+        Ok(())
     }
 
     #[test]
-    fn test_load_typescript_agent_prompt() {
-        let result = load_prompt("typescript_agent");
-        assert!(
-            result.is_ok(),
-            "Failed to load typescript_agent prompt: {:?}",
-            result.err()
-        );
-        let prompt = result.unwrap();
+    fn test_load_typescript_agent_prompt() -> Result<()> {
+        let prompt =
+            load_prompt("typescript_agent").map_err(|err| merlin_deps::anyhow::anyhow!("{err}"))?;
         // Ensure Usage section is not included in the extracted prompt
         assert!(!prompt.contains("## Usage"));
         assert!(!prompt.contains("When used:"));
+        Ok(())
     }
 }

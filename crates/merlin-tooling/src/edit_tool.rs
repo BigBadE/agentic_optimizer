@@ -185,14 +185,15 @@ declare function editFile(path: string, old_string: string, new_string: string, 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use merlin_deps::anyhow::Result;
     use merlin_deps::serde_json::json;
     use merlin_deps::tempfile::TempDir;
 
     #[tokio::test]
-    async fn test_edit_file_single_replacement() {
-        let temp_dir = TempDir::new().unwrap();
+    async fn test_edit_file_single_replacement() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let file_path = temp_dir.path().join("test.txt");
-        fs::write(&file_path, "hello world").unwrap();
+        fs::write(&file_path, "hello world")?;
 
         let tool = EditFileTool::new(temp_dir.path());
         let input = ToolInput {
@@ -203,18 +204,19 @@ mod tests {
             }),
         };
 
-        let result = tool.execute(input).await.unwrap();
+        let result = tool.execute(input).await?;
         assert!(result.success);
 
-        let content = fs::read_to_string(&file_path).unwrap();
+        let content = fs::read_to_string(&file_path)?;
         assert_eq!(content, "hello rust");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_edit_file_replace_all() {
-        let temp_dir = TempDir::new().unwrap();
+    async fn test_edit_file_replace_all() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let file_path = temp_dir.path().join("test.txt");
-        fs::write(&file_path, "foo bar foo baz foo").unwrap();
+        fs::write(&file_path, "foo bar foo baz foo")?;
 
         let tool = EditFileTool::new(temp_dir.path());
         let input = ToolInput {
@@ -226,18 +228,19 @@ mod tests {
             }),
         };
 
-        let result = tool.execute(input).await.unwrap();
+        let result = tool.execute(input).await?;
         assert!(result.success);
 
-        let content = fs::read_to_string(&file_path).unwrap();
+        let content = fs::read_to_string(&file_path)?;
         assert_eq!(content, "FOO bar FOO baz FOO");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_edit_file_multiple_without_replace_all_fails() {
-        let temp_dir = TempDir::new().unwrap();
+    async fn test_edit_file_multiple_without_replace_all_fails() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let file_path = temp_dir.path().join("test.txt");
-        fs::write(&file_path, "foo bar foo baz").unwrap();
+        fs::write(&file_path, "foo bar foo baz")?;
 
         let tool = EditFileTool::new(temp_dir.path());
         let input = ToolInput {
@@ -249,10 +252,14 @@ mod tests {
         };
 
         let result = tool.execute(input).await;
-        result.unwrap_err();
+        assert!(
+            result.is_err(),
+            "Expected error for multiple matches without replace_all"
+        );
 
         // Content should be unchanged
-        let content = fs::read_to_string(&file_path).unwrap();
+        let content = fs::read_to_string(&file_path)?;
         assert_eq!(content, "foo bar foo baz");
+        Ok(())
     }
 }

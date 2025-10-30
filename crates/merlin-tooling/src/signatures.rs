@@ -28,6 +28,7 @@ mod tests {
     use super::*;
     use crate::{ToolInput, ToolOutput, ToolResult};
     use async_trait::async_trait;
+    use merlin_deps::anyhow::Result;
 
     struct MockTool;
 
@@ -47,12 +48,13 @@ mod tests {
     }
 
     #[test]
-    fn test_generate_multiple_signatures() {
+    fn test_generate_multiple_signatures() -> Result<()> {
         let tools: Vec<&dyn Tool> = vec![&MockTool];
-        let signatures = generate_typescript_signatures(&tools).unwrap();
+        let signatures = generate_typescript_signatures(&tools)?;
 
         assert!(signatures.contains("declare function readFile"));
         assert!(signatures.contains("Reads a file from the filesystem"));
         assert!(signatures.contains("Promise<string>"));
+        Ok(())
     }
 }

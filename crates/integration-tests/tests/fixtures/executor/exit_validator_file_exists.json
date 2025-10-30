@@ -1,0 +1,92 @@
+{
+  "name": "Exit Validator - file_exists",
+  "description": "Tests the file_exists exit requirement validator",
+  "tags": [
+    "executor",
+    "exit_validators",
+    "file_operations"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create a config file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create a config file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "interface TaskList {",
+          "  title: string;",
+          "  steps: Array<{",
+          "    title: string;",
+          "    description: string;",
+          "    step_type: string;",
+          "    exit_requirement?: any;",
+          "  }>;",
+          "}",
+          "",
+          "async function agent_code(): Promise<TaskList> {",
+          "  return {",
+          "    title: 'Create Config File',",
+          "    steps: [",
+          "      {",
+          "        title: 'Create File',",
+          "        description: 'Create config.json file',",
+          "        step_type: 'implementation',",
+          "        exit_requirement: { type: 'pattern', pattern: 'Created config.json successfully' }",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create config.json file",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('config.json', '{\"name\": \"test\"}');",
+          "  return 'Created config.json successfully';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "config.json",
+            "exists": true
+          }
+        ],
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "config.json",
+        "exists": true
+      }
+    ],
+    "execution": {}
+  }
+}

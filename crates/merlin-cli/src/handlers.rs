@@ -1,4 +1,3 @@
-#![allow(dead_code, reason = "Work in progress")]
 //! Command handlers for CLI operations
 
 use merlin_agent::{RoutingOrchestrator, ThreadStore};

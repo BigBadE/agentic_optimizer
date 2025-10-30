@@ -49,154 +49,155 @@ impl FakeEmbeddingClient {
     }
 }
 
-/// Create minimal test project (2 tiny files to minimize embedding time)
-fn create_minimal_project() -> TempDir {
-    let temp_dir = TempDir::new().expect("Failed to create temp directory");
-    let src_dir = temp_dir.path().join("src");
-    fs::create_dir_all(&src_dir).expect("Failed to create src directory");
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use merlin_core::Error as CoreError;
 
-    // Tiny files to minimize embedding generation time
-    fs::write(src_dir.join("lib.rs"), "pub fn a() { }").expect("Failed to write lib.rs");
-    fs::write(src_dir.join("main.rs"), "fn main() { }").expect("Failed to write main.rs");
+    /// Create minimal test project (2 tiny files to minimize embedding time)
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if directory or file creation fails.
+    fn create_minimal_project() -> Result<TempDir> {
+        let temp_dir = TempDir::new().map_err(CoreError::Io)?;
+        let src_dir = temp_dir.path().join("src");
+        fs::create_dir_all(&src_dir).map_err(CoreError::Io)?;
 
-    temp_dir
-}
+        // Tiny files to minimize embedding generation time
+        fs::write(src_dir.join("lib.rs"), "pub fn a() { }").map_err(CoreError::Io)?;
+        fs::write(src_dir.join("main.rs"), "fn main() { }").map_err(CoreError::Io)?;
 
-#[tokio::test]
-async fn test_cache_lifecycle() {
-    // Test cache creation, persistence, and reload in one test
-    let temp_dir = create_minimal_project();
-    let project_root = temp_dir.path().to_path_buf();
+        Ok(temp_dir)
+    }
 
-    // First init - builds cache with fake embeddings
-    let mut manager1 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
-    manager1
-        .initialize()
-        .await
-        .expect("Should initialize with fake embeddings");
+    #[tokio::test]
+    async fn test_cache_lifecycle() -> Result<()> {
+        // Test cache creation, persistence, and reload in one test
+        let temp_dir = create_minimal_project()?;
+        let project_root = temp_dir.path().to_path_buf();
 
-    // Resolve cache path the same way VectorSearchManager does
-    let cache_path = env::var("MERLIN_FOLDER").map_or_else(
-        |_| {
-            project_root
-                .join(".merlin")
-                .join("cache")
-                .join("vector")
-                .join("embeddings.bin")
-        },
-        |folder| {
-            PathBuf::from(folder)
-                .join("cache")
-                .join("vector")
-                .join("embeddings.bin")
-        },
-    );
-    assert!(cache_path.exists(), "Cache file should exist");
-    let len1 = manager1.len();
+        // First init - builds cache with fake embeddings
+        let mut manager1 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
+        manager1.initialize().await?;
 
-    // Second init - loads from cache (fast)
-    let mut manager2 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
-    manager2.initialize().await.expect("Should load from cache");
-    assert_eq!(len1, manager2.len(), "Cache reload should have same files");
+        // Resolve cache path the same way VectorSearchManager does
+        let cache_path = env::var("MERLIN_FOLDER").map_or_else(
+            |_| {
+                project_root
+                    .join(".merlin")
+                    .join("cache")
+                    .join("vector")
+                    .join("embeddings.bin")
+            },
+            |folder| {
+                PathBuf::from(folder)
+                    .join("cache")
+                    .join("vector")
+                    .join("embeddings.bin")
+            },
+        );
+        assert!(cache_path.exists(), "Cache file should exist");
+        let len1 = manager1.len();
 
-    // Delete cache
-    fs::remove_file(&cache_path).expect("Failed to delete cache");
+        // Second init - loads from cache (fast)
+        let mut manager2 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
+        manager2.initialize().await?;
+        assert_eq!(len1, manager2.len(), "Cache reload should have same files");
 
-    // Third init - rebuilds cache
-    let mut manager3 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
-    manager3.initialize().await.expect("Should rebuild cache");
-    assert_eq!(len1, manager3.len(), "Rebuild should have same files");
-    assert!(cache_path.exists(), "Cache should be recreated");
-}
+        // Delete cache
+        fs::remove_file(&cache_path).map_err(CoreError::Io)?;
 
-#[tokio::test]
-async fn test_cache_file_changes() {
-    // Test modification, addition, and deletion in one test
-    let temp_dir = create_minimal_project();
-    let project_root = temp_dir.path().to_path_buf();
-    let src_dir = project_root.join("src");
+        // Third init - rebuilds cache
+        let mut manager3 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
+        manager3.initialize().await?;
+        assert_eq!(len1, manager3.len(), "Rebuild should have same files");
+        assert!(cache_path.exists(), "Cache should be recreated");
 
-    // Initial state
-    let mut manager = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
-    manager
-        .initialize()
-        .await
-        .expect("Should initialize with fake embeddings");
-    let initial_len = manager.len();
+        Ok(())
+    }
 
-    // Test 1: Modification
-    fs::write(src_dir.join("lib.rs"), "pub fn b() { }").expect("Failed to modify");
-    let mut manager2 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
-    manager2
-        .initialize()
-        .await
-        .expect("Should handle modification");
-    assert_eq!(
-        initial_len,
-        manager2.len(),
-        "Modification shouldn't change file count"
-    );
+    #[tokio::test]
+    async fn test_cache_file_changes() -> Result<()> {
+        // Test modification, addition, and deletion in one test
+        let temp_dir = create_minimal_project()?;
+        let project_root = temp_dir.path().to_path_buf();
+        let src_dir = project_root.join("src");
 
-    // Test 2: Addition
-    fs::write(src_dir.join("new.rs"), "pub fn c() { }").expect("Failed to add");
-    let mut manager3 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
-    manager3.initialize().await.expect("Should handle addition");
-    assert!(
-        manager3.len() > initial_len,
-        "Addition should increase file count"
-    );
-    let after_add = manager3.len();
+        // Initial state
+        let mut manager = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
+        manager.initialize().await?;
+        let initial_len = manager.len();
 
-    // Test 3: Deletion
-    fs::remove_file(src_dir.join("new.rs")).expect("Failed to delete");
-    let mut manager4 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
-    manager4.initialize().await.expect("Should handle deletion");
-    assert!(
-        manager4.len() < after_add,
-        "Deletion should decrease file count"
-    );
-}
+        // Test 1: Modification
+        fs::write(src_dir.join("lib.rs"), "pub fn b() { }").map_err(CoreError::Io)?;
+        let mut manager2 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
+        manager2.initialize().await?;
+        assert_eq!(
+            initial_len,
+            manager2.len(),
+            "Modification shouldn't change file count"
+        );
 
-#[tokio::test]
-async fn test_corrupted_cache_recovery() {
-    let temp_dir = create_minimal_project();
-    let project_root = temp_dir.path().to_path_buf();
+        // Test 2: Addition
+        fs::write(src_dir.join("new.rs"), "pub fn c() { }").map_err(CoreError::Io)?;
+        let mut manager3 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
+        manager3.initialize().await?;
+        assert!(
+            manager3.len() > initial_len,
+            "Addition should increase file count"
+        );
+        let after_add = manager3.len();
 
-    // Build cache
-    let mut manager = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
-    manager
-        .initialize()
-        .await
-        .expect("Should initialize with fake embeddings");
-    let initial_len = manager.len();
+        // Test 3: Deletion
+        fs::remove_file(src_dir.join("new.rs")).map_err(CoreError::Io)?;
+        let mut manager4 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
+        manager4.initialize().await?;
+        assert!(
+            manager4.len() < after_add,
+            "Deletion should decrease file count"
+        );
 
-    // Corrupt cache - resolve path the same way VectorSearchManager does
-    let cache_path = env::var("MERLIN_FOLDER").map_or_else(
-        |_| {
-            project_root
-                .join(".merlin")
-                .join("cache")
-                .join("vector")
-                .join("embeddings.bin")
-        },
-        |folder| {
-            PathBuf::from(folder)
-                .join("cache")
-                .join("vector")
-                .join("embeddings.bin")
-        },
-    );
-    fs::write(&cache_path, b"corrupted").expect("Failed to corrupt cache");
+        Ok(())
+    }
 
-    // Should rebuild
-    let mut manager2 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
-    manager2
-        .initialize()
-        .await
-        .expect("Should rebuild after corruption");
-    assert_eq!(
-        initial_len,
-        manager2.len(),
-        "Should have same files after rebuild"
-    );
+    #[tokio::test]
+    async fn test_corrupted_cache_recovery() -> Result<()> {
+        let temp_dir = create_minimal_project()?;
+        let project_root = temp_dir.path().to_path_buf();
+
+        // Build cache
+        let mut manager = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
+        manager.initialize().await?;
+        let initial_len = manager.len();
+
+        // Corrupt cache - resolve path the same way VectorSearchManager does
+        let cache_path = env::var("MERLIN_FOLDER").map_or_else(
+            |_| {
+                project_root
+                    .join(".merlin")
+                    .join("cache")
+                    .join("vector")
+                    .join("embeddings.bin")
+            },
+            |folder| {
+                PathBuf::from(folder)
+                    .join("cache")
+                    .join("vector")
+                    .join("embeddings.bin")
+            },
+        );
+        fs::write(&cache_path, b"corrupted").map_err(CoreError::Io)?;
+
+        // Should rebuild
+        let mut manager2 = VectorSearchManager::with_provider(&project_root, FakeEmbeddingClient);
+        manager2.initialize().await?;
+        assert_eq!(
+            initial_len,
+            manager2.len(),
+            "Should have same files after rebuild"
+        );
+
+        Ok(())
+    }
 }

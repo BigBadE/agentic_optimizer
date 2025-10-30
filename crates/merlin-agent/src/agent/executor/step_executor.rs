@@ -6,12 +6,11 @@ use merlin_core::{
     AgentResponse, Context, ContextSpec, ExitRequirement, ModelProvider, Query, Result,
     RoutingError, TaskId, TaskList, TaskStep, ValidationErrorType,
 };
-use merlin_deps::serde_json::from_str;
 use merlin_routing::UiChannel;
 use merlin_tooling::ToolRegistry;
 
 use super::typescript::{execute_typescript_code, extract_typescript_code};
-use crate::{AgentExecutionResult, ExitRequirementValidators};
+use crate::ExitRequirementValidators;
 
 /// Future returned by async step execution
 type StepFuture<'fut> = Pin<Box<dyn Future<Output = Result<StepResult>> + Send + 'fut>>;
@@ -51,6 +50,40 @@ pub struct StepExecutionParams<'params> {
     pub ui_channel: &'params UiChannel,
     /// Current recursion depth
     pub recursion_depth: usize,
+}
+
+/// Parameters for task list execution
+pub struct TaskListExecutionParams<'params> {
+    /// The task list to execute
+    pub task_list: &'params TaskList,
+    /// Base context to build from
+    pub base_context: &'params Context,
+    /// Provider for execution
+    pub provider: &'params Arc<dyn ModelProvider>,
+    /// Tool registry
+    pub tool_registry: &'params Arc<ToolRegistry>,
+    /// Task ID for UI events
+    pub task_id: TaskId,
+    /// UI channel
+    pub ui_channel: &'params UiChannel,
+    /// Current recursion depth
+    pub recursion_depth: usize,
+}
+
+/// Parameters for agent execution
+pub struct AgentExecutionParams<'params> {
+    /// Task description
+    pub description: &'params str,
+    /// Context for execution
+    pub context: &'params Context,
+    /// Provider for execution
+    pub provider: &'params Arc<dyn ModelProvider>,
+    /// Tool registry
+    pub tool_registry: &'params Arc<ToolRegistry>,
+    /// Task ID for UI events
+    pub task_id: TaskId,
+    /// UI channel
+    pub ui_channel: &'params UiChannel,
 }
 
 /// Step executor handles recursive task decomposition and validation
@@ -215,44 +248,15 @@ impl StepExecutor {
     ///
     /// # Errors
     /// Returns an error if any step fails
-    #[allow(clippy::too_many_arguments, reason = "Internal helper function")]
-    pub fn execute_task_list<'list>(
-        task_list: &'list TaskList,
-        base_context: &'list Context,
-        provider: &'list Arc<dyn ModelProvider>,
-        tool_registry: &'list Arc<ToolRegistry>,
-        task_id: TaskId,
-        ui_channel: &'list UiChannel,
-        recursion_depth: usize,
-    ) -> StepFuture<'list> {
-        Box::pin(async move {
-            Self::execute_task_list_impl(
-                task_list,
-                base_context,
-                provider,
-                tool_registry,
-                task_id,
-                ui_channel,
-                recursion_depth,
-            )
-            .await
-        })
+    pub fn execute_task_list<'list>(params: TaskListExecutionParams<'list>) -> StepFuture<'list> {
+        Box::pin(async move { Self::execute_task_list_impl(params).await })
     }
 
     /// Implementation of task list execution
     ///
     /// # Errors
     /// Returns an error if any step fails
-    #[allow(clippy::too_many_arguments, reason = "Internal helper function")]
-    fn execute_task_list_impl<'list>(
-        task_list: &'list TaskList,
-        base_context: &'list Context,
-        provider: &'list Arc<dyn ModelProvider>,
-        tool_registry: &'list Arc<ToolRegistry>,
-        task_id: TaskId,
-        ui_channel: &'list UiChannel,
-        recursion_depth: usize,
-    ) -> StepFuture<'list> {
+    fn execute_task_list_impl<'list>(params: TaskListExecutionParams<'list>) -> StepFuture<'list> {
         Box::pin(async move {
             let start = Instant::now();
             let mut step_results = Vec::new();
@@ -260,28 +264,28 @@ impl StepExecutor {
 
             merlin_deps::tracing::debug!(
                 "Executing task list '{}' with {} steps at depth {}",
-                task_list.title,
-                task_list.steps.len(),
-                recursion_depth
+                params.task_list.title,
+                params.task_list.steps.len(),
+                params.recursion_depth
             );
 
-            for (index, step) in task_list.steps.iter().enumerate() {
+            for (index, step) in params.task_list.steps.iter().enumerate() {
                 merlin_deps::tracing::debug!(
                     "Executing step {}/{}: {}",
                     index + 1,
-                    task_list.steps.len(),
+                    params.task_list.steps.len(),
                     step.title
                 );
 
                 let step_result = Self::execute_step_impl(StepExecutionParams {
                     step,
-                    base_context,
+                    base_context: params.base_context,
                     previous_results: &step_results,
-                    provider,
-                    tool_registry,
-                    task_id,
-                    ui_channel,
-                    recursion_depth,
+                    provider: params.provider,
+                    tool_registry: params.tool_registry,
+                    task_id: params.task_id,
+                    ui_channel: params.ui_channel,
+                    recursion_depth: params.recursion_depth,
                 })
                 .await?;
 
@@ -306,18 +310,7 @@ impl StepExecutor {
     ///
     /// # Errors
     /// Returns an error if execution or parsing fails
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Helper function needs all parameters"
-    )]
-    pub async fn execute_with_agent(
-        description: &str,
-        context: &Context,
-        provider: &Arc<dyn ModelProvider>,
-        tool_registry: &Arc<ToolRegistry>,
-        task_id: TaskId,
-        ui_channel: &UiChannel,
-    ) -> Result<AgentResponse> {
+    pub(crate) async fn execute_with_agent(params: AgentExecutionParams<'_>) -> Result<AgentResponse> {
         let query = Query::new(description.to_owned());
 
         // Execute query with provider
@@ -336,31 +329,8 @@ impl StepExecutor {
             ))
         })?;
 
-        let execution_result: AgentExecutionResult =
-            execute_typescript_code(tool_registry, task_id, &typescript_code, ui_channel).await?;
-
-        let result_str = execution_result
-            .get_result()
-            .ok_or_else(|| {
-                RoutingError::Other("Agent must return a result, not a continuation".to_owned())
-            })?
-            .to_owned();
-
-        // Try parsing as AgentResponse (String or TaskList)
-        Ok(Self::parse_agent_response(&result_str))
-    }
-
-    /// Parse agent result as String or `TaskList`
-    fn parse_agent_response(result: &str) -> AgentResponse {
-        // Try parsing as JSON first (could be TaskList)
-        if let Ok(task_list) = from_str::<TaskList>(result) {
-            merlin_deps::tracing::debug!("Parsed agent response as TaskList");
-            return AgentResponse::TaskList(task_list);
-        }
-
-        merlin_deps::tracing::debug!("Treating agent response as DirectResult");
-        // Otherwise treat as direct string result
-        AgentResponse::DirectResult(result.to_owned())
+        // Execute TypeScript code - returns AgentResponse (String | TaskList) directly
+        execute_typescript_code(tool_registry, task_id, &typescript_code, ui_channel).await
     }
 
     /// Add previous step results to context

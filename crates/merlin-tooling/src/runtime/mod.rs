@@ -135,26 +135,7 @@ impl Default for TypeScriptRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::{ToolInput, ToolOutput};
-    use async_trait::async_trait;
-
-    // Mock tool for testing
-    struct EchoTool;
-
-    #[async_trait]
-    impl Tool for EchoTool {
-        fn name(&self) -> &'static str {
-            "echo"
-        }
-
-        fn typescript_signature(&self) -> &'static str {
-            "/**\n * Echoes back the input\n */\ndeclare function echo(params: any): Promise<any>;"
-        }
-
-        async fn execute(&self, input: ToolInput) -> ToolResult<ToolOutput> {
-            Ok(ToolOutput::success_with_data("echoed", input.params))
-        }
-    }
+    use merlin_deps::anyhow::Result;
 
     #[tokio::test]
     async fn test_runtime_creation() {
@@ -171,11 +152,11 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn test_variable_declaration() {
+    async fn test_variable_declaration() -> Result<()> {
         let runtime = TypeScriptRuntime::new();
         let code = "const x = 42; x * 2";
-        let result = runtime.execute(code).await;
-        assert!(result.is_ok(), "Failed: {:?}", result.err());
-        assert_eq!(result.unwrap(), merlin_deps::serde_json::json!(84));
+        let result = runtime.execute(code).await?;
+        assert_eq!(result, merlin_deps::serde_json::json!(84));
+        Ok(())
     }
 }

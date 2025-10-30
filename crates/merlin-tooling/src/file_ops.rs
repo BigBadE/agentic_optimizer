@@ -318,11 +318,12 @@ impl Tool for ListFilesTool {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use merlin_deps::anyhow::Result;
     use merlin_deps::tempfile::TempDir;
 
     #[tokio::test]
-    async fn test_write_file_success() {
-        let temp_dir = TempDir::new().unwrap();
+    async fn test_write_file_success() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let tool = WriteFileTool::new(temp_dir.path());
         let input = ToolInput {
             params: json!({
@@ -331,16 +332,17 @@ mod tests {
             }),
         };
 
-        let result = tool.execute(input).await.unwrap();
+        let result = tool.execute(input).await?;
         assert!(result.success);
 
-        let written_content = fs::read_to_string(temp_dir.path().join("output.txt")).unwrap();
+        let written_content = fs::read_to_string(temp_dir.path().join("output.txt"))?;
         assert_eq!(written_content, "Test content");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_write_file_creates_directories() {
-        let temp_dir = TempDir::new().unwrap();
+    async fn test_write_file_creates_directories() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let tool = WriteFileTool::new(temp_dir.path());
         let input = ToolInput {
             params: json!({
@@ -349,52 +351,62 @@ mod tests {
             }),
         };
 
-        let result = tool.execute(input).await.unwrap();
+        let result = tool.execute(input).await?;
         assert!(result.success);
 
-        let written_content =
-            fs::read_to_string(temp_dir.path().join("nested/dir/file.txt")).unwrap();
+        let written_content = fs::read_to_string(temp_dir.path().join("nested/dir/file.txt"))?;
         assert_eq!(written_content, "Nested content");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_list_files_success() {
-        let temp_dir = TempDir::new().unwrap();
-        fs::write(temp_dir.path().join("file1.txt"), "content1").unwrap();
-        fs::write(temp_dir.path().join("file2.txt"), "content2").unwrap();
-        fs::create_dir(temp_dir.path().join("subdir")).unwrap();
+    async fn test_list_files_success() -> Result<()> {
+        let temp_dir = TempDir::new()?;
+        fs::write(temp_dir.path().join("file1.txt"), "content1")?;
+        fs::write(temp_dir.path().join("file2.txt"), "content2")?;
+        fs::create_dir(temp_dir.path().join("subdir"))?;
 
         let tool = ListFilesTool::new(temp_dir.path());
         let input = ToolInput { params: json!(".") };
 
-        let result = tool.execute(input).await.unwrap();
+        let result = tool.execute(input).await?;
         assert!(result.success);
 
-        let files = result.data.unwrap();
-        let files_array = files.as_array().unwrap();
+        let files = result
+            .data
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected files data"))?;
+        let files_array = files
+            .as_array()
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected array"))?;
         assert_eq!(files_array.len(), 3);
         assert!(files_array.contains(&json!("file1.txt")));
         assert!(files_array.contains(&json!("file2.txt")));
         assert!(files_array.contains(&json!("subdir")));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_list_files_empty_directory() {
-        let temp_dir = TempDir::new().unwrap();
+    async fn test_list_files_empty_directory() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let tool = ListFilesTool::new(temp_dir.path());
         let input = ToolInput { params: json!(".") };
 
-        let result = tool.execute(input).await.unwrap();
+        let result = tool.execute(input).await?;
         assert!(result.success);
 
-        let files = result.data.unwrap();
-        let files_array = files.as_array().unwrap();
+        let files = result
+            .data
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected files data"))?;
+        let files_array = files
+            .as_array()
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected array"))?;
         assert_eq!(files_array.len(), 0);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_path_traversal_prevention_write() {
-        let temp_dir = TempDir::new().unwrap();
+    async fn test_path_traversal_prevention_write() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let tool = WriteFileTool::new(temp_dir.path());
         let input = ToolInput {
             params: json!({
@@ -404,6 +416,7 @@ mod tests {
         };
 
         let result = tool.execute(input).await;
-        result.unwrap_err();
+        assert!(result.is_err(), "Expected error for path traversal");
+        Ok(())
     }
 }

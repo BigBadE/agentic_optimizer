@@ -13,7 +13,7 @@ use crate::embedding::{ProgressCallback, VectorSearchManager};
 /// Note: Does not use progress callback to avoid UI blocking
 pub fn spawn_background_embedding(project_root: PathBuf) {
     spawn(async move {
-        let mut bg_manager = VectorSearchManager::new(project_root);
+        let mut bg_manager = VectorSearchManager::new(&project_root);
         // Don't set progress callback - background task shouldn't update UI
 
         merlin_deps::tracing::info!("Background: Starting full embedding initialization...");
@@ -45,7 +45,7 @@ pub async fn initialize_systems_parallel(
     // Vector search initialization (I/O-bound, async)
     // Truly non-blocking: loads cache if available, spawns background task otherwise
     merlin_deps::tracing::info!("Loading embedding cache (non-blocking)...");
-    let mut manager = VectorSearchManager::new(project_root.to_path_buf());
+    let mut manager = VectorSearchManager::new(project_root);
 
     if let Some(callback) = progress_callback {
         manager = manager.with_progress_callback(Arc::clone(callback));

@@ -235,24 +235,12 @@ fn build_unfocused_task_lines(ctx: &UnfocusedTaskLinesContext<'_>, lines: &mut V
 /// Context for rendering unfocused root task and children
 struct UnfocusedRootContext<'ctx> {
     root_task: &'ctx TaskDisplay,
-    #[allow(
-        dead_code,
-        reason = "Kept for future use when hierarchy is reimplemented"
-    )]
     all_tasks: &'ctx [(TaskId, &'ctx TaskDisplay)],
-    #[allow(
-        dead_code,
-        reason = "Kept for future use when hierarchy is reimplemented"
-    )]
     primary_root_task_id: TaskId,
     is_active: bool,
     is_selected: bool,
     is_primary_expanded: bool,
     area: Rect,
-    #[allow(
-        dead_code,
-        reason = "Kept for future use when hierarchy is reimplemented"
-    )]
     ui_ctx: &'ctx UiCtx<'ctx>,
     theme: Theme,
 }

@@ -155,67 +155,66 @@ impl Tool for BashTool {
 }
 
 #[cfg(test)]
-#[allow(
-    unsafe_code,
-    clippy::undocumented_unsafe_blocks,
-    reason = "Test module needs to manipulate environment variables"
-)]
 mod tests {
     use super::*;
+    use merlin_deps::anyhow::Result;
 
     #[tokio::test]
-    async fn test_bash_tool_simple_command() {
+    async fn test_bash_tool_simple_command() -> Result<()> {
         let tool = BashTool;
         let input = ToolInput {
             params: merlin_deps::serde_json::json!("echo 'hello'"),
         };
 
-        let result = tool.execute(input).await;
-        assert!(result.is_ok());
-
-        let output = result.unwrap();
+        let output = tool.execute(input).await?;
         assert!(output.success);
         assert!(output.message.contains("successfully"));
         assert!(output.data.is_some());
 
-        let data = output.data.unwrap();
-        assert!(data["stdout"].as_str().unwrap().contains("hello"));
+        let data = output
+            .data
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected data"))?;
+        let stdout = data["stdout"]
+            .as_str()
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected stdout as string"))?;
+        assert!(stdout.contains("hello"));
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_bash_tool_command_failure() {
+    async fn test_bash_tool_command_failure() -> Result<()> {
         let tool = BashTool;
         let input = ToolInput {
             params: merlin_deps::serde_json::json!("exit 1"),
         };
 
-        let result = tool.execute(input).await;
-        assert!(result.is_ok());
-
-        let output = result.unwrap();
+        let output = tool.execute(input).await?;
         assert!(!output.success);
         assert!(output.message.contains("failed"));
-        assert_eq!(output.data.unwrap()["exit_code"], 1);
+        let data = output
+            .data
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected data"))?;
+        assert_eq!(data["exit_code"], 1);
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_bash_tool_with_object_params() {
+    async fn test_bash_tool_with_object_params() -> Result<()> {
         let tool = BashTool;
         let input = ToolInput {
             params: merlin_deps::serde_json::json!({"command": "echo test"}),
         };
 
-        let result = tool.execute(input).await;
-        assert!(result.is_ok());
-
-        let output = result.unwrap();
+        let output = tool.execute(input).await?;
         assert!(output.success);
-        assert!(
-            output.data.unwrap()["stdout"]
-                .as_str()
-                .unwrap()
-                .contains("test")
-        );
+        let data = output
+            .data
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected data"))?;
+        let stdout = data["stdout"]
+            .as_str()
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected stdout as string"))?;
+        assert!(stdout.contains("test"));
+        Ok(())
     }
 
     #[tokio::test]

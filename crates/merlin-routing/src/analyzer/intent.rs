@@ -209,7 +209,6 @@ mod tests {
 
         let complex = extractor.extract("Refactor the entire codebase");
         let complex_difficulty = complex.difficulty_hint.unwrap_or(5);
-        eprintln!("Complex task difficulty: {complex_difficulty}");
         assert!(
             complex_difficulty >= 7,
             "Complex tasks should have high difficulty, got {complex_difficulty}"

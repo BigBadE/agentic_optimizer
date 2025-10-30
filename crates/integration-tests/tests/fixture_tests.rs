@@ -1,19 +1,13 @@
 //! Unified integration tests.
 //!
 //! Discovers and runs all unified test fixtures.
-
 #![cfg_attr(
     test,
     allow(
-        clippy::expect_used,
-        clippy::unwrap_used,
-        clippy::panic,
         clippy::missing_panics_doc,
         clippy::missing_errors_doc,
         clippy::print_stdout,
-        clippy::print_stderr,
-        clippy::tests_outside_test_module,
-        reason = "Test allows"
+        reason = "Allow for tests"
     )
 )]
 

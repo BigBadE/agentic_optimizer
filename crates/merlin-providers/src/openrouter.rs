@@ -257,50 +257,62 @@ mod tests {
         let result = OpenRouterProvider::new("valid_key".to_owned());
         assert!(result.is_ok(), "Valid API key should succeed");
 
-        let provider = result.unwrap();
-        assert_eq!(provider.api_key, "valid_key");
-        assert_eq!(provider.model, DEFAULT_MODEL);
+        if let Ok(provider) = result {
+            assert_eq!(provider.api_key, "valid_key");
+            assert_eq!(provider.model, DEFAULT_MODEL);
+        }
     }
 
     #[test]
     fn test_with_model() {
         // Test that with_model correctly sets the model
-        let provider = OpenRouterProvider::new("test_key".to_owned()).unwrap();
-        let provider = provider.with_model("custom-model".to_owned());
-        assert_eq!(provider.model, "custom-model");
+        let result = OpenRouterProvider::new("test_key".to_owned());
+        assert!(result.is_ok());
+        if let Ok(provider) = result {
+            let provider = provider.with_model("custom-model".to_owned());
+            assert_eq!(provider.model, "custom-model");
+        }
     }
 
     #[test]
     fn test_provider_name() {
-        let provider = OpenRouterProvider::new("test_key".to_owned()).unwrap();
-        assert_eq!(provider.name(), "openrouter");
+        let result = OpenRouterProvider::new("test_key".to_owned());
+        assert!(result.is_ok());
+        if let Ok(provider) = result {
+            assert_eq!(provider.name(), "openrouter");
+        }
     }
 
     #[test]
     fn test_cost_estimation() {
-        let provider = OpenRouterProvider::new("test_key".to_owned()).unwrap();
-        let context = Context::new("test query");
-        let cost = provider.estimate_cost(&context);
+        let result = OpenRouterProvider::new("test_key".to_owned());
+        assert!(result.is_ok());
+        if let Ok(provider) = result {
+            let context = Context::new("test query");
+            let cost = provider.estimate_cost(&context);
 
-        // Cost should be positive for non-empty context
-        assert!(cost > 0.0, "Cost should be positive for non-empty context");
+            // Cost should be positive for non-empty context
+            assert!(cost > 0.0, "Cost should be positive for non-empty context");
+        }
     }
 
     #[test]
     fn test_cost_estimation_scaling() {
-        let provider = OpenRouterProvider::new("test_key".to_owned()).unwrap();
+        let result = OpenRouterProvider::new("test_key".to_owned());
+        assert!(result.is_ok());
+        if let Ok(provider) = result {
+            let small_context = Context::new("small");
+            let large_context = Context::new("large ".repeat(100));
 
-        let small_context = Context::new("small");
-        let large_context = Context::new("large ".repeat(100));
+            let small_cost = provider.estimate_cost(&small_context);
+            let large_cost = provider.estimate_cost(&large_context);
 
-        let small_cost = provider.estimate_cost(&small_context);
-        let large_cost = provider.estimate_cost(&large_context);
-
-        // Larger context should cost more
-        assert!(
-            large_cost > small_cost,
-            "Larger context should have higher cost"
-        );
+            // Larger context should cost more
+            assert!(
+                large_cost > small_cost,
+                "Larger context should have higher cost"
+            );
+        }
     }
 
     #[test]
@@ -321,27 +333,31 @@ mod tests {
         );
 
         // Last message should be user with query text
-        let last = messages.last().unwrap();
-        assert_eq!(
-            last["role"].as_str(),
-            Some("user"),
-            "Last message should be user role"
-        );
-        assert_eq!(
-            last["content"].as_str(),
-            Some("user question"),
-            "Last message should contain query text"
-        );
+        if let Some(last) = messages.last() {
+            assert_eq!(
+                last["role"].as_str(),
+                Some("user"),
+                "Last message should be user role"
+            );
+            assert_eq!(
+                last["content"].as_str(),
+                Some("user question"),
+                "Last message should contain query text"
+            );
+        } else {
+            panic!("Messages should not be empty");
+        }
     }
 
     #[test]
     fn test_model_chaining() {
         // Test that methods can be chained
-        let provider = OpenRouterProvider::new("test_key".to_owned())
-            .unwrap()
-            .with_model("custom-model".to_owned());
-
-        assert_eq!(provider.model, "custom-model");
-        assert_eq!(provider.api_key, "test_key");
+        let result = OpenRouterProvider::new("test_key".to_owned());
+        assert!(result.is_ok());
+        if let Ok(base_provider) = result {
+            let provider = base_provider.with_model("custom-model".to_owned());
+            assert_eq!(provider.model, "custom-model");
+            assert_eq!(provider.api_key, "test_key");
+        }
     }
 }

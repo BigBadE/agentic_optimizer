@@ -197,10 +197,6 @@ struct RootTaskContext<'ctx> {
     is_selected: bool,
     _is_primary: bool,
     ui_ctx: &'ctx UiCtx<'ctx>,
-    #[allow(
-        dead_code,
-        reason = "Kept for future use when hierarchy is reimplemented"
-    )]
     all_tasks: &'ctx [(TaskId, &'ctx TaskDisplay)],
     max_width: usize,
     theme: Theme,
@@ -347,7 +343,7 @@ pub fn truncate_text(text: &str, max_width: usize) -> String {
 ///
 /// This function is currently unused in the flat task system but kept for future
 /// when thread-based grouping is implemented.
-#[allow(dead_code, reason = "Kept for future thread-based grouping feature")]
+
 pub fn add_child_task_lines(
     area: Rect,
     lines: &mut Vec<Line<'static>>,

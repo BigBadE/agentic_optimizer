@@ -38,10 +38,6 @@ impl<'fixture> UnifiedVerifier<'fixture> {
     ///
     /// # Errors
     /// Returns error if verification fails critically
-    #[allow(
-        clippy::too_many_arguments,
-        reason = "Needed for comprehensive verification with all available context"
-    )]
     pub fn verify_event(
         &mut self,
         event: &TestEvent,

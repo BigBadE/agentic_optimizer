@@ -6,7 +6,7 @@ use std::env;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-/// Complete routing configuration.
+/// Complete routing configuration (global, stored in `~/.merlin/config.toml`).
 #[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct RoutingConfig {
     /// Model tier configuration
@@ -15,18 +15,6 @@ pub struct RoutingConfig {
     /// API keys for model providers
     #[serde(default)]
     pub api_keys: ApiKeys,
-    /// Validation configuration
-    #[serde(default)]
-    pub validation: ValidationConfig,
-    /// Execution configuration
-    #[serde(default)]
-    pub execution: ExecutionConfig,
-    /// Workspace configuration
-    #[serde(default)]
-    pub workspace: WorkspaceConfig,
-    /// Cache configuration
-    #[serde(default)]
-    pub cache: CacheConfig,
 }
 
 /// API keys for model providers.
@@ -36,30 +24,6 @@ pub struct ApiKeys {
     pub groq_api_key: Option<String>,
     /// `OpenRouter` API key for various models (including Claude via anthropic/* routes)
     pub openrouter_api_key: Option<String>,
-}
-
-/// Cache configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct CacheConfig {
-    /// Whether caching is enabled
-    pub enabled: bool,
-    /// Time-to-live for cache entries in hours
-    pub ttl_hours: u64,
-    /// Maximum cache size in megabytes
-    pub max_size_mb: usize,
-    /// Similarity threshold for semantic matching (0.0-1.0)
-    pub similarity_threshold: f32,
-}
-
-impl Default for CacheConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            ttl_hours: 24,
-            max_size_mb: 100,
-            similarity_threshold: 0.95,
-        }
-    }
 }
 
 /// Model tier configuration.
@@ -147,86 +111,75 @@ impl Default for ValidationChecks {
     }
 }
 
-/// Validation configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
+/// Validation configuration (always enabled, never early-exit).
+/// Timeouts are now per-project in `ProjectConfig`.
+#[derive(Default, Debug, Clone, Serialize, Deserialize)]
 pub struct ValidationConfig {
-    /// Whether validation is enabled
-    pub enabled: bool,
-    /// Whether to stop on first validation failure
-    pub early_exit: bool,
     /// Checks to perform during validation
+    #[serde(default)]
     pub checks: ValidationChecks,
-    /// Timeout in seconds for build operations
+}
+
+/// Per-project configuration (stored in `<project>/.merlin/config.toml`).
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct ProjectConfig {
+    /// Checks to perform during validation
+    #[serde(default)]
+    pub validation_checks: ValidationChecks,
+    /// Timeout in seconds for build operations (since last output line, capped at 1000 lines)
+    #[serde(default = "default_build_timeout")]
     pub build_timeout_seconds: u64,
-    /// Timeout in seconds for test operations
+    /// Timeout in seconds for test operations (since last output line, capped at 1000 lines)
+    #[serde(default = "default_test_timeout")]
     pub test_timeout_seconds: u64,
-}
-
-impl Default for ValidationConfig {
-    fn default() -> Self {
-        Self {
-            enabled: true,
-            early_exit: true,
-            checks: ValidationChecks::default(),
-            build_timeout_seconds: 60,
-            test_timeout_seconds: 300,
-        }
-    }
-}
-
-/// Execution configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[allow(
-    clippy::struct_excessive_bools,
-    reason = "Configuration struct with multiple feature flags"
-)]
-pub struct ExecutionConfig {
-    /// Maximum number of tasks to execute concurrently
-    pub max_concurrent_tasks: usize,
-    /// Whether parallel execution is enabled
-    pub enable_parallel: bool,
-    /// Whether conflict detection is enabled
-    pub enable_conflict_detection: bool,
-    /// Whether file locking is enabled
-    pub enable_file_locking: bool,
-    /// Dump full context to debug.log before each model call
-    pub context_dump: bool,
-}
-
-impl Default for ExecutionConfig {
-    fn default() -> Self {
-        Self {
-            max_concurrent_tasks: 4,
-            enable_parallel: true,
-            enable_conflict_detection: true,
-            enable_file_locking: true,
-            context_dump: false,
-        }
-    }
-}
-
-/// Workspace configuration.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct WorkspaceConfig {
-    /// Root path of the workspace
-    pub root_path: PathBuf,
-    /// Whether workspace snapshots are enabled
-    pub enable_snapshots: bool,
-    /// Whether transactional operations are enabled
-    pub enable_transactions: bool,
     /// Whether the workspace is read-only (prevents file modifications)
     #[serde(default)]
     pub read_only: bool,
 }
 
-impl Default for WorkspaceConfig {
+const fn default_build_timeout() -> u64 {
+    60
+}
+
+const fn default_test_timeout() -> u64 {
+    300
+}
+
+impl Default for ProjectConfig {
     fn default() -> Self {
         Self {
-            root_path: PathBuf::from("."),
-            enable_snapshots: true,
-            enable_transactions: true,
+            validation_checks: ValidationChecks::default(),
+            build_timeout_seconds: default_build_timeout(),
+            test_timeout_seconds: default_test_timeout(),
             read_only: false,
         }
+    }
+}
+
+impl ProjectConfig {
+    /// Load project config from `.merlin/config.toml` in the given directory.
+    ///
+    /// # Errors
+    /// Returns an error if the config file cannot be read or parsed
+    pub fn load_from_dir(project_root: &Path) -> Result<Self> {
+        let config_path = project_root.join(".merlin").join("config.toml");
+        if !config_path.exists() {
+            return Ok(Self::default());
+        }
+        Self::load_from_file(&config_path)
+    }
+
+    /// Load project config from a specific file.
+    ///
+    /// # Errors
+    /// Returns an error if the config file cannot be read or parsed
+    pub fn load_from_file(path: &Path) -> Result<Self> {
+        use merlin_deps::toml::from_str;
+
+        let contents = fs::read_to_string(path)
+            .map_err(|err| RoutingError::Other(format!("Failed to read config: {err}")))?;
+        from_str(&contents)
+            .map_err(|err| RoutingError::Other(format!("Failed to parse config: {err}")))
     }
 }
 
@@ -342,32 +295,10 @@ impl RoutingConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::serde_json::{from_str, to_string};
+    use merlin_deps::anyhow::Result;
 
     #[test]
-    fn test_default_config() {
-        let config = RoutingConfig::default();
-        assert!(config.tiers.local_enabled);
-        assert!(config.validation.enabled);
-        assert_eq!(config.execution.max_concurrent_tasks, 4);
-    }
-
-    #[test]
-    fn test_serialization() {
-        let config = RoutingConfig::default();
-        let json = match to_string(&config) {
-            Ok(serialized_json) => serialized_json,
-            Err(error) => panic!("serialize failed: {error}"),
-        };
-        let deserialized: RoutingConfig = match from_str(&json) {
-            Ok(value) => value,
-            Err(error) => panic!("deserialize failed: {error}"),
-        };
-        assert_eq!(config.tiers.local_model, deserialized.tiers.local_model);
-    }
-
-    #[test]
-    fn test_api_key_loading_from_toml() {
+    fn test_api_key_loading_from_toml() -> Result<()> {
         use merlin_deps::tempfile::NamedTempFile;
         use std::io::Write as _;
 
@@ -385,50 +316,13 @@ timeout_seconds = 300
 [api_keys]
 groq_api_key = "test_groq_key_123"
 openrouter_api_key = "test_openrouter_key_456"
-
-[validation]
-enabled = true
-early_exit = true
-build_timeout_seconds = 60
-test_timeout_seconds = 300
-
-[validation.checks]
-enabled_checks = ["Syntax", "Build", "Test", "Lint"]
-
-[execution]
-max_concurrent_tasks = 4
-enable_parallel = true
-enable_conflict_detection = true
-enable_file_locking = true
-context_dump = false
-
-[workspace]
-root_path = "."
-enable_snapshots = true
-enable_transactions = true
-
-[cache]
-enabled = true
-ttl_hours = 24
-max_size_mb = 100
-similarity_threshold = 0.95
-
-[task_list_commands]
-debug_command = "cargo check"
-feature_command = "cargo check"
-refactor_command = "cargo clippy -- -D warnings"
-verify_command = "cargo check"
-test_command = "cargo test"
 "#;
 
-        let mut temp_file = NamedTempFile::new().expect("Failed to create temp file");
-        temp_file
-            .write_all(toml_content.as_bytes())
-            .expect("Failed to write to temp file");
+        let mut temp_file = NamedTempFile::new()?;
+        temp_file.write_all(toml_content.as_bytes())?;
 
         // Load config from the temp file
-        let config = RoutingConfig::load_from_file(temp_file.path())
-            .expect("Failed to load config from temp file");
+        let config = RoutingConfig::load_from_file(temp_file.path())?;
 
         // Verify API keys were loaded
         assert_eq!(
@@ -449,25 +343,25 @@ test_command = "cargo test"
             config.get_api_key("openrouter"),
             Some("test_openrouter_key_456".to_owned())
         );
+        Ok(())
     }
 
     #[test]
-    fn test_load_actual_config_if_exists() {
+    fn test_load_actual_config_if_exists() -> Result<()> {
         // This test checks if the actual ~/.merlin/config.toml can be loaded
         // It's optional - passes if the file doesn't exist
         if let Ok(config_path) = RoutingConfig::config_path()
             && config_path.exists()
         {
-            let config = RoutingConfig::load_from_file(&config_path)
-                .expect("Failed to load actual config file");
+            let config = RoutingConfig::load_from_file(&config_path)?;
 
             // Just verify it loaded without crashing
-            println!("Loaded config from {config_path:?}");
-            println!(
+            merlin_deps::tracing::debug!("Loaded config from {config_path:?}");
+            merlin_deps::tracing::debug!(
                 "  groq_api_key present: {}",
                 config.api_keys.groq_api_key.is_some()
             );
-            println!(
+            merlin_deps::tracing::debug!(
                 "  openrouter_api_key present: {}",
                 config.api_keys.openrouter_api_key.is_some()
             );
@@ -480,5 +374,6 @@ test_command = "cargo test"
                 );
             }
         }
+        Ok(())
     }
 }

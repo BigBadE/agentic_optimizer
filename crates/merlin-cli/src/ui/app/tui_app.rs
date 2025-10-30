@@ -21,10 +21,6 @@ use merlin_routing::UiEvent;
 /// Main TUI application
 pub struct TuiApp<B: Backend> {
     /// Terminal instance used to render the UI
-    #[cfg_attr(
-        feature = "test-util",
-        allow(dead_code, reason = "Exposed for test inspection")
-    )]
     pub(crate) terminal: Terminal<B>,
     /// Channel receiving UI events from background tasks
     pub(crate) event_receiver: mpsc::UnboundedReceiver<UiEvent>,

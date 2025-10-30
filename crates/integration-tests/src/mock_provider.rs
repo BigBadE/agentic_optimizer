@@ -366,7 +366,6 @@ mod tests {
     /// # Panics
     /// Panics if pattern creation fails
     #[test]
-    #[cfg_attr(test, allow(clippy::unwrap_used, reason = "Allow for tests"))]
     fn test_pattern_response_exact_match() {
         let trigger = TriggerConfig {
             pattern: "hello world".to_owned(),
@@ -383,7 +382,6 @@ mod tests {
     /// # Panics
     /// Panics if pattern creation fails
     #[test]
-    #[cfg_attr(test, allow(clippy::unwrap_used, reason = "Allow for tests"))]
     fn test_pattern_response_contains_match() {
         let trigger = TriggerConfig {
             pattern: "world".to_owned(),
@@ -401,7 +399,6 @@ mod tests {
     /// # Panics
     /// Panics if pattern creation fails
     #[test]
-    #[cfg_attr(test, allow(clippy::unwrap_used, reason = "Allow for tests"))]
     fn test_pattern_response_regex_match() {
         let trigger = TriggerConfig {
             pattern: r"hello\s+\w+".to_owned(),

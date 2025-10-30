@@ -213,7 +213,7 @@ mod tests {
     }
 
     #[test]
-    fn test_format_report() {
+    fn test_format_report() -> Result<(), FmtError> {
         let report = DailyReport {
             total_requests: 10,
             success_rate: 0.9,
@@ -228,8 +228,9 @@ mod tests {
             escalation_rate: 0.1,
         };
 
-        let formatted = MetricsReport::format_report(&report).expect("Format failed");
+        let formatted = MetricsReport::format_report(&report)?;
         assert!(formatted.contains("Total Requests: 10"));
         assert!(formatted.contains("Success Rate: 90.0%"));
+        Ok(())
     }
 }

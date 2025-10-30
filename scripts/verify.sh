@@ -31,6 +31,42 @@ check_file_sizes() {
   return 0
 }
 
+check_allows() {
+  # Find all #[allow] and #![allow] annotations except the specific test pattern
+  # The allowed patterns are:
+  #   #![cfg_attr(
+  #       test,
+  #       allow(
+  #           clippy::missing_panics_doc,
+  #           clippy::missing_errors_doc,
+  #           reason = "Allow for tests"
+  #       )
+  #   )]
+  #   #[allow(unsafe_code)] - Required for FFI with JavaScript runtime
+
+  # Use ripgrep to find all allow annotations in a single pass
+  local all_allows
+  all_allows=$(rg -n '#!?\[.*allow\(' crates --type rust 2>/dev/null || true)
+
+  if [ -z "$all_allows" ]; then
+    return 0
+  fi
+
+  # Filter out the allowed patterns
+  local violations
+  violations=$(echo "$all_allows" | grep -v 'cfg_attr(\s*test,\s*allow(\s*clippy::missing_panics_doc' | grep -v 'allow(unsafe_code)' || true)
+
+  if [ -n "$violations" ]; then
+    echo "ERROR: Found #[allow] or #![allow] annotations in the following locations:"
+    echo "$violations"
+    echo ""
+    echo "Allows are not allowed in this project, period. All issues should be fixed."
+    return 1
+  fi
+
+  return 0
+}
+
 RUN_COVERAGE=false
 FIXTURE_ONLY=false
 
@@ -53,6 +89,10 @@ done
 # Check file sizes
 echo "[verify] Checking file sizes..."
 check_file_sizes
+
+# Check for disallowed allow annotations
+echo "[verify] Checking for disallowed #[allow] annotations..."
+check_allows
 
 # Format, lint, and test
 cargo fmt -q

@@ -1,4 +1,3 @@
-#![allow(dead_code, reason = "Work in progress")]
 use std::path::PathBuf;
 use std::process::exit;
 
@@ -89,7 +88,7 @@ OPTIONS:
     -h, --help                   Print help information
 ";
     // Help text is printed to stdout by convention for CLI tools
-    #[allow(clippy::print_stdout, reason = "Help text output")]
+
     {
         print!("{HELP_TEXT}");
     }

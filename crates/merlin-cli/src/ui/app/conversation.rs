@@ -50,10 +50,6 @@ pub fn get_conversation_history_from_task(
 /// TODO: This is for conversation threading features - allows displaying related tasks
 /// in a conversation view. Currently returns just the selected task until thread support is implemented.
 #[cfg(any(test, feature = "test-util"))]
-#[allow(
-    dead_code,
-    reason = "Test utility for future conversation threading feature"
-)]
 pub fn get_thread_context(
     selected_task_id: Option<TaskId>,
     task_manager: &TaskManager,

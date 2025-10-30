@@ -63,10 +63,6 @@ impl BenchmarkMetrics {
     }
 
     /// Calculate metrics from results and expected files
-    #[allow(
-        clippy::min_ident_chars,
-        reason = "Standard variable names for algorithms"
-    )]
     pub fn calculate(results: &[String], expected: &[ExpectedFile]) -> Self {
         // Normalize all paths to use forward slashes for consistent comparison
         let expected_paths: HashSet<_> = expected
@@ -103,26 +99,18 @@ impl BenchmarkMetrics {
     }
 
     /// Calculate precision at k
-    #[allow(
-        clippy::min_ident_chars,
-        reason = "Standard variable names for algorithms"
-    )]
-    fn precision_at_k(results: &[String], expected: &HashSet<String>, k: usize) -> f64 {
-        let top_k = results.iter().take(k);
+    fn precision_at_k(results: &[String], expected: &HashSet<String>, cutoff: usize) -> f64 {
+        let top_k = results.iter().take(cutoff);
         let relevant_count = top_k.filter(|res| expected.contains(res.as_str())).count();
-        (relevant_count as f64 / k.min(results.len()) as f64) * 100.0
+        (relevant_count as f64 / cutoff.min(results.len()) as f64) * 100.0
     }
 
     /// Calculate recall at k
-    #[allow(
-        clippy::min_ident_chars,
-        reason = "Standard variable names for algorithms"
-    )]
-    fn recall_at_k(results: &[String], expected: &HashSet<String>, k: usize) -> f64 {
+    fn recall_at_k(results: &[String], expected: &HashSet<String>, cutoff: usize) -> f64 {
         if expected.is_empty() {
             return 0.0;
         }
-        let top_k = results.iter().take(k);
+        let top_k = results.iter().take(cutoff);
         let found_count = top_k.filter(|res| expected.contains(res.as_str())).count();
         (found_count as f64 / expected.len() as f64) * 100.0
     }
@@ -138,23 +126,19 @@ impl BenchmarkMetrics {
     }
 
     /// Calculate Normalized Discounted Cumulative Gain at k
-    #[allow(
-        clippy::min_ident_chars,
-        reason = "Standard variable names for algorithms"
-    )]
-    fn ndcg_at_k(results: &[String], expected: &[ExpectedFile], k: usize) -> f64 {
-        let dcg = Self::dcg_at_k(results, expected, k);
-        let idcg = Self::ideal_dcg_at_k(expected, k);
+    fn ndcg_at_k(results: &[String], expected: &[ExpectedFile], cutoff: usize) -> f64 {
+        let dcg = Self::dcg_at_k(results, expected, cutoff);
+        let idcg = Self::ideal_dcg_at_k(expected, cutoff);
 
-        if idcg == 0.0 { 0.0 } else { dcg / idcg }
+        if idcg.abs() < f64::EPSILON {
+            0.0
+        } else {
+            dcg / idcg
+        }
     }
 
     /// Calculate Discounted Cumulative Gain at k
-    #[allow(
-        clippy::min_ident_chars,
-        reason = "Standard variable names for algorithms"
-    )]
-    fn dcg_at_k(results: &[String], expected: &[ExpectedFile], k: usize) -> f64 {
+    fn dcg_at_k(results: &[String], expected: &[ExpectedFile], cutoff: usize) -> f64 {
         // Normalize expected paths for comparison
         let expected_map: HashMap<_, _> = expected
             .iter()
@@ -163,7 +147,7 @@ impl BenchmarkMetrics {
 
         results
             .iter()
-            .take(k)
+            .take(cutoff)
             .enumerate()
             .map(|(index, result)| {
                 let relevance = expected_map
@@ -175,11 +159,7 @@ impl BenchmarkMetrics {
     }
 
     /// Calculate ideal DCG at k (best possible ordering)
-    #[allow(
-        clippy::min_ident_chars,
-        reason = "Standard variable names for algorithms"
-    )]
-    fn ideal_dcg_at_k(expected: &[ExpectedFile], k: usize) -> f64 {
+    fn ideal_dcg_at_k(expected: &[ExpectedFile], cutoff: usize) -> f64 {
         let mut relevances: Vec<_> = expected
             .iter()
             .map(|exp| exp.priority.to_relevance_score())
@@ -188,22 +168,18 @@ impl BenchmarkMetrics {
 
         relevances
             .iter()
-            .take(k)
+            .take(cutoff)
             .enumerate()
             .map(|(index, &relevance)| relevance / ((index + 2) as f64).log2())
             .sum()
     }
 
     /// Calculate percentage of critical files in top k
-    #[allow(
-        clippy::min_ident_chars,
-        reason = "Standard variable names for algorithms"
-    )]
-    fn critical_in_top_k(results: &[String], critical: &HashSet<String>, k: usize) -> f64 {
+    fn critical_in_top_k(results: &[String], critical: &HashSet<String>, cutoff: usize) -> f64 {
         if critical.is_empty() {
             return 0.0;
         }
-        let top_k = results.iter().take(k);
+        let top_k = results.iter().take(cutoff);
         let critical_count = top_k.filter(|res| critical.contains(res.as_str())).count();
         (critical_count as f64 / critical.len() as f64) * 100.0
     }
@@ -270,7 +246,7 @@ mod tests {
     use super::*;
 
     #[test]
-    #[allow(clippy::missing_panics_doc, clippy::float_cmp, reason = "Test code")]
+
     fn test_precision_calculation() {
         let results = vec![
             "file1.rs".to_owned(),
@@ -295,7 +271,7 @@ mod tests {
     }
 
     #[test]
-    #[allow(clippy::missing_panics_doc, clippy::float_cmp, reason = "Test code")]
+
     fn test_recall_calculation() {
         let results = vec![
             "file1.rs".to_owned(),
@@ -316,11 +292,11 @@ mod tests {
         ];
 
         let metrics = BenchmarkMetrics::calculate(&results, &expected);
-        assert_eq!(metrics.recall_at_10, 50.0);
+        assert!((metrics.recall_at_10 - 50.0).abs() < f64::EPSILON);
     }
 
     #[test]
-    #[allow(clippy::missing_panics_doc, clippy::float_cmp, reason = "Test code")]
+
     fn test_mrr_calculation() {
         let results = vec![
             "file1.rs".to_owned(),
@@ -334,6 +310,6 @@ mod tests {
         }];
 
         let metrics = BenchmarkMetrics::calculate(&results, &expected);
-        assert_eq!(metrics.mrr, 0.5);
+        assert!((metrics.mrr - 0.5).abs() < f64::EPSILON);
     }
 }

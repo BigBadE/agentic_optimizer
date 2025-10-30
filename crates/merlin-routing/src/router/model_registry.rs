@@ -172,44 +172,35 @@ mod tests {
     }
 
     #[test]
-    fn test_exact_match() {
+    fn test_exact_match() -> Result<()> {
         let registry = ModelRegistry::with_defaults();
-        let model = registry.select_model(5);
-
-        assert!(model.is_ok());
-        assert_eq!(model.unwrap(), Model::Llama3170BVersatile);
+        let model = registry.select_model(5)?;
+        assert_eq!(model, Model::Llama3170BVersatile);
+        Ok(())
     }
 
     #[test]
-    fn test_nearest_higher() {
+    fn test_nearest_higher() -> Result<()> {
         let mut registry = ModelRegistry::new();
-        registry
-            .register(2, Model::Llama318BInstant)
-            .expect("Failed to register model");
-        registry
-            .register(5, Model::Llama3170BVersatile)
-            .expect("Failed to register model");
-        registry
-            .register(8, Model::Claude35Haiku)
-            .expect("Failed to register model");
+        registry.register(2, Model::Llama318BInstant)?;
+        registry.register(5, Model::Llama3170BVersatile)?;
+        registry.register(8, Model::Claude35Haiku)?;
 
         // Difficulty 3 should select Llama3170BVersatile (nearest higher)
-        let model = registry.select_model(3);
-        assert!(model.is_ok());
-        assert_eq!(model.unwrap(), Model::Llama3170BVersatile);
+        let model = registry.select_model(3)?;
+        assert_eq!(model, Model::Llama3170BVersatile);
+        Ok(())
     }
 
     #[test]
-    fn test_fallback_to_highest() {
+    fn test_fallback_to_highest() -> Result<()> {
         let mut registry = ModelRegistry::new();
-        registry
-            .register(5, Model::Llama3170BVersatile)
-            .expect("Failed to register model");
+        registry.register(5, Model::Llama3170BVersatile)?;
 
         // Difficulty 10 should fall back to Llama3170BVersatile (highest registered)
-        let model = registry.select_model(10);
-        assert!(model.is_ok());
-        assert_eq!(model.unwrap(), Model::Llama3170BVersatile);
+        let model = registry.select_model(10)?;
+        assert_eq!(model, Model::Llama3170BVersatile);
+        Ok(())
     }
 
     #[test]
@@ -228,16 +219,13 @@ mod tests {
     }
 
     #[test]
-    fn test_register_and_retrieve() {
+    fn test_register_and_retrieve() -> Result<()> {
         let mut registry = ModelRegistry::new();
+        registry.register(7, Model::Claude35Sonnet)?;
 
-        registry
-            .register(7, Model::Claude35Sonnet)
-            .expect("Failed to register model");
-
-        let model = registry.select_model(7);
-        assert!(model.is_ok());
-        assert_eq!(model.unwrap(), Model::Claude35Sonnet);
+        let model = registry.select_model(7)?;
+        assert_eq!(model, Model::Claude35Sonnet);
+        Ok(())
     }
 
     #[test]
@@ -250,16 +238,17 @@ mod tests {
     }
 
     #[test]
-    fn test_register_range() {
+    fn test_register_range() -> Result<()> {
         let mut registry = ModelRegistry::new();
         registry.register_range(1..=5, Model::Llama318BInstant);
         registry.register_range(6..=10, Model::Claude35Sonnet);
 
-        assert_eq!(registry.select_model(1).unwrap(), Model::Llama318BInstant);
-        assert_eq!(registry.select_model(3).unwrap(), Model::Llama318BInstant);
-        assert_eq!(registry.select_model(5).unwrap(), Model::Llama318BInstant);
-        assert_eq!(registry.select_model(6).unwrap(), Model::Claude35Sonnet);
-        assert_eq!(registry.select_model(10).unwrap(), Model::Claude35Sonnet);
+        assert_eq!(registry.select_model(1)?, Model::Llama318BInstant);
+        assert_eq!(registry.select_model(3)?, Model::Llama318BInstant);
+        assert_eq!(registry.select_model(5)?, Model::Llama318BInstant);
+        assert_eq!(registry.select_model(6)?, Model::Claude35Sonnet);
+        assert_eq!(registry.select_model(10)?, Model::Claude35Sonnet);
+        Ok(())
     }
 
     #[test]

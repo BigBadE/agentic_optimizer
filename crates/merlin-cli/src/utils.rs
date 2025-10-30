@@ -1,4 +1,3 @@
-#![allow(dead_code, reason = "Work in progress")]
 //! Utility functions for CLI operations
 
 use merlin_deps::anyhow::{Context as _, Result};

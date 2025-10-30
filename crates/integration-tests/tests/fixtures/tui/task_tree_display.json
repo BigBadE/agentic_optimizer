@@ -31,21 +31,19 @@
         "typescript": [
           "async function agent_code(): Promise<TaskList> {",
           "  return {",
-          "    id: 'parent',",
           "    title: 'Parent Task',",
           "    steps: [",
           "      {",
-          "        id: 'child1',",
-          "        step_type: 'Feature',",
+          "        title: 'First Child',",
           "        description: 'First child task',",
-          "        verification: 'Complete'",
+          "        step_type: 'implementation',",
+          "        exit_requirement: { type: 'pattern', pattern: '.*' }",
           "      },",
           "      {",
-          "        id: 'child2',",
-          "        step_type: 'Test',",
+          "        title: 'Second Child',",
           "        description: 'Second child task',",
-          "        verification: 'Complete',",
-          "        depends_on: ['child1']",
+          "        step_type: 'validation',",
+          "        exit_requirement: { type: 'pattern', pattern: '.*' }",
           "      }",
           "    ]",
           "  };",
@@ -56,6 +54,40 @@
         "execution": {
           "return_type": "TaskList"
         }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "First child task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'First child completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Second child task",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Second child completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
       }
     },
     {

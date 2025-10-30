@@ -55,12 +55,8 @@ impl<E: EmbeddingProvider + Clone> VectorSearchManager<E> {
 
 impl VectorSearchManager<EmbeddingClient> {
     /// Create a new vector search manager with default Ollama client
-    #[allow(
-        clippy::needless_pass_by_value,
-        reason = "API design: PathBuf ownership for ergonomics"
-    )]
-    pub fn new(project_root: PathBuf) -> Self {
-        Self::with_provider(&project_root, EmbeddingClient::default())
+    pub fn new(project_root: &Path) -> Self {
+        Self::with_provider(project_root, EmbeddingClient::default())
     }
 }
 

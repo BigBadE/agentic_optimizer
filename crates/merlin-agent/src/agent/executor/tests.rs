@@ -2,7 +2,7 @@
 
 use super::super::AgentExecutor;
 use super::typescript;
-use crate::{ValidationPipeline, agent::AgentExecutionResult};
+use crate::ValidationPipeline;
 use merlin_context::ContextFetcher;
 use merlin_core::RoutingConfig;
 use merlin_deps::serde_json::{from_value, json};
@@ -109,59 +109,6 @@ fn test_extract_typescript_code_no_blocks() {
     assert!(code.is_none());
 }
 
-#[test]
-fn test_plain_string_result_handling() {
-    // Test that plain string results are treated as "done"
-    let string_value = json!("List of todos:\nTODO: Fix this\nTODO: Test that");
-
-    // Simulate what the executor does
-    let execution_result: AgentExecutionResult = if string_value.is_string() {
-        let result_str = string_value.as_str().unwrap_or("").to_owned();
-        AgentExecutionResult::done(result_str)
-    } else {
-        panic!("Expected string value");
-    };
-
-    assert!(execution_result.is_done());
-    assert_eq!(
-        execution_result.get_result(),
-        Some("List of todos:\nTODO: Fix this\nTODO: Test that")
-    );
-}
-
-#[test]
-fn test_structured_result_handling() {
-    // Test that structured results are parsed correctly
-    let structured_value = json!({
-        "done": "true",
-        "result": "Task completed successfully"
-    });
-
-    let execution_result: AgentExecutionResult = from_value(structured_value).unwrap();
-
-    assert!(execution_result.is_done());
-    assert_eq!(
-        execution_result.get_result(),
-        Some("Task completed successfully")
-    );
-}
-
-#[test]
-fn test_continue_result_handling() {
-    // Test that continue results are parsed correctly
-    let continue_value = json!({
-        "done": "false",
-        "continue": "Check the logs for errors"
-    });
-
-    let execution_result: AgentExecutionResult = from_value(continue_value).unwrap();
-
-    assert!(!execution_result.is_done());
-    assert_eq!(
-        execution_result.get_next_task(),
-        Some("Check the logs for errors")
-    );
-}
 
 #[test]
 fn test_extract_typescript_code_syntax_error() {
@@ -197,24 +144,6 @@ fn test_extract_typescript_code_empty_block() {
     assert!(code.is_none(), "Empty code blocks should be filtered out");
 }
 
-#[test]
-fn test_agent_execution_result_error_handling() {
-    // Test that error results without "done" or "continue" fields are handled
-    use merlin_deps::serde_json::Result as SerdeResult;
-
-    let error_value = json!({
-        "error": "Something went wrong",
-        "message": "Detailed error message"
-    });
-
-    // When neither done nor continue is present, it should fail to parse
-    let result: SerdeResult<AgentExecutionResult> = from_value(error_value);
-    // This should fail to parse since the structure is malformed
-    assert!(
-        result.is_err(),
-        "Malformed execution results should fail to parse"
-    );
-}
 
 #[test]
 fn test_extract_typescript_code_with_indentation() {

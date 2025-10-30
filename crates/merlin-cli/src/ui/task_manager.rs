@@ -6,10 +6,6 @@ use std::time::{Instant, SystemTime};
 
 /// Status of a task
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
-#[allow(
-    dead_code,
-    reason = "Pending status will be used when dependency tracking is implemented"
-)]
 pub enum TaskStatus {
     /// Task is pending (waiting for dependencies or resources)
     Pending,
@@ -134,10 +130,7 @@ impl TaskManager {
     }
 
     /// Iterates over all tasks
-    #[allow(
-        dead_code,
-        reason = "Kept for future use when iteration over all tasks is needed"
-    )]
+
     pub fn iter_tasks(&self) -> impl Iterator<Item = (TaskId, &TaskDisplay)> {
         self.tasks.iter().map(|(&id, task)| (id, task))
     }

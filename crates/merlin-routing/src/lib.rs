@@ -33,18 +33,11 @@
 //! # Ok(())
 //! # }
 //! ```
-
 #![cfg_attr(
     test,
     allow(
-        dead_code,
-        clippy::expect_used,
-        clippy::unwrap_used,
-        clippy::panic,
         clippy::missing_panics_doc,
         clippy::missing_errors_doc,
-        clippy::print_stdout,
-        clippy::print_stderr,
         reason = "Allow for tests"
     )
 )]
@@ -62,12 +55,11 @@ pub mod user_interface;
 
 // Re-export types from merlin-core for backward compatibility
 pub use merlin_core::{
-    CacheConfig, CommandExecution, ContextRequirements, ExecutionConfig, ExecutionContext,
-    ExecutionMode, ExecutionStrategy, FileChange, MessageLevel, Priority, Result, RoutingConfig,
-    RoutingError, Severity, StageResult, StepId, StepType, StreamingChannel, StreamingEvent,
-    Subtask, Task, TaskAction, TaskAnalysis, TaskDecision, TaskId, TaskProgress, TaskResult,
-    TaskState, TaskStep, TierConfig, UiChannel, UiEvent, ValidationConfig, ValidationError,
-    ValidationResult, ValidationStageType, WorkspaceConfig,
+    CommandExecution, ContextRequirements, ExecutionContext, ExecutionMode, ExecutionStrategy,
+    FileChange, MessageLevel, Priority, Result, RoutingConfig, RoutingError, Severity, StageResult,
+    StepId, StepType, StreamingChannel, StreamingEvent, Subtask, Task, TaskAction, TaskAnalysis,
+    TaskDecision, TaskId, TaskProgress, TaskResult, TaskState, TaskStep, TierConfig, UiChannel,
+    UiEvent, ValidationConfig, ValidationError, ValidationResult, ValidationStageType,
 };
 
 pub use analyzer::{

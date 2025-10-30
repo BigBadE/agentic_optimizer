@@ -277,9 +277,10 @@ mod tests {
         let result = GroqProvider::with_api_key_direct("valid_key".to_owned());
         assert!(result.is_ok(), "Valid API key should succeed");
 
-        let provider = result.unwrap();
-        assert_eq!(provider.api_key, "valid_key");
-        assert_eq!(provider.model, DEFAULT_MODEL);
+        if let Ok(provider) = result {
+            assert_eq!(provider.api_key, "valid_key");
+            assert_eq!(provider.model, DEFAULT_MODEL);
+        }
     }
 
     #[test]
@@ -325,12 +326,13 @@ mod tests {
         let result = GroqProvider::with_api_key_direct("test_key".to_owned());
         assert!(result.is_ok());
 
-        let provider = result
-            .unwrap()
-            .with_model("custom-model".to_owned())
-            .with_api_key("new_key".to_owned());
+        if let Ok(base_provider) = result {
+            let provider = base_provider
+                .with_model("custom-model".to_owned())
+                .with_api_key("new_key".to_owned());
 
-        assert_eq!(provider.model, "custom-model");
-        assert_eq!(provider.api_key, "new_key");
+            assert_eq!(provider.model, "custom-model");
+            assert_eq!(provider.api_key, "new_key");
+        }
     }
 }

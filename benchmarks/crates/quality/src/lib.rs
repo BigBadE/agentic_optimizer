@@ -1,15 +1,11 @@
 //! Quality benchmarking for context retrieval system.
-#![allow(
-    dead_code,
-    clippy::expect_used,
-    clippy::unwrap_used,
-    clippy::panic,
-    clippy::missing_panics_doc,
-    clippy::missing_errors_doc,
-    clippy::print_stdout,
-    clippy::print_stderr,
-    clippy::tests_outside_test_module,
-    reason = "Test allows"
+#![cfg_attr(
+    test,
+    allow(
+        clippy::missing_panics_doc,
+        clippy::missing_errors_doc,
+        reason = "Allow for tests"
+    )
 )]
 
 pub mod metrics;
@@ -27,6 +23,7 @@ use std::sync::Arc;
 use test_case::TestCase;
 use tokio::sync::Mutex;
 use tokio::task::JoinSet;
+use tracing::warn;
 use walkdir::WalkDir;
 
 /// Run all benchmarks in a directory
@@ -78,7 +75,7 @@ pub async fn run_benchmarks_async(test_cases_dir: &Path) -> Result<Vec<Benchmark
     while let Some(result) = group_tasks.join_next().await {
         match result {
             Ok(group_results) => all_results.extend(group_results),
-            Err(error) => eprintln!("Project group failed: {error}"),
+            Err(error) => warn!("Project group failed: {error}"),
         }
     }
 
@@ -117,7 +114,7 @@ async fn run_benchmarks_for_project(
     while let Some(result) = tasks.join_next().await {
         match result {
             Ok(benchmark_result) => results.push(benchmark_result),
-            Err(error) => eprintln!("Benchmark task failed: {error}"),
+            Err(error) => warn!("Benchmark task failed: {error}"),
         }
     }
 
@@ -225,7 +222,7 @@ fn setup_repository(project_root: &str, config: &test_case::RepositoryConfig) ->
 
     // Clone if repository doesn't exist
     if !repo_path.exists() {
-        eprintln!("Cloning repository: {} -> {}", config.url, project_root);
+        tracing::info!("Cloning repository: {} -> {}", config.url, project_root);
 
         // Create parent directory if needed
         if let Some(parent) = repo_path.parent() {
@@ -259,11 +256,11 @@ fn setup_repository(project_root: &str, config: &test_case::RepositoryConfig) ->
 
     if !stash_output.status.success() {
         let stderr = String::from_utf8_lossy(&stash_output.stderr);
-        eprintln!("Warning: git stash failed (might be nothing to stash): {stderr}");
+        warn!("git stash failed (might be nothing to stash): {stderr}");
     }
 
     // Checkout the specific commit
-    eprintln!("Checking out commit: {} in {}", config.commit, project_root);
+    tracing::info!("Checking out commit: {} in {}", config.commit, project_root);
     let checkout_output = Command::new("git")
         .current_dir(&repo_path)
         .args(["checkout", &config.commit])
@@ -278,56 +275,100 @@ fn setup_repository(project_root: &str, config: &test_case::RepositoryConfig) ->
     Ok(())
 }
 
-/// Restore repository to previous state (pop stash if needed)
-///
-/// # Errors
-/// Returns error if git commands fail
-fn restore_repository(project_root: &str) -> Result<()> {
-    let repo_path = PathBuf::from(project_root);
+/// Generate summary section of the report
+fn generate_summary_section(aggregate: &AggregateMetrics) -> String {
+    use std::fmt::Write as _;
 
-    if !repo_path.join(".git").exists() {
-        return Ok(()); // Not a git repo, nothing to restore
+    let mut section = String::from("## Summary\n\n");
+    _ = writeln!(section, "**Test Cases**: {}\n", aggregate.test_count);
+    section.push_str("| Metric | Value | Target |\n");
+    section.push_str("|--------|-------|--------|\n");
+    _ = writeln!(
+        section,
+        "| Precision@3 | {:.1}% | 60% |",
+        aggregate.avg_precision_at_3
+    );
+    _ = writeln!(
+        section,
+        "| Precision@10 | {:.1}% | 55% |",
+        aggregate.avg_precision_at_10
+    );
+    _ = writeln!(
+        section,
+        "| Recall@10 | {:.1}% | 70% |",
+        aggregate.avg_recall_at_10
+    );
+    _ = writeln!(section, "| MRR | {:.3} | 0.700 |", aggregate.avg_mrr);
+    _ = writeln!(
+        section,
+        "| NDCG@10 | {:.3} | 0.750 |",
+        aggregate.avg_ndcg_at_10
+    );
+    _ = writeln!(
+        section,
+        "| Critical in Top-3 | {:.1}% | 65% |\n",
+        aggregate.avg_critical_in_top_3
+    );
+
+    section
+}
+
+/// Generate individual result section
+fn generate_result_section(result: &BenchmarkResult) -> String {
+    use std::fmt::Write as _;
+
+    let mut section = String::default();
+    _ = writeln!(section, "### {}\n", result.name);
+    _ = writeln!(section, "**Query**: \"{}\"\n", result.query);
+    section.push_str("| Metric | Value |\n");
+    section.push_str("|--------|-------|\n");
+    _ = writeln!(
+        section,
+        "| Precision@3 | {:.1}% |",
+        result.metrics.precision_at_3
+    );
+    _ = writeln!(
+        section,
+        "| Precision@10 | {:.1}% |",
+        result.metrics.precision_at_10
+    );
+    _ = writeln!(
+        section,
+        "| Recall@10 | {:.1}% |",
+        result.metrics.recall_at_10
+    );
+    _ = writeln!(section, "| MRR | {:.3} |", result.metrics.mrr);
+    _ = writeln!(section, "| NDCG@10 | {:.3} |", result.metrics.ndcg_at_10);
+    _ = writeln!(
+        section,
+        "| Critical in Top-3 | {:.1}% |\n",
+        result.metrics.critical_in_top_3
+    );
+
+    section.push_str("**Top 10 Results**:\n");
+    for (index, path) in result.results.iter().take(10).enumerate() {
+        _ = writeln!(section, "{}. `{}`", index + 1, path);
     }
+    section.push('\n');
 
-    // Check if there's a stash
-    let stash_list_output = Command::new("git")
-        .current_dir(&repo_path)
-        .args(["stash", "list"])
-        .output()
-        .context("Failed to execute git stash list")?;
-
-    let stash_list = String::from_utf8_lossy(&stash_list_output.stdout);
-
-    // Only pop if there's a stash with our marker message
-    if stash_list.contains("Quality benchmark auto-stash") {
-        eprintln!("Restoring stashed changes in {project_root}");
-        let pop_output = Command::new("git")
-            .current_dir(&repo_path)
-            .args(["stash", "pop"])
-            .output()
-            .context("Failed to execute git stash pop")?;
-
-        if !pop_output.status.success() {
-            let stderr = String::from_utf8_lossy(&pop_output.stderr);
-            eprintln!("Warning: git stash pop failed: {stderr}");
+    // Add execution logs
+    if !result.logs.is_empty() {
+        section.push_str("<details>\n");
+        section.push_str("<summary>Execution Logs</summary>\n\n");
+        section.push_str("```\n");
+        for log in &result.logs {
+            _ = writeln!(section, "{log}");
         }
+        section.push_str("```\n");
+        section.push_str("</details>\n\n");
     }
 
-    Ok(())
+    section
 }
 
 /// Generate markdown report from benchmark results
-#[allow(
-    clippy::let_underscore_must_use,
-    clippy::too_many_lines,
-    reason = "writeln! to String never fails, report generation is inherently long"
-)]
 pub fn generate_report(results: &[BenchmarkResult]) -> String {
-    use std::fmt::Write as _;
-
-    let mut report = String::default();
-
-    report.push_str("# Context Quality Benchmark Results\n\n");
+    let mut report = String::from("# Context Quality Benchmark Results\n\n");
 
     let metrics: Vec<_> = results
         .iter()
@@ -335,84 +376,11 @@ pub fn generate_report(results: &[BenchmarkResult]) -> String {
         .collect();
     let aggregate = AggregateMetrics::from_metrics(&metrics);
 
-    report.push_str("## Summary\n\n");
-    let _ = writeln!(report, "**Test Cases**: {}\n", aggregate.test_count);
-    report.push_str("| Metric | Value | Target |\n");
-    report.push_str("|--------|-------|--------|\n");
-    let _ = writeln!(
-        report,
-        "| Precision@3 | {:.1}% | 60% |",
-        aggregate.avg_precision_at_3
-    );
-    let _ = writeln!(
-        report,
-        "| Precision@10 | {:.1}% | 55% |",
-        aggregate.avg_precision_at_10
-    );
-    let _ = writeln!(
-        report,
-        "| Recall@10 | {:.1}% | 70% |",
-        aggregate.avg_recall_at_10
-    );
-    let _ = writeln!(report, "| MRR | {:.3} | 0.700 |", aggregate.avg_mrr);
-    let _ = writeln!(
-        report,
-        "| NDCG@10 | {:.3} | 0.750 |",
-        aggregate.avg_ndcg_at_10
-    );
-    let _ = writeln!(
-        report,
-        "| Critical in Top-3 | {:.1}% | 65% |\n",
-        aggregate.avg_critical_in_top_3
-    );
-
+    report.push_str(&generate_summary_section(&aggregate));
     report.push_str("## Individual Test Results\n\n");
 
     for result in results {
-        let _ = writeln!(report, "### {}\n", result.name);
-        let _ = writeln!(report, "**Query**: \"{}\"\n", result.query);
-        report.push_str("| Metric | Value |\n");
-        report.push_str("|--------|-------|\n");
-        let _ = writeln!(
-            report,
-            "| Precision@3 | {:.1}% |",
-            result.metrics.precision_at_3
-        );
-        let _ = writeln!(
-            report,
-            "| Precision@10 | {:.1}% |",
-            result.metrics.precision_at_10
-        );
-        let _ = writeln!(
-            report,
-            "| Recall@10 | {:.1}% |",
-            result.metrics.recall_at_10
-        );
-        let _ = writeln!(report, "| MRR | {:.3} |", result.metrics.mrr);
-        let _ = writeln!(report, "| NDCG@10 | {:.3} |", result.metrics.ndcg_at_10);
-        let _ = writeln!(
-            report,
-            "| Critical in Top-3 | {:.1}% |\n",
-            result.metrics.critical_in_top_3
-        );
-
-        report.push_str("**Top 10 Results**:\n");
-        for (index, path) in result.results.iter().take(10).enumerate() {
-            let _ = writeln!(report, "{}. `{}`", index + 1, path);
-        }
-        report.push('\n');
-
-        // Add execution logs
-        if !result.logs.is_empty() {
-            report.push_str("<details>\n");
-            report.push_str("<summary>Execution Logs</summary>\n\n");
-            report.push_str("```\n");
-            for log in &result.logs {
-                let _ = writeln!(report, "{log}");
-            }
-            report.push_str("```\n");
-            report.push_str("</details>\n\n");
-        }
+        report.push_str(&generate_result_section(result));
     }
 
     report

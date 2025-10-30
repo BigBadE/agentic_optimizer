@@ -107,6 +107,7 @@ impl Message {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use merlin_deps::anyhow::Result;
 
     #[test]
     fn test_thread_creation() {
@@ -119,7 +120,7 @@ mod tests {
     }
 
     #[test]
-    fn test_thread_branching() {
+    fn test_thread_branching() -> Result<()> {
         let parent_id = ThreadId::new();
         let parent_msg_id = MessageId::new();
         let thread = Thread::branched_from(
@@ -129,10 +130,12 @@ mod tests {
             parent_msg_id,
         );
 
-        assert!(thread.parent_thread.is_some());
-        let branch_point = thread.parent_thread.unwrap();
+        let branch_point = thread
+            .parent_thread
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected parent thread"))?;
         assert_eq!(branch_point.thread_id, parent_id);
         assert_eq!(branch_point.message_id, parent_msg_id);
+        Ok(())
     }
 
     #[test]

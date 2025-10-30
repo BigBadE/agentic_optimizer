@@ -285,16 +285,15 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
 #[cfg(test)]
 mod tests {
     use super::*;
+    use merlin_deps::anyhow::Result;
     use merlin_deps::tempfile::TempDir;
 
     #[tokio::test]
-    async fn test_context_request_exact_file() {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    async fn test_context_request_exact_file() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let test_file = temp_dir.path().join("test.rs");
 
-        write(&test_file, "fn main() {}")
-            .await
-            .expect("Failed to write test file");
+        write(&test_file, "fn main() {}").await?;
 
         let tool = ContextRequestTool::new(temp_dir.path().to_path_buf());
 
@@ -305,31 +304,28 @@ mod tests {
             }),
         };
 
-        let output = tool.execute(input).await.expect("Tool execution failed");
+        let output = tool.execute(input).await?;
         assert!(output.success);
 
-        let result: ContextRequestResult = from_value(output.data.expect("No data in output"))
-            .expect("Failed to deserialize result");
+        let data = output
+            .data
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("No data in output"))?;
+        let result: ContextRequestResult = from_value(data)?;
 
         assert!(result.success);
         assert_eq!(result.files.len(), 1);
         assert_eq!(result.files[0].content, "fn main() {}");
+        Ok(())
     }
 
     #[tokio::test]
-    async fn test_context_request_glob_pattern() {
-        let temp_dir = TempDir::new().expect("Failed to create temp dir");
+    async fn test_context_request_glob_pattern() -> Result<()> {
+        let temp_dir = TempDir::new()?;
         let src_dir = temp_dir.path().join("src");
-        create_dir(&src_dir)
-            .await
-            .expect("Failed to create src dir");
+        create_dir(&src_dir).await?;
 
-        write(src_dir.join("lib.rs"), "pub fn foo() {}")
-            .await
-            .expect("Failed to write lib.rs");
-        write(src_dir.join("main.rs"), "fn main() {}")
-            .await
-            .expect("Failed to write main.rs");
+        write(src_dir.join("lib.rs"), "pub fn foo() {}").await?;
+        write(src_dir.join("main.rs"), "fn main() {}").await?;
 
         let tool = ContextRequestTool::new(temp_dir.path().to_path_buf());
 
@@ -341,14 +337,17 @@ mod tests {
             }),
         };
 
-        let output = tool.execute(input).await.expect("Tool execution failed");
+        let output = tool.execute(input).await?;
         assert!(output.success);
 
-        let result: ContextRequestResult = from_value(output.data.expect("No data in output"))
-            .expect("Failed to deserialize result");
+        let data = output
+            .data
+            .ok_or_else(|| merlin_deps::anyhow::anyhow!("No data in output"))?;
+        let result: ContextRequestResult = from_value(data)?;
 
         assert!(result.success);
         assert!(result.files.len() >= 2);
+        Ok(())
     }
 
     #[tokio::test]

@@ -72,6 +72,10 @@ mod tests {
 
     // REMOVED: test_error_display - Low value trait test
 
+    /// Tests error retry classification logic.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_error_is_retryable() {
         // Retryable errors

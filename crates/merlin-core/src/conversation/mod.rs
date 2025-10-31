@@ -71,6 +71,10 @@ impl fmt::Display for ThreadColor {
 mod tests {
     use super::*;
 
+    /// Tests thread color cycling through the color palette with wrapping.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_thread_color_cycling() {
         assert_eq!(ThreadColor::from_index(0), ThreadColor::Blue);

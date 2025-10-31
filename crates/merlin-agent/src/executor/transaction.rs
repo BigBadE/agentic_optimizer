@@ -191,39 +191,34 @@ mod tests {
     use super::*;
     use merlin_deps::tempfile::TempDir;
 
+    /// Tests task workspace isolation from global workspace.
+    ///
+    /// # Errors
+    /// Returns an error if workspace operations fail.
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_task_workspace_isolation() {
-        let tmp_dir = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(err) => panic!("create temp dir: {err}"),
-        };
+    async fn test_task_workspace_isolation() -> Result<()> {
+        let tmp_dir = TempDir::new()?;
         let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
         let lock_manager = Arc::new(FileLockManager::default());
         let task_id = TaskId::default();
 
-        if let Err(error) = workspace
+        workspace
             .apply_changes(&[FileChange::Create {
                 path: PathBuf::from("test.rs"),
                 content: "original".to_owned(),
             }])
-            .await
-        {
-            panic!("failed to apply initial change: {error}");
-        }
+            .await?;
 
-        let mut task_workspace = match TaskWorkspace::new(
+        let mut task_workspace = TaskWorkspace::new(
             task_id,
             vec![PathBuf::from("test.rs")],
             Arc::clone(&workspace),
             lock_manager,
         )
-        .await
-        {
-            Ok(workspace_isolated) => workspace_isolated,
-            Err(error) => panic!("failed to create task workspace: {error}"),
-        };
+        .await?;
 
         task_workspace.modify_file(PathBuf::from("test.rs"), "modified".to_owned());
 
@@ -236,51 +231,46 @@ mod tests {
             workspace.read_file(&PathBuf::from("test.rs")).await,
             Some("original".to_owned())
         );
+        Ok(())
     }
 
+    /// Tests task workspace commit to global workspace.
+    ///
+    /// # Errors
+    /// Returns an error if workspace operations fail.
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_task_workspace_commit() {
-        let tmp_dir = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(err) => panic!("create temp dir: {err}"),
-        };
+    async fn test_task_workspace_commit() -> Result<()> {
+        let tmp_dir = TempDir::new()?;
         let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
         let lock_manager = Arc::new(FileLockManager::default());
         let task_id = TaskId::default();
 
-        if let Err(error) = workspace
+        workspace
             .apply_changes(&[FileChange::Create {
                 path: PathBuf::from("test.rs"),
                 content: "original".to_owned(),
             }])
-            .await
-        {
-            panic!("failed to apply initial change: {error}");
-        }
+            .await?;
 
-        let mut task_workspace = match TaskWorkspace::new(
+        let mut task_workspace = TaskWorkspace::new(
             task_id,
             vec![PathBuf::from("test.rs")],
             Arc::clone(&workspace),
             lock_manager,
         )
-        .await
-        {
-            Ok(workspace_isolated) => workspace_isolated,
-            Err(error) => panic!("failed to create task workspace: {error}"),
-        };
+        .await?;
 
         task_workspace.modify_file(PathBuf::from("test.rs"), "modified".to_owned());
 
-        if let Err(error) = task_workspace.commit(Arc::clone(&workspace)).await {
-            panic!("commit failed: {error}");
-        }
+        task_workspace.commit(Arc::clone(&workspace)).await?;
 
         assert_eq!(
             workspace.read_file(&PathBuf::from("test.rs")).await,
             Some("modified".to_owned())
         );
+        Ok(())
     }
 }

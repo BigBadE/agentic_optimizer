@@ -76,36 +76,53 @@ impl TaskAnalyzer for LocalTaskAnalyzer {
 mod tests {
     use super::*;
 
+    /// Tests simple request analysis.
+    ///
+    /// # Errors
+    /// Returns an error if analysis fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_simple_request() {
+    async fn test_simple_request() -> Result<()> {
         let analyzer = LocalTaskAnalyzer::default();
-        let analysis = match analyzer.analyze("Add a comment to main.rs").await {
-            Ok(analysis) => analysis,
-            Err(error) => panic!("analyze failed: {error}"),
-        };
+        let analysis = analyzer.analyze("Add a comment to main.rs").await?;
 
         assert_eq!(analysis.tasks.len(), 1);
         assert!(matches!(
             analysis.execution_strategy,
             ExecutionStrategy::Sequential
         ));
+        Ok(())
     }
 
+    /// Tests refactor request analysis.
+    ///
+    /// # Errors
+    /// Returns an error if analysis fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_refactor_request() {
+    async fn test_refactor_request() -> Result<()> {
         let analyzer = LocalTaskAnalyzer::default();
-        let analysis = match analyzer.analyze("Refactor the parser module").await {
-            Ok(analysis) => analysis,
-            Err(error) => panic!("analyze failed: {error}"),
-        };
+        let analysis = analyzer.analyze("Refactor the parser module").await?;
 
         assert_eq!(analysis.tasks.len(), 3);
         assert!(matches!(
             analysis.execution_strategy,
             ExecutionStrategy::Pipeline
         ));
+        Ok(())
     }
 
+    /// Tests complexity estimation for simple and complex tasks.
+    ///
+    /// # Errors
+    /// Returns an error if analysis fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_complexity_estimation() -> Result<()> {
         let analyzer = LocalTaskAnalyzer::default();
@@ -131,13 +148,17 @@ mod tests {
         Ok(())
     }
 
+    /// Tests context needs extraction from request.
+    ///
+    /// # Errors
+    /// Returns an error if analysis fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_context_needs() {
+    async fn test_context_needs() -> Result<()> {
         let analyzer = LocalTaskAnalyzer::default();
-        let analysis = match analyzer.analyze("Modify test.rs and main.rs").await {
-            Ok(analysis) => analysis,
-            Err(error) => panic!("analyze failed: {error}"),
-        };
+        let analysis = analyzer.analyze("Modify test.rs and main.rs").await?;
 
         // Verify analysis was created successfully
         assert!(!analysis.tasks.is_empty());
@@ -146,5 +167,6 @@ mod tests {
         // Context needs may or may not be populated depending on implementation
         // Just verify the field exists and is accessible
         let _ = &task.context_needs.required_files;
+        Ok(())
     }
 }

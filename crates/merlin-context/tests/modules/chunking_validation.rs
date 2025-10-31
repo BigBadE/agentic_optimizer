@@ -113,6 +113,10 @@ mod tests {
         (chunk_count, true)
     }
 
+    /// Tests that all source files meet chunking requirements.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_chunking_validation() {
         let files = collect_crates_source_files();

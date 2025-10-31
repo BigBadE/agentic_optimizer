@@ -60,6 +60,10 @@ pub enum Complexity {
 mod tests {
     use super::*;
 
+    /// Tests query intent struct creation and field access.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_query_intent_creation() {
         let intent = QueryIntent {

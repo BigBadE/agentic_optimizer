@@ -1,13 +1,4 @@
 //! Quality benchmark CLI for context retrieval system.
-#![cfg_attr(
-    test,
-    allow(
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        clippy::print_stdout,
-        reason = "Allow for tests"
-    )
-)]
 
 use std::fs::write;
 use std::path::PathBuf;
@@ -16,7 +7,7 @@ use std::process::exit;
 use anyhow::{Context as _, Result};
 use merlin_benchmarks_quality::{generate_report, run_benchmarks_async};
 use pico_args::Arguments;
-use tracing::Level;
+use tracing::{Level, info};
 use tracing_subscriber::{EnvFilter, fmt};
 
 struct Args {
@@ -27,6 +18,10 @@ struct Args {
 }
 
 impl Args {
+    /// Parses command-line arguments into the `Args` structure.
+    ///
+    /// # Errors
+    /// Returns an error if required arguments are invalid or cannot be parsed.
     fn parse() -> Result<Self> {
         let mut pargs = Arguments::from_env();
 
@@ -54,20 +49,27 @@ impl Args {
 }
 
 fn print_help() {
-    println!("quality-bench - Run context quality benchmarks");
-    println!();
-    println!("USAGE:");
-    println!("    quality-bench [OPTIONS]");
-    println!();
-    println!("OPTIONS:");
-    println!("    -t, --test-cases <PATH>      Directory containing test case TOML files");
-    println!("                                 [default: benchmarks/crates/quality/test_cases]");
-    println!("    -o, --output <PATH>          Output file for results (markdown format)");
-    println!("    -n, --name <NAME>            Run specific test case by name");
-    println!("    -v, --verbose                Show verbose output");
-    println!("    -h, --help                   Print help information");
+    info!("quality-bench - Run context quality benchmarks");
+    info!("");
+    info!("USAGE:");
+    info!("    quality-bench [OPTIONS]");
+    info!("");
+    info!("OPTIONS:");
+    info!("    -t, --test-cases <PATH>      Directory containing test case TOML files");
+    info!("                                 [default: benchmarks/crates/quality/test_cases]");
+    info!("    -o, --output <PATH>          Output file for results (markdown format)");
+    info!("    -n, --name <NAME>            Run specific test case by name");
+    info!("    -v, --verbose                Show verbose output");
+    info!("    -h, --help                   Print help information");
 }
 
+/// Main entry point for quality benchmark CLI.
+///
+/// # Errors
+/// Returns an error if benchmark execution or report generation fails.
+///
+/// # Panics
+/// Panics if assertions fail during test execution.
 #[tokio::main]
 async fn main() -> Result<()> {
     // Initialize tracing subscriber to see debug logs
@@ -77,16 +79,16 @@ async fn main() -> Result<()> {
 
     let args = Args::parse()?;
 
-    println!("Running context quality benchmarks...");
-    println!("Test cases directory: {}", args.test_cases.display());
-    println!();
+    info!("Running context quality benchmarks...");
+    info!("Test cases directory: {}", args.test_cases.display());
+    info!("");
 
     let results = run_benchmarks_async(&args.test_cases)
         .await
         .context("Failed to run benchmarks")?;
 
     if results.is_empty() {
-        println!("No test cases found in {}", args.test_cases.display());
+        info!("No test cases found in {}", args.test_cases.display());
         return Ok(());
     }
 
@@ -100,7 +102,7 @@ async fn main() -> Result<()> {
     };
 
     if filtered_results.is_empty() {
-        println!("No test cases matched the filter");
+        info!("No test cases matched the filter");
         return Ok(());
     }
 
@@ -109,25 +111,25 @@ async fn main() -> Result<()> {
     if let Some(output_path) = &args.output {
         write(output_path, &report)
             .with_context(|| format!("Failed to write report to {}", output_path.display()))?;
-        println!("Report written to: {}", output_path.display());
+        info!("Report written to: {}", output_path.display());
     } else {
-        println!("{report}");
+        info!("{report}");
     }
 
     if args.verbose {
-        println!("\nDetailed Results:");
+        info!("\nDetailed Results:");
         for result in &filtered_results {
-            println!("\n{}", "=".repeat(60));
-            println!("Test: {}", result.name);
-            println!("Query: {}", result.query);
-            println!("Results count: {}", result.results.len());
-            println!("Metrics:");
-            println!("  P@3:  {:.1}%", result.metrics.precision_at_3);
-            println!("  P@10: {:.1}%", result.metrics.precision_at_10);
-            println!("  R@10: {:.1}%", result.metrics.recall_at_10);
-            println!("  MRR:  {:.3}", result.metrics.mrr);
-            println!("  NDCG: {:.3}", result.metrics.ndcg_at_10);
-            println!("  Crit: {:.1}%", result.metrics.critical_in_top_3);
+            info!("\n{}", "=".repeat(60));
+            info!("Test: {}", result.name);
+            info!("Query: {}", result.query);
+            info!("Results count: {}", result.results.len());
+            info!("Metrics:");
+            info!("  P@3:  {:.1}%", result.metrics.precision_at_3);
+            info!("  P@10: {:.1}%", result.metrics.precision_at_10);
+            info!("  R@10: {:.1}%", result.metrics.recall_at_10);
+            info!("  MRR:  {:.3}", result.metrics.mrr);
+            info!("  NDCG: {:.3}", result.metrics.ndcg_at_10);
+            info!("  Crit: {:.1}%", result.metrics.critical_in_top_3);
         }
     }
 

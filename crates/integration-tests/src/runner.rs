@@ -7,8 +7,9 @@ use super::event_source::{FixtureEventController, FixtureEventSource};
 use super::execution_tracker::ExecutionResultTracker;
 use super::fixture::{TestEvent, TestFixture};
 use super::mock_provider::{MockProvider, MockRouter};
+use super::tui_test_helpers;
 use super::verification_result::VerificationResult;
-use super::verifier::UnifiedVerifier;
+use super::verifier::{UnifiedVerifier, VerifyEventContext};
 use super::workspace_setup::{create_files, get_test_workspace_path};
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_cli::TuiApp;
@@ -83,7 +84,7 @@ impl UnifiedTestRunner {
         let provider = Arc::new(MockProvider::new("test-mock"));
 
         // Determine workspace setup strategy
-        let (final_workspace_path, workspace_temp, is_readonly) =
+        let (final_workspace_path, workspace_temp, _is_readonly) =
             if let Some(workspace_name) = &fixture.setup.workspace {
                 // Use pre-made workspace read-only with pre-generated embeddings
                 let premade_path = get_test_workspace_path(workspace_name)?;
@@ -93,6 +94,17 @@ impl UnifiedTestRunner {
                 create_files(&workspace_path, &fixture.setup.files)?;
                 (workspace_path, workspace_temp, false)
             };
+
+        // Generate embeddings for test workspace if files were created
+        // This ensures chunking and scoring code is exercised during test setup
+        if !fixture.setup.files.is_empty() {
+            use merlin_context::FakeEmbeddingClient;
+            use merlin_context::embedding::VectorSearchManager;
+            let mut vector_manager =
+                VectorSearchManager::with_provider(&final_workspace_path, FakeEmbeddingClient);
+            // Synchronously initialize embeddings (this exercises chunking, scoring, etc.)
+            vector_manager.initialize().await?;
+        }
 
         // Setup LLM response patterns
         for event in &fixture.events {
@@ -104,9 +116,6 @@ impl UnifiedTestRunner {
 
         // Create routing config for test orchestrator
         let mut config = RoutingConfig::default();
-        config.workspace.root_path.clone_from(&final_workspace_path);
-        config.workspace.read_only = is_readonly;
-        config.execution.max_concurrent_tasks = 4;
         // Disable all real tiers
         config.tiers.local_enabled = false;
         config.tiers.groq_enabled = false;
@@ -128,9 +137,11 @@ impl UnifiedTestRunner {
             let store = ThreadStore::new(final_workspace_path.clone())?;
             let thread_store = Arc::new(Mutex::new(store));
             RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?
+                .with_workspace(final_workspace_path.clone())
                 .with_thread_store(thread_store)
         } else {
             RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?
+                .with_workspace(final_workspace_path.clone())
         };
 
         // Create fixture-based event source with controller
@@ -141,7 +152,7 @@ impl UnifiedTestRunner {
         let backend = TestBackend::new(terminal_size.0, terminal_size.1);
 
         // Create TUI app with test backend, fixture event source, and orchestrator
-        let tui_app = TuiApp::new_for_test(
+        let tui_app = tui_test_helpers::new_test_app(
             backend,
             Box::new(event_source),
             Some(final_workspace_path.clone()),
@@ -211,7 +222,7 @@ impl UnifiedTestRunner {
             }
 
             // Process any pending UI events first (this broadcasts them)
-            self.tui_app.test_process_ui_events();
+            tui_test_helpers::process_ui_events(&mut self.tui_app);
 
             // Try to receive task-specific event with timeout (increased to reduce CPU thrashing)
             let ui_event = timeout(TokioDuration::from_millis(100), task_events.recv()).await;
@@ -264,8 +275,8 @@ impl UnifiedTestRunner {
     /// # Errors
     /// Returns error if input processing fails
     async fn process_input_events(&mut self) -> Result<()> {
-        while let Some(evt) = self.tui_app.test_next_input_event().await? {
-            self.tui_app.test_handle_input(&evt);
+        while let Some(evt) = tui_test_helpers::next_input_event(&mut self.tui_app).await? {
+            tui_test_helpers::handle_input(&mut self.tui_app, &evt);
         }
         Ok(())
     }
@@ -293,24 +304,24 @@ impl UnifiedTestRunner {
                     self.process_input_events().await?;
 
                     // Render UI after processing input
-                    self.tui_app.test_render()?;
+                    self.tui_app.render()?;
 
                     // Verify user input event AFTER submission but BEFORE task completes
                     verifier
-                        .verify_event(
+                        .verify_event(&VerifyEventContext {
                             event,
-                            &input_event.verify,
-                            Some(&self.tui_app),
-                            &execution_tracker,
-                            Some(&self.provider),
-                        )
+                            verify: &input_event.verify,
+                            tui_app: Some(&self.tui_app),
+                            execution_tracker: &execution_tracker,
+                            provider: Some(&self.provider),
+                        })
                         .map_err(RoutingError::ExecutionFailed)?;
 
                     // Advance to next fixture event
                     self.event_controller.advance();
 
                     // Get the per-task event receiver from spawn_task_execution
-                    let mut task_events = self.tui_app.test_get_task_receiver()?;
+                    let mut task_events = tui_test_helpers::get_task_receiver(&mut self.tui_app)?;
 
                     // Now await task completion using dedicated per-task channel
                     let completion_result = self.await_task_completion(&mut task_events).await?;
@@ -321,17 +332,17 @@ impl UnifiedTestRunner {
                     self.process_input_events().await?;
 
                     // Render UI after processing input
-                    self.tui_app.test_render()?;
+                    self.tui_app.render()?;
 
                     // Verify user input event AFTER processing
                     verifier
-                        .verify_event(
+                        .verify_event(&VerifyEventContext {
                             event,
-                            &input_event.verify,
-                            Some(&self.tui_app),
-                            &execution_tracker,
-                            Some(&self.provider),
-                        )
+                            verify: &input_event.verify,
+                            tui_app: Some(&self.tui_app),
+                            execution_tracker: &execution_tracker,
+                            provider: Some(&self.provider),
+                        })
                         .map_err(RoutingError::ExecutionFailed)?;
 
                     // Advance to next fixture event
@@ -339,20 +350,20 @@ impl UnifiedTestRunner {
                 }
                 TestEvent::KeyPress(_) => {
                     self.process_input_events().await?;
-                    self.tui_app.test_render()?;
+                    self.tui_app.render()?;
                     self.event_controller.advance();
                 }
                 TestEvent::LlmResponse(llm_event) => {
                     Self::complete_pending_task(&mut pending_task, &mut execution_tracker);
-                    self.tui_app.test_render()?;
+                    self.tui_app.render()?;
                     verifier
-                        .verify_event(
+                        .verify_event(&VerifyEventContext {
                             event,
-                            &llm_event.verify,
-                            Some(&self.tui_app),
-                            &execution_tracker,
-                            Some(&self.provider),
-                        )
+                            verify: &llm_event.verify,
+                            tui_app: Some(&self.tui_app),
+                            execution_tracker: &execution_tracker,
+                            provider: Some(&self.provider),
+                        })
                         .map_err(RoutingError::ExecutionFailed)?;
                     self.event_controller.advance();
                 }
@@ -364,7 +375,7 @@ impl UnifiedTestRunner {
         }
 
         Self::complete_pending_task(&mut pending_task, &mut execution_tracker);
-        self.tui_app.test_render()?;
+        self.tui_app.render()?;
         verifier
             .verify_final(&final_verify, Some(&self.tui_app), &execution_tracker)
             .map_err(RoutingError::ExecutionFailed)?;

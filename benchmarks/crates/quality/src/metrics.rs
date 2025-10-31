@@ -245,8 +245,11 @@ impl AggregateMetrics {
 mod tests {
     use super::*;
 
+    /// Tests precision metric calculation.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
-
     fn test_precision_calculation() {
         let results = vec![
             "file1.rs".to_owned(),
@@ -270,8 +273,11 @@ mod tests {
         assert!((metrics.precision_at_3 - 66.67).abs() < 0.1);
     }
 
+    /// Tests recall metric calculation.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
-
     fn test_recall_calculation() {
         let results = vec![
             "file1.rs".to_owned(),
@@ -295,8 +301,11 @@ mod tests {
         assert!((metrics.recall_at_10 - 50.0).abs() < f64::EPSILON);
     }
 
+    /// Tests mean reciprocal rank (MRR) calculation.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
-
     fn test_mrr_calculation() {
         let results = vec![
             "file1.rs".to_owned(),

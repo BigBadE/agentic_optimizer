@@ -288,6 +288,13 @@ mod tests {
     use merlin_deps::anyhow::Result;
     use merlin_deps::tempfile::TempDir;
 
+    /// Tests context request for an exact file match.
+    ///
+    /// # Errors
+    /// Returns an error if file creation or context request fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_context_request_exact_file() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -318,6 +325,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests context request using glob patterns to match multiple files.
+    ///
+    /// # Errors
+    /// Returns an error if file creation or context request fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_context_request_glob_pattern() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -350,6 +364,10 @@ mod tests {
         Ok(())
     }
 
+    /// Tests context tracker deduplication and clearing functionality.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_context_tracker() {
         let tracker = ContextTracker::new();

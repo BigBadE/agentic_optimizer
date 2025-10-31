@@ -237,9 +237,12 @@ impl ModelProvider for OpenRouterProvider {
 mod tests {
     use super::*;
 
+    /// Tests that creating a provider with an empty API key returns an error.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_new_with_empty_api_key() {
-        // Test that creating a provider with an empty API key returns an error
         let result = OpenRouterProvider::new(String::new());
         assert!(result.is_err(), "Empty API key should return an error");
 
@@ -251,9 +254,12 @@ mod tests {
         }
     }
 
+    /// Tests that creating a provider with a valid API key succeeds.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_new_with_valid_api_key() {
-        // Test that creating a provider with a valid API key succeeds
         let result = OpenRouterProvider::new("valid_key".to_owned());
         assert!(result.is_ok(), "Valid API key should succeed");
 
@@ -263,9 +269,12 @@ mod tests {
         }
     }
 
+    /// Tests that `with_model` correctly sets the model.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_with_model() {
-        // Test that with_model correctly sets the model
         let result = OpenRouterProvider::new("test_key".to_owned());
         assert!(result.is_ok());
         if let Ok(provider) = result {
@@ -274,6 +283,10 @@ mod tests {
         }
     }
 
+    /// Tests provider name returns correct identifier.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_provider_name() {
         let result = OpenRouterProvider::new("test_key".to_owned());
@@ -283,6 +296,10 @@ mod tests {
         }
     }
 
+    /// Tests cost estimation for non-empty context.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_cost_estimation() {
         let result = OpenRouterProvider::new("test_key".to_owned());
@@ -296,6 +313,10 @@ mod tests {
         }
     }
 
+    /// Tests that cost scales with context size.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_cost_estimation_scaling() {
         let result = OpenRouterProvider::new("test_key".to_owned());
@@ -315,6 +336,10 @@ mod tests {
         }
     }
 
+    /// Tests message building with context and query.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_build_messages_with_context() {
         let context = Context::new("test query");
@@ -333,25 +358,26 @@ mod tests {
         );
 
         // Last message should be user with query text
-        if let Some(last) = messages.last() {
-            assert_eq!(
-                last["role"].as_str(),
-                Some("user"),
-                "Last message should be user role"
-            );
-            assert_eq!(
-                last["content"].as_str(),
-                Some("user question"),
-                "Last message should contain query text"
-            );
-        } else {
-            panic!("Messages should not be empty");
-        }
+        assert!(!messages.is_empty(), "Messages should not be empty");
+        let last = &messages[messages.len() - 1];
+        assert_eq!(
+            last["role"].as_str(),
+            Some("user"),
+            "Last message should be user role"
+        );
+        assert_eq!(
+            last["content"].as_str(),
+            Some("user question"),
+            "Last message should contain query text"
+        );
     }
 
+    /// Tests that methods can be chained.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_model_chaining() {
-        // Test that methods can be chained
         let result = OpenRouterProvider::new("test_key".to_owned());
         assert!(result.is_ok());
         if let Ok(base_provider) = result {

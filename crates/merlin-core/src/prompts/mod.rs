@@ -49,6 +49,13 @@ mod tests {
     use super::*;
     use merlin_deps::anyhow::Result;
 
+    /// Tests extraction of prompt section from markdown.
+    ///
+    /// # Errors
+    /// Returns an error if prompt extraction fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_extract_prompt_section() -> Result<()> {
         let markdown = r"# Test Prompt
@@ -73,6 +80,13 @@ It can have multiple lines.
         Ok(())
     }
 
+    /// Tests loading context planning prompt and verifying usage section removal.
+    ///
+    /// # Errors
+    /// Returns an error if prompt loading fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_load_context_planning_prompt() -> Result<()> {
         let prompt =
@@ -83,6 +97,13 @@ It can have multiple lines.
         Ok(())
     }
 
+    /// Tests loading TypeScript agent prompt and verifying usage section removal.
+    ///
+    /// # Errors
+    /// Returns an error if prompt loading fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_load_typescript_agent_prompt() -> Result<()> {
         let prompt =

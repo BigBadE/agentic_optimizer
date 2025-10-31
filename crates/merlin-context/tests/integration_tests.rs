@@ -2,9 +2,8 @@
 #![cfg_attr(
     test,
     allow(
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        reason = "Allow for tests"
+        clippy::tests_outside_test_module,
+        reason = "Allow for integration tests"
     )
 )]
 

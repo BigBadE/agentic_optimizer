@@ -181,6 +181,10 @@ mod tests {
     use crate::metrics::collector::RequestMetricsParams;
     use merlin_core::TokenUsage;
 
+    /// Tests daily report generation with empty collector.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_daily_report_empty() {
         let collector = MetricsCollector::new();
@@ -190,6 +194,10 @@ mod tests {
         assert!((report.success_rate - 0.0).abs() < f64::EPSILON);
     }
 
+    /// Tests daily report generation with recorded metrics.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_daily_report_with_data() {
         let mut collector = MetricsCollector::new();
@@ -212,6 +220,13 @@ mod tests {
         assert_eq!(report.avg_latency_ms, 100);
     }
 
+    /// Tests formatting of daily report to human-readable string.
+    ///
+    /// # Errors
+    /// Returns an error if formatting fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_format_report() -> Result<(), FmtError> {
         let report = DailyReport {

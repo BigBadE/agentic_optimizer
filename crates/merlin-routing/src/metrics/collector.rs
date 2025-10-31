@@ -220,6 +220,10 @@ impl Default for MetricsCollector {
 mod tests {
     use super::*;
 
+    /// Tests basic metrics collection functionality.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_metrics_collector() {
         let mut collector = MetricsCollector::new();
@@ -237,6 +241,10 @@ mod tests {
         assert_eq!(collector.len(), 1);
     }
 
+    /// Tests cost estimation for different model tiers.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_cost_estimation() {
         let tokens = TokenUsage {
@@ -253,6 +261,10 @@ mod tests {
         assert!(claude_cost > f64::EPSILON);
     }
 
+    /// Tests filtering requests from today.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_requests_today() {
         let mut collector = MetricsCollector::new();

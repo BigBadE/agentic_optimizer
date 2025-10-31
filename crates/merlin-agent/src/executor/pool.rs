@@ -232,16 +232,18 @@ mod tests {
         }
     }
 
+    /// Tests basic executor pool creation.
+    ///
+    /// # Errors
+    /// Returns an error if pool creation fails.
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_executor_pool_basic() {
+    async fn test_executor_pool_basic() -> Result<()> {
         let router = Arc::new(MockRouter);
         let validator = Arc::new(MockValidator);
-        let tmp_dir = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(err) => panic!("create temp dir: {err}"),
-        };
+        let tmp_dir = TempDir::new()?;
         let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
 
         // Test pool creation - actual execution requires provider registry
@@ -249,5 +251,6 @@ mod tests {
 
         // Verify pool was created successfully
         assert!(executor.max_concurrent == 2);
+        Ok(())
     }
 }

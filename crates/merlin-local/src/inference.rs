@@ -151,6 +151,10 @@ impl ModelProvider for LocalModelProvider {
 mod tests {
     use super::*;
 
+    /// Tests local model provider initialization.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn local_provider_creation() {
         let provider = LocalModelProvider::new("qwen2.5-coder:7b".to_owned());
@@ -158,6 +162,10 @@ mod tests {
         assert_eq!(provider.model_name, "qwen2.5-coder:7b");
     }
 
+    /// Tests cost estimation for local models (should be zero).
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn cost_estimation() {
         let provider = LocalModelProvider::new("qwen2.5-coder:7b".to_owned());

@@ -1,12 +1,4 @@
 //! Merlin CLI - Interactive AI coding assistant command-line interface
-#![cfg_attr(
-    test,
-    allow(
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        reason = "Allow for tests"
-    )
-)]
 
 use cli::Cli;
 use merlin_deps::anyhow::{Context as _, Result};
@@ -24,7 +16,7 @@ mod utils;
 /// Returns error if CLI parsing or handler execution fails
 ///
 /// # Panics
-/// May panic if Tokio runtime initialization fails
+/// Panics if tokio runtime initialization fails
 #[tokio::main]
 async fn main() -> Result<()> {
     let cli = Cli::parse().context("Failed to parse command-line arguments")?;
@@ -38,6 +30,7 @@ async fn main() -> Result<()> {
 mod tests {
     use super::*;
     use merlin_core::TokenUsage;
+    use merlin_deps::anyhow::Error;
     use merlin_deps::filetime::{FileTime, set_file_mtime};
     use merlin_deps::tempfile::TempDir;
     use std::fs;
@@ -59,10 +52,10 @@ mod tests {
         )
     }
 
-    /// Tests basic cost calculation without cache
+    /// Tests basic cost calculation without cache.
     ///
     /// # Panics
-    /// Panics if cost calculation produces incorrect result
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_calculate_cost_basic() {
         const EXPECTED_COST: f64 = 0.0105;
@@ -81,10 +74,10 @@ mod tests {
         );
     }
 
-    /// Tests cost calculation with cache tokens
+    /// Tests cost calculation with cache tokens.
     ///
     /// # Panics
-    /// Panics if cost calculation produces incorrect result
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_calculate_cost_with_cache() {
         const EXPECTED_COST: f64 = 0.01485;
@@ -103,10 +96,10 @@ mod tests {
         );
     }
 
-    /// Tests cost calculation with zero tokens
+    /// Tests cost calculation with zero tokens.
     ///
     /// # Panics
-    /// Panics if zero tokens produce non-zero cost
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_calculate_cost_zero_tokens() {
         const TOLERANCE: f64 = 0.0001;
@@ -124,10 +117,10 @@ mod tests {
         );
     }
 
-    /// Tests cost calculation with large token values
+    /// Tests cost calculation with large token values.
     ///
     /// # Panics
-    /// Panics if cost calculation produces incorrect result
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_calculate_cost_large_values() {
         const LARGE_INPUT: u64 = 1_000_000;
@@ -148,35 +141,36 @@ mod tests {
         );
     }
 
-    /// Tests cleanup when .merlin directory doesn't exist
+    /// Tests cleanup when .merlin directory doesn't exist.
+    ///
+    /// # Errors
+    /// Returns error if temp directory creation or cleanup fails.
     ///
     /// # Panics
-    /// Panics if temp directory creation or cleanup fails
+    /// Panics if assertions fail during test execution.
     #[test]
-    fn test_cleanup_old_tasks_no_directory() {
-        let temp = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(err) => panic!("Failed to create temp dir: {err}"),
-        };
+    fn test_cleanup_old_tasks_no_directory() -> Result<(), Error> {
+        let temp = TempDir::new()?;
         let merlin_dir = temp.path().join(".merlin");
         let result = utils::cleanup_old_tasks(&merlin_dir);
         assert!(
             result.is_ok(),
             "Cleanup should succeed when directory doesn't exist"
         );
+        Ok(())
     }
 
-    /// Tests cleanup when task count is under limit
+    /// Tests cleanup when task count is under limit.
+    ///
+    /// # Errors
+    /// Returns error if temp directory creation or file operations fail.
     ///
     /// # Panics
-    /// Panics if temp directory creation or file operations fail
+    /// Panics if assertions fail during test execution.
     #[test]
-    fn test_cleanup_old_tasks_under_limit() {
+    fn test_cleanup_old_tasks_under_limit() -> Result<(), Error> {
         const NUM_TASKS: usize = 5;
-        let temp = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(err) => panic!("Failed to create temp dir: {err}"),
-        };
+        let temp = TempDir::new()?;
         let tasks_dir = temp.path().join(".merlin").join("tasks");
         assert!(
             fs::create_dir_all(&tasks_dir).is_ok(),
@@ -201,21 +195,22 @@ mod tests {
             remaining, NUM_TASKS,
             "All tasks should remain when under limit"
         );
+        Ok(())
     }
 
-    /// Tests cleanup when task count exceeds limit
+    /// Tests cleanup when task count exceeds limit.
+    ///
+    /// # Errors
+    /// Returns error if temp directory creation or file operations fail.
     ///
     /// # Panics
-    /// Panics if temp directory creation or file operations fail
+    /// Panics if assertions fail during test execution.
     #[test]
-    fn test_cleanup_old_tasks_over_limit() {
+    fn test_cleanup_old_tasks_over_limit() -> Result<(), Error> {
         const MAX_TASKS: usize = 50;
         const OVER_LIMIT: usize = MAX_TASKS + 10;
 
-        let temp = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(err) => panic!("Failed to create temp dir: {err}"),
-        };
+        let temp = TempDir::new()?;
         let tasks_dir = temp.path().join(".merlin").join("tasks");
         assert!(
             fs::create_dir_all(&tasks_dir).is_ok(),
@@ -245,22 +240,23 @@ mod tests {
         assert!(remaining_result.is_ok(), "Failed to read tasks dir");
         let remaining = remaining_result.map(Iterator::count).unwrap_or(0);
         assert_eq!(remaining, MAX_TASKS, "Should keep exactly MAX_TASKS tasks");
+        Ok(())
     }
 
-    /// Tests cleanup ignores non-gz files
+    /// Tests cleanup ignores non-gz files.
+    ///
+    /// # Errors
+    /// Returns error if temp directory creation or file operations fail.
     ///
     /// # Panics
-    /// Panics if temp directory creation or file operations fail
+    /// Panics if assertions fail during test execution.
     #[test]
-    fn test_cleanup_old_tasks_ignores_non_gz() {
+    fn test_cleanup_old_tasks_ignores_non_gz() -> Result<(), Error> {
         const NUM_GZ_TASKS: usize = 3;
         const NUM_OTHER_FILES: usize = 2;
         const EXPECTED_TOTAL: usize = NUM_GZ_TASKS + NUM_OTHER_FILES;
 
-        let temp = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(err) => panic!("Failed to create temp dir: {err}"),
-        };
+        let temp = TempDir::new()?;
         let tasks_dir = temp.path().join(".merlin").join("tasks");
         assert!(
             fs::create_dir_all(&tasks_dir).is_ok(),
@@ -290,21 +286,22 @@ mod tests {
         assert!(total_files_result.is_ok(), "Failed to read tasks dir");
         let total_files = total_files_result.map(Iterator::count).unwrap_or(0);
         assert_eq!(total_files, EXPECTED_TOTAL, "Should preserve non-gz files");
+        Ok(())
     }
 
-    /// Tests cleanup with mixed file extensions
+    /// Tests cleanup with mixed file extensions.
+    ///
+    /// # Errors
+    /// Returns error if temp directory creation or file operations fail.
     ///
     /// # Panics
-    /// Panics if temp directory creation or file operations fail
+    /// Panics if assertions fail during test execution.
     #[test]
-    fn test_cleanup_old_tasks_with_mixed_extensions() {
+    fn test_cleanup_old_tasks_with_mixed_extensions() -> Result<(), Error> {
         const NUM_GZ_FILES: usize = 30;
         const NUM_JSON_FILES: usize = 15;
 
-        let temp = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(err) => panic!("Failed to create temp dir: {err}"),
-        };
+        let temp = TempDir::new()?;
         let tasks_dir = temp.path().join(".merlin").join("tasks");
         assert!(
             fs::create_dir_all(&tasks_dir).is_ok(),
@@ -372,5 +369,6 @@ mod tests {
         });
 
         assert_eq!(json_count, NUM_JSON_FILES, "Should preserve all json files");
+        Ok(())
     }
 }

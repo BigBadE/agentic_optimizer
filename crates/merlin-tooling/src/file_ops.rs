@@ -321,6 +321,13 @@ mod tests {
     use merlin_deps::anyhow::Result;
     use merlin_deps::tempfile::TempDir;
 
+    /// Tests successful file writing.
+    ///
+    /// # Errors
+    /// Returns an error if file operations fail.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_write_file_success() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -340,6 +347,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests that writing a file creates parent directories if they don't exist.
+    ///
+    /// # Errors
+    /// Returns an error if file operations fail.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_write_file_creates_directories() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -359,6 +373,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests listing files in a directory.
+    ///
+    /// # Errors
+    /// Returns an error if file operations fail.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_list_files_success() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -385,6 +406,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests listing files in an empty directory.
+    ///
+    /// # Errors
+    /// Returns an error if file operations fail.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_list_files_empty_directory() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -404,6 +432,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests path traversal attack prevention in file writing.
+    ///
+    /// # Errors
+    /// Returns an error if test setup fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_path_traversal_prevention_write() -> Result<()> {
         let temp_dir = TempDir::new()?;

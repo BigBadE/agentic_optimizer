@@ -147,6 +147,10 @@ mod tests {
 
     // REMOVED: test_tool_output_success_with_data - Trivial test
 
+    /// Tests tool output creation for error cases.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_tool_output_error() {
         let output = ToolOutput::error("failed to execute");
@@ -179,6 +183,13 @@ mod tests {
         }
     }
 
+    /// Tests basic tool trait implementation.
+    ///
+    /// # Errors
+    /// Returns an error if tool execution fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_tool_trait_implementation() -> Result<()> {
         let tool = MockTool;
@@ -190,6 +201,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests tool error handling and error type propagation.
+    ///
+    /// # Errors
+    /// Returns an error if test setup fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_tool_trait_error_handling() -> Result<()> {
         let tool = MockTool;

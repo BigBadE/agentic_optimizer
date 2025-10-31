@@ -109,6 +109,10 @@ mod tests {
     use super::*;
     use merlin_deps::anyhow::Result;
 
+    /// Tests basic thread creation and initialization.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_thread_creation() {
         let thread = Thread::new("Test Thread".to_owned(), ThreadColor::Blue);
@@ -119,6 +123,13 @@ mod tests {
         assert!(!thread.archived);
     }
 
+    /// Tests thread branching functionality and parent thread tracking.
+    ///
+    /// # Errors
+    /// Returns an error if the test assertions fail or parent thread is not found.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_thread_branching() -> Result<()> {
         let parent_id = ThreadId::new();
@@ -138,6 +149,10 @@ mod tests {
         Ok(())
     }
 
+    /// Tests basic message creation and field initialization.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_message_creation() {
         let message = Message::new("Hello".to_owned());

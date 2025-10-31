@@ -43,33 +43,6 @@ pub fn get_conversation_history_from_task(
     history
 }
 
-/// Gets thread context for a specific task
-///
-/// Returns tuples of `(task_id, description, output)` for tasks in the same thread.
-///
-/// TODO: This is for conversation threading features - allows displaying related tasks
-/// in a conversation view. Currently returns just the selected task until thread support is implemented.
-#[cfg(any(test, feature = "test-util"))]
-pub fn get_thread_context(
-    selected_task_id: Option<TaskId>,
-    task_manager: &TaskManager,
-) -> Vec<(TaskId, String, String)> {
-    let Some(task_id) = selected_task_id else {
-        return Vec::default();
-    };
-
-    let mut context = Vec::default();
-
-    if let Some(task) = task_manager.get_task(task_id) {
-        context.push((task_id, task.description.clone(), task.output.clone()));
-    }
-
-    // TODO: When thread support is implemented, fetch all tasks with the same thread_id
-    // and return them in chronological order
-
-    context
-}
-
 /// Returns the task ID itself (no hierarchy in new system)
 ///
 /// Previously this would find the root conversation in a parent-child hierarchy.

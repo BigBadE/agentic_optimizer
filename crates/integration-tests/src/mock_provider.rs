@@ -363,51 +363,63 @@ mod tests {
 
     /// Tests exact pattern matching
     ///
+    /// # Errors
+    /// Returns error if `PatternResponse` creation fails
+    ///
     /// # Panics
-    /// Panics if pattern creation fails
+    /// Panics if assertions fail during test execution
     #[test]
-    fn test_pattern_response_exact_match() {
+    fn test_pattern_response_exact_match() -> Result<()> {
         let trigger = TriggerConfig {
             pattern: "hello world".to_owned(),
             match_type: MatchType::Exact,
         };
-        let response = PatternResponse::new(&trigger, "test".to_owned()).unwrap();
+        let response = PatternResponse::new(&trigger, "test".to_owned())?;
         assert!(response.matches("hello world"));
         assert!(!response.matches("hello"));
         assert!(!response.matches("hello world!"));
+        Ok(())
     }
 
     /// Tests contains pattern matching
     ///
+    /// # Errors
+    /// Returns error if `PatternResponse` creation fails
+    ///
     /// # Panics
-    /// Panics if pattern creation fails
+    /// Panics if assertions fail during test execution
     #[test]
-    fn test_pattern_response_contains_match() {
+    fn test_pattern_response_contains_match() -> Result<()> {
         let trigger = TriggerConfig {
             pattern: "world".to_owned(),
             match_type: MatchType::Contains,
         };
-        let response = PatternResponse::new(&trigger, "test".to_owned()).unwrap();
+        let response = PatternResponse::new(&trigger, "test".to_owned())?;
         assert!(response.matches("hello world"));
         assert!(response.matches("world"));
         assert!(response.matches("world hello"));
         assert!(!response.matches("hello"));
+        Ok(())
     }
 
     /// Tests regex pattern matching
     ///
+    /// # Errors
+    /// Returns error if `PatternResponse` creation fails
+    ///
     /// # Panics
-    /// Panics if pattern creation fails
+    /// Panics if assertions fail during test execution
     #[test]
-    fn test_pattern_response_regex_match() {
+    fn test_pattern_response_regex_match() -> Result<()> {
         let trigger = TriggerConfig {
             pattern: r"hello\s+\w+".to_owned(),
             match_type: MatchType::Regex,
         };
-        let response = PatternResponse::new(&trigger, "test".to_owned()).unwrap();
+        let response = PatternResponse::new(&trigger, "test".to_owned())?;
         assert!(response.matches("hello world"));
         assert!(response.matches("hello there"));
         assert!(!response.matches("hello"));
         assert!(!response.matches("helloworld"));
+        Ok(())
     }
 }

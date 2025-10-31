@@ -179,6 +179,10 @@ impl ProviderRegistry {
 mod tests {
     use super::*;
 
+    /// Tests provider registry creation with default configuration.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_provider_registry_with_defaults() {
         // This test will fail without API keys set, which is expected
@@ -196,6 +200,10 @@ mod tests {
         assert!(!registry.registered_models().is_empty());
     }
 
+    /// Tests provider registry with only local providers enabled.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_provider_registry_local_only() {
         let mut config = RoutingConfig::default();
@@ -216,6 +224,10 @@ mod tests {
         }
     }
 
+    /// Tests error when requesting provider for disabled model.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_get_provider_for_unregistered_model() {
         let mut config = RoutingConfig::default();

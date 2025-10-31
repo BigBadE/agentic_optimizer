@@ -178,6 +178,10 @@ impl Default for QueryAnalyzer {
 mod tests {
     use super::*;
 
+    /// Tests detection of create action in queries.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_detect_create_action() {
         let analyzer = QueryAnalyzer;
@@ -185,6 +189,10 @@ mod tests {
         assert!(matches!(intent.action, Action::Create));
     }
 
+    /// Tests detection of debug action in queries.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_detect_debug_action() {
         let analyzer = QueryAnalyzer;
@@ -192,6 +200,10 @@ mod tests {
         assert!(matches!(intent.action, Action::Debug));
     }
 
+    /// Tests keyword extraction from queries.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_extract_keywords() {
         let analyzer = QueryAnalyzer;
@@ -201,6 +213,10 @@ mod tests {
         assert!(intent.keywords.contains(&"service".to_string()));
     }
 
+    /// Tests entity extraction from queries.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_extract_entities() {
         let analyzer = QueryAnalyzer;
@@ -212,6 +228,10 @@ mod tests {
         );
     }
 
+    /// Tests query complexity estimation.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_complexity_estimation() {
         let analyzer = QueryAnalyzer;

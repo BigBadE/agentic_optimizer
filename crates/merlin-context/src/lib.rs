@@ -1,12 +1,4 @@
 //! Context building utilities for assembling LLM prompts from a project tree.
-#![cfg_attr(
-    test,
-    allow(
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        reason = "Allow for tests"
-    )
-)]
 
 mod builder;
 /// Context fetching with file reference extraction and semantic search
@@ -19,7 +11,7 @@ pub mod query;
 
 pub use builder::ContextBuilder;
 pub use context_fetcher::ContextFetcher;
-#[cfg(test)]
+#[cfg(any(test, feature = "test-helpers"))]
 pub use embedding::FakeEmbeddingClient;
 pub use embedding::{
     EmbeddingClient, EmbeddingProvider, ProgressCallback, SearchResult, VectorSearchManager,

@@ -185,58 +185,64 @@ mod tests {
     use super::*;
     use std::slice::from_ref;
 
+    /// Tests that write locks are exclusive.
+    ///
+    /// # Errors
+    /// Returns an error if lock acquisition fails.
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_write_lock_exclusive() {
+    async fn test_write_lock_exclusive() -> Result<()> {
         let manager = Arc::new(FileLockManager::default());
         let task_a = TaskId::default();
         let task_b = TaskId::default();
         let file = PathBuf::from("test.rs");
 
-        let _guard_a = match manager.acquire_write_locks(task_a, from_ref(&file)).await {
-            Ok(guard) => guard,
-            Err(error) => panic!("failed to acquire write lock: {error}"),
-        };
+        let _guard_a = manager.acquire_write_locks(task_a, from_ref(&file)).await?;
 
         let result = manager.acquire_write_locks(task_b, &[file]).await;
         assert!(result.is_err());
+        Ok(())
     }
 
+    /// Tests that read locks can be shared.
+    ///
+    /// # Errors
+    /// Returns an error if lock acquisition fails.
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_read_locks_shared() {
+    async fn test_read_locks_shared() -> Result<()> {
         let manager = Arc::new(FileLockManager::default());
         let task_a = TaskId::default();
         let task_b = TaskId::default();
         let file = PathBuf::from("test.rs");
 
-        let _guard_a = match manager.acquire_read_locks(task_a, from_ref(&file)).await {
-            Ok(guard) => guard,
-            Err(error) => panic!("failed to acquire read lock: {error}"),
-        };
-        let _guard_b = match manager.acquire_read_locks(task_b, from_ref(&file)).await {
-            Ok(guard) => guard,
-            Err(error) => panic!("failed to acquire read lock: {error}"),
-        };
+        let _guard_a = manager.acquire_read_locks(task_a, from_ref(&file)).await?;
+        let _guard_b = manager.acquire_read_locks(task_b, from_ref(&file)).await?;
+        Ok(())
     }
 
+    /// Tests that write locks block read locks.
+    ///
+    /// # Errors
+    /// Returns an error if lock acquisition fails.
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_write_blocks_read() {
+    async fn test_write_blocks_read() -> Result<()> {
         let manager = Arc::new(FileLockManager::default());
         let task_a = TaskId::default();
         let task_b = TaskId::default();
         let file = PathBuf::from("test.rs");
 
-        let _guard_a = match manager.acquire_write_locks(task_a, from_ref(&file)).await {
-            Ok(guard) => guard,
-            Err(error) => panic!("failed to acquire write lock: {error}"),
-        };
+        let _guard_a = manager.acquire_write_locks(task_a, from_ref(&file)).await?;
 
         let result = manager.acquire_read_locks(task_b, from_ref(&file)).await;
         assert!(result.is_err());
+        Ok(())
     }
 }

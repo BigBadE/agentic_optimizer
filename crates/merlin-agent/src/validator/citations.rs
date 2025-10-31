@@ -11,13 +11,10 @@ use std::sync::LazyLock;
 use std::time::Instant;
 
 /// Regex pattern for matching citations in format `<file:line>` or `<file:line1-line2>`
-static CITATION_REGEX: LazyLock<Regex> =
-    LazyLock::new(
-        || match Regex::new(r"([a-zA-Z0-9_/\\.-]+\.[a-zA-Z0-9]+):(\d+)(?:-(\d+))?") {
-            Ok(regex) => regex,
-            Err(err) => panic!("Citation regex is invalid: {err}"),
-        },
-    );
+///
+/// Returns None if regex compilation fails (should never happen with a valid pattern).
+static CITATION_REGEX: LazyLock<Option<Regex>> =
+    LazyLock::new(|| Regex::new(r"([a-zA-Z0-9_/\\.-]+\.[a-zA-Z0-9]+):(\d+)(?:-(\d+))?").ok());
 
 /// Citation format: `file/path.rs:42-50` or `file/path.rs:42`
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -39,26 +36,29 @@ impl Citation {
     /// - `crates/merlin-core/src/lib.rs:10-20`
     pub fn parse(text: &str) -> Option<Self> {
         // Pattern: file_path:line or file_path:line1-line2
-        if let Some(captures) = CITATION_REGEX.captures(text) {
-            let file_path = PathBuf::from(captures.get(1)?.as_str());
-            let start_line = captures.get(2)?.as_str().parse().ok();
-            let end_line = captures
-                .get(3)
-                .and_then(|match_group| match_group.as_str().parse().ok());
+        let regex = CITATION_REGEX.as_ref()?;
+        let captures = regex.captures(text)?;
 
-            Some(Self {
-                file_path,
-                start_line,
-                end_line,
-            })
-        } else {
-            None
-        }
+        let file_path = PathBuf::from(captures.get(1)?.as_str());
+        let start_line = captures.get(2)?.as_str().parse().ok();
+        let end_line = captures
+            .get(3)
+            .and_then(|match_group| match_group.as_str().parse().ok());
+
+        Some(Self {
+            file_path,
+            start_line,
+            end_line,
+        })
     }
 
     /// Extract all citations from text
     pub fn extract_all(text: &str) -> Vec<Self> {
-        CITATION_REGEX
+        let Some(regex) = CITATION_REGEX.as_ref() else {
+            return Vec::new();
+        };
+
+        regex
             .captures_iter(text)
             .filter_map(|cap| {
                 let file_path = PathBuf::from(cap.get(1)?.as_str());

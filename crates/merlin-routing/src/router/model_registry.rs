@@ -61,7 +61,7 @@ impl ModelRegistry {
     /// Registers a model for a range of difficulty levels.
     ///
     /// # Panics
-    /// Panics if any difficulty level is not in range 1-10.
+    /// Panics if any difficulty level in the range is not between 1 and 10.
     pub fn register_range(&mut self, range: RangeInclusive<DifficultyLevel>, model: Model) {
         for difficulty in range {
             assert!(
@@ -161,6 +161,10 @@ impl Default for ModelRegistry {
 mod tests {
     use super::*;
 
+    /// Tests model registry with default difficulty mappings.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_model_registry_defaults() {
         let registry = ModelRegistry::with_defaults();
@@ -171,6 +175,13 @@ mod tests {
         assert_eq!(levels[9], 10);
     }
 
+    /// Tests exact difficulty level match.
+    ///
+    /// # Errors
+    /// Returns an error if model selection fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_exact_match() -> Result<()> {
         let registry = ModelRegistry::with_defaults();
@@ -179,6 +190,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests selecting nearest higher difficulty model.
+    ///
+    /// # Errors
+    /// Returns an error if model selection fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_nearest_higher() -> Result<()> {
         let mut registry = ModelRegistry::new();
@@ -192,6 +210,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests fallback to highest registered model.
+    ///
+    /// # Errors
+    /// Returns an error if model selection fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_fallback_to_highest() -> Result<()> {
         let mut registry = ModelRegistry::new();
@@ -203,6 +228,10 @@ mod tests {
         Ok(())
     }
 
+    /// Tests error handling for invalid difficulty levels.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_invalid_difficulty() {
         let registry = ModelRegistry::with_defaults();
@@ -217,6 +246,10 @@ mod tests {
         );
     }
 
+    /// Tests error when selecting from empty registry.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_empty_registry() {
         let registry = ModelRegistry::new();
@@ -224,6 +257,13 @@ mod tests {
         assert!(result.is_err(), "Expected error for empty registry");
     }
 
+    /// Tests registering and retrieving a single model.
+    ///
+    /// # Errors
+    /// Returns an error if model registration or selection fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_register_and_retrieve() -> Result<()> {
         let mut registry = ModelRegistry::new();
@@ -234,6 +274,10 @@ mod tests {
         Ok(())
     }
 
+    /// Tests clearing all registered models.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_clear() {
         let mut registry = ModelRegistry::with_defaults();
@@ -243,6 +287,13 @@ mod tests {
         assert_eq!(registry.registered_levels().len(), 0);
     }
 
+    /// Tests registering models for difficulty ranges.
+    ///
+    /// # Errors
+    /// Returns an error if model selection fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_register_range() -> Result<()> {
         let mut registry = ModelRegistry::new();

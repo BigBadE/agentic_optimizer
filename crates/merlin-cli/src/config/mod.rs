@@ -158,8 +158,6 @@ impl ConfigManager {
 
 use std::sync::RwLockWriteGuard;
 use tokio::task::spawn;
-#[cfg(test)]
-use tokio::time::{Duration, sleep};
 
 /// RAII guard that auto-saves config when dropped
 pub struct ConfigGuard<'guard> {
@@ -208,9 +206,13 @@ impl Drop for ConfigGuard<'_> {
 mod tests {
     use super::*;
     use merlin_deps::toml::to_string_pretty;
+    use std::error::Error as StdError;
+    use tokio::time::{Duration, sleep};
 
+    /// Tests default configuration values.
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_config_default() {
         let config = Config::default();
@@ -219,8 +221,10 @@ mod tests {
         assert_eq!(config.theme, Theme::default());
     }
 
+    /// Tests providers configuration defaults.
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_providers_config_default() {
         let config = ProvidersConfig::default();
@@ -228,58 +232,58 @@ mod tests {
         assert!(config.medium_model.is_some());
     }
 
+    /// Test configuration serialization
+    ///
+    /// # Errors
+    /// Returns error if serialization fails
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[test]
-    fn test_config_serialization() {
+    fn test_config_serialization() -> Result<(), Box<dyn StdError>> {
         let config = Config::default();
-        let toml_str = match to_string_pretty(&config) {
-            Ok(str) => str,
-            Err(err) => panic!("Failed to serialize: {err}"),
-        };
+        let toml_str = to_string_pretty(&config)?;
         assert!(toml_str.contains("providers"));
         assert!(toml_str.contains("theme"));
+        Ok(())
     }
 
+    /// Test configuration manager creation
+    ///
+    /// # Errors
+    /// Returns error if manager creation or config access fails
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_config_manager_new() {
-        let manager = match ConfigManager::new().await {
-            Ok(mgr) => mgr,
-            Err(err) => panic!("Failed to create manager: {err}"),
-        };
-        let config = match manager.get() {
-            Ok(cfg) => cfg,
-            Err(err) => panic!("Failed to get config: {err}"),
-        };
+    async fn test_config_manager_new() -> Result<(), Box<dyn StdError>> {
+        let manager = ConfigManager::new().await?;
+        let config = manager.get()?;
         assert!(config.providers.high_model.is_some());
+        Ok(())
     }
 
+    /// Test configuration manager mutable access
+    ///
+    /// # Errors
+    /// Returns error if manager creation or config modification fails
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_config_manager_get_mut() {
-        let manager = match ConfigManager::new().await {
-            Ok(mgr) => mgr,
-            Err(err) => panic!("Failed to create manager: {err}"),
-        };
+    async fn test_config_manager_get_mut() -> Result<(), Box<dyn StdError>> {
+        let manager = ConfigManager::new().await?;
 
         {
-            let mut config_guard = match manager.get_mut() {
-                Ok(guard) => guard,
-                Err(err) => panic!("Failed to get mutable config: {err}"),
-            };
+            let mut config_guard = manager.get_mut()?;
             config_guard.theme = Theme::Nord;
         } // Drop happens here, triggering auto-save
 
         // Give async save a moment to complete
         sleep(Duration::from_millis(100)).await;
 
-        let config = match manager.get() {
-            Ok(cfg) => cfg,
-            Err(err) => panic!("Failed to get config: {err}"),
-        };
+        let config = manager.get()?;
         assert_eq!(config.theme, Theme::Nord);
+        Ok(())
     }
 }

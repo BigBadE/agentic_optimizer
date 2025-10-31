@@ -15,7 +15,7 @@ pub fn verify_state(
         return;
     };
 
-    let state = app.test_state();
+    let state = &app.state;
 
     // Verify conversation count (excluding system messages)
     if let Some(expected_count) = verify.conversation_count {

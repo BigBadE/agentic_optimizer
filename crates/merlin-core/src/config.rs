@@ -297,6 +297,13 @@ mod tests {
     use super::*;
     use merlin_deps::anyhow::Result;
 
+    /// Tests API key loading from TOML configuration file.
+    ///
+    /// # Errors
+    /// Returns an error if file creation or config loading fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_api_key_loading_from_toml() -> Result<()> {
         use merlin_deps::tempfile::NamedTempFile;
@@ -346,6 +353,13 @@ openrouter_api_key = "test_openrouter_key_456"
         Ok(())
     }
 
+    /// Tests loading actual user configuration file if it exists.
+    ///
+    /// # Errors
+    /// Returns an error if config loading fails unexpectedly.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_load_actual_config_if_exists() -> Result<()> {
         // This test checks if the actual ~/.merlin/config.toml can be loaded

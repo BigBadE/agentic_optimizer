@@ -88,6 +88,10 @@ mod tests {
         }
     }
 
+    /// Tests empty registry initialization.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_empty_registry() {
         let registry = ToolRegistry::default();
@@ -95,6 +99,10 @@ mod tests {
         assert_eq!(registry.len(), 0);
     }
 
+    /// Tests adding a tool to the registry.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_add_tool() {
         let tool = Arc::new(MockTool { name: "test_tool" });
@@ -104,6 +112,10 @@ mod tests {
         assert!(!registry.is_empty());
     }
 
+    /// Tests retrieving tools from the registry by name.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_get_tool() {
         let tool = Arc::new(MockTool { name: "test_tool" });
@@ -113,6 +125,10 @@ mod tests {
         assert!(registry.get_tool("nonexistent").is_none());
     }
 
+    /// Tests listing all tools in the registry.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_list_tools() {
         let tool1 = Arc::new(MockTool { name: "tool1" });

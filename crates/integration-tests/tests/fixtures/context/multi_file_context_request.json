@@ -1,0 +1,50 @@
+{
+  "name": "Multi-file Context Request",
+  "description": "Request context across multiple Rust files to trigger context builder and semantic search",
+  "tags": ["context", "semantic_search", "multi_file"],
+  "setup": {
+    "files": {
+      "src/main.rs": "mod auth;\nmod database;\nmod handlers;\n\nfn main() {\n    let db = database::connect();\n    let auth_mgr = auth::Manager::new();\n    handlers::start_server(db, auth_mgr);\n}\n",
+      "src/auth.rs": "pub struct Manager {\n    secret: String,\n}\n\nimpl Manager {\n    pub fn new() -> Self {\n        Self {\n            secret: std::env::var(\"SECRET\").unwrap_or_default(),\n        }\n    }\n\n    pub fn verify_token(&self, token: &str) -> bool {\n        token == self.secret\n    }\n}\n",
+      "src/database.rs": "use std::collections::HashMap;\n\npub struct Connection {\n    data: HashMap<String, String>,\n}\n\npub fn connect() -> Connection {\n    Connection {\n        data: HashMap::new(),\n    }\n}\n\nimpl Connection {\n    pub fn get(&self, key: &str) -> Option<&String> {\n        self.data.get(key)\n    }\n\n    pub fn set(&mut self, key: String, value: String) {\n        self.data.insert(key, value);\n    }\n}\n",
+      "src/handlers.rs": "use crate::auth::Manager;\nuse crate::database::Connection;\n\npub fn start_server(db: Connection, auth: Manager) {\n    println!(\"Server starting...\");\n}\n\npub fn handle_request(auth: &Manager, token: &str) -> Result<String, String> {\n    if auth.verify_token(token) {\n        Ok(\"Authorized\".to_string())\n    } else {\n        Err(\"Unauthorized\".to_string())\n    }\n}\n"
+    },
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "How does authentication work in this codebase?",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "How does authentication work",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const authCode = await readFile('src/auth.rs');",
+          "  const handlersCode = await readFile('src/handlers.rs');",
+          "  return `Authentication is handled by the Manager struct in src/auth.rs. It uses a secret key from environment variables to verify tokens. The handle_request function in src/handlers.rs uses this to authorize requests.`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "context": {
+          "min_files": 2,
+          "included_files": ["src/auth.rs", "src/handlers.rs"],
+          "semantic_search_used": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {}
+  }
+}

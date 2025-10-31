@@ -232,6 +232,10 @@ impl ModelProvider for GroqProvider {
 mod tests {
     use super::*;
 
+    /// Tests Groq provider initialization with API key.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn groq_provider_with_api_key() {
         let provider = GroqProvider {
@@ -244,6 +248,10 @@ mod tests {
         assert_eq!(provider.model, DEFAULT_MODEL);
     }
 
+    /// Tests cost estimation for Groq provider (should be zero).
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn cost_estimation() {
         let provider = GroqProvider {
@@ -257,9 +265,12 @@ mod tests {
         assert!(cost.abs() < f64::EPSILON);
     }
 
+    /// Tests that creating a provider with empty API key returns error.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_with_api_key_direct_empty() {
-        // Test that creating a provider with an empty API key returns an error
         let result = GroqProvider::with_api_key_direct(String::new());
         assert!(result.is_err(), "Empty API key should return an error");
 
@@ -271,9 +282,12 @@ mod tests {
         }
     }
 
+    /// Tests that creating a provider with valid API key succeeds.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_with_api_key_direct_valid() {
-        // Test that creating a provider with a valid API key succeeds
         let result = GroqProvider::with_api_key_direct("valid_key".to_owned());
         assert!(result.is_ok(), "Valid API key should succeed");
 
@@ -283,9 +297,12 @@ mod tests {
         }
     }
 
+    /// Tests that `with_model` correctly sets the model.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_with_model() {
-        // Test that with_model correctly sets the model
         let provider = GroqProvider {
             client: Client::default(),
             api_key: "test_key".to_owned(),
@@ -296,9 +313,12 @@ mod tests {
         assert_eq!(provider.model, "custom-model");
     }
 
+    /// Tests that `with_api_key` correctly updates the API key.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_with_api_key() {
-        // Test that with_api_key correctly updates the API key
         let provider = GroqProvider {
             client: Client::default(),
             api_key: "old_key".to_owned(),
@@ -309,6 +329,10 @@ mod tests {
         assert_eq!(provider.api_key, "new_key");
     }
 
+    /// Tests provider name returns correct identifier.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_groq_provider_name() {
         let provider = GroqProvider {
@@ -320,9 +344,12 @@ mod tests {
         assert_eq!(provider.name(), "Groq");
     }
 
+    /// Tests that methods can be chained.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_model_chaining() {
-        // Test that methods can be chained
         let result = GroqProvider::with_api_key_direct("test_key".to_owned());
         assert!(result.is_ok());
 

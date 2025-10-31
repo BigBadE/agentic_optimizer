@@ -137,6 +137,10 @@ mod tests {
     use super::*;
     use merlin_core::RoutingConfig;
 
+    /// Creates a test router with cloud providers disabled.
+    ///
+    /// # Errors
+    /// Returns an error if provider registry creation fails.
     fn create_test_router() -> Result<StrategyRouter> {
         let mut config = RoutingConfig::default();
         // Disable cloud providers for tests
@@ -147,6 +151,13 @@ mod tests {
         Ok(StrategyRouter::new(provider_registry))
     }
 
+    /// Tests routing for local models with low difficulty tasks.
+    ///
+    /// # Errors
+    /// Returns an error if router creation or routing fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_difficulty_based_routing_local() -> Result<()> {
         let router = create_test_router()?;
@@ -163,6 +174,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests routing with custom model registry and mock provider.
+    ///
+    /// # Errors
+    /// Returns an error if router creation or routing fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_custom_model_registry() -> Result<()> {
         use merlin_core::ModelProvider;
@@ -189,6 +207,10 @@ mod tests {
         Ok(())
     }
 
+    /// Tests that availability checker returns true for all models.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_availability_checker_always_true() {
         let checker = AvailabilityChecker::default();
@@ -197,6 +219,13 @@ mod tests {
         assert!(checker.check(Model::Claude35Sonnet));
     }
 
+    /// Tests that router accessors return valid references.
+    ///
+    /// # Errors
+    /// Returns an error if router creation fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_router_accessors() -> Result<()> {
         use std::sync::Arc;
@@ -212,6 +241,10 @@ mod tests {
         Ok(())
     }
 
+    /// Tests router creation with default strategies.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_with_default_strategies_creation() {
         // This might fail in CI without API keys, which is expected
@@ -220,6 +253,13 @@ mod tests {
         drop(result);
     }
 
+    /// Tests availability check for local models.
+    ///
+    /// # Errors
+    /// Returns an error if router creation fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_is_available_local_model() -> Result<()> {
         let router = create_test_router()?;
@@ -231,6 +271,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests routing error when model is not available.
+    ///
+    /// # Errors
+    /// Returns an error if router creation fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_route_with_invalid_model() -> Result<()> {
         let router = create_test_router()?;
@@ -247,6 +294,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests creating router with custom model registry.
+    ///
+    /// # Errors
+    /// Returns an error if router creation fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_with_model_registry_constructor() -> Result<()> {
         let mut config = RoutingConfig::default();

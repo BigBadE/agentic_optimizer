@@ -155,6 +155,10 @@ mod tests {
 
     // REMOVED: test_query_new - Constructor test
 
+    /// Tests query creation with file context.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_query_with_files() {
         let files = vec![PathBuf::from("file1.rs"), PathBuf::from("file2.rs")];
@@ -162,6 +166,13 @@ mod tests {
         assert_eq!(query.files_context, files);
     }
 
+    /// Tests query serialization and deserialization round-trip.
+    ///
+    /// # Errors
+    /// Returns an error if serialization or deserialization fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_query_serialization() -> Result<()> {
         let query = Query::new("test query").with_files(vec![PathBuf::from("test.rs")]);
@@ -172,6 +183,10 @@ mod tests {
         Ok(())
     }
 
+    /// Tests token usage total calculation.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_token_usage_total() {
         let usage = TokenUsage {
@@ -187,6 +202,10 @@ mod tests {
 
     // REMOVED: test_context_new - Constructor test
 
+    /// Tests context creation with file attachments.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_context_with_files() {
         let files = vec![FileContext::new(
@@ -198,6 +217,10 @@ mod tests {
         assert_eq!(context.files[0].path, PathBuf::from("test.rs"));
     }
 
+    /// Tests context file serialization to string format.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_context_files_to_string() {
         let files = vec![
@@ -212,6 +235,10 @@ mod tests {
         assert!(result.contains("content2"));
     }
 
+    /// Tests context token count estimation.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_context_token_estimate() {
         let files = vec![FileContext::new(PathBuf::from("test.rs"), "a".repeat(100))];
@@ -222,6 +249,13 @@ mod tests {
 
     // REMOVED: test_file_context_new - Constructor test
 
+    /// Tests loading file context from filesystem path.
+    ///
+    /// # Errors
+    /// Returns an error if file operations fail.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_file_context_from_path() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -234,6 +268,10 @@ mod tests {
         Ok(())
     }
 
+    /// Tests error handling when loading file context from nonexistent path.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_file_context_from_path_not_found() {
         let path = PathBuf::from("nonexistent.txt");
@@ -244,6 +282,13 @@ mod tests {
         }
     }
 
+    /// Tests response serialization and deserialization round-trip.
+    ///
+    /// # Errors
+    /// Returns an error if serialization or deserialization fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_response_serialization() -> Result<()> {
         let response = Response {

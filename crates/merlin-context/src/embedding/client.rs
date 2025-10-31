@@ -259,10 +259,11 @@ impl Default for OllamaEmbeddingClient {
 ///
 /// Available in test builds for fast, deterministic embeddings.
 /// Use this for testing cache behavior, file operations, etc. without requiring Ollama.
-#[cfg(test)]
+#[cfg(any(test, feature = "test-helpers"))]
+#[derive(Clone, Copy)]
 pub struct FakeEmbeddingClient;
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-helpers"))]
 impl EmbeddingProvider for FakeEmbeddingClient {
     async fn ensure_model_available(&self) -> Result<()> {
         // No-op for fake embeddings
@@ -281,7 +282,7 @@ impl EmbeddingProvider for FakeEmbeddingClient {
     }
 }
 
-#[cfg(test)]
+#[cfg(any(test, feature = "test-helpers"))]
 impl FakeEmbeddingClient {
     /// Generate fake deterministic embedding for testing
     /// Uses simple hash of content to create a 384-dim vector

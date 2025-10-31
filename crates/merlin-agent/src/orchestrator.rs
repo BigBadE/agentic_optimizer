@@ -2,13 +2,10 @@ use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
 use crate::{
-    AgentExecutor, ConflictAwareTaskGraph, ContextFetcher, ExecutorPool, ThreadStore,
-    ValidationPipeline, Validator, WorkspaceState,
+    AgentExecutor, ContextFetcher, ThreadStore, ValidationPipeline, Validator, WorkspaceState,
 };
 use merlin_core::{Result, RoutingConfig, RoutingError, Task, TaskResult, ThreadId, UiChannel};
-use merlin_routing::{
-    LocalTaskAnalyzer, ModelRouter, ProviderRegistry, StrategyRouter, TaskAnalysis, TaskAnalyzer,
-};
+use merlin_routing::{ModelRouter, ProviderRegistry, StrategyRouter};
 use merlin_tooling::{
     BashTool, ContextRequestTool, DeleteFileTool, EditFileTool, ListFilesTool, ReadFileTool,
     ToolRegistry, WriteFileTool,
@@ -28,7 +25,6 @@ struct TaskExecutionParams {
 #[derive(Clone)]
 pub struct RoutingOrchestrator {
     config: RoutingConfig,
-    analyzer: Arc<dyn TaskAnalyzer>,
     router: Arc<dyn ModelRouter>,
     validator: Arc<dyn Validator>,
     workspace: Arc<WorkspaceState>,
@@ -46,9 +42,6 @@ impl RoutingOrchestrator {
     /// # Errors
     /// Returns an error if provider registry initialization fails (e.g., missing API keys).
     pub fn new(config: RoutingConfig) -> Result<Self> {
-        // No max concurrent task limit - parallelization is always enabled
-        let analyzer = Arc::new(LocalTaskAnalyzer::default());
-
         // Create provider registry and router
         let provider_registry = ProviderRegistry::new(config.clone())?;
         let router = Arc::new(StrategyRouter::new(provider_registry));
@@ -61,7 +54,6 @@ impl RoutingOrchestrator {
 
         Ok(Self {
             config,
-            analyzer,
             router,
             validator,
             workspace,
@@ -84,9 +76,6 @@ impl RoutingOrchestrator {
         router: Arc<dyn ModelRouter>,
         provider_registry: Arc<ProviderRegistry>,
     ) -> Result<Self> {
-        // No max concurrent task limit - parallelization is always enabled
-        let analyzer = Arc::new(LocalTaskAnalyzer::default());
-
         // Validation with default stages, early exit disabled
         let validator = Arc::new(ValidationPipeline::with_default_stages());
 
@@ -95,7 +84,6 @@ impl RoutingOrchestrator {
 
         Ok(Self {
             config,
-            analyzer,
             router,
             validator,
             workspace,
@@ -111,17 +99,16 @@ impl RoutingOrchestrator {
         self
     }
 
+    /// Sets the workspace directory for file operations.
+    #[must_use]
+    pub fn with_workspace(mut self, workspace_path: PathBuf) -> Self {
+        self.workspace = WorkspaceState::new(workspace_path);
+        self
+    }
+
     /// Gets the thread store if available
     pub fn thread_store(&self) -> Option<Arc<Mutex<ThreadStore>>> {
         self.thread_store.clone()
-    }
-
-    /// Analyze a user request and decompose into tasks
-    ///
-    /// # Errors
-    /// Returns an error if analysis fails
-    pub async fn analyze_request(&self, request: &str) -> Result<TaskAnalysis> {
-        self.analyzer.analyze(request).await
     }
 
     /// Execute a task with streaming and tool support
@@ -301,39 +288,6 @@ impl RoutingOrchestrator {
         }
     }
 
-    /// Execute multiple tasks with dependency management
-    ///
-    /// # Errors
-    /// Returns an error if conflict detection or task execution fails
-    pub async fn execute_tasks(&self, tasks: Vec<Task>) -> Result<Vec<TaskResult>> {
-        // Conflict detection is always enabled with file locking
-        let graph = ConflictAwareTaskGraph::from_tasks(&tasks);
-
-        if graph.has_cycles() {
-            return Err(RoutingError::CyclicDependency);
-        }
-
-        // No max concurrent task limit - full parallelization
-        let executor = ExecutorPool::new(
-            Arc::clone(&self.router),
-            Arc::clone(&self.validator),
-            usize::MAX,
-            Arc::clone(&self.workspace),
-        );
-
-        executor.execute_conflict_aware_graph(graph).await
-    }
-
-    /// Complete workflow: analyze request → execute tasks → return results
-    ///
-    /// # Errors
-    /// Returns an error if analysis or execution fails.
-    pub async fn process_request(&self, request: &str) -> Result<Vec<TaskResult>> {
-        let analysis = self.analyze_request(request).await?;
-        let results = self.execute_tasks(analysis.tasks.clone()).await?;
-        Ok(results)
-    }
-
     /// Gets the routing configuration.
     pub fn config(&self) -> &RoutingConfig {
         &self.config
@@ -356,39 +310,6 @@ mod tests {
         let config = RoutingConfig::default();
         if let Ok(orchestrator) = RoutingOrchestrator::new(config) {
             assert!(orchestrator.config.tiers.local_enabled);
-        }
-        // Test passes even if provider initialization fails
-    }
-
-    /// # Panics
-    /// Test function - panics indicate test failure
-    #[tokio::test]
-    async fn test_analyze_request() {
-        let config = RoutingConfig::default();
-        if let Ok(orchestrator) = RoutingOrchestrator::new(config) {
-            let analysis = match orchestrator
-                .analyze_request("Add a comment to main.rs")
-                .await
-            {
-                Ok(analysis) => analysis,
-                Err(error) => panic!("analyze_request failed: {error}"),
-            };
-            assert!(!analysis.tasks.is_empty());
-        }
-    }
-
-    /// # Panics
-    /// Test function - panics indicate test failure
-    #[tokio::test]
-    #[ignore = "Requires GROQ_API_KEY environment variable"]
-    async fn test_process_simple_request() {
-        let config = RoutingConfig::default();
-        if let Ok(orchestrator) = RoutingOrchestrator::new(config) {
-            let results = match orchestrator.process_request("Add a comment").await {
-                Ok(results) => results,
-                Err(error) => panic!("process_request failed: {error}"),
-            };
-            assert!(!results.is_empty());
         }
     }
 }

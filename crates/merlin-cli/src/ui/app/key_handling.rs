@@ -18,7 +18,7 @@ fn toggle_set<T: Eq + Hash>(set: &mut HashSet<T>, value: T) {
 
 impl<B: Backend> TuiApp<B> {
     /// Handles a single key event and returns true if the app should quit
-    pub(super) fn handle_key_event(&mut self, key: &KeyEvent) -> bool {
+    pub fn handle_key_event(&mut self, key: &KeyEvent) -> bool {
         // Handle cancel/queue prompt keys if queued input exists
         if self.state.queued_input.is_some() {
             return match key.code {

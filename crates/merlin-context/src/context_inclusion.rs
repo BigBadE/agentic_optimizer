@@ -163,6 +163,10 @@ mod tests {
         }
     }
 
+    /// Tests context manager initialization.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_context_manager_new() {
         let manager = ContextManager::new(1000);
@@ -170,6 +174,10 @@ mod tests {
         assert_eq!(manager.file_count(), 0);
     }
 
+    /// Tests token estimation from text.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_estimate_tokens() {
         let text = "Hello world";
@@ -181,6 +189,10 @@ mod tests {
         assert!(tokens > 0);
     }
 
+    /// Tests that prioritized files are sorted by priority level.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_add_prioritized_files_sorts_by_priority() {
         let mut manager = ContextManager::new(10000);
@@ -207,6 +219,10 @@ mod tests {
         assert!(manager.files()[0].path.ends_with("critical.rs"));
     }
 
+    /// Tests that files with same priority are sorted by relevance score.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_add_prioritized_files_sorts_by_score() {
         let mut manager = ContextManager::new(10000);
@@ -236,6 +252,10 @@ mod tests {
         assert!(manager.files()[0].path.ends_with("file2.rs"));
     }
 
+    /// Tests that adding files stops when context manager reaches capacity.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_add_prioritized_files_stops_when_full() {
         let mut manager = ContextManager::new(50); // Small limit

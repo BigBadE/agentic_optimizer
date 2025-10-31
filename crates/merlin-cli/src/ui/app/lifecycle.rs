@@ -91,7 +91,6 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             orchestrator,
             log_file,
             config_manager,
-            #[cfg(feature = "test-util")]
             last_task_receiver: None,
         };
 

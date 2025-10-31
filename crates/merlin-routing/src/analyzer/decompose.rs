@@ -122,6 +122,10 @@ mod tests {
     use super::super::intent::IntentExtractor;
     use super::*;
 
+    /// Tests that simple tasks are not decomposed into subtasks.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_simple_task_no_decomposition() {
         let decomposer = TaskDecomposer;
@@ -133,6 +137,10 @@ mod tests {
         assert_eq!(tasks.len(), 1);
     }
 
+    /// Tests that refactor tasks are decomposed into analyze, refactor, and test steps.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_refactor_decomposition() {
         let decomposer = TaskDecomposer;
@@ -150,6 +158,10 @@ mod tests {
         assert_eq!(tasks[2].dependencies.len(), 1);
     }
 
+    /// Tests that complex creation tasks are decomposed into design, implement, and test steps.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_complex_creation_decomposition() {
         let decomposer = TaskDecomposer;
@@ -165,6 +177,10 @@ mod tests {
         assert!(tasks[2].description.contains("tests"));
     }
 
+    /// Tests that complex fix tasks are decomposed into diagnose, fix, and verify steps.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_fix_with_analysis() {
         let decomposer = TaskDecomposer;

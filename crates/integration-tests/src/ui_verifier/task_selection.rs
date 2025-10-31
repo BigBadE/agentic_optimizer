@@ -38,7 +38,6 @@ fn verify_task_status(
     };
 
     let actual_status = match task.status {
-        TaskStatus::Pending => "pending",
         TaskStatus::Running => "running",
         TaskStatus::Completed => "completed",
         TaskStatus::Failed => "failed",

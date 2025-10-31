@@ -3,14 +3,6 @@
 //! This crate wraps the Ollama runtime and exposes a unified interface for
 //! local model execution that mirrors the remote provider APIs used elsewhere
 //! in the system.
-#![cfg_attr(
-    test,
-    allow(
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        reason = "Allow for tests"
-    )
-)]
 
 /// Error types for local provider operations.
 pub mod error;

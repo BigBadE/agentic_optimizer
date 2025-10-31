@@ -137,12 +137,20 @@ mod tests {
     use super::*;
     use merlin_deps::anyhow::Result;
 
+    /// Tests TypeScript runtime initialization.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_runtime_creation() {
         let runtime = TypeScriptRuntime::new();
         assert_eq!(runtime.timeout, MAX_EXECUTION_TIME);
     }
 
+    /// Tests simple JavaScript expression execution.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_simple_javascript_execution() {
         let runtime = TypeScriptRuntime::new();
@@ -151,6 +159,13 @@ mod tests {
         assert!(result.is_ok(), "Failed: {:?}", result.err());
     }
 
+    /// Tests variable declaration and computation.
+    ///
+    /// # Errors
+    /// Returns an error if code execution fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_variable_declaration() -> Result<()> {
         let runtime = TypeScriptRuntime::new();

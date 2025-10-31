@@ -16,14 +16,11 @@ serde.workspace = true
 tokio.workspace = true
 
 [dev-dependencies]
-gungraun = "0.17"
+divan = "0.1"
+mimalloc = "0.1"
 
 [[bench]]
-name = "gungraun_integration"
-harness = false
-
-[[bench]]
-name = "gungraun_routing"
+name = "gungraun_executor"
 harness = false
 
 [lints]

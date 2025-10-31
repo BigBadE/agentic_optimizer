@@ -130,10 +130,10 @@ pub fn step_style_with_status(
 mod tests {
     use super::*;
 
-    /// Test expansion indicator symbols
+    /// Tests expansion indicator symbols.
     ///
     /// # Panics
-    /// Panics if test assertions fail
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_expansion_indicator() {
         assert_eq!(expansion_indicator(true, true), "▼ ");
@@ -142,10 +142,10 @@ mod tests {
         assert_eq!(expansion_indicator(false, false), "");
     }
 
-    /// Test selection styling
+    /// Tests selection styling.
     ///
     /// # Panics
-    /// Panics if test assertions fail
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_selection_style() {
         let theme = Theme::default();

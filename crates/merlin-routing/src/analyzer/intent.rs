@@ -161,6 +161,10 @@ impl IntentExtractor {
 mod tests {
     use super::*;
 
+    /// Tests that create action is detected from request text.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_create_action() {
         let extractor = IntentExtractor;
@@ -168,6 +172,10 @@ mod tests {
         assert_eq!(intent.action, Action::Create);
     }
 
+    /// Tests that fix action is detected from request text.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_fix_action() {
         let extractor = IntentExtractor;
@@ -175,6 +183,10 @@ mod tests {
         assert_eq!(intent.action, Action::Fix);
     }
 
+    /// Tests that refactor action is detected from request text.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_refactor_action() {
         let extractor = IntentExtractor;
@@ -182,6 +194,10 @@ mod tests {
         assert_eq!(intent.action, Action::Refactor);
     }
 
+    /// Tests that file scope is detected from file references.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_file_scope() {
         let extractor = IntentExtractor;
@@ -189,6 +205,10 @@ mod tests {
         assert!(matches!(intent.scope, Scope::File(_)));
     }
 
+    /// Tests that critical priority is detected from urgency keywords.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_critical_priority() {
         let extractor = IntentExtractor;
@@ -196,6 +216,10 @@ mod tests {
         assert_eq!(intent.priority, Priority::Critical);
     }
 
+    /// Tests that difficulty estimation matches task complexity.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_complexity_estimation() {
         let extractor = IntentExtractor;

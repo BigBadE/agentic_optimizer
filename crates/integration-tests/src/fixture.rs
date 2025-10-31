@@ -186,6 +186,10 @@ pub struct VerifyConfig {
     pub state: Option<StateVerify>,
     /// Prompt verification
     pub prompt: Option<PromptVerify>,
+    /// Context verification
+    pub context: Option<ContextVerify>,
+    /// Validation verification
+    pub validation: Option<ValidationVerify>,
 }
 
 /// Execution verification
@@ -212,6 +216,21 @@ pub struct ExecutionVerify {
     /// Validation stages that should have failed (success assumed for all others)
     #[serde(default)]
     pub validation_failures: Vec<String>,
+    /// Minimum retry attempts expected
+    #[serde(default)]
+    pub min_retry_attempts: Option<usize>,
+    /// Maximum retry attempts expected
+    #[serde(default)]
+    pub max_retry_attempts: Option<usize>,
+    /// Whether model tier escalation occurred
+    #[serde(default)]
+    pub escalation_occurred: Option<bool>,
+    /// Whether parallel execution was used
+    #[serde(default)]
+    pub parallel_execution: Option<bool>,
+    /// Whether conflict detection triggered
+    #[serde(default)]
+    pub conflict_detected: Option<bool>,
 }
 
 /// File verification
@@ -350,6 +369,53 @@ pub struct PromptVerify {
     pub has_type_definitions: Vec<String>,
 }
 
+/// Context verification
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ContextVerify {
+    /// Files that should be included in context
+    #[serde(default)]
+    pub included_files: Vec<String>,
+    /// Files that should be excluded from context
+    #[serde(default)]
+    pub excluded_files: Vec<String>,
+    /// Minimum number of files in context
+    pub min_files: Option<usize>,
+    /// Maximum number of files in context
+    pub max_files: Option<usize>,
+    /// Chunking was performed
+    pub chunking_performed: Option<bool>,
+    /// Semantic search was used
+    pub semantic_search_used: Option<bool>,
+    /// Token limit was enforced
+    pub token_limit_enforced: Option<bool>,
+}
+
+/// Validation verification
+#[derive(Debug, Clone, Default, Serialize, Deserialize)]
+#[serde(deny_unknown_fields)]
+pub struct ValidationVerify {
+    /// Validation stages that should have run
+    #[serde(default)]
+    pub stages_run: Vec<String>,
+    /// Validation stages that should have passed
+    #[serde(default)]
+    pub stages_passed: Vec<String>,
+    /// Validation stages that should have failed
+    #[serde(default)]
+    pub stages_failed: Vec<String>,
+    /// Citations were checked
+    pub citations_checked: Option<bool>,
+    /// Citation warnings were issued
+    pub citation_warnings: Option<bool>,
+    /// Syntax validation was performed
+    pub syntax_validated: Option<bool>,
+    /// Build validation was performed
+    pub build_validated: Option<bool>,
+    /// Early exit occurred
+    pub early_exit: Option<bool>,
+}
+
 /// Final verification
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -410,6 +476,8 @@ impl TestEvent {
             ui: None,
             state: None,
             prompt: None,
+            context: None,
+            validation: None,
         };
 
         match self {

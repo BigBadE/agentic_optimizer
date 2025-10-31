@@ -186,6 +186,10 @@ impl Display for TierCategory {
 mod tests {
     use super::*;
 
+    /// Tests that model properties are correctly defined.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_model_properties() {
         assert_eq!(Model::Llama318BInstant.provider_name(), "groq");
@@ -193,6 +197,10 @@ mod tests {
         assert_eq!(Model::Llama318BInstant.tier_category(), TierCategory::Groq);
     }
 
+    /// Tests that all models have valid properties.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_all_models_have_valid_properties() {
         for model in Model::all() {
@@ -203,6 +211,10 @@ mod tests {
         }
     }
 
+    /// Tests that models are correctly grouped by tier category.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_models_in_category() {
         let groq_models = Model::models_in_category(TierCategory::Groq);

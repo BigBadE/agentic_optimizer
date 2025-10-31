@@ -7,14 +7,6 @@
 //! - Task execution and dependencies
 //!
 //! All tests use the same fixture format with optional verification layers.
-#![cfg_attr(
-    test,
-    allow(
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        reason = "Allow for tests"
-    )
-)]
 
 mod event_source;
 mod execution_tracker;
@@ -25,6 +17,7 @@ mod fixture_loader;
 mod mock_provider;
 mod prompt_verifier;
 mod runner;
+mod tui_test_helpers;
 mod ui_verifier;
 mod verification_result;
 mod verifier;

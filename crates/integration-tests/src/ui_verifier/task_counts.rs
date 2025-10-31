@@ -53,7 +53,7 @@ fn verify_pending_task_count(
         .filter(|task_id| {
             task_manager
                 .get_task(**task_id)
-                .is_some_and(|task| matches!(task.status, TaskStatus::Pending))
+                .is_some_and(|task| matches!(task.status, TaskStatus::Running))
         })
         .count();
 

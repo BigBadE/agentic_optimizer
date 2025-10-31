@@ -4,7 +4,7 @@
 //! end-to-end testing of agent workflows without real API calls.
 
 use async_trait::async_trait;
-use merlin_core::{Context, ModelProvider, Query, Response, Result, TokenUsage};
+use merlin_core::{Context, IgnoreLock as _, ModelProvider, Query, Response, Result, TokenUsage};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
@@ -39,85 +39,48 @@ impl MockProvider {
     }
 
     /// Add a pattern-based response to the mock provider.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
     #[must_use]
     pub fn with_response(self, pattern: impl Into<String>, response: impl Into<String>) -> Self {
-        match self.responses.lock() {
-            Ok(mut responses) => {
-                responses.insert(pattern.into(), response.into());
-            }
-            Err(err) => panic!("Lock poisoned: {err}"),
+        {
+            let mut responses = self.responses.lock_ignore_poison();
+            responses.insert(pattern.into(), response.into());
         }
         self
     }
 
     /// Set a default response for queries that don't match any pattern.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
     #[must_use]
     pub fn with_default_response(self, response: impl Into<String>) -> Self {
-        match self.default_response.lock() {
-            Ok(mut default) => {
-                *default = Some(response.into());
-            }
-            Err(err) => panic!("Lock poisoned: {err}"),
+        {
+            let mut default = self.default_response.lock_ignore_poison();
+            *default = Some(response.into());
         }
         self
     }
 
     /// Clear the call history (used for testing).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
     pub fn clear_history(&self) {
-        match self.call_history.lock() {
-            Ok(mut history) => history.clear(),
-            Err(err) => panic!("Lock poisoned: {err}"),
-        }
+        let mut history = self.call_history.lock_ignore_poison();
+        history.clear();
     }
 
     /// Get the call history (list of all queries made).
-    ///
-    /// # Panics
-    ///
-    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
     #[must_use]
     pub fn get_call_history(&self) -> Vec<String> {
-        match self.call_history.lock() {
-            Ok(history) => history.clone(),
-            Err(err) => panic!("Lock poisoned: {err}"),
-        }
+        let history = self.call_history.lock_ignore_poison();
+        history.clone()
     }
 
     /// Get the number of calls made.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
     #[must_use]
     pub fn call_count(&self) -> usize {
-        match self.call_history.lock() {
-            Ok(history) => history.len(),
-            Err(err) => panic!("Lock poisoned: {err}"),
-        }
+        let history = self.call_history.lock_ignore_poison();
+        history.len()
     }
 
     /// Find a matching response for the given query text.
-    ///
-    /// # Panics
-    ///
-    /// Panics if the internal mutex is poisoned (another thread panicked while holding the lock).
     fn find_response(&self, query_text: &str) -> Option<String> {
-        let responses = match self.responses.lock() {
-            Ok(res) => res,
-            Err(err) => panic!("Lock poisoned: {err}"),
-        };
+        let responses = self.responses.lock_ignore_poison();
 
         // Try exact match first
         if let Some(response) = responses.get(query_text) {
@@ -154,17 +117,14 @@ impl ModelProvider for MockProvider {
 
     async fn generate(&self, query: &Query, _context: &Context) -> Result<Response> {
         // Record the call
-        match self.call_history.lock() {
-            Ok(mut history) => history.push(query.text.clone()),
-            Err(err) => panic!("Lock poisoned: {err}"),
+        {
+            let mut history = self.call_history.lock_ignore_poison();
+            history.push(query.text.clone());
         }
 
         // Find matching response
         let text = self.find_response(&query.text).unwrap_or_else(|| {
-            let default = match self.default_response.lock() {
-                Ok(def) => def,
-                Err(err) => panic!("Lock poisoned: {err}"),
-            };
+            let default = self.default_response.lock_ignore_poison();
             default
                 .clone()
                 .unwrap_or_else(|| format!("Mock response for query: {}", query.text))
@@ -193,6 +153,10 @@ impl ModelProvider for MockProvider {
 mod tests {
     use super::*;
 
+    /// Tests exact query matching in mock provider.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_mock_provider_exact_match() {
         let provider = MockProvider::new("test").with_response("hello", "world");
@@ -207,6 +171,10 @@ mod tests {
         }
     }
 
+    /// Tests substring query matching in mock provider.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_mock_provider_substring_match() {
         let provider =
@@ -222,6 +190,10 @@ mod tests {
         }
     }
 
+    /// Tests default response fallback in mock provider.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_mock_provider_default_response() {
         let provider = MockProvider::new("test").with_default_response("Default response");
@@ -236,6 +208,10 @@ mod tests {
         }
     }
 
+    /// Tests call history tracking in mock provider.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_mock_provider_call_history() {
         let provider = MockProvider::new("test");
@@ -255,6 +231,10 @@ mod tests {
         assert_eq!(history[1], "second query");
     }
 
+    /// Tests clearing call history in mock provider.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_mock_provider_clear_history() {
         let provider = MockProvider::new("test");

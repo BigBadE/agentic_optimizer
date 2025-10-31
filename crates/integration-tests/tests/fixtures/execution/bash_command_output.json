@@ -1,0 +1,41 @@
+{
+  "name": "Bash Command with Output",
+  "description": "Execute bash commands and process output to exercise bash tool paths",
+  "tags": ["execution", "bash", "command"],
+  "setup": {
+    "files": {
+      "test.txt": "line 1\nline 2\nline 3\n"
+    },
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Count lines in test.txt",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Count lines",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const result = await bash('wc -l < test.txt');",
+          "  return `File has ${result.stdout.trim()} lines`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {}
+  }
+}

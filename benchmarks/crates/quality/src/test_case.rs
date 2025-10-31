@@ -98,6 +98,13 @@ mod tests {
     use super::*;
     use toml::from_str;
 
+    /// Tests priority parsing from TOML configuration.
+    ///
+    /// # Errors
+    /// Returns an error if TOML parsing fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_priority_parsing() -> Result<()> {
         let toml_content = r#"

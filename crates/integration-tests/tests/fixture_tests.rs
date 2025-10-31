@@ -4,10 +4,8 @@
 #![cfg_attr(
     test,
     allow(
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        clippy::print_stdout,
-        reason = "Allow for tests"
+        clippy::tests_outside_test_module,
+        reason = "Allow for integration tests"
     )
 )]
 
@@ -18,6 +16,9 @@ use std::path::PathBuf;
 use std::time::Instant;
 
 /// Run a single fixture
+///
+/// # Errors
+/// Returns an error if fixture loading or execution fails
 async fn run_fixture(fixture_path: PathBuf) -> Result<VerificationResult, String> {
     let fixture_name = fixture_path
         .file_name()
@@ -50,8 +51,8 @@ async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<(String, Result<VerificationRe
     let dir_name = dir
         .file_name()
         .and_then(|name| name.to_str())
-        .unwrap_or("unknown");
-    let fixtures = UnifiedTestRunner::discover_fixtures(&dir).unwrap_or(vec![]);
+        .map_or_else(|| "unknown".to_owned(), ToString::to_string);
+    let fixtures = UnifiedTestRunner::discover_fixtures(&dir).unwrap_or_default();
     let start = Instant::now();
 
     // Run fixtures in parallel with buffer_unordered
@@ -60,8 +61,7 @@ async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<(String, Result<VerificationRe
             let fixture_name = fixture_path
                 .file_name()
                 .and_then(|name| name.to_str())
-                .unwrap_or("unknown")
-                .to_owned();
+                .map_or_else(|| "unknown".to_owned(), ToString::to_string);
 
             let result = run_fixture(fixture_path).await;
             (fixture_name, result)
@@ -77,6 +77,9 @@ async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<(String, Result<VerificationRe
 }
 
 /// Run all fixtures in the fixtures directory
+///
+/// # Panics
+/// Panics if any fixtures fail verification
 #[tokio::test]
 async fn test_all_fixtures() {
     let fixtures_root = PathBuf::from(env!("CARGO_MANIFEST_DIR"))
@@ -84,12 +87,17 @@ async fn test_all_fixtures() {
         .join("fixtures");
 
     // Discover all subdirectories
-    let subdirs = read_dir(&fixtures_root)
-        .expect("Failed to read fixtures directory")
-        .filter_map(Result::ok)
-        .filter(|entry| entry.path().is_dir())
-        .map(|entry| entry.path())
-        .collect::<Vec<_>>();
+    let subdirs = match read_dir(&fixtures_root) {
+        Ok(entries) => entries
+            .filter_map(Result::ok)
+            .filter(|entry| entry.path().is_dir())
+            .map(|entry| entry.path())
+            .collect::<Vec<_>>(),
+        Err(err) => {
+            tracing::error!("Failed to read fixtures directory: {err}");
+            Vec::new()
+        }
+    };
 
     let subdir_count = subdirs.len();
 
@@ -125,21 +133,25 @@ async fn test_all_fixtures() {
     }
 
     // Print complete summary at the end
-    println!("\n=== Test Summary ===");
-    println!("{} passed", passed.len());
+    tracing::info!("\n=== Test Summary ===");
+    tracing::info!("{} passed", passed.len());
 
     if failures_with_details.is_empty() {
-        println!("\nAll fixtures passed! ✓");
+        tracing::info!("\nAll fixtures passed! ✓");
     } else {
-        println!("{} failed\n", failures_with_details.len());
-        println!("=== Failed Fixtures ===");
+        tracing::error!("{} failed\n", failures_with_details.len());
+        tracing::error!("=== Failed Fixtures ===");
         for (fixture_name, verification) in &failures_with_details {
-            println!("\n{fixture_name}:");
+            tracing::error!("\n{fixture_name}:");
             for failure in &verification.failures {
-                println!("  - {failure}");
+                tracing::error!("  - {failure}");
             }
         }
 
-        panic!("{} fixture(s) failed", failures_with_details.len());
+        assert!(
+            failures_with_details.is_empty(),
+            "{} fixture(s) failed",
+            failures_with_details.len()
+        );
     }
 }

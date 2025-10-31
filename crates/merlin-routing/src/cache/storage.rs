@@ -127,6 +127,10 @@ mod tests {
         }
     }
 
+    /// Tests basic cache operations including put, get, and clear.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_cache_basic_operations() {
         let mut cache = ResponseCache::default();

@@ -71,9 +71,15 @@ mod tests {
         Ok(temp_dir)
     }
 
+    /// Tests cache creation, persistence, and reload lifecycle.
+    ///
+    /// # Errors
+    /// Returns an error if file operations or cache operations fail.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_cache_lifecycle() -> Result<()> {
-        // Test cache creation, persistence, and reload in one test
         let temp_dir = create_minimal_project()?;
         let project_root = temp_dir.path().to_path_buf();
 
@@ -117,9 +123,15 @@ mod tests {
         Ok(())
     }
 
+    /// Tests cache invalidation on file modifications, additions, and deletions.
+    ///
+    /// # Errors
+    /// Returns an error if file operations or cache operations fail.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_cache_file_changes() -> Result<()> {
-        // Test modification, addition, and deletion in one test
         let temp_dir = create_minimal_project()?;
         let project_root = temp_dir.path().to_path_buf();
         let src_dir = project_root.join("src");
@@ -161,6 +173,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests automatic recovery from corrupted cache files.
+    ///
+    /// # Errors
+    /// Returns an error if file operations or cache operations fail.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_corrupted_cache_recovery() -> Result<()> {
         let temp_dir = create_minimal_project()?;

@@ -44,12 +44,6 @@ impl<B: Backend> TuiApp<B> {
         history
     }
 
-    /// Gets the selected task ID
-    #[cfg(any(test, feature = "test-util"))]
-    pub fn get_selected_task_id(&self) -> Option<TaskId> {
-        self.state.active_task_id
-    }
-
     /// Returns the number of loaded tasks currently in the manager
     pub fn loaded_task_count(&self) -> usize {
         self.task_manager.task_order().len()

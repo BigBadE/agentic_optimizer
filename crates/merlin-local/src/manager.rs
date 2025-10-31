@@ -41,12 +41,20 @@ impl Default for OllamaManager {
 mod tests {
     use super::*;
 
+    /// Tests Ollama manager creation with default URL.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn ollama_manager_creation() {
         let manager = OllamaManager::default();
         assert_eq!(manager.base_url, "http://localhost:11434");
     }
 
+    /// Tests Ollama manager with custom URL configuration.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn custom_url() {
         let manager = OllamaManager::default().with_url("http://custom:8080".to_owned());

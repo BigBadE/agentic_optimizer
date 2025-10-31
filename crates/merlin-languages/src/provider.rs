@@ -130,6 +130,10 @@ mod tests {
 
     // REMOVED: test_symbol_kind_equality - Trait implementation test
 
+    /// Tests basic symbol info creation and field access.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_symbol_info_creation() {
         let symbol = SymbolInfo {
@@ -146,6 +150,10 @@ mod tests {
         assert!(symbol.documentation.is_some());
     }
 
+    /// Tests default search query initialization.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_search_query_default() {
         let query = SearchQuery::default();
@@ -155,6 +163,10 @@ mod tests {
         assert_eq!(query.max_results, 50);
     }
 
+    /// Tests search query with custom parameters.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_search_query_with_name() {
         let query = SearchQuery {
@@ -169,6 +181,10 @@ mod tests {
         assert_eq!(query.max_results, 10);
     }
 
+    /// Tests search result creation and validation.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_search_result_creation() {
         let symbols = vec![

@@ -33,14 +33,6 @@
 //! # Ok(())
 //! # }
 //! ```
-#![cfg_attr(
-    test,
-    allow(
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        reason = "Allow for tests"
-    )
-)]
 
 /// Task analysis and decomposition
 pub mod analyzer;

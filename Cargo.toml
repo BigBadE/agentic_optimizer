@@ -130,6 +130,7 @@ only_used_in_recursion = { level = "allow", priority = 1 }
 
 # Nursery
 missing_const_for_fn = { level = "allow", priority = 1 }
+significant_drop_tightening = { level = "allow", priority = 1 }
 
 # Pedantic
 cast_possible_truncation = { level = "allow", priority = 1 }
@@ -151,6 +152,7 @@ min_ident_chars = { level = "deny", priority = 1 }
 multiple_inherent_impl = { level = "deny", priority = 1 }
 mutex_atomic = { level = "deny", priority = 1 }
 mutex_integer = { level = "deny", priority = 1 }
+panic = { level = "deny", priority = 1 }
 print_stderr = { level = "deny", priority = 1 }
 print_stdout = { level = "deny", priority = 1 }
 redundant_type_annotations = { level = "deny", priority = 1 }

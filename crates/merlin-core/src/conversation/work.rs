@@ -281,6 +281,10 @@ impl VerificationStep {
 mod tests {
     use super::*;
 
+    /// Tests work unit progress calculation based on subtask completion.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_work_unit_progress() {
         let mut work = WorkUnit::new(TaskId::default(), "local".to_owned());
@@ -305,6 +309,10 @@ mod tests {
         assert_eq!(work.progress_percentage(), 100);
     }
 
+    /// Tests subtask state transitions through lifecycle stages.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_subtask_state_transitions() {
         let mut subtask = Subtask::new("Test".to_owned(), 5);
@@ -323,6 +331,10 @@ mod tests {
         assert!(subtask.error.is_none());
     }
 
+    /// Tests subtask failure handling and error tracking.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_subtask_failure() {
         let mut subtask = Subtask::new("Test".to_owned(), 5);
@@ -335,6 +347,10 @@ mod tests {
         assert_eq!(subtask.error, Some("Error occurred".to_owned()));
     }
 
+    /// Tests work unit retry counter and status updates.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_work_unit_retry() {
         let mut work = WorkUnit::new(TaskId::default(), "local".to_owned());
@@ -350,6 +366,10 @@ mod tests {
         assert_eq!(work.retry_count, 2);
     }
 
+    /// Tests verification step creation with default and custom exit codes.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_verification_step() {
         let verification = VerificationStep::new("cargo test".to_owned());
@@ -360,6 +380,10 @@ mod tests {
         assert_eq!(custom_verification.expected_exit_code, 1);
     }
 
+    /// Tests that completing a subtask clears any previous error.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_subtask_complete_clears_error() {
         let mut subtask = Subtask::new("Test".to_owned(), 5);

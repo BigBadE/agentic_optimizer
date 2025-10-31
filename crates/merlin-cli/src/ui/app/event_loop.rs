@@ -166,7 +166,7 @@ impl<B: Backend> TuiApp<B> {
     ///
     /// # Errors
     /// Returns an error if drawing to the terminal fails.
-    pub(super) fn render(&mut self) -> Result<()> {
+    pub fn render(&mut self) -> Result<()> {
         // Ensure scroll is correct before rendering (handles initial state)
         self.adjust_task_list_scroll();
 

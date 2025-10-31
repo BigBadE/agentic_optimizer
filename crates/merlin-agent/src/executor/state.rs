@@ -245,25 +245,24 @@ mod tests {
     use super::*;
     use merlin_deps::tempfile::TempDir;
 
+    /// Tests concurrent read operations on workspace.
+    ///
+    /// # Errors
+    /// Returns an error if workspace operations fail.
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_workspace_concurrent_reads() {
-        let tmp_dir = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(err) => panic!("create temp dir: {err}"),
-        };
+    async fn test_workspace_concurrent_reads() -> Result<()> {
+        let tmp_dir = TempDir::new()?;
         let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
 
-        if let Err(error) = workspace
+        workspace
             .apply_changes(&[FileChange::Create {
                 path: PathBuf::from("test.rs"),
                 content: "fn main() {}".to_owned(),
             }])
-            .await
-        {
-            panic!("failed to apply initial change: {error}");
-        }
+            .await?;
 
         let path = PathBuf::from("test.rs");
         let (content1, content2) =
@@ -271,42 +270,36 @@ mod tests {
 
         assert_eq!(content1, content2);
         assert_eq!(content1, Some("fn main() {}".to_owned()));
+        Ok(())
     }
 
+    /// Tests workspace snapshot functionality.
+    ///
+    /// # Errors
+    /// Returns an error if workspace operations fail.
+    ///
     /// # Panics
-    /// Test function - panics indicate test failure
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
-    async fn test_workspace_snapshot() {
-        let tmp_dir = match TempDir::new() {
-            Ok(dir) => dir,
-            Err(err) => panic!("create temp dir: {err}"),
-        };
+    async fn test_workspace_snapshot() -> Result<()> {
+        let tmp_dir = TempDir::new()?;
         let workspace = WorkspaceState::new(tmp_dir.path().to_path_buf());
 
-        if let Err(error) = workspace
+        workspace
             .apply_changes(&[FileChange::Create {
                 path: PathBuf::from("test.rs"),
                 content: "fn main() {}".to_owned(),
             }])
-            .await
-        {
-            panic!("failed to apply initial change: {error}");
-        }
+            .await?;
 
-        let snapshot = match workspace.snapshot(&[PathBuf::from("test.rs")]).await {
-            Ok(snapshot) => snapshot,
-            Err(error) => panic!("failed to create snapshot: {error}"),
-        };
+        let snapshot = workspace.snapshot(&[PathBuf::from("test.rs")]).await?;
 
-        if let Err(error) = workspace
+        workspace
             .apply_changes(&[FileChange::Modify {
                 path: PathBuf::from("test.rs"),
                 content: "fn main() { println!(\"changed\"); }".to_owned(),
             }])
-            .await
-        {
-            panic!("failed to modify file: {error}");
-        }
+            .await?;
 
         assert_eq!(
             snapshot.get(&PathBuf::from("test.rs")),
@@ -316,5 +309,6 @@ mod tests {
             workspace.read_file(&PathBuf::from("test.rs")).await,
             Some("fn main() { println!(\"changed\"); }".to_owned())
         );
+        Ok(())
     }
 }

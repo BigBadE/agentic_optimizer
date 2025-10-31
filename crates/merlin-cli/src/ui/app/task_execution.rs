@@ -364,15 +364,6 @@ impl<B: Backend> TuiApp<B> {
         }));
 
         // Store receiver for test access
-        #[cfg(feature = "test-util")]
-        {
-            self.last_task_receiver = Some(task_event_rx);
-        }
-
-        // Return the task-specific receiver for isolated event waiting
-        #[cfg(not(feature = "test-util"))]
-        {
-            drop(task_event_rx); // Not used in production
-        }
+        self.last_task_receiver = Some(task_event_rx);
     }
 }

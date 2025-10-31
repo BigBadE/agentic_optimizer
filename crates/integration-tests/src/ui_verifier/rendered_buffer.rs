@@ -45,7 +45,7 @@ fn verify_rendered_buffer_contains(
         return;
     }
 
-    let backend = tui_app.test_backend();
+    let backend = tui_app.terminal.backend();
     let buffer_content = buffer_to_string(backend.buffer());
 
     for expected_pattern in &verify.rendered_buffer_contains {
@@ -71,7 +71,7 @@ fn verify_rendered_buffer_not_contains(
         return;
     }
 
-    let backend = tui_app.test_backend();
+    let backend = tui_app.terminal.backend();
     let buffer_content = buffer_to_string(backend.buffer());
 
     for unexpected_pattern in &verify.rendered_buffer_not_contains {

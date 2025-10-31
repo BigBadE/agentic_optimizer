@@ -7,8 +7,7 @@ default-run = "merlin"
 [[bin]]
 name = "merlin"
 path = "src/main.rs"
-test = false  # Don't run tests for the binary, only the library
-# Note: Bin inherits all lints from lib, no need to check separately
+test = false
 
 [dependencies]
 bincode.workspace = true
@@ -24,10 +23,6 @@ merlin-tooling.workspace = true
 pico-args.workspace = true
 serde.workspace = true
 tokio.workspace = true
-
-[features]
-# Enable test utilities for integration tests
-test-util = []
 
 [dev-dependencies]
 assert_cmd.workspace = true

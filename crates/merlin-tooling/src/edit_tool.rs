@@ -189,6 +189,13 @@ mod tests {
     use merlin_deps::serde_json::json;
     use merlin_deps::tempfile::TempDir;
 
+    /// Tests single string replacement in a file.
+    ///
+    /// # Errors
+    /// Returns an error if file operations or edit execution fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_edit_file_single_replacement() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -212,6 +219,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests replacing all occurrences of a string in a file.
+    ///
+    /// # Errors
+    /// Returns an error if file operations or edit execution fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_edit_file_replace_all() -> Result<()> {
         let temp_dir = TempDir::new()?;
@@ -236,6 +250,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests that editing fails when multiple matches exist without `replace_all` flag.
+    ///
+    /// # Errors
+    /// Returns an error if file operations fail.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_edit_file_multiple_without_replace_all_fails() -> Result<()> {
         let temp_dir = TempDir::new()?;

@@ -24,6 +24,20 @@ pub struct UnifiedVerifier<'fixture> {
     result: VerificationResult,
 }
 
+/// Context for event verification
+pub struct VerifyEventContext<'ctx> {
+    /// The event to verify
+    pub event: &'ctx TestEvent,
+    /// Verification configuration
+    pub verify: &'ctx VerifyConfig,
+    /// Optional TUI application
+    pub tui_app: Option<&'ctx TuiApp<TestBackend>>,
+    /// Execution result tracker
+    pub execution_tracker: &'ctx ExecutionResultTracker,
+    /// Optional mock provider
+    pub provider: Option<&'ctx Arc<MockProvider>>,
+}
+
 impl<'fixture> UnifiedVerifier<'fixture> {
     /// Create new verifier
     #[must_use]
@@ -38,14 +52,15 @@ impl<'fixture> UnifiedVerifier<'fixture> {
     ///
     /// # Errors
     /// Returns error if verification fails critically
-    pub fn verify_event(
-        &mut self,
-        event: &TestEvent,
-        verify: &VerifyConfig,
-        tui_app: Option<&TuiApp<TestBackend>>,
-        execution_tracker: &ExecutionResultTracker,
-        provider: Option<&Arc<MockProvider>>,
-    ) -> Result<(), String> {
+    pub fn verify_event(&mut self, ctx: &VerifyEventContext<'_>) -> Result<(), String> {
+        let VerifyEventContext {
+            event,
+            verify,
+            tui_app,
+            execution_tracker,
+            provider,
+        } = ctx;
+
         // Verify execution if specified
         if let Some(exec_verify) = &verify.execution {
             // Get execution result by ID or fall back to last result
@@ -67,7 +82,12 @@ impl<'fixture> UnifiedVerifier<'fixture> {
                 },
             );
 
-            ExecutionVerifier::verify_execution(&mut self.result, execution, exec_verify, provider);
+            ExecutionVerifier::verify_execution(
+                &mut self.result,
+                execution,
+                exec_verify,
+                *provider,
+            );
         }
 
         // Verify files if specified
@@ -79,12 +99,12 @@ impl<'fixture> UnifiedVerifier<'fixture> {
 
         // Verify UI if specified
         if let Some(ui_verify) = &verify.ui {
-            UiVerifier::verify_ui(&mut self.result, tui_app, ui_verify);
+            UiVerifier::verify_ui(&mut self.result, *tui_app, ui_verify);
         }
 
         // Verify state if specified
         if let Some(state_verify) = &verify.state {
-            UiVerifier::verify_state(&mut self.result, tui_app, state_verify);
+            UiVerifier::verify_state(&mut self.result, *tui_app, state_verify);
         }
 
         // Verify prompt if specified
@@ -188,7 +208,7 @@ impl<'fixture> UnifiedVerifier<'fixture> {
             return;
         };
 
-        let task_manager = app.test_task_manager();
+        let task_manager = &app.task_manager;
 
         // Verify incomplete tasks
         for expected_incomplete in &verify.incomplete_tasks {

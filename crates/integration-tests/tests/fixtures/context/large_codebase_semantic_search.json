@@ -1,0 +1,52 @@
+{
+  "name": "Large Codebase Semantic Search",
+  "description": "Large codebase to trigger code chunking and semantic search with embeddings",
+  "tags": ["context", "semantic_search", "chunking", "large_codebase"],
+  "setup": {
+    "files": {
+      "src/auth/mod.rs": "//! Authentication module\n//! Handles user authentication, token generation and validation\npub mod manager;\npub mod token;\npub mod session;\n\nuse std::time::Duration;\n\npub struct AuthConfig {\n    pub secret_key: String,\n    pub token_expiry: Duration,\n    pub max_sessions: usize,\n}\n\nimpl Default for AuthConfig {\n    fn default() -> Self {\n        Self {\n            secret_key: String::from(\"default_secret\"),\n            token_expiry: Duration::from_secs(3600),\n            max_sessions: 10,\n        }\n    }\n}\n",
+      "src/auth/manager.rs": "//! Auth Manager implementation\n//! Central authentication manager that coordinates token and session management\nuse super::{AuthConfig, token::TokenService, session::SessionStore};\nuse std::sync::Arc;\n\npub struct AuthManager {\n    config: Arc<AuthConfig>,\n    token_service: TokenService,\n    session_store: SessionStore,\n}\n\nimpl AuthManager {\n    pub fn new(config: AuthConfig) -> Self {\n        let config = Arc::new(config);\n        Self {\n            config: config.clone(),\n            token_service: TokenService::new(config.clone()),\n            session_store: SessionStore::new(config.max_sessions),\n        }\n    }\n\n    pub fn authenticate(&self, username: &str, password: &str) -> Result<String, String> {\n        if self.verify_credentials(username, password) {\n            let token = self.token_service.generate(username)?;\n            self.session_store.create(username, &token)?;\n            Ok(token)\n        } else {\n            Err(\"Invalid credentials\".to_string())\n        }\n    }\n\n    fn verify_credentials(&self, username: &str, password: &str) -> bool {\n        // Simplified credential check\n        !username.is_empty() && !password.is_empty()\n    }\n}\n",
+      "src/auth/token.rs": "//! Token generation and validation\n//! Uses HMAC for token signing\nuse std::sync::Arc;\nuse super::AuthConfig;\n\npub struct TokenService {\n    config: Arc<AuthConfig>,\n}\n\nimpl TokenService {\n    pub fn new(config: Arc<AuthConfig>) -> Self {\n        Self { config }\n    }\n\n    pub fn generate(&self, username: &str) -> Result<String, String> {\n        Ok(format!(\"{}:{}\", username, self.config.secret_key))\n    }\n\n    pub fn validate(&self, token: &str) -> Result<String, String> {\n        let parts: Vec<&str> = token.split(':').collect();\n        if parts.len() == 2 {\n            Ok(parts[0].to_string())\n        } else {\n            Err(\"Invalid token format\".to_string())\n        }\n    }\n}\n",
+      "src/auth/session.rs": "//! Session storage and management\n//! In-memory session store with capacity limits\nuse std::collections::HashMap;\nuse std::sync::{Arc, Mutex};\n\npub struct SessionStore {\n    sessions: Arc<Mutex<HashMap<String, String>>>,\n    max_sessions: usize,\n}\n\nimpl SessionStore {\n    pub fn new(max_sessions: usize) -> Self {\n        Self {\n            sessions: Arc::new(Mutex::new(HashMap::new())),\n            max_sessions,\n        }\n    }\n\n    pub fn create(&self, username: &str, token: &str) -> Result<(), String> {\n        let mut sessions = self.sessions.lock().unwrap();\n        if sessions.len() >= self.max_sessions {\n            return Err(\"Session limit reached\".to_string());\n        }\n        sessions.insert(username.to_string(), token.to_string());\n        Ok(())\n    }\n\n    pub fn get(&self, username: &str) -> Option<String> {\n        self.sessions.lock().unwrap().get(username).cloned()\n    }\n\n    pub fn remove(&self, username: &str) {\n        self.sessions.lock().unwrap().remove(username);\n    }\n}\n",
+      "src/database/mod.rs": "//! Database module\n//! Provides database connection and query interfaces\npub mod connection;\npub mod query;\npub mod migration;\n\nuse std::path::PathBuf;\n\npub struct DatabaseConfig {\n    pub path: PathBuf,\n    pub max_connections: usize,\n    pub timeout_ms: u64,\n}\n\nimpl Default for DatabaseConfig {\n    fn default() -> Self {\n        Self {\n            path: PathBuf::from(\"./data.db\"),\n            max_connections: 5,\n            timeout_ms: 5000,\n        }\n    }\n}\n",
+      "src/database/connection.rs": "//! Database connection pool\n//! Manages SQLite connections with pooling\nuse super::DatabaseConfig;\nuse std::sync::Arc;\n\npub struct ConnectionPool {\n    config: Arc<DatabaseConfig>,\n    active_connections: usize,\n}\n\nimpl ConnectionPool {\n    pub fn new(config: DatabaseConfig) -> Self {\n        Self {\n            config: Arc::new(config),\n            active_connections: 0,\n        }\n    }\n\n    pub fn get_connection(&mut self) -> Result<Connection, String> {\n        if self.active_connections >= self.config.max_connections {\n            return Err(\"Connection pool exhausted\".to_string());\n        }\n        self.active_connections += 1;\n        Ok(Connection::new(self.config.clone()))\n    }\n}\n\npub struct Connection {\n    config: Arc<DatabaseConfig>,\n}\n\nimpl Connection {\n    fn new(config: Arc<DatabaseConfig>) -> Self {\n        Self { config }\n    }\n\n    pub fn execute(&self, sql: &str) -> Result<usize, String> {\n        // Simplified execution\n        Ok(sql.len())\n    }\n}\n",
+      "src/api/mod.rs": "//! API module\n//! HTTP API handlers and routing\npub mod handlers;\npub mod middleware;\npub mod routes;\n\nuse std::net::SocketAddr;\n\npub struct ApiConfig {\n    pub bind_address: SocketAddr,\n    pub max_body_size: usize,\n}\n\nimpl Default for ApiConfig {\n    fn default() -> Self {\n        Self {\n            bind_address: \"127.0.0.1:8080\".parse().unwrap(),\n            max_body_size: 1024 * 1024,\n        }\n    }\n}\n",
+      "src/api/handlers.rs": "//! Request handlers\n//! Business logic for API endpoints\nuse crate::auth::AuthManager;\nuse crate::database::connection::ConnectionPool;\n\npub struct ApiHandlers {\n    auth: AuthManager,\n    db_pool: ConnectionPool,\n}\n\nimpl ApiHandlers {\n    pub fn new(auth: AuthManager, db_pool: ConnectionPool) -> Self {\n        Self { auth, db_pool }\n    }\n\n    pub fn handle_login(&self, username: &str, password: &str) -> Result<String, String> {\n        self.auth.authenticate(username, password)\n    }\n\n    pub fn handle_query(&mut self, query: &str) -> Result<String, String> {\n        let conn = self.db_pool.get_connection()?;\n        conn.execute(query)?;\n        Ok(\"Query executed\".to_string())\n    }\n}\n"
+    },
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "How does authentication work? Explain the token generation process.",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "How does authentication work",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return `Authentication is handled by the AuthManager in src/auth/manager.rs. The token generation process uses TokenService (src/auth/token.rs) which creates tokens by combining the username with a secret key. Sessions are stored in SessionStore (src/auth/session.rs) with a configurable limit.`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "context": {
+          "min_files": 3,
+          "semantic_search_used": true,
+          "chunking_performed": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {}
+  }
+}

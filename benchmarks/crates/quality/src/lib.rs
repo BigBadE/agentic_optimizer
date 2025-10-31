@@ -1,12 +1,4 @@
 //! Quality benchmarking for context retrieval system.
-#![cfg_attr(
-    test,
-    allow(
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        reason = "Allow for tests"
-    )
-)]
 
 pub mod metrics;
 pub mod test_case;

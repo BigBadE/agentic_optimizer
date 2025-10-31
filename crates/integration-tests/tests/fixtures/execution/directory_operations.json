@@ -1,0 +1,69 @@
+{
+  "name": "Directory Operations",
+  "description": "Create directories and organize files to exercise directory handling",
+  "tags": ["execution", "directories", "file_ops"],
+  "setup": {
+    "files": {},
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create a project structure with src, tests, and docs directories",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create a project structure",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await bash('mkdir -p src tests docs');",
+          "  await writeFile('src/main.rs', 'fn main() {}');",
+          "  await writeFile('tests/test.rs', '#[test]\\nfn it_works() { assert!(true); }');",
+          "  await writeFile('docs/README.md', '# Project Documentation');",
+          "  return 'Created project structure with src, tests, and docs';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "src/main.rs",
+            "exists": true
+          },
+          {
+            "path": "tests/test.rs",
+            "exists": true
+          },
+          {
+            "path": "docs/README.md",
+            "exists": true
+          }
+        ],
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "src/main.rs",
+        "exists": true
+      },
+      {
+        "path": "tests/test.rs",
+        "exists": true
+      },
+      {
+        "path": "docs/README.md",
+        "exists": true
+      }
+    ]
+  }
+}

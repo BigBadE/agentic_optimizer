@@ -2,19 +2,13 @@
 //!
 //! This crate provides fundamental types, error handling, and trait definitions
 //! used across the agentic optimizer system.
-#![cfg_attr(
-    test,
-    allow(
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        reason = "Allow for tests"
-    )
-)]
 
 /// Error types and result definitions.
 pub mod error;
 /// Prompt loading utilities.
 pub mod prompts;
+/// Synchronization utilities.
+pub mod sync;
 /// Trait definitions for model providers.
 pub mod traits;
 /// Core data types for queries, responses, and context.
@@ -37,6 +31,7 @@ pub mod ui;
 // Original merlin-core exports
 pub use error::Error;
 pub use error::Result as CoreResult; // Renamed to avoid conflict
+pub use sync::IgnoreLock;
 pub use traits::ModelProvider;
 pub use types::{Context, FileContext, Query, Response, TokenUsage};
 

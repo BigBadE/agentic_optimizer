@@ -2,14 +2,6 @@
 //!
 //! This crate provides language provider abstractions for semantic code analysis.
 //! Language backends have been removed as they are not currently in use.
-#![cfg_attr(
-    test,
-    allow(
-        clippy::missing_panics_doc,
-        clippy::missing_errors_doc,
-        reason = "Allow for tests"
-    )
-)]
 
 /// Language provider trait and types.
 pub mod provider;

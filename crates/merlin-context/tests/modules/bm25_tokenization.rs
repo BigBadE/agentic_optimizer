@@ -5,6 +5,9 @@ mod tests {
     use merlin_context::embedding::BM25Index;
 
     /// Ensures special tokens like `::` and `--` are preserved and searchable.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_special_token_preservation() {
         let mut index = BM25Index::default();
@@ -30,6 +33,9 @@ mod tests {
     }
 
     /// Debug helper to ensure exact tokens rank higher.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_tokenization_debug() {
         // This test helps debug what tokens are actually generated
@@ -54,6 +60,9 @@ mod tests {
     }
 
     /// Bigrams should improve phrase matching quality by ranking exact phrases higher.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_bigram_phrase_ranking() {
         let mut index = BM25Index::default();
@@ -78,6 +87,9 @@ mod tests {
     }
 
     /// Mixed special and regular tokens should be searchable together.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_mixed_special_and_regular_tokens() {
         let mut index = BM25Index::default();

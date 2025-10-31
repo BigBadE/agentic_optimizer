@@ -47,6 +47,13 @@ mod tests {
         }
     }
 
+    /// Tests TypeScript signature generation for multiple tools.
+    ///
+    /// # Errors
+    /// Returns an error if signature generation fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[test]
     fn test_generate_multiple_signatures() -> Result<()> {
         let tools: Vec<&dyn Tool> = vec![&MockTool];

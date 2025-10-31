@@ -1,0 +1,77 @@
+{
+  "name": "Many Files Chunk and Search",
+  "description": "25 files to force code chunking and test semantic search across large codebase",
+  "tags": [
+    "context",
+    "chunking",
+    "semantic_search",
+    "many_files"
+  ],
+  "setup": {
+    "files": {
+      "src/module00.rs": "//! Module 0\n//! This module handles feature 0 of the system\n\npub struct Module0 {\n    counter: usize,\n}\n\nimpl Module0 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module0 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module01.rs": "//! Module 1\n//! This module handles feature 1 of the system\n\npub struct Module1 {\n    counter: usize,\n}\n\nimpl Module1 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module1 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module02.rs": "//! Module 2\n//! This module handles feature 2 of the system\n\npub struct Module2 {\n    counter: usize,\n}\n\nimpl Module2 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module2 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module03.rs": "//! Module 3\n//! This module handles feature 3 of the system\n\npub struct Module3 {\n    counter: usize,\n}\n\nimpl Module3 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module3 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module04.rs": "//! Module 4\n//! This module handles feature 4 of the system\n\npub struct Module4 {\n    counter: usize,\n}\n\nimpl Module4 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module4 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module05.rs": "//! Module 5\n//! This module handles feature 5 of the system\n\npub struct Module5 {\n    counter: usize,\n}\n\nimpl Module5 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module5 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module06.rs": "//! Module 6\n//! This module handles feature 6 of the system\n\npub struct Module6 {\n    counter: usize,\n}\n\nimpl Module6 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module6 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module07.rs": "//! Module 7\n//! This module handles feature 7 of the system\n\npub struct Module7 {\n    counter: usize,\n}\n\nimpl Module7 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module7 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module08.rs": "//! Module 8\n//! This module handles feature 8 of the system\n\npub struct Module8 {\n    counter: usize,\n}\n\nimpl Module8 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module8 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module09.rs": "//! Module 9\n//! This module handles feature 9 of the system\n\npub struct Module9 {\n    counter: usize,\n}\n\nimpl Module9 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module9 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module10.rs": "//! Module 10\n//! This module handles feature 10 of the system\n\npub struct Module10 {\n    counter: usize,\n}\n\nimpl Module10 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module10 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module11.rs": "//! Module 11\n//! This module handles feature 11 of the system\n\npub struct Module11 {\n    counter: usize,\n}\n\nimpl Module11 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module11 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module12.rs": "//! Module 12\n//! This module handles feature 12 of the system\n\npub struct Module12 {\n    counter: usize,\n}\n\nimpl Module12 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module12 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module13.rs": "//! Module 13\n//! This module handles feature 13 of the system\n\npub struct Module13 {\n    counter: usize,\n}\n\nimpl Module13 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module13 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module14.rs": "//! Module 14\n//! This module handles feature 14 of the system\n\npub struct Module14 {\n    counter: usize,\n}\n\nimpl Module14 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module14 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module15.rs": "//! Module 15\n//! This module handles feature 15 of the system\n\npub struct Module15 {\n    counter: usize,\n}\n\nimpl Module15 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module15 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module16.rs": "//! Module 16\n//! This module handles feature 16 of the system\n\npub struct Module16 {\n    counter: usize,\n}\n\nimpl Module16 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module16 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module17.rs": "//! Module 17\n//! This module handles feature 17 of the system\n\npub struct Module17 {\n    counter: usize,\n}\n\nimpl Module17 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module17 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module18.rs": "//! Module 18\n//! This module handles feature 18 of the system\n\npub struct Module18 {\n    counter: usize,\n}\n\nimpl Module18 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module18 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module19.rs": "//! Module 19\n//! This module handles feature 19 of the system\n\npub struct Module19 {\n    counter: usize,\n}\n\nimpl Module19 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module19 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module20.rs": "//! Module 20\n//! This module handles feature 20 of the system\n\npub struct Module20 {\n    counter: usize,\n}\n\nimpl Module20 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module20 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module21.rs": "//! Module 21\n//! This module handles feature 21 of the system\n\npub struct Module21 {\n    counter: usize,\n}\n\nimpl Module21 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module21 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module22.rs": "//! Module 22\n//! This module handles feature 22 of the system\n\npub struct Module22 {\n    counter: usize,\n}\n\nimpl Module22 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module22 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module23.rs": "//! Module 23\n//! This module handles feature 23 of the system\n\npub struct Module23 {\n    counter: usize,\n}\n\nimpl Module23 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module23 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n",
+      "src/module24.rs": "//! Module 24\n//! This module handles feature 24 of the system\n\npub struct Module24 {\n    counter: usize,\n}\n\nimpl Module24 {\n    pub fn new() -> Self {\n        Self { counter: 0 }\n    }\n\n    pub fn process(&mut self, input: &str) -> String {\n        self.counter += 1;\n        format!(\"Module24 processed: {}\", input)\n    }\n\n    pub fn get_count(&self) -> usize {\n        self.counter\n    }\n}\n"
+    },
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Which module handles counter functionality?",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Which module handles counter",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'All modules (Module00 through Module24) have counter functionality via the counter field and get_count() method.';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "context": {
+          "min_files": 10,
+          "semantic_search_used": true,
+          "chunking_performed": true
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {}
+  }
+}

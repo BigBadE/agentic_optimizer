@@ -159,6 +159,13 @@ mod tests {
     use super::*;
     use merlin_deps::anyhow::Result;
 
+    /// Tests basic bash command execution with successful output.
+    ///
+    /// # Errors
+    /// Returns an error if command execution fails or output parsing fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_bash_tool_simple_command() -> Result<()> {
         let tool = BashTool;
@@ -181,6 +188,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests bash command execution with non-zero exit code.
+    ///
+    /// # Errors
+    /// Returns an error if command execution fails unexpectedly.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_bash_tool_command_failure() -> Result<()> {
         let tool = BashTool;
@@ -198,6 +212,13 @@ mod tests {
         Ok(())
     }
 
+    /// Tests bash command execution with object-style parameters.
+    ///
+    /// # Errors
+    /// Returns an error if command execution or output parsing fails.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_bash_tool_with_object_params() -> Result<()> {
         let tool = BashTool;
@@ -217,6 +238,10 @@ mod tests {
         Ok(())
     }
 
+    /// Tests bash tool error handling when required command parameter is missing.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_bash_tool_missing_command_param() {
         let tool = BashTool;
@@ -228,6 +253,10 @@ mod tests {
         assert!(result.is_err(), "Should fail with missing command param");
     }
 
+    /// Tests bash tool name and TypeScript signature generation.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
     #[tokio::test]
     async fn test_bash_tool_name_and_signature() {
         let tool = BashTool;

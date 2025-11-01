@@ -1,8 +1,30 @@
 //! Types for task decomposition and step-based execution
 
-use merlin_deps::serde_json::Value as JsonValue;
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+
+/// Handle to a JavaScript value stored in the persistent runtime
+///
+/// This is a lightweight handle that references a JavaScript value
+/// kept alive in the TypeScript runtime's storage.
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct JsValueHandle {
+    /// Unique identifier for this value in the runtime's storage
+    pub(crate) id: String,
+}
+
+impl JsValueHandle {
+    /// Create a new handle with the given ID
+    #[must_use]
+    pub fn new(id: String) -> Self {
+        Self { id }
+    }
+
+    /// Get the identifier for this handle
+    #[must_use]
+    pub fn id(&self) -> &str {
+        &self.id
+    }
+}
 
 /// Agent response type - either a direct result or a task list to decompose
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -34,11 +56,20 @@ pub struct TaskStep {
     pub description: String,
     /// Type of work for this step
     pub step_type: StepType,
-    /// Validation criteria for completion
-    pub exit_requirement: ExitRequirement,
+    /// Optional JavaScript function reference for validation
+    /// Function is kept alive in persistent runtime and called when step completes
+    /// Function signature: () => Promise<void>
+    /// Throws error if validation fails
+    /// Has full access to all tools (readFile, writeFile, bash, etc.)
+    /// Can capture variables from outer scope
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub exit_requirement: Option<JsValueHandle>,
     /// Optional context specification
     #[serde(skip_serializing_if = "Option::is_none")]
     pub context: Option<ContextSpec>,
+    /// Step titles this step depends on (for parallel execution)
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub dependencies: Vec<String>,
 }
 
 /// Type of work being performed in a step
@@ -55,30 +86,6 @@ pub enum StepType {
     Validation,
     /// Documentation and comments
     Documentation,
-}
-
-/// Exit requirement for step validation
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(tag = "type", rename_all = "lowercase")]
-pub enum ExitRequirement {
-    /// Built-in callback function validation
-    Callback {
-        /// Function name (e.g., `file_exists`)
-        function_name: String,
-        /// Arguments for the function
-        #[serde(default)]
-        args: HashMap<String, JsonValue>,
-    },
-    /// Pattern matching validation
-    Pattern {
-        /// Regex pattern to match
-        pattern: String,
-    },
-    /// Named validator from pipeline
-    Validation {
-        /// Validator name
-        validator: String,
-    },
 }
 
 /// Context specification for a step

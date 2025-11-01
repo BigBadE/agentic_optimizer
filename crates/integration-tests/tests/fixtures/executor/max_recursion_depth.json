@@ -1,0 +1,84 @@
+{
+  "name": "Max Recursion Depth Limit",
+  "description": "Tests max recursion depth (10) protection for task decomposition",
+  "tags": ["executor", "recursion", "error-paths", "limits"],
+  "setup": {
+    "files": {},
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create deeply nested task structure",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create deeply nested task structure",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<any> {",
+          "  return {",
+          "    title: 'Level 1',",
+          "    steps: [",
+          "      {",
+          "        title: 'Decompose to level 2',",
+          "        description: 'Create nested task',",
+          "        step_type: 'implementation'",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create nested task",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<any> {",
+          "  return {",
+          "    title: 'Level 2',",
+          "    steps: [",
+          "      {",
+          "        title: 'Final step',",
+          "        description: 'Complete task',",
+          "        step_type: 'implementation'",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Complete task",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Task completed at recursion level 2';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {}
+  }
+}

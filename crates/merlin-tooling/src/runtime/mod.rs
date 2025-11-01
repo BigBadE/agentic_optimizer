@@ -1,9 +1,15 @@
 //! TypeScript/JavaScript runtime using Boa engine.
 
 mod conversion;
+mod handle;
+mod persistent;
+mod persistent_helpers;
 mod promise;
 mod tool_registration;
 mod typescript;
+
+pub use handle::JsValueHandle;
+pub use persistent::PersistentTypeScriptRuntime;
 
 use std::collections::HashMap;
 use std::sync::Arc;

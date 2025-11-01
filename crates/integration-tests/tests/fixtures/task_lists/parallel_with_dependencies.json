@@ -1,0 +1,134 @@
+{
+  "name": "Parallel Execution with Dependencies",
+  "description": "Tests parallel task execution where independent tasks run concurrently and dependent tasks wait",
+  "tags": ["task_lists", "parallel", "dependencies", "execution"],
+  "setup": {
+    "files": {},
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Build frontend and backend components in parallel",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Build frontend and backend",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code() {",
+          "  return {",
+          "    title: 'Build Application Components',",
+          "    steps: [",
+          "      {",
+          "        title: 'Build Frontend',",
+          "        description: 'Build frontend React components',",
+          "        step_type: 'implementation'",
+          "      },",
+          "      {",
+          "        title: 'Build Backend',",
+          "        description: 'Build backend API server',",
+          "        step_type: 'implementation'",
+          "      },",
+          "      {",
+          "        title: 'Integration Test',",
+          "        description: 'Run integration tests',",
+          "        step_type: 'validation'",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Build frontend React components",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('frontend.js', 'const App = () => <div>Hello</div>;');",
+          "  return 'Frontend built successfully';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "frontend.js",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Build backend API server",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('backend.rs', 'fn main() { println!(\"Server running\"); }');",
+          "  return 'Backend built successfully';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "backend.rs",
+            "exists": true
+          }
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Run integration tests",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const frontend = await readFile('frontend.js');",
+          "  const backend = await readFile('backend.rs');",
+          "  if (frontend && backend) {",
+          "    return 'Tests passed - both components exist';",
+          "  }",
+          "  return 'Tests failed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "frontend.js",
+        "exists": true
+      },
+      {
+        "path": "backend.rs",
+        "exists": true
+      }
+    ]
+  }
+}

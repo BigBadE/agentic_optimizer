@@ -1,0 +1,97 @@
+{
+  "name": "Validation Retry - Success on Second Attempt",
+  "description": "Tests soft validation error triggering retry that succeeds",
+  "tags": ["executor", "validation", "retry", "error-paths"],
+  "setup": {
+    "files": {
+      "config.json": "{\"value\": 0}"
+    },
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Update config value",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Update config value",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<any> {",
+          "  return {",
+          "    title: 'Update config value',",
+          "    steps: [",
+          "      {",
+          "        title: 'Set config to valid value',",
+          "        description: 'Update config with value at least 100',",
+          "        step_type: 'implementation',",
+          "        exit_requirement: async () => {",
+          "          const content = await readFile('config.json');",
+          "          const config = JSON.parse(content);",
+          "          if (config.value < 100) {",
+          "            throw new Error('[SOFT] Config value must be at least 100, got ' + config.value);",
+          "          }",
+          "        }",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Update config with value at least 100",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('config.json', '{\"value\": 50}');",
+          "  return 'Set config value to 50';",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Update config with value at least 100",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('config.json', '{\"value\": 150}');",
+          "  return 'Set config value to 150';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "config.json",
+            "contains": ["150"]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "config.json",
+        "exists": true,
+        "contains": ["150"]
+      }
+    ]
+  }
+}

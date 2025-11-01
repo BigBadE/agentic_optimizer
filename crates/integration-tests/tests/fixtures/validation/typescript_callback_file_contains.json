@@ -1,0 +1,83 @@
+{
+  "name": "TypeScript Callback - File Contains Pattern",
+  "description": "Test TypeScript callback that validates file content",
+  "tags": ["validation", "typescript_callback", "exit_requirement", "pattern_match"],
+  "setup": {
+    "files": {},
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create README with project info",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create README with project info",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<any> {",
+          "  return {",
+          "    title: 'Create README',",
+          "    steps: [",
+          "      {",
+          "        title: 'Write README',",
+          "        description: 'Create README.md with project description',",
+          "        step_type: 'documentation',",
+          "        exit_requirement: async () => {",
+          "          const content = await readFile('README.md');",
+          "          if (!content.includes('Test Project')) {",
+          "            throw new Error('README.md does not contain project name');",
+          "          }",
+          "          if (!content.includes('v1.0.0')) {",
+          "            throw new Error('README.md does not contain version');",
+          "          }",
+          "        }",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create README.md with project description",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const readme = '# Test Project\\n\\nVersion: v1.0.0\\n\\nA test project for validation.';",
+          "  await writeFile('README.md', readme);",
+          "  return 'Created README.md';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "README.md",
+            "exists": true
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "README.md",
+        "exists": true,
+        "contains": ["Test Project", "v1.0.0"]
+      }
+    ]
+  }
+}

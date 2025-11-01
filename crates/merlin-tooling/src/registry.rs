@@ -1,6 +1,8 @@
 //! Tool registry for managing available tools.
 
 use std::convert::AsRef;
+use std::env;
+use std::path::{Path, PathBuf};
 use std::sync::Arc;
 
 use super::Tool;
@@ -11,6 +13,7 @@ type ToolList = Arc<Vec<Arc<dyn Tool>>>;
 #[derive(Clone)]
 pub struct ToolRegistry {
     tools: ToolList,
+    workspace_root: PathBuf,
 }
 
 impl ToolRegistry {
@@ -19,7 +22,23 @@ impl ToolRegistry {
     pub fn new() -> Self {
         Self {
             tools: Arc::new(Vec::new()),
+            workspace_root: env::current_dir().unwrap_or_else(|_| PathBuf::from(".")),
         }
+    }
+
+    /// Create a new tool registry with a specific workspace root
+    #[must_use]
+    pub fn with_workspace(workspace_root: impl Into<PathBuf>) -> Self {
+        Self {
+            tools: Arc::new(Vec::new()),
+            workspace_root: workspace_root.into(),
+        }
+    }
+
+    /// Get the workspace root path
+    #[must_use]
+    pub fn workspace_root(&self) -> &Path {
+        &self.workspace_root
     }
 
     /// Add a tool to the registry

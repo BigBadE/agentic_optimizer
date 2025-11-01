@@ -1,0 +1,79 @@
+{
+  "name": "TypeScript Callback - Command Succeeds",
+  "description": "Test TypeScript callback that validates command execution success",
+  "tags": ["validation", "typescript_callback", "exit_requirement", "command_check"],
+  "setup": {
+    "files": {},
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create and test script",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Create and test script",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<any> {",
+          "  return {",
+          "    title: 'Create and test script',",
+          "    steps: [",
+          "      {",
+          "        title: 'Create test script',",
+          "        description: 'Write test.sh that exits successfully',",
+          "        step_type: 'implementation',",
+          "        exit_requirement: async () => {",
+          "          const result = await bash('bash test.sh');",
+          "          if (result.exit_code !== 0) {",
+          "            throw new Error(`Script failed with exit code ${result.exit_code}`);",
+          "          }",
+          "        }",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Write test.sh that exits successfully",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  await writeFile('test.sh', '#!/bin/bash\\necho \"Test passed\"\\nexit 0');",
+          "  return 'Created test.sh';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "test.sh",
+            "exists": true
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "test.sh",
+        "exists": true,
+        "contains": ["Test passed"]
+      }
+    ]
+  }
+}

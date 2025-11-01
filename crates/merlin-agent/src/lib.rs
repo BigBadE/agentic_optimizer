@@ -3,16 +3,16 @@
 //! This crate provides agent execution capabilities including:
 //!
 //! - **Agent Execution**: Core agent runtime with context management and conversation tracking
-//! - **Task Execution**: Workspace isolation, conflict detection, and parallel execution
+//! - **Parallel Execution**: Dependency-aware parallel task execution
 //! - **Validation Pipeline**: Multi-stage validation (syntax, lint, test, build)
 //!
 //! # Architecture
 //!
 //! The crate is organized into three key modules:
 //!
-//! - [`agent`]: Agent execution, context management, conversation tracking, and self-assessment
-//! - [`executor`]: Task execution with workspace isolation and conflict detection
+//! - [`agent`]: Agent execution, context management, conversation tracking, and parallel execution
 //! - [`validator`]: Multi-stage validation pipeline for code generation
+//! - [`orchestrator`]: High-level routing orchestration
 //!
 //! # Example
 //!
@@ -38,10 +38,8 @@
 
 /// Agent execution and self-assessment
 pub mod agent;
-/// Task execution with workspace management
+/// Workspace state management
 pub mod executor;
-/// Exit requirement validators for V2 execution model
-pub mod exit_validators;
 /// High-level orchestration of routing components
 pub mod orchestrator;
 /// Thread persistence and management
@@ -53,15 +51,9 @@ pub use agent::{
     AgentExecutor, ContextFetcher, ContextManager, StepExecutionParams, StepExecutor, StepResult,
     StepTracker,
 };
-pub use executor::{
-    BuildResult, ConflictAwareTaskGraph, ConflictReport, ExecutorPool, FileConflict,
-    FileLockManager, IsolatedBuildEnv, LintResult, TaskGraph, TaskWorkspace, TestResult,
-    WorkspaceSnapshot, WorkspaceState,
-};
-pub use exit_validators::ExitRequirementValidators;
+pub use executor::WorkspaceState;
 pub use orchestrator::RoutingOrchestrator;
 pub use thread_store::ThreadStore;
 pub use validator::{
-    BuildValidationStage, LintValidationStage, SyntaxValidationStage, TestValidationStage,
-    ValidationPipeline, ValidationStage as ValidationStageTrait, Validator,
+    SyntaxValidationStage, ValidationPipeline, ValidationStage as ValidationStageTrait, Validator,
 };

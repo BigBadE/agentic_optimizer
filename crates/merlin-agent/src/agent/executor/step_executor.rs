@@ -1,16 +1,15 @@
 //! Step executor for recursive task decomposition with exit requirements
 
-use std::{future::Future, path::Path, pin::Pin, result, sync::Arc, time::Instant};
+use std::{future::Future, pin::Pin, result, sync::Arc, time::Instant};
 
 use merlin_core::{
-    AgentResponse, Context, ContextSpec, ExitRequirement, ModelProvider, Query, Result,
-    RoutingError, TaskId, TaskList, TaskStep, ValidationErrorType,
+    AgentResponse, Context, ContextSpec, JsValueHandle, ModelProvider, Query, Result, RoutingError,
+    TaskId, TaskList, TaskStep, ValidationErrorType,
 };
 use merlin_routing::UiChannel;
-use merlin_tooling::ToolRegistry;
+use merlin_tooling::{PersistentTypeScriptRuntime, ToolRegistry, ToolingJsValueHandle};
 
 use super::typescript::{execute_typescript_code, extract_typescript_code};
-use crate::ExitRequirementValidators;
 
 /// Future returned by async step execution
 type StepFuture<'fut> = Pin<Box<dyn Future<Output = Result<StepResult>> + Send + 'fut>>;
@@ -44,6 +43,8 @@ pub struct StepExecutionParams<'params> {
     pub provider: &'params Arc<dyn ModelProvider>,
     /// Tool registry
     pub tool_registry: &'params Arc<ToolRegistry>,
+    /// Persistent TypeScript runtime
+    pub runtime: &'params Arc<PersistentTypeScriptRuntime>,
     /// Task ID for UI events
     pub task_id: TaskId,
     /// UI channel
@@ -62,6 +63,8 @@ pub struct TaskListExecutionParams<'params> {
     pub provider: &'params Arc<dyn ModelProvider>,
     /// Tool registry
     pub tool_registry: &'params Arc<ToolRegistry>,
+    /// Persistent TypeScript runtime
+    pub runtime: &'params Arc<PersistentTypeScriptRuntime>,
     /// Task ID for UI events
     pub task_id: TaskId,
     /// UI channel
@@ -80,6 +83,8 @@ pub struct AgentExecutionParams<'params> {
     pub provider: &'params Arc<dyn ModelProvider>,
     /// Tool registry
     pub tool_registry: &'params Arc<ToolRegistry>,
+    /// Persistent TypeScript runtime
+    pub runtime: &'params Arc<PersistentTypeScriptRuntime>,
     /// Task ID for UI events
     pub task_id: TaskId,
     /// UI channel
@@ -141,6 +146,7 @@ impl StepExecutor {
             context,
             provider: params.provider,
             tool_registry: params.tool_registry,
+            runtime: params.runtime,
             task_id: params.task_id,
             ui_channel: params.ui_channel,
         })
@@ -158,10 +164,10 @@ impl StepExecutor {
         match response {
             AgentResponse::DirectResult(result) => {
                 let validation = Self::validate_exit_requirement(
-                    &params.step.exit_requirement,
-                    &result,
-                    params.tool_registry,
-                );
+                    params.step.exit_requirement.as_ref(),
+                    params.runtime,
+                )
+                .await;
 
                 if Self::handle_validation_error(validation, &params.step.title, attempt).is_ok() {
                     Ok(Some(StepResult {
@@ -175,22 +181,24 @@ impl StepExecutor {
             }
 
             AgentResponse::TaskList(task_list) => {
-                let combined_result = Self::execute_task_list_impl(&TaskListExecutionParams {
-                    task_list: &task_list,
-                    base_context: context,
-                    provider: params.provider,
-                    tool_registry: params.tool_registry,
-                    task_id: params.task_id,
-                    ui_channel: params.ui_channel,
-                    recursion_depth: params.recursion_depth + 1,
-                })
-                .await?;
+                let combined_result =
+                    super::parallel::execute_task_list_parallel(&TaskListExecutionParams {
+                        task_list: &task_list,
+                        base_context: context,
+                        provider: params.provider,
+                        tool_registry: params.tool_registry,
+                        runtime: params.runtime,
+                        task_id: params.task_id,
+                        ui_channel: params.ui_channel,
+                        recursion_depth: params.recursion_depth + 1,
+                    })
+                    .await?;
 
                 Self::validate_exit_requirement(
-                    &params.step.exit_requirement,
-                    &combined_result.text,
-                    params.tool_registry,
+                    params.step.exit_requirement.as_ref(),
+                    params.runtime,
                 )
+                .await
                 .map_err(|err| match err {
                     ValidationErrorType::Hard(msg) | ValidationErrorType::Soft(msg) => {
                         RoutingError::Other(format!("Task list result failed validation: {msg}"))
@@ -206,7 +214,7 @@ impl StepExecutor {
     ///
     /// # Errors
     /// Returns an error if max retries exceeded or critical failure occurs
-    async fn execute_step_impl(params: StepExecutionParams<'_>) -> Result<StepResult> {
+    pub(super) async fn execute_step_impl(params: StepExecutionParams<'_>) -> Result<StepResult> {
         if params.recursion_depth >= MAX_RECURSION_DEPTH {
             return Err(RoutingError::Other(format!(
                 "Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded"
@@ -244,68 +252,12 @@ impl StepExecutor {
         }
     }
 
-    /// Execute a task list by running all steps sequentially
+    /// Execute a task list with dependency-aware parallel execution
     ///
     /// # Errors
     /// Returns an error if any step fails
     pub fn execute_task_list(params: TaskListExecutionParams<'_>) -> StepFuture<'_> {
-        Box::pin(async move { Self::execute_task_list_impl(&params).await })
-    }
-
-    /// Implementation of task list execution
-    ///
-    /// # Errors
-    /// Returns an error if any step fails
-    fn execute_task_list_impl<'task_params>(
-        params: &'task_params TaskListExecutionParams<'task_params>,
-    ) -> StepFuture<'task_params> {
-        Box::pin(async move {
-            let start = Instant::now();
-            let mut step_results = Vec::new();
-            let mut combined_output = Vec::new();
-
-            merlin_deps::tracing::debug!(
-                "Executing task list '{}' with {} steps at depth {}",
-                params.task_list.title,
-                params.task_list.steps.len(),
-                params.recursion_depth
-            );
-
-            for (index, step) in params.task_list.steps.iter().enumerate() {
-                merlin_deps::tracing::debug!(
-                    "Executing step {}/{}: {}",
-                    index + 1,
-                    params.task_list.steps.len(),
-                    step.title
-                );
-
-                let step_result = Self::execute_step_impl(StepExecutionParams {
-                    step,
-                    base_context: params.base_context,
-                    previous_results: &step_results,
-                    provider: params.provider,
-                    tool_registry: params.tool_registry,
-                    task_id: params.task_id,
-                    ui_channel: params.ui_channel,
-                    recursion_depth: params.recursion_depth,
-                })
-                .await?;
-
-                combined_output.push(format!(
-                    "## Step {}: {}\n{}",
-                    index + 1,
-                    step.title,
-                    step_result.text
-                ));
-                step_results.push(step_result);
-            }
-
-            Ok(StepResult {
-                text: combined_output.join("\n\n"),
-                duration_ms: start.elapsed().as_millis() as u64,
-                success: true,
-            })
-        })
+        Box::pin(async move { super::parallel::execute_task_list_parallel(&params).await })
     }
 
     /// Execute task with agent and parse response
@@ -318,7 +270,7 @@ impl StepExecutor {
         let description = params.step.description.as_str();
         let context = params.context;
         let provider = params.provider;
-        let tool_registry = params.tool_registry;
+        let runtime = params.runtime;
         let task_id = params.task_id;
         let ui_channel = params.ui_channel;
 
@@ -341,7 +293,7 @@ impl StepExecutor {
         })?;
 
         // Execute TypeScript code - returns AgentResponse (String | TaskList) directly
-        execute_typescript_code(tool_registry, task_id, &typescript_code, ui_channel).await
+        execute_typescript_code(runtime, task_id, &typescript_code, ui_channel).await
     }
 
     /// Add previous step results to context
@@ -395,13 +347,35 @@ impl StepExecutor {
     ///
     /// # Errors
     /// Returns `ValidationErrorType` if validation fails
-    fn validate_exit_requirement(
-        requirement: &ExitRequirement,
-        result: &str,
-        _tool_registry: &Arc<ToolRegistry>,
+    async fn validate_exit_requirement(
+        requirement: Option<&JsValueHandle>,
+        runtime: &Arc<PersistentTypeScriptRuntime>,
     ) -> result::Result<(), ValidationErrorType> {
-        // TODO: Pass workspace root properly
-        let workspace_root = Path::new(".");
-        ExitRequirementValidators::validate(requirement, result, workspace_root)
+        // If no exit requirement specified, validation passes
+        let Some(func_handle) = requirement else {
+            return Ok(());
+        };
+
+        merlin_deps::tracing::debug!(
+            "Validating exit requirement with function handle: {}",
+            func_handle.id()
+        );
+
+        // Convert core handle to tooling handle
+        let tooling_handle = ToolingJsValueHandle::new(func_handle.id().to_owned());
+
+        // Call the stored JavaScript function directly
+        match runtime.call_function(tooling_handle).await {
+            Ok(_result_handle) => {
+                merlin_deps::tracing::debug!("Exit requirement validation passed");
+                Ok(())
+            }
+            Err(err) => {
+                merlin_deps::tracing::debug!("Exit requirement validation failed: {err}");
+                Err(ValidationErrorType::Soft(format!(
+                    "Exit requirement validation failed: {err}"
+                )))
+            }
+        }
     }
 }

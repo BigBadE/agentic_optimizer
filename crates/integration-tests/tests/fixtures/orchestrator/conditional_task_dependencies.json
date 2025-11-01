@@ -1,0 +1,142 @@
+{
+  "name": "Conditional Task Dependencies",
+  "description": "Tests task execution with conditional dependencies based on previous step results",
+  "tags": ["orchestrator", "dependencies", "conditional", "task-chain"],
+  "setup": {
+    "files": {
+      "config.json": "{\"mode\": \"production\"}"
+    },
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Deploy application based on configuration",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Deploy application",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<any> {",
+          "  return {",
+          "    title: 'Application deployment',",
+          "    steps: [",
+          "      {",
+          "        title: 'Check configuration',",
+          "        description: 'Read and validate config',",
+          "        step_type: 'implementation'",
+          "      },",
+          "      {",
+          "        title: 'Build application',",
+          "        description: 'Build for production',",
+          "        step_type: 'implementation'",
+          "      },",
+          "      {",
+          "        title: 'Deploy',",
+          "        description: 'Deploy to production server',",
+          "        step_type: 'implementation'",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Read and validate config",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const config = await readFile('config.json');",
+          "  const parsed = JSON.parse(config);",
+          "  await writeFile('mode.txt', parsed.mode);",
+          "  return `Configuration validated: ${parsed.mode} mode`;",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Build for production",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const mode = await readFile('mode.txt');",
+          "  if (mode === 'production') {",
+          "    await writeFile('build.txt', 'optimized build');",
+          "    return 'Built with production optimizations';",
+          "  } else {",
+          "    await writeFile('build.txt', 'dev build');",
+          "    return 'Built in development mode';",
+          "  }",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Deploy to production server",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const buildType = await readFile('build.txt');",
+          "  await writeFile('deployment.log', `Deployed: ${buildType}`);",
+          "  return `Deployment complete: ${buildType}`;",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "mode.txt",
+            "contains": ["production"]
+          },
+          {
+            "path": "build.txt",
+            "contains": ["optimized"]
+          },
+          {
+            "path": "deployment.log",
+            "contains": ["optimized build"]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "mode.txt",
+        "exists": true,
+        "contains": ["production"]
+      },
+      {
+        "path": "build.txt",
+        "exists": true,
+        "contains": ["optimized"]
+      },
+      {
+        "path": "deployment.log",
+        "exists": true,
+        "contains": ["optimized build"]
+      }
+    ]
+  }
+}

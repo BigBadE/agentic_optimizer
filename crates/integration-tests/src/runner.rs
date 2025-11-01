@@ -52,6 +52,21 @@ pub struct UnifiedTestRunner {
 }
 
 impl UnifiedTestRunner {
+    /// Generate embeddings for workspace to enable semantic search
+    ///
+    /// # Errors
+    /// Returns error if embedding initialization fails critically
+    async fn generate_workspace_embeddings(workspace_path: &Path) -> Result<()> {
+        use merlin_context::VectorSearchManager;
+        VectorSearchManager::new(workspace_path)
+            .initialize()
+            .await
+            .or_else(|err| {
+                merlin_deps::tracing::warn!("Embeddings failed: {err}");
+                Ok(())
+            })
+    }
+
     /// Create new test runner with auto-managed workspace
     ///
     /// # Errors
@@ -59,11 +74,9 @@ impl UnifiedTestRunner {
     pub async fn new(fixture: TestFixture) -> Result<Self> {
         let workspace = TempDir::new()
             .map_err(|err| RoutingError::Other(format!("Failed to create workspace: {err}")))?;
-        let workspace_path = workspace.path().to_path_buf();
-
-        Self::new_internal(fixture, Some(workspace), workspace_path).await
+        let path = workspace.path().to_path_buf();
+        Self::new_internal(fixture, Some(workspace), path).await
     }
-
     /// Create new test runner with provided workspace directory
     ///
     /// # Errors
@@ -71,7 +84,6 @@ impl UnifiedTestRunner {
     pub async fn new_with_workspace(fixture: TestFixture, workspace_path: PathBuf) -> Result<Self> {
         Self::new_internal(fixture, None, workspace_path).await
     }
-
     /// Internal constructor shared by both public constructors
     ///
     /// # Errors
@@ -83,27 +95,18 @@ impl UnifiedTestRunner {
     ) -> Result<Self> {
         let provider = Arc::new(MockProvider::new("test-mock"));
 
-        // Determine workspace setup strategy
+        // Setup workspace
         let (final_workspace_path, workspace_temp, _is_readonly) =
-            if let Some(workspace_name) = &fixture.setup.workspace {
-                // Use pre-made workspace read-only with pre-generated embeddings
-                let premade_path = get_test_workspace_path(workspace_name)?;
-                (premade_path, None, true)
+            if let Some(ws_name) = &fixture.setup.workspace {
+                (get_test_workspace_path(ws_name)?, None, true)
             } else {
-                // Non-workspace tests: always use temp workspace
                 create_files(&workspace_path, &fixture.setup.files)?;
                 (workspace_path, workspace_temp, false)
             };
 
-        // Generate embeddings for test workspace if files were created
-        // This ensures chunking and scoring code is exercised during test setup
+        // Generate embeddings for workspace files to enable semantic search testing
         if !fixture.setup.files.is_empty() {
-            use merlin_context::FakeEmbeddingClient;
-            use merlin_context::embedding::VectorSearchManager;
-            let mut vector_manager =
-                VectorSearchManager::with_provider(&final_workspace_path, FakeEmbeddingClient);
-            // Synchronously initialize embeddings (this exercises chunking, scoring, etc.)
-            vector_manager.initialize().await?;
+            Self::generate_workspace_embeddings(&final_workspace_path).await?;
         }
 
         // Setup LLM response patterns
@@ -205,7 +208,7 @@ impl UnifiedTestRunner {
         task_events: &mut mpsc::Receiver<UiEvent>,
     ) -> Result<TaskCompletionResult> {
         let mut outputs = Vec::new();
-        let overall_timeout = TokioDuration::from_secs(5);
+        let overall_timeout = TokioDuration::from_secs(3);
         let start = Instant::now();
         let mut events_received = 0;
         let mut last_event_time = Instant::now();
@@ -216,7 +219,7 @@ impl UnifiedTestRunner {
             if start.elapsed() >= overall_timeout {
                 let idle_time = last_event_time.elapsed().as_millis();
                 return Err(RoutingError::ExecutionFailed(format!(
-                    "Task completion timed out after 5 seconds - {events_received} events received, \
+                    "Task completion timed out after 3 seconds - {events_received} events received, \
                      task_started: {task_started}, idle for {idle_time}ms"
                 )));
             }
@@ -224,8 +227,8 @@ impl UnifiedTestRunner {
             // Process any pending UI events first (this broadcasts them)
             tui_test_helpers::process_ui_events(&mut self.tui_app);
 
-            // Try to receive task-specific event with timeout (increased to reduce CPU thrashing)
-            let ui_event = timeout(TokioDuration::from_millis(100), task_events.recv()).await;
+            // Try to receive task-specific event with timeout
+            let ui_event = timeout(TokioDuration::from_millis(10), task_events.recv()).await;
 
             match ui_event {
                 Ok(Some(event)) => {

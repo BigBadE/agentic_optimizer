@@ -1,0 +1,51 @@
+{
+  "name": "Large Result Set Truncation",
+  "description": "Tests context builder truncation when search returns many files",
+  "tags": ["context", "semantic-search", "edge-case", "large-results"],
+  "setup": {
+    "files": {
+      "file01.rs": "fn test01() {}",
+      "file02.rs": "fn test02() {}",
+      "file03.rs": "fn test03() {}",
+      "file04.rs": "fn test04() {}",
+      "file05.rs": "fn test05() {}",
+      "file06.rs": "fn test06() {}",
+      "file07.rs": "fn test07() {}",
+      "file08.rs": "fn test08() {}",
+      "file09.rs": "fn test09() {}",
+      "file10.rs": "fn test10() {}",
+      "file11.rs": "fn test11() {}",
+      "file12.rs": "fn test12() {}"
+    },
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "List all test functions",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "List all test functions",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Found 12 test functions across multiple files';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {}
+  }
+}

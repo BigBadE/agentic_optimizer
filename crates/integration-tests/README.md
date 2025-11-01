@@ -77,7 +77,7 @@ Fixtures are JSON files with the following structure:
 
 ## Fixture Organization
 
-**74 JSON fixtures** organized by component:
+**111 JSON fixtures** organized by component:
 
 - `agent/` - Agent execution tests (4 fixtures)
 - `basic/` - Simple response tests (1 fixture)
@@ -190,9 +190,9 @@ provider.add_pattern("error handling", "Added error handling...");
 
 ## Testing Status
 
-**✅ Comprehensive** (100% pass rate - 74/74 passing)
+**✅ Comprehensive** (100% pass rate - 111/111 passing, ~4s total runtime)
 
-- **All crates tested**: Via 74 fixtures covering all major components
+- **All crates tested**: Via 111 fixtures covering all major components
 - **Auto-discovery**: Single test runner with parallel execution
 - **Coverage verified**: Via `scripts/commit.sh` and `scripts/verify.sh`
 - **Conversation count verification**: Excludes system messages, only counts User/Assistant

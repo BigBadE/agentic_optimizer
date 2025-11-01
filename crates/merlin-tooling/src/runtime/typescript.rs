@@ -73,11 +73,11 @@ pub fn wrap_code(code: &str) -> String {
 
     // Check if code already defines agent_code function (async or sync)
     if trimmed.contains("async function agent_code") {
-        // Wrap async function call in async IIFE for compatibility
-        format!("{trimmed}\n(async () => await agent_code())()")
+        // Wrap in IIFE to avoid global scope pollution in persistent runtime
+        format!("(async () => {{ {trimmed}; return await agent_code(); }})()")
     } else if trimmed.contains("function agent_code") {
-        // Just call sync function
-        format!("{trimmed}\nagent_code();")
+        // Wrap in IIFE to avoid global scope pollution in persistent runtime
+        format!("(function() {{ {trimmed}; return agent_code(); }})()")
     } else {
         // Check if code contains top-level await
         let has_await = trimmed.contains("await ");

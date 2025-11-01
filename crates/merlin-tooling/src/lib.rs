@@ -33,6 +33,8 @@ pub use delete_tool::DeleteFileTool;
 pub use edit_tool::EditFileTool;
 pub use file_ops::{ListFilesTool, ReadFileTool, WriteFileTool};
 pub use registry::ToolRegistry;
-pub use runtime::TypeScriptRuntime;
+pub use runtime::{
+    JsValueHandle as ToolingJsValueHandle, PersistentTypeScriptRuntime, TypeScriptRuntime,
+};
 pub use signatures::generate_typescript_signatures;
 pub use tool::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};

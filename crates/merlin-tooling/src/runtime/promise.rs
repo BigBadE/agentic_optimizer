@@ -46,9 +46,10 @@ pub fn extract_promise_if_needed(result: JsValue, context: &mut Context) -> Tool
         .map_err(|err| ToolError::ExecutionFailed(format!("Failed to register promise: {err}")))?;
 
     // Use a JavaScript helper to extract the resolved value
+    // Use `var` instead of `let` to avoid duplicate declaration errors in persistent runtime
     let setup_handler = r"
-        let __result__;
-        let __error__;
+        var __result__;
+        var __error__;
         __promise__.then(
             value => { __result__ = value; },
             error => { __error__ = error; }

@@ -232,7 +232,7 @@ impl RoutingOrchestrator {
     /// Returns error if executor creation fails.
     fn create_agent_executor(&self) -> Result<AgentExecutor> {
         let workspace_root = self.workspace.root_path();
-        let tool_registry = ToolRegistry::default()
+        let tool_registry = ToolRegistry::with_workspace(workspace_root.clone())
             .with_tool(Arc::new(BashTool))
             .with_tool(Arc::new(ReadFileTool::new(workspace_root)))
             .with_tool(Arc::new(WriteFileTool::new(workspace_root)))

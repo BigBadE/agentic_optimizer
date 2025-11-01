@@ -139,7 +139,8 @@ async fn test_all_fixtures() {
     if failures_with_details.is_empty() {
         tracing::info!("\nAll fixtures passed! ✓");
     } else {
-        tracing::error!("{} failed\n", failures_with_details.len());
+        // Log failures before assertion for better debugging
+        tracing::error!("\n{} failed\n", failures_with_details.len());
         tracing::error!("=== Failed Fixtures ===");
         for (fixture_name, verification) in &failures_with_details {
             tracing::error!("\n{fixture_name}:");
@@ -148,10 +149,24 @@ async fn test_all_fixtures() {
             }
         }
 
-        assert!(
-            failures_with_details.is_empty(),
-            "{} fixture(s) failed",
-            failures_with_details.len()
-        );
+        // Build detailed failure message by iterating fixtures
+        let failure_count = failures_with_details.len();
+        let mut failure_msg = String::with_capacity(failure_count * 100);
+        failure_msg.push_str(&failure_count.to_string());
+        failure_msg.push_str(" fixture(s) failed:\n");
+
+        for (fixture_name, verification) in &failures_with_details {
+            failure_msg.push('\n');
+            failure_msg.push_str(fixture_name);
+            failure_msg.push_str(":\n");
+
+            for failure in &verification.failures {
+                failure_msg.push_str("  - ");
+                failure_msg.push_str(failure);
+                failure_msg.push('\n');
+            }
+        }
+
+        assert!(failures_with_details.is_empty(), "{failure_msg}");
     }
 }

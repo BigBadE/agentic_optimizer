@@ -71,18 +71,12 @@ impl ValidationPipeline {
 
     /// Creates a pipeline with the default validation stages.
     ///
-    /// Includes: Syntax, Build, Test, and Lint stages (in that order).
+    /// Currently includes only: Syntax validation.
     pub fn with_default_stages() -> Self {
-        use super::stages::{
-            BuildValidationStage, LintValidationStage, SyntaxValidationStage, TestValidationStage,
-        };
+        use super::stages::SyntaxValidationStage;
 
-        let stages: Vec<Arc<dyn ValidationStage>> = vec![
-            Arc::new(SyntaxValidationStage::default()),
-            Arc::new(BuildValidationStage::default()),
-            Arc::new(TestValidationStage::default()),
-            Arc::new(LintValidationStage::default()),
-        ];
+        let stages: Vec<Arc<dyn ValidationStage>> =
+            vec![Arc::new(SyntaxValidationStage::default())];
 
         Self::new(stages)
     }

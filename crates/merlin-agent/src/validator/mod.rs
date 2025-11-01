@@ -16,9 +16,7 @@ use merlin_core::{Result, Task, ValidationResult};
 
 pub use citations::{Citation, CitationStatistics, CitationValidator};
 pub use pipeline::{ValidationPipeline, ValidationStage};
-pub use stages::{
-    BuildValidationStage, LintValidationStage, SyntaxValidationStage, TestValidationStage,
-};
+pub use stages::SyntaxValidationStage;
 
 /// Trait for validation strategies
 #[async_trait]

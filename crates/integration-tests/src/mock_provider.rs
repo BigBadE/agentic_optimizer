@@ -233,18 +233,11 @@ impl MockProvider {
                 continue;
             }
 
-            tracing::debug!(
-                "Trying candidate #{} ({} chars): {}",
-                idx,
-                candidate.len(),
-                candidate.chars().take(100).collect::<String>()
-            );
-
             if let Some(resp) = responses
                 .iter_mut()
                 .find(|response| !response.used && response.matches(candidate))
             {
-                tracing::debug!(
+                tracing::info!(
                     "Matched pattern '{}' (match_type={:?}) against candidate #{} (first 80 chars: '{}')",
                     resp.pattern,
                     resp.match_type,

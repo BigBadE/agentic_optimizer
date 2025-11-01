@@ -1,0 +1,126 @@
+{
+  "name": "Multi-Step Workflow",
+  "description": "Tests complex workflow with multiple sequential steps",
+  "tags": ["workflow", "multi-step", "sequential"],
+  "setup": {
+    "files": {
+      "input.txt": "start"
+    },
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Process data through pipeline",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Process data through pipeline",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<any> {",
+          "  return {",
+          "    title: 'Data processing pipeline',",
+          "    steps: [",
+          "      {",
+          "        title: 'Step 1: Read input',",
+          "        description: 'Read input.txt',",
+          "        step_type: 'implementation'",
+          "      },",
+          "      {",
+          "        title: 'Step 2: Transform data',",
+          "        description: 'Transform to uppercase',",
+          "        step_type: 'implementation'",
+          "      },",
+          "      {",
+          "        title: 'Step 3: Write output',",
+          "        description: 'Write final result',",
+          "        step_type: 'implementation'",
+          "      }",
+          "    ]",
+          "  };",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Read input.txt",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const data = await readFile('input.txt');",
+          "  return 'Read: ' + data;",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Transform to uppercase",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const input = await readFile('input.txt');",
+          "  await writeFile('transformed.txt', input.toUpperCase());",
+          "  return 'Transformed to uppercase';",
+          "}"
+        ]
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Write final result",
+        "match_type": "exact"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const data = await readFile('transformed.txt');",
+          "  await writeFile('output.txt', data);",
+          "  return 'Pipeline complete';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {
+            "path": "output.txt",
+            "contains": ["START"]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "input.txt",
+        "exists": true
+      },
+      {
+        "path": "transformed.txt",
+        "exists": true,
+        "contains": ["START"]
+      },
+      {
+        "path": "output.txt",
+        "exists": true,
+        "contains": ["START"]
+      }
+    ]
+  }
+}

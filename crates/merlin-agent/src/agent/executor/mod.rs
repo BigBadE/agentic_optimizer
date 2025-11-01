@@ -2,6 +2,7 @@
 
 mod context;
 mod logging;
+mod parallel;
 mod step_executor;
 pub(crate) mod typescript;
 
@@ -15,6 +16,7 @@ pub use step_executor::{
 };
 
 use std::{
+    collections::HashMap,
     sync::{
         Arc,
         atomic::{AtomicBool, Ordering},
@@ -28,12 +30,12 @@ use merlin_context::ContextFetcher;
 use merlin_core::AgentResponse;
 use merlin_core::ModelProvider;
 use merlin_core::{
-    Context, ExitRequirement, Response, Result, RoutingConfig, RoutingError, StepType, Task,
-    TaskId, TaskResult, TaskStep, TokenUsage, ValidationResult,
+    Context, Response, Result, RoutingConfig, RoutingError, StepType, Task, TaskId, TaskResult,
+    TaskStep, TokenUsage, ValidationResult,
     ui::{UiChannel, UiEvent},
 };
 use merlin_routing::{ModelRouter, ProviderRegistry, RoutingDecision};
-use merlin_tooling::{ToolRegistry, generate_typescript_signatures};
+use merlin_tooling::{PersistentTypeScriptRuntime, ToolRegistry, generate_typescript_signatures};
 
 /// Parameters for executing with step executor
 struct ExecutorParams<'exec> {
@@ -95,6 +97,8 @@ pub struct AgentExecutor {
     context_dump_enabled: Arc<AtomicBool>,
     /// Provider registry for accessing model providers
     provider_registry: Arc<ProviderRegistry>,
+    /// Persistent TypeScript runtime for agent code execution
+    runtime: Arc<PersistentTypeScriptRuntime>,
 }
 
 impl AgentExecutor {
@@ -114,6 +118,16 @@ impl AgentExecutor {
         let conversation_history = Arc::new(Mutex::new(Vec::new()));
         let context_builder = ContextBuilder::new(context_fetcher_arc, conversation_history);
 
+        // Create persistent runtime with tools
+        let tools = tool_registry.list_tools();
+        let mut tools_map = HashMap::new();
+        for tool in tools {
+            if let Some(tool_arc) = tool_registry.get_tool(tool.name()) {
+                tools_map.insert(tool.name().to_owned(), tool_arc);
+            }
+        }
+        let runtime = Arc::new(PersistentTypeScriptRuntime::new(tools_map));
+
         Ok(Self {
             router,
             validator,
@@ -121,6 +135,7 @@ impl AgentExecutor {
             context_builder,
             context_dump_enabled: Arc::new(AtomicBool::new(false)),
             provider_registry,
+            runtime,
         })
     }
 
@@ -133,6 +148,16 @@ impl AgentExecutor {
         let conversation_history = Arc::new(Mutex::new(Vec::new()));
         let context_builder = ContextBuilder::new(context_fetcher_arc, conversation_history);
 
+        // Create persistent runtime with tools
+        let tools = params.tool_registry.list_tools();
+        let mut tools_map = HashMap::new();
+        for tool in tools {
+            if let Some(tool_arc) = params.tool_registry.get_tool(tool.name()) {
+                tools_map.insert(tool.name().to_owned(), tool_arc);
+            }
+        }
+        let runtime = Arc::new(PersistentTypeScriptRuntime::new(tools_map));
+
         Ok(Self {
             router: params.router,
             validator: params.validator,
@@ -140,6 +165,7 @@ impl AgentExecutor {
             context_builder,
             context_dump_enabled: Arc::new(AtomicBool::new(false)),
             provider_registry: params.provider_registry,
+            runtime,
         })
     }
 
@@ -222,10 +248,9 @@ impl AgentExecutor {
             title: params.task.description.clone(),
             description: params.task.description.clone(),
             step_type: StepType::Implementation,
-            exit_requirement: ExitRequirement::Pattern {
-                pattern: String::from(".*"), // Match anything - no validation
-            },
+            exit_requirement: None, // No validation
             context: None,
+            dependencies: Vec::new(),
         };
 
         StepExecutor::execute_with_agent(AgentExecutionParams {
@@ -233,6 +258,7 @@ impl AgentExecutor {
             context: params.context,
             provider: params.provider,
             tool_registry: &self.tool_registry,
+            runtime: &self.runtime,
             task_id: params.task_id,
             ui_channel: params.ui_channel,
         })
@@ -280,6 +306,7 @@ impl AgentExecutor {
                     base_context: params.context,
                     provider: params.provider,
                     tool_registry: &self.tool_registry,
+                    runtime: &self.runtime,
                     task_id: params.task_id,
                     ui_channel: params.ui_channel,
                     recursion_depth: 0,

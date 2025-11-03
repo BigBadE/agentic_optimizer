@@ -8,10 +8,11 @@ use merlin_routing::{Model, ModelRouter, RoutingDecision, Task as RoutingTask};
 use std::{
     collections::HashMap,
     sync::{
-        Arc, Mutex,
+        Arc, Mutex as StdMutex,
         atomic::{AtomicUsize, Ordering},
     },
 };
+use tokio::sync::Mutex as TokioMutex;
 
 /// Pattern response configuration
 struct PatternResponse {
@@ -73,15 +74,15 @@ pub struct MockProvider {
     /// Provider name
     name: &'static str,
     /// Pattern responses
-    responses: Arc<Mutex<Vec<PatternResponse>>>,
+    responses: Arc<TokioMutex<Vec<PatternResponse>>>,
     /// Call counter for debugging
     call_count: Arc<AtomicUsize>,
     /// Captured prompts for verification
-    captured_prompts: Arc<Mutex<Vec<String>>>,
+    captured_prompts: Arc<StdMutex<Vec<String>>>,
     /// Event ID to prompt mapping for scoped verification
-    event_prompts: Arc<Mutex<EventPromptMap>>,
+    event_prompts: Arc<StdMutex<EventPromptMap>>,
     /// Verification errors (root cause messages only)
-    verification_errors: Arc<Mutex<Vec<String>>>,
+    verification_errors: Arc<StdMutex<Vec<String>>>,
 }
 
 impl MockProvider {
@@ -90,11 +91,11 @@ impl MockProvider {
     pub fn new(name: &'static str) -> Self {
         Self {
             name,
-            responses: Arc::new(Mutex::new(Vec::new())),
+            responses: Arc::new(TokioMutex::new(Vec::new())),
             call_count: Arc::new(AtomicUsize::new(0)),
-            captured_prompts: Arc::new(Mutex::new(Vec::new())),
-            event_prompts: Arc::new(Mutex::new(HashMap::new())),
-            verification_errors: Arc::new(Mutex::new(Vec::new())),
+            captured_prompts: Arc::new(StdMutex::new(Vec::new())),
+            event_prompts: Arc::new(StdMutex::new(HashMap::new())),
+            verification_errors: Arc::new(StdMutex::new(Vec::new())),
         }
     }
 
@@ -148,17 +149,13 @@ impl MockProvider {
     ///
     /// # Errors
     /// Returns error if lock acquisition fails
-    pub fn get_last_matched_prompt(&self) -> Result<Option<String>> {
-        self.responses
-            .lock()
-            .map(|responses| {
-                responses
-                    .iter()
-                    .rev()
-                    .find(|resp| resp.used)
-                    .and_then(|resp| resp.captured_prompt.clone())
-            })
-            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))
+    pub async fn get_last_matched_prompt(&self) -> Result<Option<String>> {
+        let responses = self.responses.lock().await;
+        Ok(responses
+            .iter()
+            .rev()
+            .find(|resp| resp.used)
+            .and_then(|resp| resp.captured_prompt.clone()))
     }
 
     /// Get all verification errors
@@ -176,12 +173,9 @@ impl MockProvider {
     ///
     /// # Errors
     /// Returns error if pattern is invalid
-    pub fn add_response(&self, trigger: &TriggerConfig, typescript: String) -> Result<()> {
+    pub async fn add_response(&self, trigger: &TriggerConfig, typescript: String) -> Result<()> {
         let response = PatternResponse::new(trigger, typescript)?;
-        self.responses
-            .lock()
-            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
-            .push(response);
+        self.responses.lock().await.push(response);
         Ok(())
     }
 
@@ -189,12 +183,9 @@ impl MockProvider {
     ///
     /// # Errors
     /// Returns error if lock acquisition fails
-    pub fn reset(&self) -> Result<()> {
+    pub async fn reset(&self) -> Result<()> {
         {
-            let mut responses = self
-                .responses
-                .lock()
-                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
+            let mut responses = self.responses.lock().await;
             for response in responses.iter_mut() {
                 response.used = false;
             }
@@ -219,11 +210,8 @@ impl MockProvider {
     ///
     /// # Errors
     /// Returns error if no matching pattern found
-    fn find_matching_pattern(&self, candidates: &[String]) -> Result<(String, String)> {
-        let mut responses = self
-            .responses
-            .lock()
-            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
+    async fn find_matching_pattern(&self, candidates: &[String]) -> Result<(String, String)> {
+        let mut responses = self.responses.lock().await;
 
         let mut matched_prompt = None;
         let mut matched_response = None;
@@ -303,13 +291,13 @@ impl ModelProvider for MockProvider {
             },
         ];
 
-        let (prompt_for_matching, typescript_code) = self.find_matching_pattern(&candidates)?;
+        let (prompt_for_matching, typescript_code) = self.find_matching_pattern(&candidates).await?;
 
         // Capture matched prompt
         self.captured_prompts
             .lock()
             .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
-            .push(prompt_for_matching);
+            .push(prompt_for_matching.clone());
 
         Ok(Response {
             text: format!("```typescript\n{typescript_code}\n```"),
@@ -330,18 +318,48 @@ impl ModelProvider for MockProvider {
     }
 }
 
-/// Simple mock router that always returns the default model
-pub struct MockRouter;
+/// Mock router that can simulate multi-tier routing and escalation
+pub struct MockRouter {
+    /// Current tier being used (increments on each route call for escalation testing)
+    tier: Arc<AtomicUsize>,
+    /// Available tiers (provider names in order of escalation)
+    tiers: Vec<&'static str>,
+}
+
+impl MockRouter {
+    /// Create a new mock router with default single tier
+    #[must_use]
+    pub fn new() -> Self {
+        Self {
+            tier: Arc::new(AtomicUsize::new(0)),
+            tiers: vec!["test-mock"],
+        }
+    }
+}
+
+impl Default for MockRouter {
+    fn default() -> Self {
+        Self::new()
+    }
+}
 
 #[async_trait]
 impl ModelRouter for MockRouter {
     async fn route(&self, _task: &RoutingTask) -> Result<RoutingDecision> {
+        let tier_idx = self.tier.fetch_add(1, Ordering::SeqCst);
+        let tier_name = self
+            .tiers
+            .get(tier_idx.min(self.tiers.len() - 1))
+            .unwrap_or(&"test-mock");
+
+        tracing::debug!("MockRouter routing to tier {} ({})", tier_idx, tier_name);
+
         // Always route to the default model for tests
         Ok(RoutingDecision {
             model: Model::Qwen25Coder32B,
             estimated_cost: 0.0,
             estimated_latency_ms: 100,
-            reasoning: "Test routing".to_owned(),
+            reasoning: format!("Test routing to tier {tier_idx}"),
         })
     }
 

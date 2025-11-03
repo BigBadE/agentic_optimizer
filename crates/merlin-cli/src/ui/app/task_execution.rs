@@ -15,13 +15,15 @@ use tokio::sync::{mpsc, oneshot};
 use super::tui_app::TuiApp;
 
 /// Parameters for thread work completion
-struct WorkCompletionParams {
+struct WorkCompletionParams<'params> {
     thread_id: ThreadId,
     message_id: MessageId,
     task_id: TaskId,
     tier_used: String,
     tokens_used: TokenUsage,
     duration_ms: u64,
+    /// Optional `WorkUnit` from task decomposition
+    work_unit: Option<&'params WorkUnit>,
 }
 
 /// Context for task result handling
@@ -167,6 +169,7 @@ fn handle_task_success(result_data: &TaskResult, ctx: &mut TaskResultContext<'_>
                 tier_used: result_data.tier_used.clone(),
                 tokens_used: result_data.response.tokens_used.clone(),
                 duration_ms: result_data.duration_ms,
+                work_unit: result_data.work_unit.as_ref(),
             },
         );
     }
@@ -224,7 +227,10 @@ fn create_or_continue_thread(
 }
 
 /// Update thread work completion status
-fn update_thread_work_completed(orchestrator: &RoutingOrchestrator, params: WorkCompletionParams) {
+fn update_thread_work_completed(
+    orchestrator: &RoutingOrchestrator,
+    params: WorkCompletionParams<'_>,
+) {
     let Some(thread_store_arc) = orchestrator.thread_store() else {
         return;
     };
@@ -239,11 +245,22 @@ fn update_thread_work_completed(orchestrator: &RoutingOrchestrator, params: Work
             .iter_mut()
             .find(|message| message.id == params.message_id)
         {
-            let mut work = WorkUnit::new(params.task_id, params.tier_used);
-            work.tokens_used = params.tokens_used;
-            work.duration_ms = params.duration_ms;
-            work.complete();
-            msg.attach_work(work);
+            // Use WorkUnit from TaskResult if available (task decomposition)
+            if let Some(decomposed_work) = params.work_unit {
+                msg.attach_work(decomposed_work.clone());
+            } else if let Some(work) = &mut msg.work {
+                // Update existing work for non-decomposed tasks
+                work.tokens_used = params.tokens_used;
+                work.duration_ms = params.duration_ms;
+                work.complete();
+            } else {
+                // Create simple work unit for non-decomposed tasks
+                let mut work = WorkUnit::new(params.task_id, params.tier_used);
+                work.tokens_used = params.tokens_used;
+                work.duration_ms = params.duration_ms;
+                work.complete();
+                msg.attach_work(work);
+            }
         }
         thread.clone()
     });
@@ -276,9 +293,14 @@ fn update_thread_work_failed(
             .iter_mut()
             .find(|message| message.id == message_id)
         {
-            let mut work = WorkUnit::new(task_id, "unknown".to_string());
-            work.fail();
-            msg.attach_work(work);
+            // Update existing work or create new if missing
+            if let Some(work) = &mut msg.work {
+                work.fail();
+            } else {
+                let mut work = WorkUnit::new(task_id, "unknown".to_string());
+                work.fail();
+                msg.attach_work(work);
+            }
         }
         thread.clone()
     });

@@ -1,12 +1,13 @@
 //! User interface event system for Merlin.
 //! Provides channel and event types for UI updates.
 
-use crate::conversation::ThreadId;
+use crate::conversation::{ThreadId, WorkUnit};
 use crate::task::{TaskId, TaskResult};
 use merlin_deps::tracing::warn;
 use merlin_tooling::ToolError;
+use std::sync::Arc;
 use tokio::spawn;
-use tokio::sync::mpsc;
+use tokio::sync::{mpsc, Mutex};
 
 /// Event types for UI updates
 pub mod events;
@@ -88,6 +89,30 @@ impl UiChannel {
                 total: None,
                 message,
             },
+        });
+    }
+
+    /// Sends `WorkUnit` started event with live reference
+    pub fn work_unit_started(&self, task_id: TaskId, work_unit: Arc<Mutex<WorkUnit>>) {
+        self.send(UiEvent::WorkUnitStarted {
+            task_id,
+            work_unit,
+        });
+    }
+
+    /// Sends `WorkUnit` progress update
+    pub fn work_unit_progress(
+        &self,
+        task_id: TaskId,
+        progress_percentage: u8,
+        completed_subtasks: usize,
+        total_subtasks: usize,
+    ) {
+        self.send(UiEvent::WorkUnitProgress {
+            task_id,
+            progress_percentage,
+            completed_subtasks,
+            total_subtasks,
         });
     }
 

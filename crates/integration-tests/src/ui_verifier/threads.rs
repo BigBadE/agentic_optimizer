@@ -1,7 +1,7 @@
 //! Thread state verification logic.
 
-use crate::fixture::UiVerify;
 use crate::verification_result::VerificationResult;
+use crate::verify::UiVerify;
 use merlin_cli::TuiApp;
 use merlin_cli::ui::state::UiState;
 use merlin_core::Thread;

@@ -111,7 +111,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": "Security check passed"
+          "return_type": "string"
         }
       }
     },

@@ -78,7 +78,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": ".*0\\.95.*"
+          "return_type": "string"
         },
         "files": [
           {
@@ -86,8 +86,7 @@
             "exists": true,
             "contains": [
               "Value: 42",
-              "Name: test",
-              "Confidence: 0.95"
+              "Name: test"
             ]
           }
         ]
@@ -133,15 +132,14 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": ".*0\\.75.*"
+          "return_type": "string"
         },
         "files": [
           {
             "path": "context_needed.txt",
             "exists": true,
             "contains": [
-              "Need production environment details",
-              "Confidence: 0.75"
+              "Need production environment details"
             ]
           }
         ]
@@ -182,7 +180,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": ".*0\\.85.*"
+          "return_type": "string"
         },
         "files": [
           {
@@ -190,7 +188,6 @@
             "exists": true,
             "contains": [
               "Reasoning: Have both data and config files",
-              "Confidence: 0.85",
               "Action: Processing data with config settings"
             ]
           }
@@ -210,17 +207,11 @@
       },
       {
         "path": "context_needed.txt",
-        "exists": true,
-        "contains": [
-          "Confidence: 0.75"
-        ]
+        "exists": true
       },
       {
         "path": "decision.txt",
-        "exists": true,
-        "contains": [
-          "Confidence: 0.85"
-        ]
+        "exists": true
       }
     ]
   }

@@ -1,7 +1,7 @@
 //! Task count verification logic.
 
-use crate::fixture::UiVerify;
 use crate::verification_result::VerificationResult;
+use crate::verify::UiVerify;
 use merlin_cli::ui::task_manager::{TaskManager, TaskStatus};
 
 /// Verify task counts (pending, running, completed, failed, displayed)

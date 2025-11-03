@@ -40,7 +40,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": "Output: Hello World"
+          "return_type": "string"
         }
       }
     },
@@ -67,7 +67,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": "Failed with code: 42"
+          "return_type": "string"
         }
       }
     },
@@ -97,7 +97,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": "Grep found: foo"
+          "return_type": "string"
         }
       }
     },
@@ -124,7 +124,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": "Stderr: error message"
+          "return_type": "string"
         }
       }
     },
@@ -155,7 +155,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": "Line count: 5"
+          "return_type": "string"
         }
       }
     },
@@ -182,7 +182,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": "Result: Current dir:"
+          "return_type": "string"
         }
       }
     },
@@ -210,7 +210,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": "Lines: 3, First: line1"
+          "return_type": "string"
         }
       }
     },

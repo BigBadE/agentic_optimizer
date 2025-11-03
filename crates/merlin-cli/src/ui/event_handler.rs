@@ -1,12 +1,14 @@
 use super::persistence::TaskPersistence;
 use super::state::{ConversationEntry, ConversationRole, UiState};
 use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo, TaskStepStatus};
-use merlin_core::ThreadId;
+use merlin_core::{ThreadId, WorkUnit};
 use merlin_deps::serde_json::Value;
 use merlin_deps::tracing::warn;
 use merlin_routing::{MessageLevel, TaskId, TaskProgress, TaskResult, UiEvent};
 use merlin_tooling::ToolError;
+use std::sync::Arc;
 use std::time::{Instant, SystemTime};
+use tokio::sync::Mutex;
 
 /// Handles UI events and updates task manager and state
 pub struct EventHandler<'handler> {
@@ -41,6 +43,27 @@ impl<'handler> EventHandler<'handler> {
 
             UiEvent::TaskProgress { task_id, progress } => {
                 self.handle_task_progress(task_id, progress);
+            }
+
+            UiEvent::WorkUnitStarted {
+                task_id,
+                work_unit,
+            } => {
+                self.handle_work_unit_started(task_id, work_unit);
+            }
+
+            UiEvent::WorkUnitProgress {
+                task_id,
+                progress_percentage,
+                completed_subtasks,
+                total_subtasks,
+            } => {
+                self.handle_work_unit_progress(
+                    task_id,
+                    progress_percentage,
+                    completed_subtasks,
+                    total_subtasks,
+                );
             }
 
             UiEvent::TaskOutput { task_id, output } => self.handle_task_output(task_id, &output),
@@ -127,6 +150,7 @@ impl<'handler> EventHandler<'handler> {
             steps: Vec::default(),
             current_step: None,
             retry_count: 0,
+            work_unit: None,
         };
 
         self.task_manager.add_task(task_id, task_display);
@@ -144,6 +168,34 @@ impl<'handler> EventHandler<'handler> {
     fn handle_task_progress(&mut self, task_id: TaskId, progress: TaskProgress) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             task.progress = Some(progress);
+        }
+    }
+
+    fn handle_work_unit_started(
+        &mut self,
+        task_id: TaskId,
+        work_unit: Arc<Mutex<WorkUnit>>,
+    ) {
+        if let Some(task) = self.task_manager.get_task_mut(task_id) {
+            task.work_unit = Some(work_unit);
+        }
+    }
+
+    fn handle_work_unit_progress(
+        &mut self,
+        task_id: TaskId,
+        _progress_percentage: u8,
+        _completed_subtasks: usize,
+        _total_subtasks: usize,
+    ) {
+        // The WorkUnit is already updated by the executor via Arc<Mutex<>>
+        // This event is just a signal to re-render the UI
+        // The UI will read the latest state from task.work_unit when rendering
+
+        // Trigger a re-render by marking this task as needing update
+        if self.state.active_task_id == Some(task_id) {
+            // Force output scroll update to trigger re-render
+            self.state.auto_scroll_output_to_bottom = false;
         }
     }
 

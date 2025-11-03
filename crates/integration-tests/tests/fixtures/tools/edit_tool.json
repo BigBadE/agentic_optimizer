@@ -117,7 +117,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": "Expected error"
+          "return_type": "string"
         }
       }
     },

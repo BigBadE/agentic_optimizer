@@ -1,0 +1,50 @@
+{
+  "name": "WorkUnit Retry Logic",
+  "description": "Tests WorkUnit retry tracking and retry count increment",
+  "tags": ["conversation", "work_unit", "retry"],
+  "setup": {
+    "files": {},
+    "terminal_size": [120, 40]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Test retry logic",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Test retry logic",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  const retry_states = {",
+          "    initial: { status: 'in_progress', retry_count: 0 },",
+          "    first_retry: { status: 'retrying', retry_count: 1 },",
+          "    second_retry: { status: 'retrying', retry_count: 2 },",
+          "    max_retries: { status: 'retrying', retry_count: 3 }",
+          "  };",
+          "  ",
+          "  await writeFile('retry_test.json', JSON.stringify(retry_states, null, 2));",
+          "  return 'Retry states tracked';",
+          "}"
+        ]
+      },
+      "verify": {
+        "files": [
+          {"path": "retry_test.json", "exists": true, "contains": ["in_progress", "retrying", "retry_count"]}
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {"path": "retry_test.json", "exists": true, "contains": ["initial", "first_retry", "second_retry", "max_retries"]}
+    ]
+  }
+}

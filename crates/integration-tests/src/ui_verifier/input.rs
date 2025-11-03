@@ -1,7 +1,7 @@
 //! Input field verification logic.
 
-use crate::fixture::UiVerify;
 use crate::verification_result::VerificationResult;
+use crate::verify::UiVerify;
 use merlin_cli::ui::input::InputManager;
 
 /// Verify input-related fields (text, cleared, cursor position)

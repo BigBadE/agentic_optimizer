@@ -77,14 +77,102 @@ impl WorkUnit {
         }
     }
 
-    /// Adds a subtask to this work unit
-    pub fn add_subtask(&mut self, subtask: Subtask) {
+    /// Adds a subtask to track decomposed work
+    pub fn add_subtask(&mut self, description: String, difficulty: u8) -> SubtaskId {
+        let subtask = Subtask {
+            id: SubtaskId::new(),
+            description,
+            difficulty,
+            status: SubtaskStatus::Pending,
+            verification: None,
+            error: None,
+            result: None,
+        };
+        let id = subtask.id;
         self.subtasks.push(subtask);
+        id
     }
 
-    /// Marks the work as completed
+    /// Marks a subtask as in progress by ID
+    pub fn start_subtask(&mut self, subtask_id: SubtaskId) {
+        if let Some(subtask) = self.subtasks.iter_mut().find(|sub| sub.id == subtask_id) {
+            subtask.status = SubtaskStatus::InProgress;
+        }
+    }
+
+    /// Marks a subtask as completed
+    pub fn complete_subtask(&mut self, subtask_id: SubtaskId, result: Option<String>) {
+        if let Some(subtask) = self.subtasks.iter_mut().find(|sub| sub.id == subtask_id) {
+            merlin_deps::tracing::debug!(
+                "Completing subtask {:?} ('{}') - previous status: {:?}",
+                subtask_id,
+                subtask.description,
+                subtask.status
+            );
+            subtask.status = SubtaskStatus::Completed;
+            subtask.result = result;
+            subtask.error = None;
+        } else {
+            merlin_deps::tracing::warn!(
+                "Attempted to complete subtask {:?} but it was not found. Available: {:?}",
+                subtask_id,
+                self.subtasks.iter().map(|s| (s.id, &s.description)).collect::<Vec<_>>()
+            );
+        }
+    }
+
+    /// Marks a subtask as failed
+    pub fn fail_subtask(&mut self, subtask_id: SubtaskId, error: String) {
+        if let Some(subtask) = self.subtasks.iter_mut().find(|sub| sub.id == subtask_id) {
+            subtask.status = SubtaskStatus::Failed;
+            subtask.error = Some(error);
+        }
+    }
+
+    /// Returns the next pending subtask
+    #[must_use]
+    pub fn next_pending_subtask(&self) -> Option<&Subtask> {
+        self.subtasks
+            .iter()
+            .find(|sub| matches!(sub.status, SubtaskStatus::Pending))
+    }
+
+    /// Returns progress percentage (0-100) based on completed subtasks
+    #[must_use]
+    pub fn progress_percentage(&self) -> u8 {
+        if self.subtasks.is_empty() {
+            return match self.status {
+                WorkStatus::Completed => 100,
+                WorkStatus::InProgress | WorkStatus::Retrying => 50,
+                WorkStatus::Failed | WorkStatus::Cancelled => 0,
+            };
+        }
+
+        let completed = self
+            .subtasks
+            .iter()
+            .filter(|sub| matches!(sub.status, SubtaskStatus::Completed))
+            .count();
+
+        ((completed as f64 / self.subtasks.len() as f64) * 100.0) as u8
+    }
+
+    /// Marks the work as completed if all subtasks are already completed
     pub fn complete(&mut self) {
-        self.status = WorkStatus::Completed;
+        // Only mark as completed if all subtasks are completed
+        let all_completed = self.subtasks.iter().all(|sub| matches!(sub.status, SubtaskStatus::Completed));
+
+        if all_completed {
+            self.status = WorkStatus::Completed;
+        } else {
+            // If not all subtasks are completed, keep status as InProgress
+            // This can happen during async execution when complete() is called before all subtasks finish
+            merlin_deps::tracing::debug!(
+                "WorkUnit.complete() called but only {}/{} subtasks are completed",
+                self.subtasks.iter().filter(|s| matches!(s.status, SubtaskStatus::Completed)).count(),
+                self.subtasks.len()
+            );
+        }
     }
 
     /// Marks the work as failed
@@ -92,7 +180,7 @@ impl WorkUnit {
         self.status = WorkStatus::Failed;
     }
 
-    /// Marks the work as cancelled
+    /// Marks the work as cancelled by user
     pub fn cancel(&mut self) {
         self.status = WorkStatus::Cancelled;
     }
@@ -103,26 +191,13 @@ impl WorkUnit {
         self.status = WorkStatus::Retrying;
     }
 
-    /// Returns the next pending subtask
+    /// Returns true if the work is in a terminal state
     #[must_use]
-    pub fn next_pending_subtask(&self) -> Option<&Subtask> {
-        self.subtasks
-            .iter()
-            .find(|subtask| matches!(subtask.status, SubtaskStatus::Pending))
-    }
-
-    /// Returns progress percentage (0-100)
-    #[must_use]
-    pub fn progress_percentage(&self) -> u8 {
-        if self.subtasks.is_empty() {
-            return 0;
-        }
-        let completed = self
-            .subtasks
-            .iter()
-            .filter(|subtask| matches!(subtask.status, SubtaskStatus::Completed))
-            .count();
-        ((completed as f64 / self.subtasks.len() as f64) * 100.0) as u8
+    pub const fn is_terminal(&self) -> bool {
+        matches!(
+            self.status,
+            WorkStatus::Completed | WorkStatus::Failed | WorkStatus::Cancelled
+        )
     }
 }
 
@@ -183,73 +258,6 @@ pub struct Subtask {
     pub result: Option<String>,
 }
 
-impl Subtask {
-    /// Creates a new pending subtask
-    pub fn new(description: String, difficulty: u8) -> Self {
-        Self {
-            id: SubtaskId::new(),
-            description,
-            difficulty,
-            status: SubtaskStatus::Pending,
-            verification: None,
-            error: None,
-            result: None,
-        }
-    }
-
-    /// Creates a new subtask with verification
-    pub fn with_verification(
-        description: String,
-        difficulty: u8,
-        verification: VerificationStep,
-    ) -> Self {
-        Self {
-            id: SubtaskId::new(),
-            description,
-            difficulty,
-            status: SubtaskStatus::Pending,
-            verification: Some(verification),
-            error: None,
-            result: None,
-        }
-    }
-
-    /// Marks the subtask as in progress
-    pub fn start(&mut self) {
-        self.status = SubtaskStatus::InProgress;
-    }
-
-    /// Marks the subtask as completed with optional result
-    pub fn complete(&mut self, result: Option<String>) {
-        self.status = SubtaskStatus::Completed;
-        self.result = result;
-        self.error = None;
-    }
-
-    /// Marks the subtask as failed with an error message
-    pub fn fail(&mut self, error: String) {
-        self.status = SubtaskStatus::Failed;
-        self.error = Some(error);
-    }
-
-    /// Marks the subtask as skipped
-    pub fn skip(&mut self) {
-        self.status = SubtaskStatus::Skipped;
-    }
-
-    /// Returns true if the subtask is completed
-    #[must_use]
-    pub const fn is_completed(&self) -> bool {
-        matches!(self.status, SubtaskStatus::Completed)
-    }
-
-    /// Returns true if the subtask failed
-    #[must_use]
-    pub const fn is_failed(&self) -> bool {
-        matches!(self.status, SubtaskStatus::Failed)
-    }
-}
-
 /// Verification step for a subtask (optional)
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct VerificationStep {
@@ -259,100 +267,153 @@ pub struct VerificationStep {
     pub expected_exit_code: i32,
 }
 
-impl VerificationStep {
-    /// Creates a new verification step expecting exit code 0
-    pub fn new(command: String) -> Self {
-        Self {
-            command,
-            expected_exit_code: 0,
-        }
-    }
-
-    /// Creates a new verification step with custom expected exit code
-    pub fn with_exit_code(command: String, expected_exit_code: i32) -> Self {
-        Self {
-            command,
-            expected_exit_code,
-        }
-    }
-}
-
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// Tests work unit progress calculation based on subtask completion.
+    /// Tests work unit creation and basic state.
     ///
     /// # Panics
     /// Panics if assertions fail during test execution.
     #[test]
-    fn test_work_unit_progress() {
+    fn test_work_unit_creation() {
+        let work = WorkUnit::new(TaskId::default(), "groq".to_owned());
+        assert_eq!(work.tier_used, "groq");
+        assert_eq!(work.status, WorkStatus::InProgress);
+        assert_eq!(work.retry_count, 0);
+        assert!(work.subtasks.is_empty());
+        assert!(!work.is_terminal());
+    }
+
+    /// Tests subtask addition and tracking.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
+    #[test]
+    fn test_subtask_management() {
         let mut work = WorkUnit::new(TaskId::default(), "local".to_owned());
 
-        // No subtasks = 0%
+        let id1 = work.add_subtask("Task 1".to_owned(), 5);
+        let id2 = work.add_subtask("Task 2".to_owned(), 7);
+
+        assert_eq!(work.subtasks.len(), 2);
+        assert_eq!(work.subtasks[0].description, "Task 1");
+        assert_eq!(work.subtasks[0].difficulty, 5);
+        assert_eq!(work.subtasks[1].description, "Task 2");
+
+        work.start_subtask(id1);
+        assert_eq!(work.subtasks[0].status, SubtaskStatus::InProgress);
+
+        work.complete_subtask(id1, Some("Done".to_owned()));
+        assert_eq!(work.subtasks[0].status, SubtaskStatus::Completed);
+        assert_eq!(work.subtasks[0].result, Some("Done".to_owned()));
+        assert!(work.subtasks[0].error.is_none());
+
+        work.fail_subtask(id2, "Error occurred".to_owned());
+        assert_eq!(work.subtasks[1].status, SubtaskStatus::Failed);
+        assert_eq!(work.subtasks[1].error, Some("Error occurred".to_owned()));
+    }
+
+    /// Tests next pending subtask retrieval.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
+    #[test]
+    fn test_next_pending_subtask() {
+        let mut work = WorkUnit::new(TaskId::default(), "local".to_owned());
+
+        let id1 = work.add_subtask("Task 1".to_owned(), 5);
+        let id2 = work.add_subtask("Task 2".to_owned(), 5);
+        let _id3 = work.add_subtask("Task 3".to_owned(), 5);
+
+        let next1 = work.next_pending_subtask();
+        assert!(next1.is_some());
+        assert_eq!(
+            next1.map_or_else(String::new, |subtask| subtask.description.clone()),
+            "Task 1"
+        );
+
+        work.complete_subtask(id1, None);
+        let next2 = work.next_pending_subtask();
+        assert!(next2.is_some());
+        assert_eq!(
+            next2.map_or_else(String::new, |subtask| subtask.description.clone()),
+            "Task 2"
+        );
+
+        work.start_subtask(id2);
+        let next3 = work.next_pending_subtask();
+        assert!(next3.is_some());
+        assert_eq!(
+            next3.map_or_else(String::new, |subtask| subtask.description.clone()),
+            "Task 3"
+        );
+    }
+
+    /// Tests progress percentage calculation.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
+    #[test]
+    fn test_progress_percentage() {
+        let mut work = WorkUnit::new(TaskId::default(), "local".to_owned());
+
+        // No subtasks - based on status
+        assert_eq!(work.progress_percentage(), 50); // InProgress = 50%
+
+        let id1 = work.add_subtask("Task 1".to_owned(), 5);
+        let id2 = work.add_subtask("Task 2".to_owned(), 5);
+        let id3 = work.add_subtask("Task 3".to_owned(), 5);
+        let id4 = work.add_subtask("Task 4".to_owned(), 5);
+
+        // 0/4 complete = 0%
         assert_eq!(work.progress_percentage(), 0);
 
-        // Add 4 subtasks
-        work.add_subtask(Subtask::new("Task 1".to_owned(), 5));
-        work.add_subtask(Subtask::new("Task 2".to_owned(), 5));
-        work.add_subtask(Subtask::new("Task 3".to_owned(), 5));
-        work.add_subtask(Subtask::new("Task 4".to_owned(), 5));
+        work.complete_subtask(id1, None);
+        work.complete_subtask(id2, None);
 
-        // Complete 2 out of 4 = 50%
-        work.subtasks[0].complete(None);
-        work.subtasks[1].complete(None);
+        // 2/4 complete = 50%
         assert_eq!(work.progress_percentage(), 50);
 
-        // Complete all = 100%
-        work.subtasks[2].complete(None);
-        work.subtasks[3].complete(None);
+        work.complete_subtask(id3, None);
+        work.complete_subtask(id4, None);
+
+        // 4/4 complete = 100%
         assert_eq!(work.progress_percentage(), 100);
     }
 
-    /// Tests subtask state transitions through lifecycle stages.
+    /// Tests work unit state transitions.
     ///
     /// # Panics
     /// Panics if assertions fail during test execution.
     #[test]
-    fn test_subtask_state_transitions() {
-        let mut subtask = Subtask::new("Test".to_owned(), 5);
+    fn test_work_state_transitions() {
+        let mut work = WorkUnit::new(TaskId::default(), "local".to_owned());
 
-        assert_eq!(subtask.status, SubtaskStatus::Pending);
-        assert!(!subtask.is_completed());
-        assert!(!subtask.is_failed());
+        assert_eq!(work.status, WorkStatus::InProgress);
+        assert!(!work.is_terminal());
 
-        subtask.start();
-        assert_eq!(subtask.status, SubtaskStatus::InProgress);
+        work.complete();
+        assert_eq!(work.status, WorkStatus::Completed);
+        assert!(work.is_terminal());
 
-        subtask.complete(Some("Done".to_owned()));
-        assert_eq!(subtask.status, SubtaskStatus::Completed);
-        assert!(subtask.is_completed());
-        assert_eq!(subtask.result, Some("Done".to_owned()));
-        assert!(subtask.error.is_none());
+        let mut work2 = WorkUnit::new(TaskId::default(), "groq".to_owned());
+        work2.fail();
+        assert_eq!(work2.status, WorkStatus::Failed);
+        assert!(work2.is_terminal());
+
+        let mut work3 = WorkUnit::new(TaskId::default(), "premium".to_owned());
+        work3.cancel();
+        assert_eq!(work3.status, WorkStatus::Cancelled);
+        assert!(work3.is_terminal());
     }
 
-    /// Tests subtask failure handling and error tracking.
+    /// Tests retry logic.
     ///
     /// # Panics
     /// Panics if assertions fail during test execution.
     #[test]
-    fn test_subtask_failure() {
-        let mut subtask = Subtask::new("Test".to_owned(), 5);
-
-        subtask.start();
-        subtask.fail("Error occurred".to_owned());
-
-        assert_eq!(subtask.status, SubtaskStatus::Failed);
-        assert!(subtask.is_failed());
-        assert_eq!(subtask.error, Some("Error occurred".to_owned()));
-    }
-
-    /// Tests work unit retry counter and status updates.
-    ///
-    /// # Panics
-    /// Panics if assertions fail during test execution.
-    #[test]
-    fn test_work_unit_retry() {
+    fn test_work_retry() {
         let mut work = WorkUnit::new(TaskId::default(), "local".to_owned());
 
         assert_eq!(work.retry_count, 0);
@@ -361,38 +422,71 @@ mod tests {
         work.retry();
         assert_eq!(work.retry_count, 1);
         assert_eq!(work.status, WorkStatus::Retrying);
+        assert!(!work.is_terminal());
 
         work.retry();
         assert_eq!(work.retry_count, 2);
+        assert_eq!(work.status, WorkStatus::Retrying);
     }
 
-    /// Tests verification step creation with default and custom exit codes.
+    /// Tests status emoji representations.
     ///
     /// # Panics
     /// Panics if assertions fail during test execution.
     #[test]
-    fn test_verification_step() {
-        let verification = VerificationStep::new("cargo test".to_owned());
-        assert_eq!(verification.command, "cargo test");
-        assert_eq!(verification.expected_exit_code, 0);
+    fn test_status_emojis() {
+        assert_eq!(WorkStatus::InProgress.emoji(), "⏳");
+        assert_eq!(WorkStatus::Completed.emoji(), "✅");
+        assert_eq!(WorkStatus::Failed.emoji(), "❌");
+        assert_eq!(WorkStatus::Cancelled.emoji(), "⏸️");
+        assert_eq!(WorkStatus::Retrying.emoji(), "🔄");
 
-        let custom_verification = VerificationStep::with_exit_code("npm run lint".to_owned(), 1);
-        assert_eq!(custom_verification.expected_exit_code, 1);
+        assert_eq!(SubtaskStatus::Pending.emoji(), "⏳");
+        assert_eq!(SubtaskStatus::InProgress.emoji(), "🔄");
+        assert_eq!(SubtaskStatus::Completed.emoji(), "✅");
+        assert_eq!(SubtaskStatus::Failed.emoji(), "❌");
+        assert_eq!(SubtaskStatus::Skipped.emoji(), "⏭️");
     }
 
-    /// Tests that completing a subtask clears any previous error.
+    /// Tests mid-execution progress tracking (33%, 66%, 100%).
     ///
     /// # Panics
     /// Panics if assertions fail during test execution.
     #[test]
-    fn test_subtask_complete_clears_error() {
-        let mut subtask = Subtask::new("Test".to_owned(), 5);
+    fn test_mid_execution_progress() {
+        let mut work = WorkUnit::new(TaskId::default(), "test".to_owned());
+        let id1 = work.add_subtask("Step 1".to_owned(), 5);
+        let id2 = work.add_subtask("Step 2".to_owned(), 5);
+        let id3 = work.add_subtask("Step 3".to_owned(), 5);
 
-        subtask.fail("Initial error".to_owned());
-        assert!(subtask.error.is_some());
+        assert_eq!(work.progress_percentage(), 0);
+        work.complete_subtask(id1, Some("Done 1".to_owned()));
+        assert_eq!(work.progress_percentage(), 33);
+        work.complete_subtask(id2, Some("Done 2".to_owned()));
+        assert_eq!(work.progress_percentage(), 66);
+        work.complete_subtask(id3, Some("Done 3".to_owned()));
+        assert_eq!(work.progress_percentage(), 100);
+    }
 
-        subtask.complete(Some("Fixed".to_owned()));
-        assert!(subtask.error.is_none());
-        assert_eq!(subtask.result, Some("Fixed".to_owned()));
+    /// Tests that `complete()` requires all subtasks to be completed.
+    ///
+    /// # Panics
+    /// Panics if assertions fail during test execution.
+    #[test]
+    fn test_complete_requires_all_subtasks() {
+        let mut work = WorkUnit::new(TaskId::default(), "test".to_owned());
+        let id1 = work.add_subtask("Step 1".to_owned(), 5);
+        let id2 = work.add_subtask("Step 2".to_owned(), 5);
+        let id3 = work.add_subtask("Step 3".to_owned(), 5);
+
+        work.complete();
+        assert_eq!(work.status, WorkStatus::InProgress);
+        work.complete_subtask(id1, None);
+        work.complete_subtask(id2, None);
+        work.complete();
+        assert_eq!(work.status, WorkStatus::InProgress);
+        work.complete_subtask(id3, None);
+        work.complete();
+        assert_eq!(work.status, WorkStatus::Completed);
     }
 }

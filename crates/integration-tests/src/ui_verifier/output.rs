@@ -1,7 +1,7 @@
 //! Output pattern verification logic.
 
-use crate::fixture::UiVerify;
 use crate::verification_result::VerificationResult;
+use crate::verify::UiVerify;
 use merlin_cli::ui::task_manager::TaskManager;
 
 /// Verify output patterns (contains and not contains)

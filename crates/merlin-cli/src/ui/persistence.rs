@@ -178,6 +178,7 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
         steps: Vec::default(),
         current_step: None,
         retry_count: 0,
+        work_unit: None, // No live WorkUnit for persisted tasks
     };
 
     (serializable.id, task_display)

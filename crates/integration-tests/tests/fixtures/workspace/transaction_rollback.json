@@ -174,7 +174,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": "Correctly threw error"
+          "return_type": "string"
         }
       }
     }

@@ -1,7 +1,7 @@
 //! Prompt verification for testing prompt correctness.
 
-use super::fixture::PromptVerify;
 use super::verification_result::VerificationResult;
+use super::verify::PromptVerify;
 use merlin_core::prompts::load_prompt;
 
 /// Prompt verifier

@@ -1,0 +1,100 @@
+{
+  "name": "Live Update Verification",
+  "description": "Tests that UI updates appear immediately after events (task status changes, output streaming)",
+  "tags": [
+    "tui",
+    "live_update",
+    "timing",
+    "rendered_buffer"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Task with streaming output",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "rendered_buffer_regions": [
+            {
+              "region": "input",
+              "not_contains": [
+                "Task with streaming output"
+              ]
+            }
+          ]
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "streaming output",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'All steps completed';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 1,
+          "task_status": "completed",
+          "output_contains": [
+            "All steps completed"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Second task for status transition",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "status transition",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Status changed immediately';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 2,
+          "output_contains": [
+            "Status changed immediately"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {},
+    "ui": {
+      "all_tasks_completed": true,
+      "tasks_displayed": 2,
+      "completed_tasks_count": 2
+    }
+  }
+}

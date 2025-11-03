@@ -1,7 +1,7 @@
 //! UI and state verification logic.
 
-use super::fixture::{StateVerify, UiVerify};
 use super::verification_result::VerificationResult;
+use super::verify::{StateVerify, UiVerify};
 use merlin_cli::TuiApp;
 use merlin_cli::ui::input::InputManager;
 use merlin_cli::ui::renderer::FocusedPane;
@@ -16,6 +16,7 @@ mod task_counts;
 mod task_details;
 mod task_selection;
 mod threads;
+mod work_unit;
 
 use input::verify_input_related_fields;
 use output::verify_output_patterns;
@@ -24,13 +25,14 @@ use task_counts::verify_task_counts;
 use task_details::verify_task_details;
 use task_selection::verify_selected_task;
 use threads::verify_thread_state;
+use work_unit::verify_work_unit;
 
 /// UI verifier helper
 pub struct UiVerifier;
 
 impl UiVerifier {
     /// Verify UI
-    pub fn verify_ui(
+    pub async fn verify_ui(
         result: &mut VerificationResult,
         tui_app: Option<&TuiApp<TestBackend>>,
         verify: &UiVerify,
@@ -53,6 +55,12 @@ impl UiVerifier {
         Self::verify_ui_states(result, task_manager, input_manager, verify);
         verify_thread_state(result, app, state, verify);
         verify_rendered_buffer(result, app, verify);
+
+        // Verify WorkUnit if specified
+        if let Some(ref work_unit_verify) = verify.work_unit {
+            let work_unit_result = verify_work_unit(app, work_unit_verify).await;
+            result.merge(work_unit_result);
+        }
     }
 
     /// Verify focused pane
@@ -99,11 +107,11 @@ impl UiVerifier {
     }
 
     /// Verify state
-    pub fn verify_state(
+    pub async fn verify_state(
         result: &mut VerificationResult,
         tui_app: Option<&TuiApp<TestBackend>>,
         verify: &StateVerify,
     ) {
-        state::verify_state(result, tui_app, verify);
+        state::verify_state(result, tui_app, verify).await;
     }
 }

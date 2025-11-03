@@ -111,7 +111,7 @@ impl FixtureEventState {
                     state: KeyEventState::empty(),
                 }));
             }
-            TestEvent::LlmResponse(_) | TestEvent::Wait(_) => {
+            TestEvent::LlmResponse(_) | TestEvent::Wait(_) | TestEvent::Verify(_) => {
                 // These events don't produce terminal input events
                 // Don't add any events - the runner will call advance() when it's processed
             }

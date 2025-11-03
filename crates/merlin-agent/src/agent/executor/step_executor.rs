@@ -4,10 +4,11 @@ use std::{future::Future, pin::Pin, result, sync::Arc, time::Instant};
 
 use merlin_core::{
     AgentResponse, Context, ContextSpec, JsValueHandle, ModelProvider, Query, Result, RoutingError,
-    TaskId, TaskList, TaskStep, ValidationErrorType,
+    TaskId, TaskList, TaskStep, ValidationErrorType, WorkUnit,
 };
 use merlin_routing::UiChannel;
 use merlin_tooling::{PersistentTypeScriptRuntime, ToolRegistry, ToolingJsValueHandle};
+use tokio::sync::Mutex;
 
 use super::typescript::{execute_typescript_code, extract_typescript_code};
 
@@ -71,6 +72,8 @@ pub struct TaskListExecutionParams<'params> {
     pub ui_channel: &'params UiChannel,
     /// Current recursion depth
     pub recursion_depth: usize,
+    /// Work unit for tracking subtask progress (optional, only for top-level decomposition)
+    pub work_unit: Option<&'params Arc<Mutex<WorkUnit>>>,
 }
 
 /// Parameters for agent execution
@@ -191,6 +194,7 @@ impl StepExecutor {
                         task_id: params.task_id,
                         ui_channel: params.ui_channel,
                         recursion_depth: params.recursion_depth + 1,
+                        work_unit: None, // No tracking for nested decompositions
                     })
                     .await?;
 

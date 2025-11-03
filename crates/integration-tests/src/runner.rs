@@ -113,7 +113,7 @@ impl UnifiedTestRunner {
         for event in &fixture.events {
             if let TestEvent::LlmResponse(llm_event) = event {
                 let typescript = llm_event.response.typescript.join("\n");
-                provider.add_response(&llm_event.trigger, typescript)?;
+                provider.add_response(&llm_event.trigger, typescript).await?;
             }
         }
 
@@ -132,7 +132,7 @@ impl UnifiedTestRunner {
         );
 
         // Create orchestrator with mock router and provider registry
-        let router = Arc::new(MockRouter);
+        let router = Arc::new(MockRouter::new());
 
         // Create thread store for conversation management if fixture uses threads
         let needs_threads = fixture.tags.contains(&"threads".to_owned());
@@ -318,6 +318,7 @@ impl UnifiedTestRunner {
                             execution_tracker: &execution_tracker,
                             provider: Some(&self.provider),
                         })
+                        .await
                         .map_err(RoutingError::ExecutionFailed)?;
 
                     // Advance to next fixture event
@@ -346,6 +347,7 @@ impl UnifiedTestRunner {
                             execution_tracker: &execution_tracker,
                             provider: Some(&self.provider),
                         })
+                        .await
                         .map_err(RoutingError::ExecutionFailed)?;
 
                     // Advance to next fixture event
@@ -357,30 +359,99 @@ impl UnifiedTestRunner {
                     self.event_controller.advance();
                 }
                 TestEvent::LlmResponse(llm_event) => {
+                    // Complete any pending task BEFORE verification so execution results are available
                     Self::complete_pending_task(&mut pending_task, &mut execution_tracker);
-                    self.tui_app.render()?;
+
+                    // Verify BEFORE event execution (initial state)
                     verifier
                         .verify_event(&VerifyEventContext {
                             event,
-                            verify: &llm_event.verify,
+                            verify: &llm_event.verify_before,
                             tui_app: Some(&self.tui_app),
                             execution_tracker: &execution_tracker,
                             provider: Some(&self.provider),
                         })
+                        .await
                         .map_err(RoutingError::ExecutionFailed)?;
+
+                    // Give agent time to process LLM response and update state
+                    // Poll for UI events with timeout to ensure WorkUnit updates are captured
+                    let poll_start = Instant::now();
+                    while poll_start.elapsed() < TokioDuration::from_millis(200) {
+                        tui_test_helpers::process_ui_events(&mut self.tui_app);
+                        if !self.tui_app.event_receiver.is_empty() {
+                            sleep(TokioDuration::from_millis(10)).await;
+                        } else {
+                            sleep(TokioDuration::from_millis(5)).await;
+                        }
+                    }
+
+                    // Final pass to ensure all events are processed
+                    tui_test_helpers::process_ui_events(&mut self.tui_app);
+
+                    // Render to capture updated UI state
+                    self.tui_app.render()?;
+
+                    // Verify AFTER event execution (use verify_after if specified, else fall back to verify)
+                    let verify_config = if !llm_event.verify_after.is_empty() {
+                        &llm_event.verify_after
+                    } else {
+                        &llm_event.verify
+                    };
+
+                    verifier
+                        .verify_event(&VerifyEventContext {
+                            event,
+                            verify: verify_config,
+                            tui_app: Some(&self.tui_app),
+                            execution_tracker: &execution_tracker,
+                            provider: Some(&self.provider),
+                        })
+                        .await
+                        .map_err(RoutingError::ExecutionFailed)?;
+
+                    // Advance to next fixture event
                     self.event_controller.advance();
                 }
                 TestEvent::Wait(wait_event) => {
                     sleep(TokioDuration::from_millis(wait_event.data.duration_ms)).await;
                     self.event_controller.advance();
                 }
+                TestEvent::Verify(verify_event) => {
+                    // Mid-execution verification
+                    // Process any pending UI events before verification
+                    tui_test_helpers::process_ui_events(&mut self.tui_app);
+
+                    // Render to capture current UI state
+                    self.tui_app.render()?;
+
+                    // Run verification
+                    verifier
+                        .verify_event(&VerifyEventContext {
+                            event,
+                            verify: &verify_event.verify,
+                            tui_app: Some(&self.tui_app),
+                            execution_tracker: &execution_tracker,
+                            provider: Some(&self.provider),
+                        })
+                        .await
+                        .map_err(RoutingError::ExecutionFailed)?;
+
+                    self.event_controller.advance();
+                }
             }
         }
 
         Self::complete_pending_task(&mut pending_task, &mut execution_tracker);
+
+        // Give time for final UI state updates and process any pending events
+        sleep(TokioDuration::from_millis(50)).await;
+        tui_test_helpers::process_ui_events(&mut self.tui_app);
         self.tui_app.render()?;
+
         verifier
             .verify_final(&final_verify, Some(&self.tui_app), &execution_tracker)
+            .await
             .map_err(RoutingError::ExecutionFailed)?;
 
         // Clean up test artifacts

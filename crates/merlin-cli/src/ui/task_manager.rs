@@ -1,8 +1,12 @@
-use merlin_core::ThreadId;
+use merlin_core::{ThreadId, WorkUnit};
 use merlin_routing::TaskId;
 use merlin_routing::TaskProgress;
-use std::collections::HashMap;
-use std::time::{Instant, SystemTime};
+use std::{
+    collections::HashMap,
+    sync::Arc,
+    time::{Instant, SystemTime},
+};
+use tokio::sync::Mutex;
 
 /// Status of a task
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -40,6 +44,8 @@ pub struct TaskDisplay {
     pub current_step: Option<TaskStepInfo>,
     /// Retry count (0 = first attempt, increments on each retry)
     pub retry_count: u32,
+    /// Live `WorkUnit` reference during execution (for mid-execution verification)
+    pub work_unit: Option<Arc<Mutex<WorkUnit>>>,
 }
 
 /// Status of a task step
@@ -157,6 +163,7 @@ mod tests {
             steps: vec![],
             current_step: None,
             retry_count: 0,
+            work_unit: None,
         }
     }
 

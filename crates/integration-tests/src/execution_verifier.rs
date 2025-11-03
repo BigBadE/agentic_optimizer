@@ -1,8 +1,8 @@
 //! Execution verification logic.
 
-use super::fixture::ExecutionVerify;
 use super::mock_provider::MockProvider;
 use super::verification_result::VerificationResult;
+use super::verify::ExecutionVerify;
 use merlin_deps::regex::Regex;
 use merlin_deps::serde_json::{Map, Value};
 use merlin_tooling::{ToolError, ToolResult};

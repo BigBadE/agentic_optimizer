@@ -1,0 +1,147 @@
+{
+  "name": "Comprehensive Keybind Test",
+  "description": "Tests all major keyboard shortcuts work correctly: focus changes, navigation, expansion, deletion",
+  "tags": [
+    "tui",
+    "keybinds",
+    "keyboard",
+    "navigation"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      100,
+      30
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Task 1",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "trigger": {
+        "pattern": "Task 1",
+        "match_type": "contains"
+      },
+      "response": {
+        "typescript": [
+          "async function agent_code(): Promise<string> {",
+          "  return 'Task 1 done';",
+          "}"
+        ]
+      },
+      "verify": {
+        "execution": {},
+        "ui": {
+          "tasks_displayed": 1,
+          "focused_pane": "input"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "t",
+        "modifiers": ["ctrl"]
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "tasks"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Down"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Up"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "output"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "input"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Tab"
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "tasks"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "t",
+        "modifiers": ["ctrl"]
+      },
+      "verify": {
+        "ui": {
+          "focused_pane": "tasks"
+        }
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Enter"
+      },
+      "verify": {
+        "ui": {}
+      }
+    },
+    {
+      "type": "key_press",
+      "data": {
+        "key": "Enter"
+      },
+      "verify": {
+        "ui": {}
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {},
+    "ui": {
+      "all_tasks_completed": true,
+      "tasks_displayed": 1
+    }
+  }
+}

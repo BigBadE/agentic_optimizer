@@ -3,11 +3,12 @@
 use super::execution_tracker::{ExecutionRecord, ExecutionResultTracker};
 use super::execution_verifier::ExecutionVerifier;
 use super::file_verifier::FileVerifier;
-use super::fixture::{ExecutionVerify, FinalVerify, TestEvent, VerifyConfig};
+use super::fixture::TestEvent;
 use super::mock_provider::MockProvider;
 use super::prompt_verifier::PromptVerifier;
 use super::ui_verifier::UiVerifier;
 use super::verification_result::VerificationResult;
+use super::verify::{ExecutionVerify, FinalVerify, VerifyConfig};
 use merlin_cli::TuiApp;
 use merlin_cli::ui::task_manager::TaskStatus;
 use merlin_deps::ratatui::backend::TestBackend;
@@ -52,7 +53,7 @@ impl<'fixture> UnifiedVerifier<'fixture> {
     ///
     /// # Errors
     /// Returns error if verification fails critically
-    pub fn verify_event(&mut self, ctx: &VerifyEventContext<'_>) -> Result<(), String> {
+    pub async fn verify_event(&mut self, ctx: &VerifyEventContext<'_>) -> Result<(), String> {
         let VerifyEventContext {
             event,
             verify,
@@ -99,32 +100,30 @@ impl<'fixture> UnifiedVerifier<'fixture> {
 
         // Verify UI if specified
         if let Some(ui_verify) = &verify.ui {
-            UiVerifier::verify_ui(&mut self.result, *tui_app, ui_verify);
+            UiVerifier::verify_ui(&mut self.result, *tui_app, ui_verify).await;
         }
 
         // Verify state if specified
         if let Some(state_verify) = &verify.state {
-            UiVerifier::verify_state(&mut self.result, *tui_app, state_verify);
+            UiVerifier::verify_state(&mut self.result, *tui_app, state_verify).await;
         }
 
         // Verify prompt if specified
         if let Some(prompt_verify) = &verify.prompt {
             if let Some(provider_ref) = provider {
                 // Get the prompt for this specific event ID or fall back to last matched
-                let matched_prompt = event.id().map_or_else(
-                    || {
-                        provider_ref
-                            .get_last_matched_prompt()
-                            .ok()
-                            .and_then(identity)
-                    },
-                    |event_id| {
-                        provider_ref
-                            .get_prompt_for_event(event_id)
-                            .ok()
-                            .and_then(identity)
-                    },
-                );
+                let matched_prompt = if let Some(event_id) = event.id() {
+                    provider_ref
+                        .get_prompt_for_event(event_id)
+                        .ok()
+                        .and_then(identity)
+                } else {
+                    provider_ref
+                        .get_last_matched_prompt()
+                        .await
+                        .ok()
+                        .and_then(identity)
+                };
                 PromptVerifier::verify_prompt(
                     &mut self.result,
                     matched_prompt.as_deref(),
@@ -144,7 +143,7 @@ impl<'fixture> UnifiedVerifier<'fixture> {
     ///
     /// # Errors
     /// Returns error if verification fails
-    pub fn verify_final(
+    pub async fn verify_final(
         &mut self,
         verify: &FinalVerify,
         tui_app: Option<&TuiApp<TestBackend>>,
@@ -185,12 +184,12 @@ impl<'fixture> UnifiedVerifier<'fixture> {
 
         // Verify final UI state if specified
         if let Some(ui_verify) = &verify.ui {
-            UiVerifier::verify_ui(&mut self.result, tui_app, ui_verify);
+            UiVerifier::verify_ui(&mut self.result, tui_app, ui_verify).await;
         }
 
         // Verify final state if specified
         if let Some(state_verify) = &verify.state {
-            UiVerifier::verify_state(&mut self.result, tui_app, state_verify);
+            UiVerifier::verify_state(&mut self.result, tui_app, state_verify).await;
         }
 
         Ok(())

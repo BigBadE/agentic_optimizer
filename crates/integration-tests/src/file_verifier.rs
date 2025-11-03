@@ -1,7 +1,7 @@
 //! File verification logic.
 
-use super::fixture::FileVerify;
 use super::verification_result::VerificationResult;
+use super::verify::FileVerify;
 use std::fs;
 use std::path::Path;
 

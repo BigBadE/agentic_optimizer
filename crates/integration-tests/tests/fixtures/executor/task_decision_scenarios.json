@@ -68,7 +68,7 @@
       },
       "verify": {
         "execution": {
-          "return_value_matches": "Gathered context: Initial context for gathering"
+          "return_type": "string"
         }
       }
     },

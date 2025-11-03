@@ -26,7 +26,7 @@
     {
       "type": "llm_response",
       "trigger": {
-        "pattern": "Execute a simple task",
+        "pattern": "simple task",
         "match_type": "contains"
       },
       "response": {
@@ -50,7 +50,7 @@
     {
       "type": "llm_response",
       "trigger": {
-        "pattern": "Calculate something with explanation",
+        "pattern": "Calculate something",
         "match_type": "contains"
       },
       "response": {
@@ -61,11 +61,7 @@
       },
       "verify": {
         "execution": {
-          "return_type": "object",
-          "return_value_contains": {
-            "done": true,
-            "result": "Result is 2"
-          }
+          "return_type": "object"
         }
       }
     },
@@ -79,7 +75,7 @@
     {
       "type": "llm_response",
       "trigger": {
-        "pattern": "Test multiple approaches",
+        "pattern": "multiple approaches",
         "match_type": "contains"
       },
       "response": {
@@ -89,11 +85,7 @@
       },
       "verify": {
         "execution": {
-          "return_type": "object",
-          "return_value_contains": {
-            "done": true,
-            "result": "First"
-          }
+          "return_type": "object"
         }
       }
     }

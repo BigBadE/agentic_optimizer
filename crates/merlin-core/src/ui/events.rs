@@ -1,8 +1,10 @@
-use crate::conversation::ThreadId;
+use crate::conversation::{ThreadId, WorkUnit};
 use crate::task::{TaskId, TaskResult};
 use merlin_deps::serde_json::Value;
 use merlin_tooling::ToolError;
 use serde::{Deserialize, Serialize};
+use std::sync::Arc;
+use tokio::sync::Mutex;
 
 /// UI event that tasks send to update display.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -24,6 +26,26 @@ pub enum UiEvent {
         task_id: TaskId,
         /// Progress information
         progress: TaskProgress,
+    },
+    /// `WorkUnit` started (task decomposition in progress)
+    /// Note: This variant cannot be serialized due to `Arc<Mutex<>>`
+    #[serde(skip)]
+    WorkUnitStarted {
+        /// ID of the task
+        task_id: TaskId,
+        /// Live reference to the `WorkUnit` being tracked
+        work_unit: Arc<Mutex<WorkUnit>>,
+    },
+    /// `WorkUnit` progress update (subtask completed)
+    WorkUnitProgress {
+        /// ID of the task
+        task_id: TaskId,
+        /// Current progress percentage (0-100)
+        progress_percentage: u8,
+        /// Number of completed subtasks
+        completed_subtasks: usize,
+        /// Total number of subtasks
+        total_subtasks: usize,
     },
     /// Task produced output
     TaskOutput {

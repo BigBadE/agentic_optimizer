@@ -5,9 +5,10 @@ use std::future::Future;
 use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
+use tokio::sync::Mutex;
 use tokio::task::JoinSet;
 
-use merlin_core::{Result, RoutingError, TaskStep};
+use merlin_core::{Result, RoutingError, TaskStep, WorkUnit};
 
 use super::step_executor::{
     StepExecutionParams, StepExecutor, StepResult, TaskListExecutionParams,
@@ -127,6 +128,105 @@ fn spawn_step_task(
     });
 }
 
+/// Mark subtask as started in `WorkUnit`
+async fn mark_subtask_started(work_unit: &Arc<Mutex<WorkUnit>>, index: usize) {
+    let mut work_unit_guard = work_unit.lock().await;
+    if let Some(subtask) = work_unit_guard.subtasks.get(index) {
+        let subtask_id = subtask.id;
+        work_unit_guard.start_subtask(subtask_id);
+    }
+}
+
+/// Update `WorkUnit` when a step completes
+async fn update_work_unit_on_completion(
+    work_unit: &Arc<Mutex<WorkUnit>>,
+    params: &TaskListExecutionParams<'_>,
+    step_title: &str,
+    step_result: &StepResult,
+    completed: &HashSet<String>,
+) {
+    let mut work_unit_guard = work_unit.lock().await;
+
+    merlin_deps::tracing::debug!(
+        "Updating WorkUnit for completed step: '{}' (result length: {})",
+        step_title,
+        step_result.text.len()
+    );
+
+    // Find the subtask index by matching title
+    if let Some(step_index) = params
+        .task_list
+        .steps
+        .iter()
+        .position(|step| step.title == step_title)
+    {
+        merlin_deps::tracing::debug!(
+            "Found step at index {}, subtask count: {}",
+            step_index,
+            work_unit_guard.subtasks.len()
+        );
+
+        if let Some(subtask) = work_unit_guard.subtasks.get(step_index) {
+            let subtask_id = subtask.id;
+            merlin_deps::tracing::debug!(
+                "Marking subtask {} (id: {:?}, current status: {:?}) as completed",
+                step_index,
+                subtask_id,
+                subtask.status
+            );
+            work_unit_guard.complete_subtask(subtask_id, Some(step_result.text.clone()));
+
+            // Verify it was actually completed
+            if let Some(updated_subtask) = work_unit_guard.subtasks.get(step_index) {
+                merlin_deps::tracing::debug!(
+                    "After update, subtask {} status: {:?}",
+                    step_index,
+                    updated_subtask.status
+                );
+            }
+        } else {
+            merlin_deps::tracing::warn!(
+                "No subtask found at index {} (step_title: '{}')",
+                step_index,
+                step_title
+            );
+        }
+
+        // Send progress update to UI
+        let completed_count = completed.len() + 1;
+        let progress_pct = work_unit_guard.progress_percentage();
+        let total_subtasks = work_unit_guard.subtasks.len();
+        let completed_subtasks = work_unit_guard
+            .subtasks
+            .iter()
+            .filter(|s| matches!(s.status, merlin_core::SubtaskStatus::Completed))
+            .count();
+
+        merlin_deps::tracing::debug!(
+            "WorkUnit progress: {progress_pct}% ({completed_subtasks}/{total_subtasks} subtasks completed)"
+        );
+
+        // Send both progress events for compatibility
+        params.ui_channel.progress(
+            params.task_id,
+            format!("step-{completed_count}"),
+            format!("Completed: {step_title} ({progress_pct}%)"),
+        );
+
+        params.ui_channel.work_unit_progress(
+            params.task_id,
+            progress_pct,
+            completed_subtasks,
+            total_subtasks,
+        );
+    } else {
+        merlin_deps::tracing::warn!(
+            "Step '{}' not found in task_list.steps",
+            step_title
+        );
+    }
+}
+
 /// Execute a task list with dependency-aware parallel execution
 ///
 /// # Errors
@@ -135,6 +235,26 @@ pub(super) fn execute_task_list_parallel<'lifetime>(
     params: &'lifetime TaskListExecutionParams<'lifetime>,
 ) -> ParallelExecutionFuture<'lifetime> {
     Box::pin(execute_task_list_parallel_impl(params))
+}
+
+/// Determine concurrency level for execution
+fn determine_concurrency(params: &TaskListExecutionParams<'_>) -> (bool, usize) {
+    let has_dependencies = params
+        .task_list
+        .steps
+        .iter()
+        .any(|step| !step.dependencies.is_empty());
+
+    let max_concurrent = if has_dependencies { 4 } else { 1 };
+
+    if has_dependencies {
+        merlin_deps::tracing::info!(
+            "Using parallel execution for task list '{}' (dependencies detected)",
+            params.task_list.title
+        );
+    }
+
+    (has_dependencies, max_concurrent)
 }
 
 /// Implementation of parallel task list execution
@@ -155,29 +275,14 @@ async fn execute_task_list_parallel_impl<'lifetime>(
     let mut join_set: StepJoinSet = JoinSet::new();
 
     merlin_deps::tracing::debug!(
-        "Executing task list '{}' with {} steps at depth {}",
+        "Executing task list '{}' with {} steps at depth {}, work_unit tracking: {}",
         params.task_list.title,
         params.task_list.steps.len(),
-        params.recursion_depth
+        params.recursion_depth,
+        params.work_unit.is_some()
     );
 
-    // Check if we can use parallel execution (any steps have dependencies)
-    let has_dependencies = params
-        .task_list
-        .steps
-        .iter()
-        .any(|step| !step.dependencies.is_empty());
-
-    // Use concurrency only when dependencies are explicitly specified
-    // Otherwise maintain sequential execution for backward compatibility
-    let max_concurrent = if has_dependencies { 4 } else { 1 };
-
-    if has_dependencies {
-        merlin_deps::tracing::info!(
-            "Using parallel execution for task list '{}' (dependencies detected)",
-            params.task_list.title
-        );
-    }
+    let (has_dependencies, max_concurrent) = determine_concurrency(params);
 
     loop {
         // Find steps ready to execute (dependencies met, not running/completed)
@@ -205,6 +310,11 @@ async fn execute_task_list_parallel_impl<'lifetime>(
                 break;
             }
 
+            // Mark subtask as started in WorkUnit if tracking
+            if let Some(work_unit) = params.work_unit {
+                mark_subtask_started(work_unit, index).await;
+            }
+
             running.insert(step.title.clone());
             spawn_step_task(&mut join_set, step, &spawn_context, index);
         }
@@ -228,6 +338,19 @@ async fn execute_task_list_parallel_impl<'lifetime>(
 
             running.remove(&step_title);
             completed.insert(step_title.clone());
+
+            // Mark subtask as completed in WorkUnit if tracking
+            if let Some(work_unit) = params.work_unit {
+                update_work_unit_on_completion(
+                    work_unit,
+                    params,
+                    &step_title,
+                    &step_result,
+                    &completed,
+                )
+                .await;
+            }
+
             results_by_title.insert(step_title, step_result);
         }
     }

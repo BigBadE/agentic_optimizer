@@ -1,12 +1,13 @@
 //! State verification logic.
 
-use crate::fixture::StateVerify;
+use super::work_unit::verify_work_unit;
 use crate::verification_result::VerificationResult;
+use crate::verify::StateVerify;
 use merlin_cli::TuiApp;
 use merlin_deps::ratatui::backend::TestBackend;
 
 /// Verify state
-pub fn verify_state(
+pub async fn verify_state(
     result: &mut VerificationResult,
     tui_app: Option<&TuiApp<TestBackend>>,
     verify: &StateVerify,
@@ -50,5 +51,11 @@ pub fn verify_state(
                 "Expected thread '{expected_thread}' but none active"
             ));
         }
+    }
+
+    // Verify work unit (mid-execution or completed)
+    if let Some(ref work_unit_verify) = verify.work_unit {
+        let wu_result = verify_work_unit(app, work_unit_verify).await;
+        result.merge(wu_result);
     }
 }

@@ -35,10 +35,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "hi",
-          "match_type": "exact"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -75,10 +71,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Analyze the JSON",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -123,10 +115,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Parse config",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -180,10 +168,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "moderate confidence",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

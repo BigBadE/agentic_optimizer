@@ -37,10 +37,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "syntax error",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -72,10 +68,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "mismatched parentheses",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

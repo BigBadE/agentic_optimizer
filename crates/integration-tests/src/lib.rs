@@ -15,7 +15,6 @@ mod file_verifier;
 mod fixture;
 mod fixture_loader;
 mod mock_provider;
-mod prompt_verifier;
 mod runner;
 mod timing;
 mod tui_test_helpers;
@@ -26,7 +25,7 @@ mod verify;
 mod workspace_setup;
 
 pub use fixture::{
-    EventType, LlmResponseEvent, SetupConfig, TestEvent, TestFixture, TriggerConfig, UserInputEvent,
+    EventType, LlmResponseEvent, SetupConfig, TestEvent, TestFixture, UserInputEvent,
 };
 pub use mock_provider::MockProvider;
 pub use runner::UnifiedTestRunner;

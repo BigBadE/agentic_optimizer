@@ -36,10 +36,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Process nested data structures",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "function agent_code() {",
@@ -80,10 +76,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Execute complex workflow",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "function agent_code() {",
@@ -138,10 +130,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Manipulate JSON configuration",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "function agent_code() {",
@@ -194,10 +182,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Use Math functions and constants",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "function agent_code() {",

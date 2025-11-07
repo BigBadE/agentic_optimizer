@@ -157,16 +157,16 @@ Located in `crates/<crate-name>/README.md`:
 
 Fixtures auto-discovered by `crates/integration-tests/tests/unified_tests.rs` and run with `UnifiedTestRunner`.
 
-**Tests should not be modified to match incorrect behavior**. This is not a production system, it will have issues, 
+**Tests should not be modified to match incorrect behavior**. This is not a production system, it will have issues,
 rely on tests to find them and fix them.
 
-**Tests should NEVER duplicate behavior**. For example, the fixture runner shouldn't re-implement input handling, 
+**Tests should NEVER duplicate behavior**. For example, the fixture runner shouldn't re-implement input handling,
 it should run the CLI and pass inputs to it.
 
-**Tests should NEVER be relaxed**. Verification is the most important thing. Deleting/simplifying tests just to make them pass is never a good idea. 
+**Tests should NEVER be relaxed**. Verification is the most important thing. Deleting/simplifying tests just to make them pass is never a good idea.
 You can change them if necessary, but never make them less strict and lose out on finding potential issues.
 
-**ALWAYS follow the fail by default stragety**. Tests should never pass with unexpected conditions. For example, if you're testing 
+**ALWAYS follow the fail by default strategy**. Tests should never pass with unexpected conditions. For example, if you're testing
 the thread system, you should not test if thread_count > 0. Instead, check that thread_count == expected_thread_count.
 Failure in tests is ALWAYS better than a false pass, tests are designed to catch issues.
 
@@ -174,6 +174,15 @@ Failure in tests is ALWAYS better than a false pass, tests are designed to catch
 that likely means it can't be reached at all. Analyze any issues like that, determine if fixtures need to be expanded,
 or if the code its targetting isn't used, and go ahead with the proper fix. Do NOT just say something is "Out of scope"
 or "Unreachable" or "Should be unit tested instead".
+
+**Routing-Based Fixture Matching**: Fixtures use routing-based matching (not string pattern matching) to test agent behavior:
+- Matches on `context_type` (task_decomposition, step_execution, validation, etc.)
+- Matches on `prompt_type` (design, debug, validation, planning)
+- Matches on `retry_attempt` (0 for first attempt, 1+ for retries)
+- Matches on `previous_result` (soft_error, hard_error)
+- Tests routing decisions, not query string formats
+- Decouples tests from implementation details
+- If no `routing_match` specified, strategy matches any query (for simple fixtures)
 
 Fixture coverage can be tested by adding the --fixture flag and --cov flag to the verify script
 

@@ -2,7 +2,7 @@
 
 use crate::event_source::{FixtureEventController, FixtureEventSource};
 use crate::fixture::{TestEvent, TestFixture};
-use crate::mock_provider::{MockProvider, MockRouter};
+use crate::mock_provider::{MockProvider, ResponseStrategy};
 use crate::tui_test_helpers;
 use crate::workspace_setup::{create_files, get_test_workspace_path};
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
@@ -10,7 +10,8 @@ use merlin_cli::TuiApp;
 use merlin_core::{ModelProvider, Result, RoutingError};
 use merlin_deps::ratatui::backend::TestBackend;
 use merlin_deps::tempfile::TempDir;
-use merlin_routing::{Model, ProviderRegistry, RoutingConfig};
+use merlin_routing::{Model, ModelRegistry, ProviderRegistry, RoutingConfig, StrategyRouter};
+use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 
@@ -28,6 +29,34 @@ pub struct RunnerComponents {
     pub event_controller: FixtureEventController,
 }
 
+/// Build strategy map from fixture events
+fn build_strategy_map(fixture: &TestFixture) -> HashMap<String, Vec<ResponseStrategy>> {
+    let mut strategy_map = HashMap::new();
+    for (event_idx, event) in fixture.events.iter().enumerate() {
+        if let TestEvent::LlmResponse(llm_event) = event {
+            let event_id = llm_event
+                .id
+                .clone()
+                .unwrap_or_else(|| format!("event_{event_idx}"));
+
+            let mut strategies = vec![llm_event.strategy.to_response_strategy()];
+
+            // Add retry strategies
+            for retry in &llm_event.retry_responses {
+                let typescript = retry.response.typescript.join("\n");
+                let routing_matcher = retry.routing_match.to_routing_matcher();
+                strategies.push(ResponseStrategy::Once {
+                    routing_match: Some(routing_matcher),
+                    typescript,
+                });
+            }
+
+            strategy_map.insert(event_id, strategies);
+        }
+    }
+    strategy_map
+}
+
 /// Create test runner components
 ///
 /// Context fixtures use read-only workspaces with pre-generated embeddings.
@@ -36,7 +65,11 @@ pub struct RunnerComponents {
 /// # Errors
 /// Returns error if setup fails
 pub fn create_runner_components(fixture: &TestFixture) -> Result<RunnerComponents> {
-    let provider = Arc::new(MockProvider::new("test-mock"));
+    // Build strategy map from fixture events
+    let strategy_map = build_strategy_map(fixture);
+
+    // Create provider with pre-built strategy map
+    let provider = Arc::new(MockProvider::new("test-mock", strategy_map));
 
     // Determine final workspace path
     // Fixtures with explicit workspace use read-only pre-made workspaces (e.g. context tests)
@@ -58,15 +91,6 @@ pub fn create_runner_components(fixture: &TestFixture) -> Result<RunnerComponent
         (workspace_path, Some(workspace))
     };
 
-    // Register all LLM response strategies upfront
-    for (event_idx, event) in fixture.events.iter().enumerate() {
-        if let TestEvent::LlmResponse(llm_event) = event {
-            let event_id = llm_event.id.clone().unwrap_or_else(|| format!("event_{event_idx}"));
-            let strategy = llm_event.strategy.to_response_strategy()?;
-            provider.register_event(event_id, vec![strategy])?;
-        }
-    }
-
     // Create routing config for test orchestrator
     let mut config = RoutingConfig::default();
     // Disable all real tiers
@@ -74,15 +98,25 @@ pub fn create_runner_components(fixture: &TestFixture) -> Result<RunnerComponent
     config.tiers.groq_enabled = false;
     config.tiers.premium_enabled = false;
 
-    // Create provider registry and register mock provider
+    // Create provider registry and register mock provider for test model
     let mut registry = ProviderRegistry::new(config.clone())?;
     registry.register_provider(
         Model::Qwen25Coder32B,
         Arc::clone(&provider) as Arc<dyn ModelProvider>,
     );
 
-    // Create orchestrator with mock router and provider registry
-    let router = Arc::new(MockRouter::new());
+    // Create a test model registry that routes all difficulty levels to our mock model
+    let mut model_registry = ModelRegistry::new();
+    // Register test model for all difficulty levels (1-10)
+    for difficulty in 1..=10 {
+        model_registry.register(difficulty, Model::Qwen25Coder32B)?;
+    }
+
+    // Create real StrategyRouter with mock provider registry
+    let router = Arc::new(StrategyRouter::with_model_registry(
+        model_registry,
+        registry.clone(),
+    ));
 
     // Determine if embeddings should be enabled
     // Only enable for fixtures that use pre-made test workspaces (which have cached embeddings)

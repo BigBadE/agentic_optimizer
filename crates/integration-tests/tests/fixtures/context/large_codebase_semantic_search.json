@@ -43,10 +43,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "How does authentication work",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

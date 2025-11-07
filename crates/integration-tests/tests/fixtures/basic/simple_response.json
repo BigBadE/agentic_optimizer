@@ -27,10 +27,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "What is 2 \\+ 2",
-          "match_type": "regex"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

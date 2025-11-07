@@ -41,10 +41,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "syntax validation with valid",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -74,10 +70,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "build validation stage",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -101,10 +93,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "test validation stage",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -128,10 +116,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "lint validation stage",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -155,10 +139,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "stages can run independently",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -191,10 +171,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "validation with file changes",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -233,10 +209,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "multiple file changes",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -263,10 +235,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "validation result structure",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -290,10 +258,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "stage ordering",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -317,10 +281,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "quick check functionality",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

@@ -44,13 +44,14 @@ check_allows() {
   # Find Rust files that might have allow or cfg_attr
   mapfile -t files < <(
     find crates -type f -name '*.rs' -print0 |
-    xargs -0 grep -lE '#!?\\[(allow|cfg_attr)' 2>/dev/null
+    xargs -0 grep -lE '#!?\[(allow|cfg_attr)' 2>&1 | grep -v "No such file"
   )
 
   local violations=false
 
   for file in "${files[@]}"; do
-    if ! awk -v allowed1="$norm_allowed1" -v allowed2="$norm_allowed2" '
+    # Check for disallowed allow annotations
+    result=$(awk -v allowed1="$norm_allowed1" -v allowed2="$norm_allowed2" '
       function norm(s) { gsub(/[[:space:]]+/, "", s); return s }
 
       BEGIN { in_attr = 0; attr = "" }
@@ -62,8 +63,7 @@ check_allows() {
           if (index($0, "]")) {
             n = norm(attr)
             if (n != allowed1 && n != allowed2) {
-              print "DISALLOWED: " FILENAME
-              print attr
+              print "DISALLOWED:::" FILENAME ":::" n
               exit 1
             }
             in_attr = 0
@@ -73,13 +73,12 @@ check_allows() {
         }
 
         # Detect start of an attribute with allow or cfg_attr
-        if ($0 ~ /#(!)?\[[^]]*(allow|cfg_attr)[^]]*$/) {
+        if ($0 ~ /#(!)?\[.*allow/ || $0 ~ /#!\[cfg_attr/) {
           attr = $0
-          if (index($0, "]")) {
+          if (index($0, ")]")) {
             n = norm(attr)
             if (n != allowed1 && n != allowed2) {
-              print "DISALLOWED: " FILENAME
-              print attr
+              print "DISALLOWED:::" FILENAME ":::" n
               exit 1
             }
             attr = ""
@@ -93,116 +92,27 @@ check_allows() {
         if (in_attr && attr != "") {
           n = norm(attr)
           if (n != allowed1 && n != allowed2) {
-            print "DISALLOWED: " FILENAME
-            print attr
+            print "DISALLOWED|||" FILENAME "|||" n
             exit 1
           }
         }
       }
-    ' "$file"; then
+    ' "$file")
+
+    if [ -n "$result" ]; then
+      echo "ERROR: Found disallowed #[allow] annotation:"
+      echo "$result" | awk -F':::' '{print "  File: " $2; print "  Annotation: " $3}'
       violations=true
     fi
   done
 
-  $violations && return 1 || return 0
-}
-
-
-
-validate_allows_in_file() {
-  local file="$1"
-  local violations=""
-
-  # Read the entire file and check each allow annotation
-  local in_allow=false
-  local allow_start_line=0
-  local allow_content=""
-  local line_num=0
-
-  while IFS= read -r line; do
-    ((line_num++))
-
-    # Detect start of allow annotation
-    if echo "$line" | grep -q '#!\?\[.*allow('; then
-      in_allow=true
-      allow_start_line=$line_num
-      allow_content="$line"
-
-      # Check if it's a single-line allow (contains closing )])
-      if echo "$line" | grep -q ')]'; then
-        # Process immediately as complete allow
-        local normalized
-        normalized=$(echo "$allow_content" | tr -d '\n\r' | sed 's/[[:space:]]\+/ /g' | sed 's/^ //; s/ $//')
-
-        # Check against the two exact allowed patterns
-        local is_valid=false
-
-        # Pattern 1: cfg_attr test allow (normalized)
-        local pattern1='#![cfg_attr( test, allow( clippy::tests_outside_test_module, reason = "Allow for integration tests" ) )]'
-        if [ "$normalized" = "$pattern1" ]; then
-          is_valid=true
-        fi
-
-        # Pattern 2: unsafe_code allow (normalized)
-        local pattern2='#[allow( unsafe_code, reason = "Arc<dyn Tool> is not Trace, but safe to use as documented above" )]'
-        if [ "$normalized" = "$pattern2" ]; then
-          is_valid=true
-        fi
-
-        if [ "$is_valid" = false ]; then
-          violations="${violations}${file}:${allow_start_line}:${normalized}\n"
-        fi
-
-        # Reset for next annotation
-        in_allow=false
-        allow_content=""
-      fi
-      continue
-    fi
-
-    # Continue collecting allow content (multi-line case)
-    if [ "$in_allow" = true ]; then
-      allow_content="${allow_content}"$'\n'"${line}"
-
-      # Check if we've reached the end of the allow block
-      if echo "$line" | grep -q '^[[:space:]]*)][[:space:]]*$'; then
-        # Normalize whitespace for comparison
-        local normalized
-        normalized=$(echo "$allow_content" | tr -d '\n\r' | sed 's/[[:space:]]\+/ /g' | sed 's/^ //; s/ $//')
-
-        # Check against the two exact allowed patterns
-        local is_valid=false
-
-        # Pattern 1: cfg_attr test allow (normalized)
-        local pattern1='#![cfg_attr( test, allow( clippy::tests_outside_test_module, reason = "Allow for integration tests" ) )]'
-        if [ "$normalized" = "$pattern1" ]; then
-          is_valid=true
-        fi
-
-        # Pattern 2: unsafe_code allow (normalized)
-        local pattern2='#[allow( unsafe_code, reason = "Arc<dyn Tool> is not Trace, but safe to use as documented above" )]'
-        if [ "$normalized" = "$pattern2" ]; then
-          is_valid=true
-        fi
-
-        if [ "$is_valid" = false ]; then
-          violations="${violations}${file}:${allow_start_line}:${normalized}\n"
-        fi
-
-        # Reset for next annotation
-        in_allow=false
-        allow_content=""
-      fi
-    fi
-  done < "$file"
-
-  if [ -n "$violations" ]; then
-    echo "ERROR: Found disallowed #[allow] annotation in:"
-    echo -e "$violations"
+  if $violations; then
     echo ""
-    echo "Only these TWO EXACT allow patterns are permitted:"
+    echo "Only these TWO EXACT #[allow] patterns are permitted:"
     echo "  1. #![cfg_attr(test, allow(clippy::tests_outside_test_module, reason = \"Allow for integration tests\"))]"
     echo "  2. #[allow(unsafe_code, reason = \"Arc<dyn Tool> is not Trace, but safe to use as documented above\")]"
+    echo ""
+    echo "All other allows must be removed. Fix the code instead of silencing warnings."
     return 1
   fi
 
@@ -234,7 +144,10 @@ check_file_sizes
 
 # Check for disallowed allow annotations
 echo "[verify] Checking for disallowed #[allow] annotations..."
-check_allows
+if ! check_allows; then
+  echo "FATAL: check_allows failed" >&2
+  exit 1
+fi
 
 # Format, lint, and test
 cargo fmt -q

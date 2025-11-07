@@ -34,10 +34,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "command.*fail",
-          "match_type": "regex"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

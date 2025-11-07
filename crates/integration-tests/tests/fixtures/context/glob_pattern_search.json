@@ -39,10 +39,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Find all Rust source files",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -73,10 +69,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "specific file pattern",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -106,10 +98,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "exact file",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

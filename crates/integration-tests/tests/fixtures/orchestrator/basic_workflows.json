@@ -31,10 +31,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "hello world",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -58,10 +54,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Say hello",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -85,10 +77,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Continue",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

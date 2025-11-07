@@ -42,10 +42,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Delete to_delete.txt",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -71,10 +67,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "delete nonexistent",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -109,10 +101,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "delete the src directory",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

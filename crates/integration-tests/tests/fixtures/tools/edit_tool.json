@@ -45,10 +45,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Change add to multiply",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -81,10 +77,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Replace all 'foo'",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -112,10 +104,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "without replace_all",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -157,10 +145,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Edit line 3",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -200,10 +184,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Replace unicode",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

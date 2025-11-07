@@ -50,10 +50,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Refactor",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

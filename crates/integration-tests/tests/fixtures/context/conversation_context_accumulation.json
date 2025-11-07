@@ -31,10 +31,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "tell me the name",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -60,10 +56,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "What role",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -98,10 +90,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "named after them",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -130,10 +118,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "first thing",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

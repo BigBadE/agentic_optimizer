@@ -23,85 +23,6 @@
     },
     {
       "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "multi-file project structure",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<any> {",
-            "  return {",
-            "    title: 'Project Structure Setup',",
-            "    steps: [",
-            "      {title: 'Create README', description: 'Create README.md', step_type: 'implementation'},",
-            "      {title: 'Create source dir', description: 'Create src/ directory', step_type: 'implementation'},",
-            "      {title: 'Create test dir', description: 'Create tests/ directory', step_type: 'implementation'},",
-            "      {title: 'Create config', description: 'Create package.json', step_type: 'implementation'}",
-            "    ]",
-            "  };",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create README.md",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('README.md', '# Project');",
-            "  return 'Created README.md';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create src/ directory",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('src/index.js', 'export default {};');",
-            "  return 'Created src/ directory';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create tests/ directory",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('tests/test.js', 'describe(\"test\", () => {});');",
-            "  return 'Created tests/ directory';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
       "verify": {
         "files": [
           {
@@ -123,19 +44,56 @@
         ]
       },
       "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create package.json",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('package.json', '{\"name\": \"project\"}');",
-            "  return 'Created package.json';",
-            "}"
-          ]
-        }
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Project Structure Setup',",
+              "    steps: [",
+              "      {title: 'Create README', description: 'Create README.md', step_type: 'implementation'},",
+              "      {title: 'Create source dir', description: 'Create src/ directory', step_type: 'implementation'},",
+              "      {title: 'Create test dir', description: 'Create tests/ directory', step_type: 'implementation'},",
+              "      {title: 'Create config', description: 'Create package.json', step_type: 'implementation'}",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('README.md', '# Project');",
+              "  return 'Created README.md';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('src/index.js', 'export default {};');",
+              "  return 'Created src/ directory';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('tests/test.js', 'describe(\"test\", () => {});');",
+              "  return 'Created tests/ directory';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('package.json', '{\"name\": \"project\"}');",
+              "  return 'Created package.json';",
+              "}"
+            ]
+          }
+        ]
       }
     }
   ],

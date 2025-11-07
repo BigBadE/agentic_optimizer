@@ -23,48 +23,44 @@
     },
     {
       "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Do a simple task",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<any> {",
-            "  return {",
-            "    title: 'Simple Task',",
-            "    steps: [",
-            "      {title: 'Step 1', description: 'First step', step_type: 'implementation', dependencies: []}",
-            "    ]",
-            "  };",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
       "verify": {
         "ui": {
           "work_unit": {
-            "exists": true
+            "exists": true,
+            "status": "completed",
+            "subtask_count": 1,
+            "progress_percentage": 100,
+            "is_terminal": true,
+            "tier_used": "test-mock",
+            "subtask_titles": [
+              "Step 1"
+            ]
           }
         }
       },
       "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "First step",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  return 'Done';",
-            "}"
-          ]
-        }
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Simple Task',",
+              "    steps: [",
+              "      {title: 'Step 1', description: 'First step', step_type: 'implementation', dependencies: []}",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  return 'Done';",
+              "}"
+            ]
+          }
+        ]
       }
     }
   ],

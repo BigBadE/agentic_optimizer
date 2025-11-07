@@ -26,6 +26,24 @@ mod task_completion;
 
 use task_completion::{PendingTaskResult, complete_pending_task};
 
+/// Parameters for handling submit input event
+struct SubmitInputParams<'event, 'verifier> {
+    event: &'event TestEvent,
+    input_event: &'event super::fixture::UserInputEvent,
+    event_index: usize,
+    verifier: &'event mut UnifiedVerifier<'verifier>,
+    execution_tracker: &'event ExecutionResultTracker,
+}
+
+/// Parameters for handling LLM response event
+struct LlmResponseParams<'event, 'verifier> {
+    event: &'event TestEvent,
+    llm_event: &'event super::fixture::LlmResponseEvent,
+    event_index: usize,
+    verifier: &'event mut UnifiedVerifier<'verifier>,
+    execution_tracker: &'event ExecutionResultTracker,
+}
+
 /// Unified test runner
 pub struct UnifiedTestRunner {
     /// Test fixture
@@ -105,10 +123,7 @@ impl UnifiedTestRunner {
     /// Returns error if input processing or verification fails
     async fn handle_submit_input(
         &mut self,
-        event: &TestEvent,
-        input_event: &super::fixture::UserInputEvent,
-        verifier: &mut UnifiedVerifier<'_>,
-        execution_tracker: &ExecutionResultTracker,
+        params: SubmitInputParams<'_, '_>,
     ) -> Result<PendingTaskResult> {
         let start = Instant::now();
 
@@ -124,12 +139,13 @@ impl UnifiedTestRunner {
         tracing::debug!("  render: {:.3}s", render_start.elapsed().as_secs_f64());
 
         let verify_start = Instant::now();
-        verifier
+        params
+            .verifier
             .verify_event(&VerifyEventContext {
-                event,
-                verify: &input_event.verify,
+                event: params.event,
+                verify: &params.input_event.verify,
                 tui_app: Some(&self.tui_app),
-                execution_tracker,
+                execution_tracker: params.execution_tracker,
                 provider: Some(&self.provider),
             })
             .await
@@ -138,6 +154,25 @@ impl UnifiedTestRunner {
             "  verify_event: {:.3}s",
             verify_start.elapsed().as_secs_f64()
         );
+
+        // Look ahead to find the next LlmResponse event and set it as current
+        // This allows LLM queries triggered by submit to find their responses
+        for (idx, evt) in self
+            .fixture
+            .events
+            .iter()
+            .enumerate()
+            .skip(params.event_index + 1)
+        {
+            if let TestEvent::LlmResponse(llm_event) = evt {
+                let event_id = llm_event
+                    .id
+                    .clone()
+                    .unwrap_or_else(|| format!("event_{idx}"));
+                self.provider.set_current_event(Some(event_id))?;
+                break;
+            }
+        }
 
         self.event_controller.advance();
 
@@ -190,22 +225,17 @@ impl UnifiedTestRunner {
     ///
     /// # Errors
     /// Returns error if verification fails
-    async fn handle_llm_response(
-        &mut self,
-        event: &TestEvent,
-        llm_event: &super::fixture::LlmResponseEvent,
-        verifier: &mut UnifiedVerifier<'_>,
-        execution_tracker: &ExecutionResultTracker,
-    ) -> Result<()> {
+    async fn handle_llm_response(&mut self, params: LlmResponseParams<'_, '_>) -> Result<()> {
         let start = Instant::now();
 
         let verify_before_start = Instant::now();
-        verifier
+        params
+            .verifier
             .verify_event(&VerifyEventContext {
-                event,
-                verify: &llm_event.verify_before,
+                event: params.event,
+                verify: &params.llm_event.verify_before,
                 tui_app: Some(&self.tui_app),
-                execution_tracker,
+                execution_tracker: params.execution_tracker,
                 provider: Some(&self.provider),
             })
             .await
@@ -215,11 +245,18 @@ impl UnifiedTestRunner {
             verify_before_start.elapsed().as_secs_f64()
         );
 
-        // Set current event for mock provider
+        // Set current event for mock provider (must match registration ID)
         let set_event_start = Instant::now();
-        let event_id = llm_event.id.clone().unwrap_or_else(|| "default".to_owned());
+        let event_id = params
+            .llm_event
+            .id
+            .clone()
+            .unwrap_or_else(|| format!("event_{}", params.event_index));
         self.provider.set_current_event(Some(event_id))?;
-        tracing::debug!("  set_event: {:.3}s", set_event_start.elapsed().as_secs_f64());
+        tracing::debug!(
+            "  set_event: {:.3}s",
+            set_event_start.elapsed().as_secs_f64()
+        );
 
         let process_ui_start = Instant::now();
         self.process_pending_ui_events();
@@ -232,19 +269,20 @@ impl UnifiedTestRunner {
         self.tui_app.render()?;
         tracing::debug!("  render: {:.3}s", render_start.elapsed().as_secs_f64());
 
-        let verify_config = if llm_event.verify_after.is_empty() {
-            &llm_event.verify
+        let verify_config = if params.llm_event.verify_after.is_empty() {
+            &params.llm_event.verify
         } else {
-            &llm_event.verify_after
+            &params.llm_event.verify_after
         };
 
         let verify_after_start = Instant::now();
-        let verify_result = verifier
+        let verify_result = params
+            .verifier
             .verify_event(&VerifyEventContext {
-                event,
+                event: params.event,
                 verify: verify_config,
                 tui_app: Some(&self.tui_app),
-                execution_tracker,
+                execution_tracker: params.execution_tracker,
                 provider: Some(&self.provider),
             })
             .await;
@@ -256,7 +294,10 @@ impl UnifiedTestRunner {
         // Clear current event (even if verification failed)
         let clear_event_start = Instant::now();
         self.provider.set_current_event(None)?;
-        tracing::debug!("  clear_event: {:.3}s", clear_event_start.elapsed().as_secs_f64());
+        tracing::debug!(
+            "  clear_event: {:.3}s",
+            clear_event_start.elapsed().as_secs_f64()
+        );
 
         // Now check verification result
         verify_result.map_err(RoutingError::ExecutionFailed)?;
@@ -287,7 +328,13 @@ impl UnifiedTestRunner {
                 TestEvent::UserInput(input_event) if input_event.data.submit => {
                     complete_pending_task(&mut pending_task, &mut execution_tracker);
                     let completion_result = self
-                        .handle_submit_input(event, input_event, &mut verifier, &execution_tracker)
+                        .handle_submit_input(SubmitInputParams {
+                            event,
+                            input_event,
+                            event_index,
+                            verifier: &mut verifier,
+                            execution_tracker: &execution_tracker,
+                        })
                         .await?;
                     pending_task = Some((completion_result, execution_id));
                 }
@@ -302,12 +349,13 @@ impl UnifiedTestRunner {
                 }
                 TestEvent::LlmResponse(llm_event) => {
                     complete_pending_task(&mut pending_task, &mut execution_tracker);
-                    self.handle_llm_response(
+                    self.handle_llm_response(LlmResponseParams {
                         event,
-                        llm_event.as_ref(),
-                        &mut verifier,
-                        &execution_tracker,
-                    )
+                        llm_event: llm_event.as_ref(),
+                        event_index,
+                        verifier: &mut verifier,
+                        execution_tracker: &execution_tracker,
+                    })
                     .await?;
                 }
                 TestEvent::Wait(wait_event) => {

@@ -42,10 +42,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Read lib.rs",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -102,10 +98,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Create 5 test files",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -147,10 +139,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "List all available tools",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -176,10 +164,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "unknown tool",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

@@ -34,10 +34,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "doesn't exist",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -72,10 +68,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "string that doesn't exist",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -106,10 +98,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "path traversal",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -138,10 +126,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "missing arguments",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -171,10 +155,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "empty strings",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

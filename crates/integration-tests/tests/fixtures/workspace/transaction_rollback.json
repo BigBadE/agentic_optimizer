@@ -41,10 +41,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "create operation",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -83,10 +79,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "modify operation",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -117,10 +109,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "delete operation",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -145,10 +133,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "read operation",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -175,10 +159,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "nonexistent file",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

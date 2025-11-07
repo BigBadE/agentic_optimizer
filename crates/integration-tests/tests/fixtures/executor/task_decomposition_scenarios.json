@@ -45,10 +45,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Process files sequentially",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -107,10 +103,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "independent output files",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -161,10 +153,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "complex multi-step",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

@@ -24,41 +24,6 @@
     },
     {
       "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create clean output file",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<any> {",
-            "  return {",
-            "    title: 'Create clean output file',",
-            "    steps: [",
-            "      {",
-            "        title: 'Create output',",
-            "        description: 'Write output.log without errors',",
-            "        step_type: 'implementation',",
-            "        exit_requirement: async () => {",
-            "          const content = await readFile('output.log');",
-            "          const errorPatterns = ['ERROR', 'FAIL', 'panic!'];",
-            "          for (const pattern of errorPatterns) {",
-            "            if (content.includes(pattern)) {",
-            "              throw new Error(`Found error pattern: ${pattern}`);",
-            "            }",
-            "          }",
-            "        }",
-            "      }",
-            "    ]",
-            "  };",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
       "verify": {
         "files": [
           {
@@ -68,20 +33,43 @@
         ]
       },
       "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Write output.log without errors",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  const log = 'INFO: Process started\\nINFO: Task completed successfully\\nINFO: Process finished';",
-            "  await writeFile('output.log', log);",
-            "  return 'Created clean output.log';",
-            "}"
-          ]
-        }
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Create clean output file',",
+              "    steps: [",
+              "      {",
+              "        title: 'Create output',",
+              "        description: 'Write output.log without errors',",
+              "        step_type: 'implementation',",
+              "        exit_requirement: async () => {",
+              "          const content = await readFile('output.log');",
+              "          const errorPatterns = ['ERROR', 'FAIL', 'panic!'];",
+              "          for (const pattern of errorPatterns) {",
+              "            if (content.includes(pattern)) {",
+              "              throw new Error(`Found error pattern: ${pattern}`);",
+              "            }",
+              "          }",
+              "        }",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  const log = 'INFO: Process started\\nINFO: Task completed successfully\\nINFO: Process finished';",
+              "  await writeFile('output.log', log);",
+              "  return 'Created clean output.log';",
+              "}"
+            ]
+          }
+        ]
       }
     }
   ],

@@ -24,38 +24,6 @@
     },
     {
       "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create config file",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<any> {",
-            "  return {",
-            "    title: 'Create config file',",
-            "    steps: [",
-            "      {",
-            "        title: 'Create config',",
-            "        description: 'Write app.config.json',",
-            "        step_type: 'implementation',",
-            "        exit_requirement: async () => {",
-            "          const exists = await bash('test -f app.config.json && echo exists || echo missing');",
-            "          if (!exists.stdout.includes('exists')) {",
-            "            throw new Error('app.config.json was not created');",
-            "          }",
-            "        }",
-            "      }",
-            "    ]",
-            "  };",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
       "verify": {
         "files": [
           {
@@ -65,20 +33,40 @@
         ]
       },
       "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Write app.config.json",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  const config = { app: 'test-app', version: '1.0.0' };",
-            "  await writeFile('app.config.json', JSON.stringify(config, null, 2));",
-            "  return 'Created app.config.json';",
-            "}"
-          ]
-        }
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Create config file',",
+              "    steps: [",
+              "      {",
+              "        title: 'Create config',",
+              "        description: 'Write app.config.json',",
+              "        step_type: 'implementation',",
+              "        exit_requirement: async () => {",
+              "          const exists = await bash('test -f app.config.json && echo exists || echo missing');",
+              "          if (!exists.stdout.includes('exists')) {",
+              "            throw new Error('app.config.json was not created');",
+              "          }",
+              "        }",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  const config = { app: 'test-app', version: '1.0.0' };",
+              "  await writeFile('app.config.json', JSON.stringify(config, null, 2));",
+              "  return 'Created app.config.json';",
+              "}"
+            ]
+          }
+        ]
       }
     }
   ],

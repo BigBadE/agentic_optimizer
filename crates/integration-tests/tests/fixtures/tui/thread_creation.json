@@ -31,10 +31,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "First thread",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

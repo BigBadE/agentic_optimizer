@@ -42,10 +42,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Write a test file",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "function agent_code() {",

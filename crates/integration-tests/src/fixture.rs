@@ -5,9 +5,10 @@
 
 use crate::mock_provider::{self, ResponseStrategy};
 use crate::verify::{FinalVerify, VerifyConfig};
-use merlin_core::Result;
+use merlin_core::{ContextType, ExecutionResult, PromptType};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::sync::atomic::AtomicUsize;
 
 /// Complete test fixture
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -128,6 +129,21 @@ pub struct LlmResponseEvent {
     /// Optional verification (maps to `verify_after`)
     #[serde(default)]
     pub verify: VerifyConfig,
+    /// Retry responses for this event (executed on validation failures)
+    #[serde(default)]
+    pub retry_responses: Vec<RetryResponse>,
+}
+
+/// Retry response configuration
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct RetryResponse {
+    /// Routing match configuration for this retry
+    pub routing_match: RoutingMatchConfig,
+    /// Response configuration
+    pub response: ResponseConfig,
+    /// Optional verification after this retry
+    #[serde(default)]
+    pub verify: VerifyConfig,
 }
 
 /// Strategy configuration
@@ -136,67 +152,95 @@ pub struct LlmResponseEvent {
 pub enum StrategyConfig {
     /// Single response (one-time use)
     Once {
-        /// Trigger configuration
-        trigger: TriggerConfig,
+        /// Routing match configuration (optional - if None, matches any)
+        #[serde(default)]
+        routing_match: Option<RoutingMatchConfig>,
         /// Response configuration
         response: ResponseConfig,
     },
     /// Sequence of responses
     Sequence {
-        /// Trigger configuration
-        trigger: TriggerConfig,
+        /// Routing match configuration (optional - if None, matches any)
+        #[serde(default)]
+        routing_match: Option<RoutingMatchConfig>,
         /// List of responses
         responses: Vec<ResponseConfig>,
     },
     /// Repeating response
     Repeating {
-        /// Trigger configuration
-        trigger: TriggerConfig,
+        /// Routing match configuration (optional - if None, matches any)
+        #[serde(default)]
+        routing_match: Option<RoutingMatchConfig>,
         /// Response configuration
         response: ResponseConfig,
     },
 }
 
-/// Trigger configuration
+/// Routing match configuration for routing-based matching
 #[derive(Debug, Clone, Serialize, Deserialize)]
 #[serde(deny_unknown_fields)]
-pub struct TriggerConfig {
-    /// Pattern to match
-    pub pattern: String,
-    /// Match type
-    pub match_type: MatchType,
-    /// What to match against (default: combined for backward compat)
-    #[serde(default = "default_match_against")]
-    pub match_against: MatchAgainst,
+pub struct RoutingMatchConfig {
+    /// Expected context type (optional - None matches any)
+    #[serde(default)]
+    pub context_type: Option<String>,
+    /// Expected prompt type (optional - None matches any)
+    #[serde(default)]
+    pub prompt_type: Option<String>,
+    /// Expected difficulty range [min, max] (optional - None matches any)
+    #[serde(default)]
+    pub difficulty_range: Option<(u8, u8)>,
+    /// Expected retry attempt (optional - None matches any)
+    #[serde(default)]
+    pub retry_attempt: Option<u8>,
+    /// Expected previous result (`soft_error` or `hard_error`, optional - None matches any)
+    #[serde(default)]
+    pub previous_result: Option<String>,
 }
 
-/// Default match against for backward compatibility
-fn default_match_against() -> MatchAgainst {
-    MatchAgainst::Combined
-}
+impl RoutingMatchConfig {
+    /// Convert to mock provider `RoutingMatcher`
+    #[must_use]
+    pub fn to_routing_matcher(&self) -> mock_provider::RoutingMatcher {
+        let context_type =
+            self.context_type
+                .as_ref()
+                .and_then(|context_str| match context_str.as_str() {
+                    "task_decomposition" => Some(ContextType::TaskDecomposition),
+                    "step_execution" => Some(ContextType::StepExecution),
+                    "validation" => Some(ContextType::Validation),
+                    "error_recovery" => Some(ContextType::ErrorRecovery),
+                    "conversation" => Some(ContextType::Conversation),
+                    _ => None,
+                });
 
-/// Match against
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum MatchAgainst {
-    /// Match against query text only
-    Query,
-    /// Match against system prompt only
-    System,
-    /// Match against combined system + query
-    Combined,
-}
+        let prompt_type =
+            self.prompt_type
+                .as_ref()
+                .and_then(|prompt_str| match prompt_str.as_str() {
+                    "design" => Some(PromptType::Design),
+                    "debug" => Some(PromptType::Debug),
+                    "validation" => Some(PromptType::Validation),
+                    "planning" => Some(PromptType::Planning),
+                    _ => None,
+                });
 
-/// Match type
-#[derive(Debug, Clone, Copy, Serialize, Deserialize)]
-#[serde(rename_all = "snake_case")]
-pub enum MatchType {
-    /// Exact string match
-    Exact,
-    /// Contains substring
-    Contains,
-    /// Regex match
-    Regex,
+        let previous_result = self
+            .previous_result
+            .as_ref()
+            .and_then(|result_str| match result_str.as_str() {
+                "soft_error" => Some(ExecutionResult::SoftError),
+                "hard_error" => Some(ExecutionResult::HardError),
+                _ => None,
+            });
+
+        mock_provider::RoutingMatcher {
+            context_type,
+            prompt_type,
+            difficulty_range: self.difficulty_range,
+            retry_attempt: self.retry_attempt,
+            previous_result,
+        }
+    }
 }
 
 /// Response configuration
@@ -305,56 +349,54 @@ impl TestEvent {
 }
 
 impl StrategyConfig {
-    /// Convert to ResponseStrategy
-    ///
-    /// # Errors
-    /// Returns error if conversion fails
-    pub fn to_response_strategy(&self) -> Result<ResponseStrategy> {
+    /// Convert to `ResponseStrategy`
+    #[must_use]
+    pub fn to_response_strategy(&self) -> ResponseStrategy {
         match self {
-            Self::Once { trigger, response } => {
-                let trigger_cfg = trigger.to_trigger_config()?;
+            Self::Once {
+                routing_match,
+                response,
+            } => {
+                let routing_matcher = routing_match
+                    .as_ref()
+                    .map(RoutingMatchConfig::to_routing_matcher);
                 let typescript = response.typescript.join("\n");
-                Ok(ResponseStrategy::Once {
-                    trigger: trigger_cfg,
+                ResponseStrategy::Once {
+                    routing_match: routing_matcher,
                     typescript,
-                })
+                }
             }
-            Self::Sequence { trigger, responses } => {
-                let trigger_cfg = trigger.to_trigger_config()?;
-                let typescript_responses =
-                    responses.iter().map(|r| r.typescript.join("\n")).collect();
-                Ok(ResponseStrategy::new_sequence(trigger_cfg, typescript_responses))
+            Self::Sequence {
+                routing_match,
+                responses,
+            } => {
+                let routing_matcher = routing_match
+                    .as_ref()
+                    .map(RoutingMatchConfig::to_routing_matcher);
+                let typescript_responses = responses
+                    .iter()
+                    .map(|response| response.typescript.join("\n"))
+                    .collect();
+
+                ResponseStrategy::Sequence {
+                    routing_match: routing_matcher,
+                    responses: typescript_responses,
+                    index: AtomicUsize::new(0),
+                }
             }
-            Self::Repeating { trigger, response } => {
-                let trigger_cfg = trigger.to_trigger_config()?;
+            Self::Repeating {
+                routing_match,
+                response,
+            } => {
+                let routing_matcher = routing_match
+                    .as_ref()
+                    .map(RoutingMatchConfig::to_routing_matcher);
                 let typescript = response.typescript.join("\n");
-                Ok(ResponseStrategy::Repeating {
-                    trigger: trigger_cfg,
+                ResponseStrategy::Repeating {
+                    routing_match: routing_matcher,
                     typescript,
-                })
+                }
             }
         }
-    }
-}
-
-impl TriggerConfig {
-    /// Convert to mock provider TriggerConfig
-    ///
-    /// # Errors
-    /// Returns error if conversion fails
-    fn to_trigger_config(&self) -> Result<mock_provider::TriggerConfig> {
-        let match_type = match self.match_type {
-            MatchType::Exact => mock_provider::MatchType::Exact,
-            MatchType::Contains => mock_provider::MatchType::Contains,
-            MatchType::Regex => mock_provider::MatchType::Regex,
-        };
-
-        let match_against = match self.match_against {
-            MatchAgainst::Query => mock_provider::MatchAgainst::Query,
-            MatchAgainst::System => mock_provider::MatchAgainst::System,
-            MatchAgainst::Combined => mock_provider::MatchAgainst::Combined,
-        };
-
-        mock_provider::TriggerConfig::new(self.pattern.clone(), match_type, match_against)
     }
 }

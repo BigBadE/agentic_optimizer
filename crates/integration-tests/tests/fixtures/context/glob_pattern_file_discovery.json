@@ -41,10 +41,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "What data models exist",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

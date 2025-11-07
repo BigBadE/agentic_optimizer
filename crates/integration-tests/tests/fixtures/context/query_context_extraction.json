@@ -33,10 +33,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "analyze src/main.rs",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -66,10 +62,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Review src/lib.rs",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -97,10 +89,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "crate::analyzer",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -140,10 +128,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Add error handling",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

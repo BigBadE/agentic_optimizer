@@ -32,10 +32,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "simple task",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "return { done: true, result: \"Success\" };"
@@ -59,10 +55,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Calculate something",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "const x = 1 + 1;",
@@ -87,10 +79,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "multiple approaches",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "return { done: true, result: \"First\" };"

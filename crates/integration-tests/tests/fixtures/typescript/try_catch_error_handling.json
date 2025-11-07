@@ -33,10 +33,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Handle errors",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

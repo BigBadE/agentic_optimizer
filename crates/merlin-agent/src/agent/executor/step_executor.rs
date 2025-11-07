@@ -3,8 +3,9 @@
 use std::{result, sync::Arc, time::Instant};
 
 use merlin_core::{
-    AgentResponse, Context, ContextSpec, JsValueHandle, ModelProvider, Query, Result, RoutingError,
-    TaskId, TaskList, TaskStep, ValidationErrorType, WorkUnit,
+    AgentResponse, Context, ContextSpec, ContextType, ExecutionResult, JsValueHandle,
+    ModelProvider, PromptType, Query, Result, RoutingContext, RoutingError, TaskId, TaskList,
+    TaskStep, ValidationErrorType, WorkUnit,
 };
 use merlin_deps::tracing::{Level, span};
 use merlin_routing::UiChannel;
@@ -51,6 +52,10 @@ pub struct StepExecutionParams<'params> {
     pub ui_channel: &'params UiChannel,
     /// Current recursion depth
     pub recursion_depth: usize,
+    /// Current retry attempt (0 for first attempt)
+    pub retry_attempt: u8,
+    /// Previous execution result if this is a retry
+    pub previous_result: Option<ExecutionResult>,
 }
 
 /// Parameters for task list execution
@@ -91,6 +96,10 @@ pub struct AgentExecutionParams<'params> {
     pub task_id: TaskId,
     /// UI channel
     pub ui_channel: &'params UiChannel,
+    /// Current retry attempt (0 for first attempt)
+    pub retry_attempt: u8,
+    /// Previous execution result if this is a retry
+    pub previous_result: Option<ExecutionResult>,
 }
 
 /// Step executor handles recursive task decomposition and validation
@@ -99,26 +108,28 @@ pub struct StepExecutor;
 impl StepExecutor {
     /// Handle validation error and determine retry strategy
     ///
+    /// Returns `Ok(())` if validation passed.
+    ///
     /// # Errors
-    /// Returns `Err(())` if validation failed and retry should be attempted
+    /// Returns `Err(ExecutionResult)` if validation failed, indicating retry type.
     fn handle_validation_error(
         validation_result: result::Result<(), ValidationErrorType>,
         step_title: &str,
         attempt: &mut usize,
-    ) -> result::Result<(), ()> {
+    ) -> result::Result<(), ExecutionResult> {
         match validation_result {
             Ok(()) => Ok(()),
             Err(ValidationErrorType::Hard(err)) => {
                 merlin_deps::tracing::warn!("Hard validation error for step '{step_title}': {err}");
                 *attempt += 1;
                 // TODO: Implement model tier escalation
-                Err(())
+                Err(ExecutionResult::HardError)
             }
             Err(ValidationErrorType::Soft(err)) => {
                 merlin_deps::tracing::info!("Soft validation error for step '{step_title}': {err}");
                 *attempt += 1;
                 // TODO: Add feedback to context for next attempt
-                Err(())
+                Err(ExecutionResult::SoftError)
             }
         }
     }
@@ -143,6 +154,8 @@ impl StepExecutor {
             runtime: params.runtime,
             task_id: params.task_id,
             ui_channel: params.ui_channel,
+            retry_attempt: params.retry_attempt,
+            previous_result: params.previous_result,
         })
         .await?;
 
@@ -163,14 +176,18 @@ impl StepExecutor {
                 )
                 .await;
 
-                if Self::handle_validation_error(validation, &params.step.title, attempt).is_ok() {
-                    Ok(Some(StepResult {
+                match Self::handle_validation_error(validation, &params.step.title, attempt) {
+                    Ok(()) => Ok(Some(StepResult {
                         text: result,
                         duration_ms: start.elapsed().as_millis() as u64,
                         success: true,
-                    }))
-                } else {
-                    Ok(None)
+                    })),
+                    Err(exec_result) => {
+                        // Update params for retry
+                        params.retry_attempt = params.retry_attempt.saturating_add(1);
+                        params.previous_result = Some(exec_result);
+                        Ok(None)
+                    }
                 }
             }
 
@@ -221,6 +238,10 @@ impl StepExecutor {
 
         let start = Instant::now();
         let mut attempt = 0;
+
+        // Initialize retry tracking
+        params.retry_attempt = 0;
+        params.previous_result = None;
 
         loop {
             if attempt >= MAX_RETRY_ATTEMPTS {
@@ -275,7 +296,27 @@ impl StepExecutor {
             let task_id = params.task_id;
             let ui_channel = params.ui_channel;
 
-            let query = Query::new(description.to_owned());
+            // Build routing context with appropriate settings
+            let routing_context = RoutingContext {
+                context_type: ContextType::StepExecution,
+                prompt_type: if params.retry_attempt > 0 {
+                    PromptType::Debug
+                } else {
+                    PromptType::Design
+                },
+                estimated_difficulty: None, // TODO: Implement difficulty estimation
+                retry_attempt: params.retry_attempt,
+                previous_result: params.previous_result,
+            };
+
+            let query = Query::new(description.to_owned()).with_routing_context(routing_context);
+
+            merlin_deps::tracing::debug!(
+                "Executing query with routing: context={:?}, prompt={:?}, retry={}",
+                query.routing_context.context_type,
+                query.routing_context.prompt_type,
+                query.routing_context.retry_attempt
+            );
 
             // Execute query with provider
             let response = provider

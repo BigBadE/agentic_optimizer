@@ -34,10 +34,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "2 \\+ 2",
-          "match_type": "regex"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -67,10 +63,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "multiply.*3",
-          "match_type": "regex"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -100,10 +92,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "first number",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

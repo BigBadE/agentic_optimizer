@@ -269,6 +269,8 @@ impl AgentExecutor {
                 runtime: &mut self.runtime,
                 task_id: params.task_id,
                 ui_channel: params.ui_channel,
+                retry_attempt: 0,
+                previous_result: None,
             })
             .await?;
 

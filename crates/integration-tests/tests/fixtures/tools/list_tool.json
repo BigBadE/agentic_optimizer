@@ -34,10 +34,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "List files in src",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -62,10 +58,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "subdirectories in src",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -91,10 +83,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "without hidden",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -120,10 +108,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "WITH hidden",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -149,10 +133,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "list nonexistent",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -181,10 +161,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "list a file",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

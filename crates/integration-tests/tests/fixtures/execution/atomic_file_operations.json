@@ -48,10 +48,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "atomic",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

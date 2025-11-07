@@ -24,45 +24,6 @@
     {
       "type": "llm_response",
       "verify": {
-        "execution": {}
-      },
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create a simple Rust project",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code() {",
-            "  return {",
-            "    title: 'Setup Rust Project',",
-            "    steps: [",
-            "      {",
-            "        title: 'Create main.rs',",
-            "        description: 'Create src/main.rs with hello world',",
-            "        step_type: 'implementation'",
-            "      },",
-            "      {",
-            "        title: 'Create lib.rs',",
-            "        description: 'Create src/lib.rs with basic function',",
-            "        step_type: 'implementation'",
-            "      },",
-            "      {",
-            "        title: 'Create Cargo.toml',",
-            "        description: 'Create Cargo.toml manifest',",
-            "        step_type: 'implementation'",
-            "      }",
-            "    ]",
-            "  };",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "verify": {
         "files": [
           {
             "path": "src/main.rs",
@@ -71,58 +32,14 @@
               "fn main",
               "println!"
             ]
-          }
-        ]
-      },
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create src/main.rs with hello world",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('src/main.rs', 'fn main() {\\n    println!(\"Hello, world!\");\\n}');",
-            "  return 'Created src/main.rs';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "verify": {
-        "files": [
+          },
           {
             "path": "src/lib.rs",
             "exists": true,
             "contains": [
               "pub fn add"
             ]
-          }
-        ]
-      },
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create src/lib.rs with basic function",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('src/lib.rs', 'pub fn add(a: i32, b: i32) -> i32 {\\n    a + b\\n}');",
-            "  return 'Created src/lib.rs';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "verify": {
-        "files": [
+          },
           {
             "path": "Cargo.toml",
             "exists": true,
@@ -131,23 +48,64 @@
               "name ="
             ]
           }
-        ]
+        ],
+        "execution": {}
       },
       "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create Cargo.toml manifest",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  const manifest = '[package]\\nname = \"test-project\"\\nversion = \"0.1.0\"\\nedition = \"2021\"';",
-            "  await writeFile('Cargo.toml', manifest);",
-            "  return 'Created Cargo.toml';",
-            "}"
-          ]
-        }
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code() {",
+              "  return {",
+              "    title: 'Setup Rust Project',",
+              "    steps: [",
+              "      {",
+              "        title: 'Create main.rs',",
+              "        description: 'Create src/main.rs with hello world',",
+              "        step_type: 'implementation'",
+              "      },",
+              "      {",
+              "        title: 'Create lib.rs',",
+              "        description: 'Create src/lib.rs with basic function',",
+              "        step_type: 'implementation'",
+              "      },",
+              "      {",
+              "        title: 'Create Cargo.toml',",
+              "        description: 'Create Cargo.toml manifest',",
+              "        step_type: 'implementation'",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('src/main.rs', 'fn main() {\\n    println!(\"Hello, world!\");\\n}');",
+              "  return 'Created src/main.rs';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('src/lib.rs', 'pub fn add(a: i32, b: i32) -> i32 {\\n    a + b\\n}');",
+              "  return 'Created src/lib.rs';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  const manifest = '[package]\\nname = \"test-project\"\\nversion = \"0.1.0\"\\nedition = \"2021\"';",
+              "  await writeFile('Cargo.toml', manifest);",
+              "  return 'Created Cargo.toml';",
+              "}"
+            ]
+          }
+        ]
       }
     }
   ],

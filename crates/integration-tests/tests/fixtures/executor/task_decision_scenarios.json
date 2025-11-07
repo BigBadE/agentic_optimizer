@@ -33,10 +33,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Complete a simple task",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -63,10 +59,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Gather context",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -101,10 +93,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "multiple decisions",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

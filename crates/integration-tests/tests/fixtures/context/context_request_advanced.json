@@ -34,10 +34,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Check file metadata",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -67,10 +63,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Verify executor content",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -101,10 +93,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "TypeScript glob pattern",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -131,10 +119,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "invalid parameters",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -164,10 +148,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "default max_files",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -193,10 +173,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "TypeScript return structure",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

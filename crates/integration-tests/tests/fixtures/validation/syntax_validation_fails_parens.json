@@ -28,10 +28,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Test syntax validation",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

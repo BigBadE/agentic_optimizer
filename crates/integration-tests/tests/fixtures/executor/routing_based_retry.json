@@ -1,0 +1,101 @@
+{
+  "name": "Routing-Based Retry Test",
+  "description": "Tests routing-based matching with design/debug prompt switching on retry",
+  "tags": ["executor", "routing", "retry"],
+  "setup": {
+    "files": {
+      "test.txt": "initial content"
+    }
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create a valid function",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "id": "create_function",
+      "verify": {
+        "files": [
+          {
+            "path": "test.txt",
+            "exists": true,
+            "contains": ["fixed function"]
+          }
+        ]
+      },
+      "strategy": {
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code() {",
+              "  return {",
+              "    title: 'Create Function',",
+              "    steps: [",
+              "      {",
+              "        title: 'Write function',",
+              "        description: 'Create a function that passes validation',",
+              "        step_type: 'implementation',",
+              "        exit_requirement: async () => {",
+              "          const content = await readFile('test.txt');",
+              "          if (!content.includes('fixed')) {",
+              "            throw new Error('[SOFT] Function must be fixed');",
+              "          }",
+              "        }",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('test.txt', 'broken function');",
+              "  return 'Created function (will fail validation)';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('test.txt', 'fixed function');",
+              "  return 'Fixed function with debug prompt';",
+              "}"
+            ]
+          }
+        ]
+      },
+      "retry_responses": [
+        {
+          "routing_match": {
+            "prompt_type": "debug",
+            "retry_attempt": 1,
+            "previous_result": "soft_error"
+          },
+          "response": {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('test.txt', 'fixed function via retry');",
+              "  return 'Fixed function with routing-based retry';",
+              "}"
+            ]
+          }
+        }
+      ]
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "test.txt",
+        "exists": true,
+        "contains": ["fixed function"]
+      }
+    ]
+  }
+}

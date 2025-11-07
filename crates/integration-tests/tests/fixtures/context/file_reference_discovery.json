@@ -38,10 +38,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "check src/main.rs",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -69,10 +65,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "issue is in",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -123,10 +115,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "config.toml",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -181,10 +169,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Update all three",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -211,10 +195,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "nonexistent.rs",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

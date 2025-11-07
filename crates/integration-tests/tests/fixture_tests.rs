@@ -15,10 +15,11 @@ use std::cmp::Reverse;
 use std::collections::HashMap;
 use std::fs::read_dir;
 use std::path::PathBuf;
+use std::process::abort;
 use std::time::{Duration, Instant};
 use tokio::runtime::Builder;
 use tokio::task::{LocalSet, spawn_blocking};
-use tracing::{debug, info};
+use tracing::{debug, error, info};
 
 #[cfg(feature = "timing-layer")]
 use integration_tests::{TimingData, TimingLayer};
@@ -194,12 +195,14 @@ async fn run_fixtures_in_dir(dir: PathBuf) -> Vec<FixtureRunResult> {
         .map(|fixture_path| {
             spawn_blocking(move || {
                 // Create a new single-threaded runtime for this fixture
-                // Panic on build failure since this is test infrastructure
-                #[allow(clippy::expect_used, reason = "Test infrastructure initialization")]
                 let runtime = Builder::new_current_thread()
                     .enable_all()
                     .build()
-                    .expect("Failed to create runtime for fixture");
+                    .unwrap_or_else(|build_error| {
+                        // Tests are allowed to abort on critical failures
+                        error!("FATAL: Failed to create runtime for fixture: {build_error}");
+                        abort();
+                    });
 
                 // Run the fixture in a LocalSet
                 LocalSet::new().block_on(&runtime, run_fixture(fixture_path))

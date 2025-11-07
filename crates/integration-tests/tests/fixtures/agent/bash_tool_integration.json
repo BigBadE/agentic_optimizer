@@ -28,10 +28,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "echo hello",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -56,10 +52,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "invalid bash command",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

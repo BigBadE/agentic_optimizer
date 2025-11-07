@@ -40,10 +40,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Fix the bug",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -79,10 +75,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "add error handling",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -108,10 +100,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "edge cases",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

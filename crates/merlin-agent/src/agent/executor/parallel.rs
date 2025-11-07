@@ -186,6 +186,8 @@ async fn execute_and_track_step(
         task_id: params.task_id,
         ui_channel: params.ui_channel,
         recursion_depth: params.recursion_depth,
+        retry_attempt: 0,
+        previous_result: None,
     })
     .await?;
 

@@ -39,10 +39,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Show me the main.rs",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -67,10 +63,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "lines 1-2",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -95,10 +87,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Read unicode.txt",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -123,10 +111,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "read nonexistent.rs",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

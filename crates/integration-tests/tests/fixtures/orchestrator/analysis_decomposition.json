@@ -34,10 +34,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Add a comment to the code",
-          "match_type": "exact"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -61,10 +57,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Refactor.*async/await",
-          "match_type": "regex"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -88,10 +80,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "non-existent",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -129,10 +117,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "workspace state",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -157,10 +141,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "custom configuration",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -184,10 +164,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "simple task.*decomposition",
-          "match_type": "regex"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -211,10 +187,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "canonicalization",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -239,10 +211,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "final verification",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

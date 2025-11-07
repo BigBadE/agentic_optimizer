@@ -33,7 +33,10 @@ pub use error::Error;
 pub use error::Result as CoreResult; // Renamed to avoid conflict
 pub use sync::IgnoreLock;
 pub use traits::ModelProvider;
-pub use types::{Context, FileContext, Query, Response, TokenUsage};
+pub use types::{
+    Context, ContextType, ExecutionResult, FileContext, PromptType, Query, Response,
+    RoutingContext, TokenUsage,
+};
 
 // Re-export types from merged modules (formerly merlin-types)
 pub use config::{

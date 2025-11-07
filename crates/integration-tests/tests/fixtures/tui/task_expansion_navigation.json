@@ -30,100 +30,56 @@
         }
       },
       "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "multi-step",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<any> {",
-            "  return {",
-            "    title: 'Multi-step task',",
-            "    steps: [",
-            "      {",
-            "        title: 'Step 1',",
-            "        description: 'Step 1: Initialize',",
-            "        step_type: 'implementation'",
-            "      },",
-            "      {",
-            "        title: 'Step 2',",
-            "        description: 'Step 2: Process',",
-            "        step_type: 'implementation'",
-            "      },",
-            "      {",
-            "        title: 'Step 3',",
-            "        description: 'Step 3: Finalize',",
-            "        step_type: 'implementation'",
-            "      }",
-            "    ]",
-            "  };",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "verify": {
-        "execution": {},
-        "ui": {}
-      },
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Step 1",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  return 'Step 1 completed';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "verify": {
-        "execution": {},
-        "ui": {}
-      },
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Step 2",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  return 'Step 2 completed';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "verify": {
-        "execution": {},
-        "ui": {}
-      },
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Step 3",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  return 'Step 3 completed';",
-            "}"
-          ]
-        }
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Multi-step task',",
+              "    steps: [",
+              "      {",
+              "        title: 'Step 1',",
+              "        description: 'Step 1: Initialize',",
+              "        step_type: 'implementation'",
+              "      },",
+              "      {",
+              "        title: 'Step 2',",
+              "        description: 'Step 2: Process',",
+              "        step_type: 'implementation'",
+              "      },",
+              "      {",
+              "        title: 'Step 3',",
+              "        description: 'Step 3: Finalize',",
+              "        step_type: 'implementation'",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  return 'Step 1 completed';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  return 'Step 2 completed';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  return 'Step 3 completed';",
+              "}"
+            ]
+          }
+        ]
       }
     },
     {

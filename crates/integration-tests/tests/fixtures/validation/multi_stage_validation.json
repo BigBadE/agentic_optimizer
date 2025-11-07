@@ -38,10 +38,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Validate",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

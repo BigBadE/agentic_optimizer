@@ -33,10 +33,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "successful echo",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -63,10 +59,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "failing command",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -93,10 +85,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "echo and grep",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -126,10 +114,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "stderr output",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -156,10 +140,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Count lines",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -190,10 +170,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "command substitution",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -220,10 +196,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "multiline output",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -249,10 +221,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "ls command",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

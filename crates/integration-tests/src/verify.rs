@@ -67,6 +67,9 @@ pub struct ExecutionVerify {
     /// Maximum retry attempts expected
     #[serde(default)]
     pub max_retry_attempts: Option<usize>,
+    /// Allow queries that don't match any registered event (default: false - fail on unmatched)
+    #[serde(default)]
+    pub allow_unmatched_queries: bool,
     /// Whether model tier escalation occurred
     #[serde(default)]
     pub escalation_occurred: Option<bool>,

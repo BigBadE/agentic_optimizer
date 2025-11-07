@@ -31,10 +31,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Long running",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -68,10 +64,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Interrupting",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

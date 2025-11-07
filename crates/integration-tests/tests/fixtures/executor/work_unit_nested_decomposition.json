@@ -25,121 +25,103 @@
     },
     {
       "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Build a feature",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<any> {",
-            "  return {",
-            "    title: 'Feature Development',",
-            "    steps: [",
-            "      {title: 'Design', description: 'Design the feature architecture', step_type: 'planning', dependencies: []},",
-            "      {title: 'Implement', description: 'Implement the feature', step_type: 'implementation', dependencies: ['Design']}",
-            "    ]",
-            "  };",
-            "}"
-          ]
+      "verify": {
+        "files": [
+          {
+            "path": "design.txt",
+            "exists": true
+          },
+          {
+            "path": "module.ts",
+            "exists": true
+          },
+          {
+            "path": "module.test.ts",
+            "exists": true
+          },
+          {
+            "path": "README.md",
+            "exists": true
+          }
+        ],
+        "ui": {
+          "work_unit": {
+            "exists": true,
+            "status": "completed",
+            "subtask_count": 2,
+            "progress_percentage": 100,
+            "is_terminal": true,
+            "tier_used": "test-mock",
+            "subtask_titles": [
+              "Design",
+              "Implement"
+            ]
+          }
         }
-      }
-    },
-    {
-      "type": "llm_response",
+      },
       "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Design the feature architecture",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('design.txt', 'Architecture: Modular design with clear interfaces');",
-            "  return 'Design complete';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Implement the feature",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<any> {",
-            "  return {",
-            "    title: 'Implementation Tasks',",
-            "    steps: [",
-            "      {title: 'Create Module', description: 'Create the main module file', step_type: 'implementation', dependencies: []},",
-            "      {title: 'Add Tests', description: 'Add unit tests', step_type: 'validation', dependencies: ['Create Module']},",
-            "      {title: 'Document', description: 'Add documentation', step_type: 'documentation', dependencies: ['Create Module']}",
-            "    ]",
-            "  };",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create the main module file",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('module.ts', 'export class Feature { constructor() {} }');",
-            "  return 'Module created';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Add unit tests",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('module.test.ts', 'describe(\"Feature\", () => { it(\"works\", () => {}) });');",
-            "  return 'Tests added';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Add documentation",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('README.md', '# Feature\\n\\nUsage instructions');",
-            "  return 'Documentation added';",
-            "}"
-          ]
-        }
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Feature Development',",
+              "    steps: [",
+              "      {title: 'Design', description: 'Design the feature architecture', step_type: 'planning', dependencies: []},",
+              "      {title: 'Implement', description: 'Implement the feature', step_type: 'implementation', dependencies: ['Design']}",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('design.txt', 'Architecture: Modular design with clear interfaces');",
+              "  return 'Design complete';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Implementation Tasks',",
+              "    steps: [",
+              "      {title: 'Create Module', description: 'Create the main module file', step_type: 'implementation', dependencies: []},",
+              "      {title: 'Add Tests', description: 'Add unit tests', step_type: 'validation', dependencies: ['Create Module']},",
+              "      {title: 'Document', description: 'Add documentation', step_type: 'documentation', dependencies: ['Create Module']}",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('module.ts', 'export class Feature { constructor() {} }');",
+              "  return 'Module created';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('module.test.ts', 'describe(\"Feature\", () => { it(\"works\", () => {}) });');",
+              "  return 'Tests added';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('README.md', '# Feature\\n\\nUsage instructions');",
+              "  return 'Documentation added';",
+              "}"
+            ]
+          }
+        ]
       }
     }
   ],

@@ -25,72 +25,12 @@
     {
       "type": "llm_response",
       "verify": {
-        "execution": {}
-      },
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Build frontend and backend",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code() {",
-            "  return {",
-            "    title: 'Build Application Components',",
-            "    steps: [",
-            "      {",
-            "        title: 'Build Frontend',",
-            "        description: 'Build frontend React components',",
-            "        step_type: 'implementation'",
-            "      },",
-            "      {",
-            "        title: 'Build Backend',",
-            "        description: 'Build backend API server',",
-            "        step_type: 'implementation'",
-            "      },",
-            "      {",
-            "        title: 'Integration Test',",
-            "        description: 'Run integration tests',",
-            "        step_type: 'validation'",
-            "      }",
-            "    ]",
-            "  };",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "verify": {
+        "execution": {},
         "files": [
           {
             "path": "frontend.js",
             "exists": true
-          }
-        ]
-      },
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Build frontend React components",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('frontend.js', 'const App = () => <div>Hello</div>;');",
-            "  return 'Frontend built successfully';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "verify": {
-        "files": [
+          },
           {
             "path": "backend.rs",
             "exists": true
@@ -98,44 +38,63 @@
         ]
       },
       "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Build backend API server",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('backend.rs', 'fn main() { println!(\"Server running\"); }');",
-            "  return 'Backend built successfully';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "verify": {
-        "execution": {}
-      },
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Run integration tests",
-          "match_type": "contains"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  const frontend = await readFile('frontend.js');",
-            "  const backend = await readFile('backend.rs');",
-            "  if (frontend && backend) {",
-            "    return 'Tests passed - both components exist';",
-            "  }",
-            "  return 'Tests failed';",
-            "}"
-          ]
-        }
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code() {",
+              "  return {",
+              "    title: 'Build Application Components',",
+              "    steps: [",
+              "      {",
+              "        title: 'Build Frontend',",
+              "        description: 'Build frontend React components',",
+              "        step_type: 'implementation'",
+              "      },",
+              "      {",
+              "        title: 'Build Backend',",
+              "        description: 'Build backend API server',",
+              "        step_type: 'implementation'",
+              "      },",
+              "      {",
+              "        title: 'Integration Test',",
+              "        description: 'Run integration tests',",
+              "        step_type: 'validation'",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('frontend.js', 'const App = () => <div>Hello</div>;');",
+              "  return 'Frontend built successfully';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('backend.rs', 'fn main() { println!(\"Server running\"); }');",
+              "  return 'Backend built successfully';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  const frontend = await readFile('frontend.js');",
+              "  const backend = await readFile('backend.rs');",
+              "  if (frontend && backend) {",
+              "    return 'Tests passed - both components exist';",
+              "  }",
+              "  return 'Tests failed';",
+              "}"
+            ]
+          }
+        ]
       }
     }
   ],

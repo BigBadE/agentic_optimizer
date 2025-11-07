@@ -35,10 +35,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "small file",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -66,10 +62,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "deeply nested",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -97,10 +89,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "path traversal",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -125,10 +113,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "matches nothing",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -155,10 +139,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "max_files=1",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -185,10 +165,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "same file multiple times",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -215,10 +191,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Mix glob patterns",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -246,10 +218,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "file size tracking",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

@@ -32,10 +32,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Check src/main.rs",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -78,10 +74,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Fix both files",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

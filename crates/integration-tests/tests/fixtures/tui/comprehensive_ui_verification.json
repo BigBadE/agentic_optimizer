@@ -60,10 +60,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Second input",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -103,10 +99,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Create a new file",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -137,10 +129,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Third task",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

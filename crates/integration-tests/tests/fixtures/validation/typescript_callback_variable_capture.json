@@ -24,40 +24,6 @@
     },
     {
       "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create file with specific content",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<any> {",
-            "  const expectedContent = 'Hello, World!';",
-            "  const filename = 'test.txt';",
-            "  return {",
-            "    title: 'Create File',",
-            "    steps: [",
-            "      {",
-            "        title: 'Write File',",
-            "        description: 'Create test.txt with specific content',",
-            "        step_type: 'implementation',",
-            "        exit_requirement: async () => {",
-            "          const content = await readFile(filename);",
-            "          if (content !== expectedContent) {",
-            "            throw new Error('Content mismatch: expected ' + expectedContent + ', got ' + content);",
-            "          }",
-            "        }",
-            "      }",
-            "    ]",
-            "  };",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
       "verify": {
         "files": [
           {
@@ -70,19 +36,41 @@
         ]
       },
       "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create test.txt with specific content",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('test.txt', 'Hello, World!');",
-            "  return 'Created test.txt';",
-            "}"
-          ]
-        }
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  const expectedContent = 'Hello, World!';",
+              "  const filename = 'test.txt';",
+              "  return {",
+              "    title: 'Create File',",
+              "    steps: [",
+              "      {",
+              "        title: 'Write File',",
+              "        description: 'Create test.txt with specific content',",
+              "        step_type: 'implementation',",
+              "        exit_requirement: async () => {",
+              "          const content = await readFile(filename);",
+              "          if (content !== expectedContent) {",
+              "            throw new Error('Content mismatch: expected ' + expectedContent + ', got ' + content);",
+              "          }",
+              "        }",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('test.txt', 'Hello, World!');",
+              "  return 'Created test.txt';",
+              "}"
+            ]
+          }
+        ]
       }
     }
   ],

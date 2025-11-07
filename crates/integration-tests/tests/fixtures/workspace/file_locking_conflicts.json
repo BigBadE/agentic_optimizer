@@ -42,10 +42,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "acquiring lock",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -87,10 +83,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "independent files",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -129,10 +121,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "releasing locks",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -172,10 +160,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "conflict detection",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

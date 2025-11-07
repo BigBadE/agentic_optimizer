@@ -44,10 +44,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Modify test\\.rs",
-          "match_type": "regex"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<void> {",
@@ -82,10 +78,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "goodbye",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<void> {",
@@ -110,10 +102,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "workspace",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -137,10 +125,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "configuration",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

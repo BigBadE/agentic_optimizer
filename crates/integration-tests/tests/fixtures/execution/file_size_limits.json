@@ -49,10 +49,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "compare",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

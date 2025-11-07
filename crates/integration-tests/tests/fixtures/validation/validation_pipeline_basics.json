@@ -28,10 +28,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Test validation pipeline",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -56,10 +52,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "custom pipeline",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -83,10 +75,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "empty pipeline",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -110,10 +98,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "single stage",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -137,10 +121,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "stage metadata",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -164,10 +144,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "score normalization",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -191,10 +167,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "quick validation",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -218,10 +190,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "pipeline chaining",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

@@ -48,10 +48,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "streaming output",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -81,10 +77,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "status transition",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

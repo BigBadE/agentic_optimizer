@@ -45,10 +45,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "promise chaining",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -79,10 +75,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "promise rejection",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -146,10 +138,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "complex async workflow",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -189,10 +177,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "error propagation",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -241,10 +225,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "bash and file operations asynchronously",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -283,10 +263,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "returning complex objects",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code() {",

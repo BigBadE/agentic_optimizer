@@ -101,6 +101,11 @@ Tests instantiate the actual `TuiApp` from `merlin-cli` with:
   - Only provides crossterm events for the current fixture event
   - Prevents event queue drainage issues by controlling event availability
 - Read-only access to TUI state for verification (via `test-util` feature)
+- **Real routing with mock responses**: Uses actual `StrategyRouter` from `merlin-routing`
+  - Registers `MockProvider` as the provider for test model (`Qwen25Coder32B`)
+  - Custom `ModelRegistry` routes all difficulty levels (1-10) to the mock model
+  - Exercises real routing logic while providing controlled, pattern-matched responses
+  - Auto-matches queries to registered event strategies when no explicit event is set
 - **Automatic cleanup**: Thread and task files are cleaned up after each test completes
   - Threads stored in `workspace/.merlin/threads/`
   - Tasks stored in `workspace/.merlin/tasks/`
@@ -162,7 +167,7 @@ See [TIMING.md](../../TIMING.md) for detailed performance analysis.
 - `TestFixture` - Fixture structure
 - `UnifiedTestRunner` - Test execution using actual CLI
 - `UnifiedVerifier` - Verification logic
-- `PatternMockProvider` - Mock LLM responses based on patterns
+- `MockProvider` - Mock LLM provider with event-based response strategies
 - `FixtureEventSource` - Event source for fixture-based testing
 
 ## Features
@@ -191,12 +196,84 @@ let (tui_app, _) = TuiApp::new_for_test(backend, event_source, workspace_dir)?;
 let state = tui_app.test_state();
 ```
 
-### Pattern-Based Mocking
-`PatternMockProvider` returns responses based on query patterns:
+### Event-Based Mocking
 
-```rust
-let provider = PatternMockProvider::new();
-provider.add_pattern("error handling", "Added error handling...");
+`MockProvider` supports two matching strategies:
+
+**1. Routing-Based Matching (Recommended)**
+
+Matches based on routing decisions rather than query content:
+
+```json
+{
+  "type": "llm_response",
+  "strategy": {
+    "type": "once",
+    "routing_match": {
+      "context_type": "step_execution",
+      "prompt_type": "design",
+      "retry_attempt": 0
+    },
+    "response": {
+      "typescript": ["return 'Matched based on routing!';"]
+    }
+  }
+}
+```
+
+**2. Pattern-Based Matching (Legacy)**
+
+Matches based on query string patterns:
+
+```json
+{
+  "type": "llm_response",
+  "strategy": {
+    "type": "once",
+    "trigger": {
+      "pattern": "hello",
+      "match_type": "contains",
+      "match_against": "query"
+    },
+    "response": {
+      "typescript": ["return 'Hello, world!';"]
+    }
+  }
+}
+```
+
+The system uses the real `StrategyRouter` from `merlin-routing` with a custom `ModelRegistry` that routes all difficulty levels to the mock provider. This ensures tests exercise the actual routing logic while using controlled mock responses.
+
+### Retry Testing
+
+Fixtures can test retry logic with routing-based retry responses:
+
+```json
+{
+  "type": "llm_response",
+  "strategy": {
+    "type": "once",
+    "routing_match": {
+      "prompt_type": "design",
+      "retry_attempt": 0
+    },
+    "response": {
+      "typescript": ["return 'First attempt (will fail)';"]
+    }
+  },
+  "retry_responses": [
+    {
+      "routing_match": {
+        "prompt_type": "debug",
+        "retry_attempt": 1,
+        "previous_result": "soft_error"
+      },
+      "response": {
+        "typescript": ["return 'Second attempt with debug prompt';"]
+      }
+    }
+  ]
+}
 ```
 
 ### Comprehensive Verification

@@ -32,10 +32,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Request first file",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -60,10 +56,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Request second file",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -88,10 +80,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "lib.rs again",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -116,10 +104,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "third unique file",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

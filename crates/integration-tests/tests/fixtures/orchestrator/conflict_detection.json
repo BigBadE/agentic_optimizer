@@ -45,10 +45,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "shared\\.rs.*hello",
-          "match_type": "regex"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<void> {",
@@ -81,10 +77,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "shared\\.rs.*goodbye",
-          "match_type": "regex"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<void> {",
@@ -117,10 +109,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "file_a.rs",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<void> {",
@@ -153,10 +141,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "file_b.rs",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<void> {",
@@ -180,10 +164,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "conflict detection",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",
@@ -210,10 +190,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "concurrent",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

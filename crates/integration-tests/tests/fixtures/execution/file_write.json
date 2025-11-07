@@ -39,10 +39,6 @@
       },
       "strategy": {
         "type": "once",
-        "trigger": {
-          "pattern": "Create a config file",
-          "match_type": "contains"
-        },
         "response": {
           "typescript": [
             "async function agent_code(): Promise<string> {",

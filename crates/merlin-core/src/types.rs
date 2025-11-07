@@ -1,4 +1,5 @@
 use serde::{Deserialize, Serialize};
+use std::collections::HashMap;
 use std::fs::read_to_string;
 use std::path::PathBuf;
 
@@ -13,6 +14,9 @@ pub struct Query {
     pub conversation_id: Option<String>,
     /// Paths to files that provide additional context for the query.
     pub files_context: Vec<PathBuf>,
+    /// Routing context for test infrastructure and debugging.
+    #[serde(default)]
+    pub routing_context: RoutingContext,
 }
 
 impl Query {
@@ -22,6 +26,7 @@ impl Query {
             text: text.into(),
             conversation_id: None,
             files_context: Vec::default(),
+            routing_context: RoutingContext::default(),
         }
     }
 
@@ -29,6 +34,13 @@ impl Query {
     #[must_use]
     pub fn with_files(mut self, files: Vec<PathBuf>) -> Self {
         self.files_context = files;
+        self
+    }
+
+    /// Sets the routing context for this query.
+    #[must_use]
+    pub fn with_routing_context(mut self, routing_context: RoutingContext) -> Self {
+        self.routing_context = routing_context;
         self
     }
 }
@@ -76,8 +88,8 @@ pub struct Context {
     /// System-level instructions for the model.
     pub system_prompt: String,
     /// Optional metadata for test infrastructure (ignored by real providers)
-    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
-    pub metadata: std::collections::HashMap<String, String>,
+    #[serde(default, skip_serializing_if = "HashMap::is_empty")]
+    pub metadata: HashMap<String, String>,
 }
 
 impl Context {
@@ -86,7 +98,7 @@ impl Context {
         Self {
             files: Vec::default(),
             system_prompt: system_prompt.into(),
-            metadata: std::collections::HashMap::new(),
+            metadata: HashMap::new(),
         }
     }
 
@@ -315,4 +327,74 @@ mod tests {
         assert_eq!(response.provider, deserialized.provider);
         Ok(())
     }
+}
+
+/// Routing context for tracking execution flow and testing.
+///
+/// This context is populated by the agent during execution and used by
+/// the test infrastructure to match expected routing decisions.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct RoutingContext {
+    /// What type of work is this query for?
+    pub context_type: ContextType,
+    /// What prompt strategy is being used?
+    pub prompt_type: PromptType,
+    /// Estimated difficulty level (1-10).
+    pub estimated_difficulty: Option<u8>,
+    /// Which retry attempt is this (0 for first attempt)?
+    pub retry_attempt: u8,
+    /// Result classification from previous attempt if this is a retry.
+    pub previous_result: Option<ExecutionResult>,
+}
+
+impl Default for RoutingContext {
+    fn default() -> Self {
+        Self {
+            context_type: ContextType::Conversation,
+            prompt_type: PromptType::Design,
+            estimated_difficulty: None,
+            retry_attempt: 0,
+            previous_result: None,
+        }
+    }
+}
+
+/// Type of context or work being performed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ContextType {
+    /// Initial task analysis and decomposition into steps.
+    TaskDecomposition,
+    /// Executing a specific step from a task list.
+    StepExecution,
+    /// Validation or verification of results.
+    Validation,
+    /// Error recovery or debugging.
+    ErrorRecovery,
+    /// General conversation or query response.
+    Conversation,
+}
+
+/// Type of prompt being used for this query.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum PromptType {
+    /// Standard design and implementation prompt.
+    Design,
+    /// Debug and error analysis prompt.
+    Debug,
+    /// Validation and verification prompt.
+    Validation,
+    /// Planning and decomposition prompt.
+    Planning,
+}
+
+/// Execution result classification for retry logic.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "snake_case")]
+pub enum ExecutionResult {
+    /// Soft error - retry with same tier but different prompt.
+    SoftError,
+    /// Hard error - escalate to higher tier.
+    HardError,
 }

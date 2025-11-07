@@ -25,60 +25,11 @@
     },
     {
       "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create file that will fail",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<any> {",
-            "  return {",
-            "    title: 'Create file that will fail',",
-            "    steps: [",
-            "      {",
-            "        title: 'Attempt file creation',",
-            "        description: 'Create output.txt',",
-            "        step_type: 'implementation',",
-            "        exit_requirement: async () => {",
-            "          const content = await readFile('output.txt');",
-            "          if (!content.includes('success')) {",
-            "            throw new Error('[SOFT] Output missing success marker');",
-            "          }",
-            "        }",
-            "      }",
-            "    ]",
-            "  };",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
-      "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create output.txt",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('output.txt', 'incomplete');",
-            "  return 'Created output.txt (incomplete)';",
-            "}"
-          ]
-        }
-      }
-    },
-    {
-      "type": "llm_response",
       "verify": {
         "files": [
           {
             "path": "output.txt",
+            "exists": true,
             "contains": [
               "success"
             ]
@@ -86,19 +37,47 @@
         ]
       },
       "strategy": {
-        "type": "once",
-        "trigger": {
-          "pattern": "Create output.txt",
-          "match_type": "exact"
-        },
-        "response": {
-          "typescript": [
-            "async function agent_code(): Promise<string> {",
-            "  await writeFile('output.txt', 'success marker added');",
-            "  return 'Created output.txt with success marker';",
-            "}"
-          ]
-        }
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Create file that will fail',",
+              "    steps: [",
+              "      {",
+              "        title: 'Attempt file creation',",
+              "        description: 'Create output.txt',",
+              "        step_type: 'implementation',",
+              "        exit_requirement: async () => {",
+              "          const content = await readFile('output.txt');",
+              "          if (!content.includes('success')) {",
+              "            throw new Error('[SOFT] Output missing success marker');",
+              "          }",
+              "        }",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('output.txt', 'incomplete');",
+              "  return 'Created output.txt (incomplete)';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('output.txt', 'success marker added');",
+              "  return 'Created output.txt with success marker';",
+              "}"
+            ]
+          }
+        ]
       }
     }
   ],

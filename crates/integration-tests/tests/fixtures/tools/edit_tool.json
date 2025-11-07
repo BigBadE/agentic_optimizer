@@ -11,7 +11,7 @@
       "src/lib.rs": "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n",
       "test.txt": "foo bar foo baz foo",
       "multiline.txt": "Line 1\nLine 2\nLine 3\nLine 4\nLine 5\n",
-      "unicode.txt": "Hello 世界 🌍\nRust 🦀 is great!\n"
+      "unicode.txt": "Hello \u4e16\u754c \ud83c\udf0d\nRust \ud83e\udd80 is great!\n"
     },
     "terminal_size": [
       80,
@@ -28,19 +28,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Change add to multiply",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await editFile('src/lib.rs', 'a + b', 'a * b');",
-          "  const content = await readFile('src/lib.rs');",
-          "  return `Updated lib.rs to multiply:\\n${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -55,6 +42,22 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Change add to multiply",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await editFile('src/lib.rs', 'a + b', 'a * b');",
+            "  const content = await readFile('src/lib.rs');",
+            "  return `Updated lib.rs to multiply:\\n${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -66,19 +69,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Replace all 'foo'",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await editFile('test.txt', 'foo', 'FOO', { replace_all: true });",
-          "  const content = await readFile('test.txt');",
-          "  return `Replaced all occurrences: ${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -88,6 +78,22 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Replace all 'foo'",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await editFile('test.txt', 'foo', 'FOO', { replace_all: true });",
+            "  const content = await readFile('test.txt');",
+            "  return `Replaced all occurrences: ${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -99,25 +105,28 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "without replace_all",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    await editFile('test.txt', 'FOO', 'foo');",
-          "    return 'Unexpectedly succeeded';",
-          "  } catch (error) {",
-          "    return `Expected error: ${error}`;",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "without replace_all",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    await editFile('test.txt', 'FOO', 'foo');",
+            "    return 'Unexpectedly succeeded';",
+            "  } catch (error) {",
+            "    return `Expected error: ${error}`;",
+            "  }",
+            "}"
+          ]
         }
       }
     },
@@ -130,19 +139,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Edit line 3",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await editFile('multiline.txt', 'Line 3', 'Modified Line 3');",
-          "  const content = await readFile('multiline.txt');",
-          "  return `Updated multiline.txt:\\n${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -158,6 +154,22 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Edit line 3",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await editFile('multiline.txt', 'Line 3', 'Modified Line 3');",
+            "  const content = await readFile('multiline.txt');",
+            "  return `Updated multiline.txt:\\n${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -169,19 +181,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Replace unicode",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await editFile('unicode.txt', '世界', 'World');",
-          "  const content = await readFile('unicode.txt');",
-          "  return `Updated unicode file: ${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -189,15 +188,31 @@
             "exists": true,
             "contains": [
               "World",
-              "🌍",
-              "🦀"
+              "\ud83c\udf0d",
+              "\ud83e\udd80"
             ],
             "not_contains": [
-              "世界"
+              "\u4e16\u754c"
             ]
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Replace unicode",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await editFile('unicode.txt', '\u4e16\u754c', 'World');",
+            "  const content = await readFile('unicode.txt');",
+            "  return `Updated unicode file: ${content}`;",
+            "}"
+          ]
+        }
       }
     }
   ],
@@ -226,7 +241,7 @@
           "World"
         ],
         "not_contains": [
-          "世界"
+          "\u4e16\u754c"
         ]
       }
     ]

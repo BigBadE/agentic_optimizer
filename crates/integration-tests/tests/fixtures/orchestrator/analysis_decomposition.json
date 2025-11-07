@@ -29,19 +29,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Add a comment to the code",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Simple request analyzed: Adding comment is a basic operation requiring minimal complexity.';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Add a comment to the code",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Simple request analyzed: Adding comment is a basic operation requiring minimal complexity.';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -53,19 +56,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Refactor.*async/await",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Complex request analyzed: Refactoring entire codebase requires decomposition into multiple subtasks:\\n1. Identify all synchronous functions\\n2. Convert to async\\n3. Update call sites\\n4. Run tests\\n5. Validate compilation';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Refactor.*async/await",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Complex request analyzed: Refactoring entire codebase requires decomposition into multiple subtasks:\\n1. Identify all synchronous functions\\n2. Convert to async\\n3. Update call sites\\n4. Run tests\\n5. Validate compilation';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -77,24 +83,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "non-existent",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    await readFile('nonexistent.txt');",
-          "    return 'File found unexpectedly';",
-          "  } catch (err) {",
-          "    return 'Workspace correctly handles missing files: file not found';",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "non-existent",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    await readFile('nonexistent.txt');",
+            "    return 'File found unexpectedly';",
+            "  } catch (err) {",
+            "    return 'Workspace correctly handles missing files: file not found';",
+            "  }",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -106,18 +115,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "workspace state",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('sample.txt');",
-          "  return `Workspace state verified. Root path accessible. File content: ${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -129,6 +126,21 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "workspace state",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = await readFile('sample.txt');",
+            "  return `Workspace state verified. Root path accessible. File content: ${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -140,19 +152,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "custom configuration",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Orchestrator configuration applied:\\n- max_concurrent_tasks: 4\\n- conflict_detection: enabled\\n- validation_early_exit: true\\nConfiguration successfully validated.';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "custom configuration",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Orchestrator configuration applied:\\n- max_concurrent_tasks: 4\\n- conflict_detection: enabled\\n- validation_early_exit: true\\nConfiguration successfully validated.';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -164,19 +179,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "simple task.*decomposition",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Task analysis complete: Simple task does not require decomposition. Single atomic operation identified.';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "simple task.*decomposition",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Task analysis complete: Simple task does not require decomposition. Single atomic operation identified.';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -188,20 +206,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "canonicalization",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const files = await listFiles('.');",
-          "  return `Workspace root path canonicalized successfully. Found ${files.length} files in workspace.`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "canonicalization",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const files = await listFiles('.');",
+            "  return `Workspace root path canonicalized successfully. Found ${files.length} files in workspace.`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -213,21 +234,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "final verification",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const files = await listFiles('.');",
-          "  const sampleContent = await readFile('sample.txt');",
-          "  return `Orchestrator analysis verification complete:\\n- Request analysis: ✓\\n- Task decomposition: ✓\\n- Workspace operations: ✓\\n- Configuration handling: ✓\\n- Files in workspace: ${files.length}\\n- Sample content verified: ${sampleContent.includes('Sample file')}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "final verification",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const files = await listFiles('.');",
+            "  const sampleContent = await readFile('sample.txt');",
+            "  return `Orchestrator analysis verification complete:\\n- Request analysis: \u2713\\n- Task decomposition: \u2713\\n- Workspace operations: \u2713\\n- Configuration handling: \u2713\\n- Files in workspace: ${files.length}\\n- Sample content verified: ${sampleContent.includes('Sample file')}`;",
+            "}"
+          ]
+        }
       }
     }
   ],

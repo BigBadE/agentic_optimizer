@@ -215,6 +215,12 @@ impl UnifiedTestRunner {
             verify_before_start.elapsed().as_secs_f64()
         );
 
+        // Set current event for mock provider
+        let set_event_start = Instant::now();
+        let event_id = llm_event.id.clone().unwrap_or_else(|| "default".to_owned());
+        self.provider.set_current_event(Some(event_id))?;
+        tracing::debug!("  set_event: {:.3}s", set_event_start.elapsed().as_secs_f64());
+
         let process_ui_start = Instant::now();
         self.process_pending_ui_events();
         tracing::debug!(
@@ -233,7 +239,7 @@ impl UnifiedTestRunner {
         };
 
         let verify_after_start = Instant::now();
-        verifier
+        let verify_result = verifier
             .verify_event(&VerifyEventContext {
                 event,
                 verify: verify_config,
@@ -241,12 +247,19 @@ impl UnifiedTestRunner {
                 execution_tracker,
                 provider: Some(&self.provider),
             })
-            .await
-            .map_err(RoutingError::ExecutionFailed)?;
+            .await;
         tracing::debug!(
             "  verify_after: {:.3}s",
             verify_after_start.elapsed().as_secs_f64()
         );
+
+        // Clear current event (even if verification failed)
+        let clear_event_start = Instant::now();
+        self.provider.set_current_event(None)?;
+        tracing::debug!("  clear_event: {:.3}s", clear_event_start.elapsed().as_secs_f64());
+
+        // Now check verification result
+        verify_result.map_err(RoutingError::ExecutionFailed)?;
 
         self.event_controller.advance();
         tracing::debug!(

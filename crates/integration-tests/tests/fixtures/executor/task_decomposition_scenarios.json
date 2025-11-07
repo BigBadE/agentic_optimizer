@@ -29,29 +29,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Process files sequentially",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // TaskAction::Decompose with ExecutionMode::Sequential",
-          "  // Subtask 1: Read first file",
-          "  const content1 = await readFile('input1.txt');",
-          "  ",
-          "  // Subtask 2: Read second file",
-          "  const content2 = await readFile('input2.txt');",
-          "  ",
-          "  // Subtask 3: Read third file and combine",
-          "  const content3 = await readFile('input3.txt');",
-          "  const combined = `${content1}\\n${content2}\\n${content3}`;",
-          "  ",
-          "  await writeFile('sequential_output.txt', combined);",
-          "  return `Sequential processing complete: ${combined.length} chars`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -65,6 +42,32 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Process files sequentially",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // TaskAction::Decompose with ExecutionMode::Sequential",
+            "  // Subtask 1: Read first file",
+            "  const content1 = await readFile('input1.txt');",
+            "  ",
+            "  // Subtask 2: Read second file",
+            "  const content2 = await readFile('input2.txt');",
+            "  ",
+            "  // Subtask 3: Read third file and combine",
+            "  const content3 = await readFile('input3.txt');",
+            "  const combined = `${content1}\\n${content2}\\n${content3}`;",
+            "  ",
+            "  await writeFile('sequential_output.txt', combined);",
+            "  return `Sequential processing complete: ${combined.length} chars`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -76,28 +79,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "independent output files",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // TaskAction::Decompose with ExecutionMode::Parallel",
-          "  // Subtasks can be executed in parallel (independent writes)",
-          "  const input1 = await readFile('input1.txt');",
-          "  await writeFile('output1.txt', input1.toUpperCase());",
-          "  ",
-          "  const input2 = await readFile('input2.txt');",
-          "  await writeFile('output2.txt', input2.toUpperCase());",
-          "  ",
-          "  const input3 = await readFile('input3.txt');",
-          "  await writeFile('output3.txt', input3.toUpperCase());",
-          "  ",
-          "  return 'Parallel-style processing complete';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -123,6 +104,31 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "independent output files",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // TaskAction::Decompose with ExecutionMode::Parallel",
+            "  // Subtasks can be executed in parallel (independent writes)",
+            "  const input1 = await readFile('input1.txt');",
+            "  await writeFile('output1.txt', input1.toUpperCase());",
+            "  ",
+            "  const input2 = await readFile('input2.txt');",
+            "  await writeFile('output2.txt', input2.toUpperCase());",
+            "  ",
+            "  const input3 = await readFile('input3.txt');",
+            "  await writeFile('output3.txt', input3.toUpperCase());",
+            "  ",
+            "  return 'Parallel-style processing complete';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -134,32 +140,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "complex multi-step",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Complex task with multiple subtasks of varying complexity",
-          "  // Step 1: Read and validate (Simple)",
-          "  const data = await readFile('input1.txt');",
-          "  if (!data) throw new Error('No data');",
-          "  ",
-          "  // Step 2: Transform (Medium complexity)",
-          "  const transformed = data.split(' ').reverse().join(' ').toUpperCase();",
-          "  ",
-          "  // Step 3: Write intermediate result (Simple)",
-          "  await writeFile('intermediate.txt', transformed);",
-          "  ",
-          "  // Step 4: Final processing (Medium complexity)",
-          "  const final_result = transformed + ' - PROCESSED';",
-          "  await writeFile('final.txt', final_result);",
-          "  ",
-          "  return `Pipeline complete: ${final_result.length} chars`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -178,6 +158,35 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "complex multi-step",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Complex task with multiple subtasks of varying complexity",
+            "  // Step 1: Read and validate (Simple)",
+            "  const data = await readFile('input1.txt');",
+            "  if (!data) throw new Error('No data');",
+            "  ",
+            "  // Step 2: Transform (Medium complexity)",
+            "  const transformed = data.split(' ').reverse().join(' ').toUpperCase();",
+            "  ",
+            "  // Step 3: Write intermediate result (Simple)",
+            "  await writeFile('intermediate.txt', transformed);",
+            "  ",
+            "  // Step 4: Final processing (Medium complexity)",
+            "  const final_result = transformed + ' - PROCESSED';",
+            "  await writeFile('final.txt', final_result);",
+            "  ",
+            "  return `Pipeline complete: ${final_result.length} chars`;",
+            "}"
+          ]
+        }
       }
     }
   ],

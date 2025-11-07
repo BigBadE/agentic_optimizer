@@ -24,22 +24,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Write a test file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "function agent_code() {",
-          "  const content = 'Hello from TypeScript!';",
-          "  const filename = 'test.txt';",
-          "  ",
-          "  writeFile(filename, content);",
-          "  ",
-          "  return { message: 'File written', filename, content };",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_value_contains": {
@@ -55,6 +39,25 @@
             "exact_content": "Hello from TypeScript!"
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Write a test file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "function agent_code() {",
+            "  const content = 'Hello from TypeScript!';",
+            "  const filename = 'test.txt';",
+            "  ",
+            "  writeFile(filename, content);",
+            "  ",
+            "  return { message: 'File written', filename, content };",
+            "}"
+          ]
+        }
       }
     }
   ],

@@ -23,18 +23,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "ValidationError",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Should find error_handler.rs with ValidationError enum variant",
-          "  return 'Found ValidationError in src/error_handler.rs';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
@@ -43,6 +31,21 @@
           "output_contains": [
             "ValidationError",
             "error_handler"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "ValidationError",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Should find error_handler.rs with ValidationError enum variant",
+            "  return 'Found ValidationError in src/error_handler.rs';",
+            "}"
           ]
         }
       }

@@ -23,22 +23,25 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "First thread",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Response in thread 1';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 1,
           "thread_count": 1
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "First thread",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Response in thread 1';",
+            "}"
+          ]
         }
       }
     },
@@ -46,7 +49,10 @@
       "type": "key_press",
       "data": {
         "key": "t",
-        "modifiers": ["ctrl", "shift"]
+        "modifiers": [
+          "ctrl",
+          "shift"
+        ]
       },
       "verify": {
         "ui": {
@@ -83,27 +89,33 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Second thread",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Response in thread 2';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Second thread",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Response in thread 2';",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "key_press",
       "data": {
         "key": "t",
-        "modifiers": ["ctrl", "shift"]
+        "modifiers": [
+          "ctrl",
+          "shift"
+        ]
       },
       "verify": {
         "ui": {

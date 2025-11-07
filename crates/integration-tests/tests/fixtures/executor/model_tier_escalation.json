@@ -1,10 +1,18 @@
 {
   "name": "Model Tier Escalation",
   "description": "Tests automatic escalation to higher model tiers on failure",
-  "tags": ["executor", "escalation", "retry", "work_unit"],
+  "tags": [
+    "executor",
+    "escalation",
+    "retry",
+    "work_unit"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -16,16 +24,19 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Test escalation",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Escalation test complete';",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Test escalation",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Escalation test complete';",
+            "}"
+          ]
+        }
       }
     }
   ],

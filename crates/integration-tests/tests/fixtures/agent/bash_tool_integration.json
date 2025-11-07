@@ -23,20 +23,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "echo hello",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await bash('echo hello');",
-          "  return `Command output: ${result}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "echo hello",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await bash('echo hello');",
+            "  return `Command output: ${result}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -48,24 +51,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "invalid bash command",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    const result = await bash('%%%invalid%%%');",
-          "    return `Unexpectedly succeeded: ${result}`;",
-          "  } catch (error) {",
-          "    return `Handled error gracefully: Command failed as expected`;",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "invalid bash command",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    const result = await bash('%%%invalid%%%');",
+            "    return `Unexpectedly succeeded: ${result}`;",
+            "  } catch (error) {",
+            "    return `Handled error gracefully: Command failed as expected`;",
+            "  }",
+            "}"
+          ]
+        }
       }
     }
   ],

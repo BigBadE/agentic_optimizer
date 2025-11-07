@@ -23,18 +23,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "email",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Should find src/validator.rs but NOT test files",
-          "  return 'Found email validation in src/validator.rs';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
@@ -43,6 +31,21 @@
           "output_contains": [
             "email",
             "validation"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "email",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Should find src/validator.rs but NOT test files",
+            "  return 'Found email validation in src/validator.rs';",
+            "}"
           ]
         }
       }

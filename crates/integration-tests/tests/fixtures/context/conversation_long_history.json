@@ -26,19 +26,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Start counting",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Starting count: 1';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Start counting",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Starting count: 1';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -50,17 +53,20 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Continue to 2",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "return 'Count: 2';"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Continue to 2",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "return 'Count: 2';"
+          ]
+        }
       }
     },
     {
@@ -72,17 +78,20 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Continue to 3",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "return 'Count: 3';"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Continue to 3",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "return 'Count: 3';"
+          ]
+        }
       }
     },
     {
@@ -94,17 +103,20 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Continue to 4",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "return 'Count: 4';"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Continue to 4",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "return 'Count: 4';"
+          ]
+        }
       }
     },
     {
@@ -116,17 +128,20 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Continue to 5",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "return 'Count: 5';"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Continue to 5",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "return 'Count: 5';"
+          ]
+        }
       }
     },
     {
@@ -138,17 +153,20 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Continue to 6",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "return 'Count: 6';"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Continue to 6",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "return 'Count: 6';"
+          ]
+        }
       }
     },
     {
@@ -160,17 +178,20 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Continue to 7",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "return 'Count: 7';"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Continue to 7",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "return 'Count: 7';"
+          ]
+        }
       }
     },
     {
@@ -182,17 +203,20 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Continue to 8",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "return 'Count: 8';"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Continue to 8",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "return 'Count: 8';"
+          ]
+        }
       }
     },
     {
@@ -204,17 +228,20 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Continue to 9",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "return 'Count: 9';"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Continue to 9",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "return 'Count: 9';"
+          ]
+        }
       }
     },
     {
@@ -226,17 +253,20 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Continue to 10",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "return 'Count: 10';"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Continue to 10",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "return 'Count: 10';"
+          ]
+        }
       }
     },
     {
@@ -248,19 +278,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "first number",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Based on our conversation history, the first number was 1';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "first number",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Based on our conversation history, the first number was 1';",
+            "}"
+          ]
+        }
       }
     }
   ],

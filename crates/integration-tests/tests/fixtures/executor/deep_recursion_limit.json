@@ -1,10 +1,18 @@
 {
   "name": "Deep Recursion Approaching Limit",
   "description": "Tests task decomposition with recursion depth approaching the MAX_RECURSION_DEPTH limit",
-  "tags": ["executor", "decomposition", "recursion", "limits"],
+  "tags": [
+    "executor",
+    "decomposition",
+    "recursion",
+    "limits"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -16,109 +24,126 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create deeply nested structure",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  return {",
-          "    title: 'Level 1',",
-          "    steps: [{",
-          "      title: 'Decompose to level 2',",
-          "      description: 'Go deeper level 2',",
-          "      step_type: 'implementation'",
-          "    }]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create deeply nested structure",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Level 1',",
+            "    steps: [{",
+            "      title: 'Decompose to level 2',",
+            "      description: 'Go deeper level 2',",
+            "      step_type: 'implementation'",
+            "    }]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Go deeper level 2",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  return {",
-          "    title: 'Level 2',",
-          "    steps: [{",
-          "      title: 'Decompose to level 3',",
-          "      description: 'Go deeper level 3',",
-          "      step_type: 'implementation'",
-          "    }]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Go deeper level 2",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Level 2',",
+            "    steps: [{",
+            "      title: 'Decompose to level 3',",
+            "      description: 'Go deeper level 3',",
+            "      step_type: 'implementation'",
+            "    }]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Go deeper level 3",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  return {",
-          "    title: 'Level 3',",
-          "    steps: [{",
-          "      title: 'Decompose to level 4',",
-          "      description: 'Go deeper level 4',",
-          "      step_type: 'implementation'",
-          "    }]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Go deeper level 3",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Level 3',",
+            "    steps: [{",
+            "      title: 'Decompose to level 4',",
+            "      description: 'Go deeper level 4',",
+            "      step_type: 'implementation'",
+            "    }]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Go deeper level 4",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  return {",
-          "    title: 'Level 4',",
-          "    steps: [{",
-          "      title: 'Final implementation',",
-          "      description: 'Complete the task',",
-          "      step_type: 'implementation'",
-          "    }]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Go deeper level 4",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Level 4',",
+            "    steps: [{",
+            "      title: 'Final implementation',",
+            "      description: 'Complete the task',",
+            "      step_type: 'implementation'",
+            "    }]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Complete the task",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('deep_result.txt', 'Completed at depth 5');",
-          "  return 'Deep recursion completed successfully';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
             "path": "deep_result.txt",
-            "contains": ["depth 5"]
+            "contains": [
+              "depth 5"
+            ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Complete the task",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('deep_result.txt', 'Completed at depth 5');",
+            "  return 'Deep recursion completed successfully';",
+            "}"
+          ]
+        }
       }
     }
   ],
@@ -127,7 +152,9 @@
       {
         "path": "deep_result.txt",
         "exists": true,
-        "contains": ["depth 5"]
+        "contains": [
+          "depth 5"
+        ]
       }
     ]
   }

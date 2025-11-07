@@ -1,10 +1,18 @@
 {
   "name": "TypeScript Callback - JSON Valid",
   "description": "Test TypeScript callback that validates JSON syntax",
-  "tags": ["validation", "typescript_callback", "exit_requirement", "json_check"],
+  "tags": [
+    "validation",
+    "typescript_callback",
+    "exit_requirement",
+    "json_check"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -16,50 +24,40 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create valid JSON config",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  return {",
-          "    title: 'Create valid JSON config',",
-          "    steps: [",
-          "      {",
-          "        title: 'Create JSON file',",
-          "        description: 'Write settings.json with valid JSON',",
-          "        step_type: 'implementation',",
-          "        exit_requirement: async () => {",
-          "          const content = await readFile('settings.json');",
-          "          try {",
-          "            JSON.parse(content);",
-          "          } catch (e) {",
-          "            throw new Error(`Invalid JSON: ${e.message}`);",
-          "          }",
-          "        }",
-          "      }",
-          "    ]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create valid JSON config",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Create valid JSON config',",
+            "    steps: [",
+            "      {",
+            "        title: 'Create JSON file',",
+            "        description: 'Write settings.json with valid JSON',",
+            "        step_type: 'implementation',",
+            "        exit_requirement: async () => {",
+            "          const content = await readFile('settings.json');",
+            "          try {",
+            "            JSON.parse(content);",
+            "          } catch (e) {",
+            "            throw new Error(`Invalid JSON: ${e.message}`);",
+            "          }",
+            "        }",
+            "      }",
+            "    ]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Write settings.json with valid JSON",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const settings = { theme: 'dark', fontSize: 14, autoSave: true };",
-          "  await writeFile('settings.json', JSON.stringify(settings, null, 2));",
-          "  return 'Created settings.json';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -67,6 +65,22 @@
             "exists": true
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Write settings.json with valid JSON",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const settings = { theme: 'dark', fontSize: 14, autoSave: true };",
+            "  await writeFile('settings.json', JSON.stringify(settings, null, 2));",
+            "  return 'Created settings.json';",
+            "}"
+          ]
+        }
       }
     }
   ],
@@ -75,7 +89,10 @@
       {
         "path": "settings.json",
         "exists": true,
-        "contains": ["theme", "dark"]
+        "contains": [
+          "theme",
+          "dark"
+        ]
       }
     ]
   }

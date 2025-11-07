@@ -1,10 +1,18 @@
 {
   "name": "WorkUnit Subtask Tracking",
   "description": "Tests WorkUnit creation, subtask tracking, and progress calculation",
-  "tags": ["conversation", "work_unit", "subtasks", "threads"],
+  "tags": [
+    "conversation",
+    "work_unit",
+    "subtasks",
+    "threads"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -16,98 +24,154 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "multi-step project setup",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  const work_unit_test = {",
-          "    task_id: '12345678',",
-          "    tier_used: 'local',",
-          "    subtasks: [",
-          "      { description: 'Create README', difficulty: 3, status: 'pending' },",
-          "      { description: 'Create src directory', difficulty: 2, status: 'pending' },",
-          "      { description: 'Create tests directory', difficulty: 2, status: 'pending' }",
-          "    ],",
-          "    progress_percentage: 0",
-          "  };",
-          "  ",
-          "  await writeFile('work_unit_test.json', JSON.stringify(work_unit_test, null, 2));",
-          "  ",
-          "  return {",
-          "    title: 'Multi-step project setup',",
-          "    steps: [",
-          "      { title: 'Create README', description: 'Create README.md file', step_type: 'implementation' },",
-          "      { title: 'Create src', description: 'Create src/ directory', step_type: 'implementation' },",
-          "      { title: 'Create tests', description: 'Create tests/ directory', step_type: 'implementation' }",
-          "    ]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "multi-step project setup",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  const work_unit_test = {",
+            "    task_id: '12345678',",
+            "    tier_used: 'local',",
+            "    subtasks: [",
+            "      { description: 'Create README', difficulty: 3, status: 'pending' },",
+            "      { description: 'Create src directory', difficulty: 2, status: 'pending' },",
+            "      { description: 'Create tests directory', difficulty: 2, status: 'pending' }",
+            "    ],",
+            "    progress_percentage: 0",
+            "  };",
+            "  ",
+            "  await writeFile('work_unit_test.json', JSON.stringify(work_unit_test, null, 2));",
+            "  ",
+            "  return {",
+            "    title: 'Multi-step project setup',",
+            "    steps: [",
+            "      { title: 'Create README', description: 'Create README.md file', step_type: 'implementation' },",
+            "      { title: 'Create src', description: 'Create src/ directory', step_type: 'implementation' },",
+            "      { title: 'Create tests', description: 'Create tests/ directory', step_type: 'implementation' }",
+            "    ]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create README.md file",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('README.md', '# Project');",
-          "  return 'Created README';",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create README.md file",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('README.md', '# Project');",
+            "  return 'Created README';",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create src/ directory",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('src/main.rs', 'fn main() {}');",
-          "  return 'Created src directory';",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create src/ directory",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('src/main.rs', 'fn main() {}');",
+            "  return 'Created src directory';",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create tests/ directory",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('tests/test.rs', '#[test] fn test_basic() {}');",
-          "  return 'Created tests directory';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
-          {"path": "work_unit_test.json", "exists": true, "contains": ["task_id", "subtasks", "progress_percentage"]},
-          {"path": "README.md", "exists": true},
-          {"path": "src/main.rs", "exists": true},
-          {"path": "tests/test.rs", "exists": true}
+          {
+            "path": "work_unit_test.json",
+            "exists": true,
+            "contains": [
+              "task_id",
+              "subtasks",
+              "progress_percentage"
+            ]
+          },
+          {
+            "path": "README.md",
+            "exists": true
+          },
+          {
+            "path": "src/main.rs",
+            "exists": true
+          },
+          {
+            "path": "tests/test.rs",
+            "exists": true
+          }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create tests/ directory",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('tests/test.rs', '#[test] fn test_basic() {}');",
+            "  return 'Created tests directory';",
+            "}"
+          ]
+        }
       }
     }
   ],
   "final_verify": {
     "files": [
-      {"path": "work_unit_test.json", "exists": true, "contains": ["12345678", "Create README", "Create src directory", "Create tests directory"]},
-      {"path": "README.md", "exists": true, "contains": ["# Project"]},
-      {"path": "src/main.rs", "exists": true, "contains": ["fn main()"]},
-      {"path": "tests/test.rs", "exists": true, "contains": ["#[test]"]}
+      {
+        "path": "work_unit_test.json",
+        "exists": true,
+        "contains": [
+          "12345678",
+          "Create README",
+          "Create src directory",
+          "Create tests directory"
+        ]
+      },
+      {
+        "path": "README.md",
+        "exists": true,
+        "contains": [
+          "# Project"
+        ]
+      },
+      {
+        "path": "src/main.rs",
+        "exists": true,
+        "contains": [
+          "fn main()"
+        ]
+      },
+      {
+        "path": "tests/test.rs",
+        "exists": true,
+        "contains": [
+          "#[test]"
+        ]
+      }
     ],
     "ui": {
       "work_unit": {

@@ -23,22 +23,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "2 \\+ 2",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return '2 + 2 equals 4';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 1,
-          "output_contains": ["equals 4"]
+          "output_contains": [
+            "equals 4"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "2 \\+ 2",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return '2 + 2 equals 4';",
+            "}"
+          ]
         }
       }
     },
@@ -51,22 +56,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "multiply.*3",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return '4 multiplied by 3 equals 12';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 2,
-          "output_contains": ["equals 12"]
+          "output_contains": [
+            "equals 12"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "multiply.*3",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return '4 multiplied by 3 equals 12';",
+            "}"
+          ]
         }
       }
     },
@@ -79,22 +89,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "first number",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'The first calculation was 2 + 2';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 3,
-          "output_contains": ["first calculation"]
+          "output_contains": [
+            "first calculation"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "first number",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'The first calculation was 2 + 2';",
+            "}"
+          ]
         }
       }
     }

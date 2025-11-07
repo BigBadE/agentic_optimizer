@@ -25,19 +25,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "workspace",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('workspace_file.txt', 'Workspace specific content');",
-          "  const safe = await readFile('safe.txt');",
-          "  return `Safe file intact: ${safe}`;",
-          "}"
-        ]
-      },
       "verify": {
         "ui": {
           "tasks_displayed": 1,
@@ -63,6 +50,22 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "workspace",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('workspace_file.txt', 'Workspace specific content');",
+            "  const safe = await readFile('safe.txt');",
+            "  return `Safe file intact: ${safe}`;",
+            "}"
+          ]
+        }
       }
     }
   ],

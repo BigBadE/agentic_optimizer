@@ -29,18 +29,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Modify test\\.rs",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<void> {",
-          "  const current = await readFile('test.rs');",
-          "  await editFile('test.rs', 'fn main() {}', 'fn hello() -> String {\\n  \"Hello\".to_string()\\n}\\n\\nfn main() {}');",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -53,6 +41,21 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Modify test\\.rs",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<void> {",
+            "  const current = await readFile('test.rs');",
+            "  await editFile('test.rs', 'fn main() {}', 'fn hello() -> String {\\n  \"Hello\".to_string()\\n}\\n\\nfn main() {}');",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -64,18 +67,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "goodbye",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<void> {",
-          "  const current = await readFile('test.rs');",
-          "  await editFile('test.rs', 'fn main() {}', 'fn goodbye() -> String {\\n  \"Goodbye\".to_string()\\n}\\n\\nfn main() {}');",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -88,6 +79,21 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "goodbye",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<void> {",
+            "  const current = await readFile('test.rs');",
+            "  await editFile('test.rs', 'fn main() {}', 'fn goodbye() -> String {\\n  \"Goodbye\".to_string()\\n}\\n\\nfn main() {}');",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -99,19 +105,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "workspace",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Workspace root path is accessible and valid';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "workspace",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Workspace root path is accessible and valid';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -123,19 +132,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "configuration",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Configuration verified: max_concurrent_tasks = 5, conflict_detection = enabled, validation_early_exit = enabled';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "configuration",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Configuration verified: max_concurrent_tasks = 5, conflict_detection = enabled, validation_early_exit = enabled';",
+            "}"
+          ]
+        }
       }
     }
   ],

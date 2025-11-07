@@ -1,7 +1,11 @@
 {
   "name": "Glob Pattern File Discovery",
   "description": "Use glob patterns to discover and include multiple files in context",
-  "tags": ["context", "glob", "file_discovery"],
+  "tags": [
+    "context",
+    "glob",
+    "file_discovery"
+  ],
   "setup": {
     "files": {
       "src/models/user.rs": "pub struct User {\n    pub id: u64,\n    pub name: String,\n}\n",
@@ -9,7 +13,10 @@
       "src/models/order.rs": "pub struct Order {\n    pub id: u64,\n    pub user_id: u64,\n    pub items: Vec<u64>,\n}\n",
       "src/lib.rs": "pub mod models;\n"
     },
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -21,22 +28,29 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "What data models exist",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return `The src/models/ directory contains three data models: User (with id and name), Product (with id, name, and price), and Order (with id, user_id, and items).`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "context": {
           "min_files": 3,
-          "included_files": ["src/models/user.rs", "src/models/product.rs", "src/models/order.rs"]
+          "included_files": [
+            "src/models/user.rs",
+            "src/models/product.rs",
+            "src/models/order.rs"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "What data models exist",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return `The src/models/ directory contains three data models: User (with id and name), Product (with id, name, and price), and Order (with id, user_id, and items).`;",
+            "}"
+          ]
         }
       }
     }

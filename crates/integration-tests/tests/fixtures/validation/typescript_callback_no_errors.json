@@ -1,10 +1,18 @@
 {
   "name": "TypeScript Callback - No Errors Pattern",
   "description": "Test TypeScript callback that validates absence of error patterns",
-  "tags": ["validation", "typescript_callback", "exit_requirement", "error_check"],
+  "tags": [
+    "validation",
+    "typescript_callback",
+    "exit_requirement",
+    "error_check"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -16,51 +24,41 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create clean output file",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  return {",
-          "    title: 'Create clean output file',",
-          "    steps: [",
-          "      {",
-          "        title: 'Create output',",
-          "        description: 'Write output.log without errors',",
-          "        step_type: 'implementation',",
-          "        exit_requirement: async () => {",
-          "          const content = await readFile('output.log');",
-          "          const errorPatterns = ['ERROR', 'FAIL', 'panic!'];",
-          "          for (const pattern of errorPatterns) {",
-          "            if (content.includes(pattern)) {",
-          "              throw new Error(`Found error pattern: ${pattern}`);",
-          "            }",
-          "          }",
-          "        }",
-          "      }",
-          "    ]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create clean output file",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Create clean output file',",
+            "    steps: [",
+            "      {",
+            "        title: 'Create output',",
+            "        description: 'Write output.log without errors',",
+            "        step_type: 'implementation',",
+            "        exit_requirement: async () => {",
+            "          const content = await readFile('output.log');",
+            "          const errorPatterns = ['ERROR', 'FAIL', 'panic!'];",
+            "          for (const pattern of errorPatterns) {",
+            "            if (content.includes(pattern)) {",
+            "              throw new Error(`Found error pattern: ${pattern}`);",
+            "            }",
+            "          }",
+            "        }",
+            "      }",
+            "    ]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Write output.log without errors",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const log = 'INFO: Process started\\nINFO: Task completed successfully\\nINFO: Process finished';",
-          "  await writeFile('output.log', log);",
-          "  return 'Created clean output.log';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -68,6 +66,22 @@
             "exists": true
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Write output.log without errors",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const log = 'INFO: Process started\\nINFO: Task completed successfully\\nINFO: Process finished';",
+            "  await writeFile('output.log', log);",
+            "  return 'Created clean output.log';",
+            "}"
+          ]
+        }
       }
     }
   ],
@@ -76,7 +90,9 @@
       {
         "path": "output.log",
         "exists": true,
-        "contains": ["INFO"]
+        "contains": [
+          "INFO"
+        ]
       }
     ]
   }

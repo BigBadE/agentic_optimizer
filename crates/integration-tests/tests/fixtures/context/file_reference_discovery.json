@@ -33,23 +33,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "check src/main.rs",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const mainContent = await readFile('src/main.rs');",
-          "  const libContent = await readFile('src/lib.rs');",
-          "  const hasUtils = mainContent.includes('utils');",
-          "  const hasPublic = libContent.includes('public_function');",
-          "  return `Main file uses utils: ${hasUtils}, Lib has public API: ${hasPublic}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "check src/main.rs",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const mainContent = await readFile('src/main.rs');",
+            "  const libContent = await readFile('src/lib.rs');",
+            "  const hasUtils = mainContent.includes('utils');",
+            "  const hasPublic = libContent.includes('public_function');",
+            "  return `Main file uses utils: ${hasUtils}, Lib has public API: ${hasPublic}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -61,23 +64,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "issue is in",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const mainContent = await readFile('src/main.rs');",
-          "  const helperContent = await readFile('src/utils/helper.rs');",
-          "  const mainLines = mainContent.split('\\n').length;",
-          "  const helperFunctions = (helperContent.match(/pub fn/g) || []).length;",
-          "  return `Main has ${mainLines} lines, helper has ${helperFunctions} public functions`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "issue is in",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const mainContent = await readFile('src/main.rs');",
+            "  const helperContent = await readFile('src/utils/helper.rs');",
+            "  const mainLines = mainContent.split('\\n').length;",
+            "  const helperFunctions = (helperContent.match(/pub fn/g) || []).length;",
+            "  return `Main has ${mainLines} lines, helper has ${helperFunctions} public functions`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -89,23 +95,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "config.toml",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const config = await readFile('config.toml');",
-          "  const readme = await readFile('README.md');",
-          "  const data = await readFile('data.json');",
-          "  const hasToml = config.includes('[section]');",
-          "  const hasMd = readme.startsWith('# Project');",
-          "  const hasJson = data.includes('\"test\"');",
-          "  return `Found TOML: ${hasToml}, MD: ${hasMd}, JSON: ${hasJson}`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -131,6 +120,26 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "config.toml",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const config = await readFile('config.toml');",
+            "  const readme = await readFile('README.md');",
+            "  const data = await readFile('data.json');",
+            "  const hasToml = config.includes('[section]');",
+            "  const hasMd = readme.startsWith('# Project');",
+            "  const hasJson = data.includes('\"test\"');",
+            "  return `Found TOML: ${hasToml}, MD: ${hasMd}, JSON: ${hasJson}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -142,20 +151,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Update all three",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('config.toml', 'key = \"updated\"\\n[section]\\nfoo = \"baz\"');",
-          "  await writeFile('README.md', '# Project\\n\\nThis is an updated test project.');",
-          "  await writeFile('data.json', '{\"test\": true, \"value\": 100, \"updated\": true}');",
-          "  return 'Updated all three configuration files';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -183,6 +178,23 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Update all three",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('config.toml', 'key = \"updated\"\\n[section]\\nfoo = \"baz\"');",
+            "  await writeFile('README.md', '# Project\\n\\nThis is an updated test project.');",
+            "  await writeFile('data.json', '{\"test\": true, \"value\": 100, \"updated\": true}');",
+            "  return 'Updated all three configuration files';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -194,29 +206,32 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "nonexistent.rs",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    await readFile('nonexistent.rs');",
-          "    return 'File exists unexpectedly';",
-          "  } catch (error) {",
-          "    try {",
-          "      await readFile('fake_file.txt');",
-          "      return 'Fake file exists unexpectedly';",
-          "    } catch (error2) {",
-          "      return 'Both files correctly do not exist';",
-          "    }",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "nonexistent.rs",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    await readFile('nonexistent.rs');",
+            "    return 'File exists unexpectedly';",
+            "  } catch (error) {",
+            "    try {",
+            "      await readFile('fake_file.txt');",
+            "      return 'Fake file exists unexpectedly';",
+            "    } catch (error2) {",
+            "      return 'Both files correctly do not exist';",
+            "    }",
+            "  }",
+            "}"
+          ]
+        }
       }
     }
   ],

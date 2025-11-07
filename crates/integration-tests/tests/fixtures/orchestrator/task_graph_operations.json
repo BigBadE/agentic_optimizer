@@ -31,20 +31,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "task_a",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('task_a.txt');",
-          "  return `Read Task A: ${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "task_a",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = await readFile('task_a.txt');",
+            "  return `Read Task A: ${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -56,20 +59,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "task_b.*depends",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('task_b.txt');",
-          "  return `Read Task B after Task A: ${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "task_b.*depends",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = await readFile('task_b.txt');",
+            "  return `Read Task B after Task A: ${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -81,20 +87,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "task_c.*both",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('task_c.txt');",
-          "  return `Read Task C after both A and B: ${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "task_c.*both",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = await readFile('task_c.txt');",
+            "  return `Read Task C after both A and B: ${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -106,23 +115,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "complex.*dependencies",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const results = [];",
-          "  results.push(await readFile('task_a.txt'));",
-          "  results.push(await readFile('task_b.txt'));",
-          "  results.push(await readFile('task_c.txt'));",
-          "  return `All tasks completed in dependency order: ${results.join(', ')}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "complex.*dependencies",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const results = [];",
+            "  results.push(await readFile('task_a.txt'));",
+            "  results.push(await readFile('task_b.txt'));",
+            "  results.push(await readFile('task_c.txt'));",
+            "  return `All tasks completed in dependency order: ${results.join(', ')}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -134,20 +146,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "no cycles",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const files = await listFiles('.');",
-          "  return `Task graph valid (no cycles detected). Found ${files.length} files to process.`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "no cycles",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const files = await listFiles('.');",
+            "  return `Task graph valid (no cycles detected). Found ${files.length} files to process.`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -159,19 +174,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "complete",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Task graph completion verified: all tasks successfully completed.';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "complete",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Task graph completion verified: all tasks successfully completed.';",
+            "}"
+          ]
+        }
       }
     }
   ],

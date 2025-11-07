@@ -23,27 +23,32 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "command.*fail",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    const result = await runCommand('false', []);",
-          "    return `Command succeeded: ${result.stdout}`;",
-          "  } catch (error) {",
-          "    return `Command failed as expected: ${error}`;",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 1,
-          "output_contains": ["failed as expected"]
+          "output_contains": [
+            "failed as expected"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "command.*fail",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    const result = await runCommand('false', []);",
+            "    return `Command succeeded: ${result.stdout}`;",
+            "  } catch (error) {",
+            "    return `Command failed as expected: ${error}`;",
+            "  }",
+            "}"
+          ]
         }
       }
     }

@@ -23,21 +23,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "thread 1",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Response from thread 1';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 1
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "thread 1",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Response from thread 1';",
+            "}"
+          ]
         }
       }
     },

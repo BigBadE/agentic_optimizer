@@ -27,20 +27,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Request first file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('src/lib.rs', 'First request');",
-          "  return `First file requested: ${result.success}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Request first file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('src/lib.rs', 'First request');",
+            "  return `First file requested: ${result.success}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -52,20 +55,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Request second file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('src/executor.rs', 'Second request');",
-          "  return `Second file requested: ${result.success}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Request second file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('src/executor.rs', 'Second request');",
+            "  return `Second file requested: ${result.success}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -77,20 +83,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "lib.rs again",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('src/lib.rs', 'Requesting same file again');",
-          "  return `Duplicate request: ${result.success}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "lib.rs again",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('src/lib.rs', 'Requesting same file again');",
+            "  return `Duplicate request: ${result.success}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -102,20 +111,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "third unique file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('src/parser.rs', 'Third unique request');",
-          "  return `Third file requested: ${result.success}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "third unique file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('src/parser.rs', 'Third unique request');",
+            "  return `Third file requested: ${result.success}`;",
+            "}"
+          ]
+        }
       }
     }
   ],

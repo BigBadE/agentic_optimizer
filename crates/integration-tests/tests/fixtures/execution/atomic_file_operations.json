@@ -25,20 +25,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "atomic",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const original = await readFile('atomic.txt');",
-          "  await writeFile('atomic.txt', `Updated: ${original}`);",
-          "  const updated = await readFile('atomic.txt');",
-          "  return `Result: ${updated}`;",
-          "}"
-        ]
-      },
       "verify": {
         "ui": {
           "tasks_displayed": 1,
@@ -59,6 +45,23 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "atomic",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const original = await readFile('atomic.txt');",
+            "  await writeFile('atomic.txt', `Updated: ${original}`);",
+            "  const updated = await readFile('atomic.txt');",
+            "  return `Result: ${updated}`;",
+            "}"
+          ]
+        }
       }
     }
   ],

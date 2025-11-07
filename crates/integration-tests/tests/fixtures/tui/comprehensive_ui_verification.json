@@ -46,18 +46,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Second input",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('test.txt');",
-          "  return `Read file: ${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "ui": {
           "output_contains": [
@@ -69,6 +57,21 @@
           "task_created": true
         },
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Second input",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = await readFile('test.txt');",
+            "  return `Read file: ${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -80,18 +83,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create a new file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('output.txt', 'New content');",
-          "  return 'File created successfully';",
-          "}"
-        ]
-      },
       "verify": {
         "ui": {
           "output_contains": [
@@ -109,6 +100,21 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create a new file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('output.txt', 'New content');",
+            "  return 'File created successfully';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -120,17 +126,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Third task",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Task three completed';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
@@ -138,6 +133,20 @@
             "Task three completed"
           ],
           "tasks_displayed": 3
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Third task",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Task three completed';",
+            "}"
+          ]
         }
       }
     }

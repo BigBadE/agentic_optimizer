@@ -1,7 +1,12 @@
 {
   "name": "Large Codebase Semantic Search",
   "description": "Large codebase to trigger code chunking and semantic search with embeddings",
-  "tags": ["context", "semantic_search", "chunking", "large_codebase"],
+  "tags": [
+    "context",
+    "semantic_search",
+    "chunking",
+    "large_codebase"
+  ],
   "setup": {
     "files": {
       "src/auth/mod.rs": "//! Authentication module\n//! Handles user authentication, token generation and validation\npub mod manager;\npub mod token;\npub mod session;\n\nuse std::time::Duration;\n\npub struct AuthConfig {\n    pub secret_key: String,\n    pub token_expiry: Duration,\n    pub max_sessions: usize,\n}\n\nimpl Default for AuthConfig {\n    fn default() -> Self {\n        Self {\n            secret_key: String::from(\"default_secret\"),\n            token_expiry: Duration::from_secs(3600),\n            max_sessions: 10,\n        }\n    }\n}\n",
@@ -13,7 +18,10 @@
       "src/api/mod.rs": "//! API module\n//! HTTP API handlers and routing\npub mod handlers;\npub mod middleware;\npub mod routes;\n\nuse std::net::SocketAddr;\n\npub struct ApiConfig {\n    pub bind_address: SocketAddr,\n    pub max_body_size: usize,\n}\n\nimpl Default for ApiConfig {\n    fn default() -> Self {\n        Self {\n            bind_address: \"127.0.0.1:8080\".parse().unwrap(),\n            max_body_size: 1024 * 1024,\n        }\n    }\n}\n",
       "src/api/handlers.rs": "//! Request handlers\n//! Business logic for API endpoints\nuse crate::auth::AuthManager;\nuse crate::database::connection::ConnectionPool;\n\npub struct ApiHandlers {\n    auth: AuthManager,\n    db_pool: ConnectionPool,\n}\n\nimpl ApiHandlers {\n    pub fn new(auth: AuthManager, db_pool: ConnectionPool) -> Self {\n        Self { auth, db_pool }\n    }\n\n    pub fn handle_login(&self, username: &str, password: &str) -> Result<String, String> {\n        self.auth.authenticate(username, password)\n    }\n\n    pub fn handle_query(&mut self, query: &str) -> Result<String, String> {\n        let conn = self.db_pool.get_connection()?;\n        conn.execute(query)?;\n        Ok(\"Query executed\".to_string())\n    }\n}\n"
     },
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -25,23 +33,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "How does authentication work",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return `Authentication is handled by the AuthManager in src/auth/manager.rs. The token generation process uses TokenService (src/auth/token.rs) which creates tokens by combining the username with a secret key. Sessions are stored in SessionStore (src/auth/session.rs) with a configurable limit.`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "context": {
           "min_files": 3,
           "semantic_search_used": true,
           "chunking_performed": true
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "How does authentication work",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return `Authentication is handled by the AuthManager in src/auth/manager.rs. The token generation process uses TokenService (src/auth/token.rs) which creates tokens by combining the username with a secret key. Sessions are stored in SessionStore (src/auth/session.rs) with a configurable limit.`;",
+            "}"
+          ]
         }
       }
     }

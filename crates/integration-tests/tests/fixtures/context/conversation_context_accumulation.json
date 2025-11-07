@@ -1,12 +1,20 @@
 {
   "name": "Conversation Context Accumulation",
   "description": "Tests multi-turn conversation where context accumulates and influences later responses",
-  "tags": ["context", "conversation", "accumulation", "multi-turn"],
+  "tags": [
+    "context",
+    "conversation",
+    "accumulation",
+    "multi-turn"
+  ],
   "setup": {
     "files": {
       "user_data.json": "{\"name\": \"Alice\", \"role\": \"developer\"}"
     },
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -18,21 +26,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "tell me the name",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const data = await readFile('user_data.json');",
-          "  const parsed = JSON.parse(data);",
-          "  return `The name is ${parsed.name}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "tell me the name",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const data = await readFile('user_data.json');",
+            "  const parsed = JSON.parse(data);",
+            "  return `The name is ${parsed.name}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -44,21 +55,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "What role",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const data = await readFile('user_data.json');",
-          "  const parsed = JSON.parse(data);",
-          "  return `${parsed.name} is a ${parsed.role}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "What role",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const data = await readFile('user_data.json');",
+            "  const parsed = JSON.parse(data);",
+            "  return `${parsed.name} is a ${parsed.role}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -70,30 +84,36 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "named after them",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const data = await readFile('user_data.json');",
-          "  const parsed = JSON.parse(data);",
-          "  const filename = `${parsed.name.toLowerCase()}_profile.txt`;",
-          "  const content = `Name: ${parsed.name}\\nRole: ${parsed.role}`;",
-          "  await writeFile(filename, content);",
-          "  return `Created ${filename} with profile information`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
             "path": "alice_profile.txt",
             "exists": true,
-            "contains": ["Alice", "developer"]
+            "contains": [
+              "Alice",
+              "developer"
+            ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "named after them",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const data = await readFile('user_data.json');",
+            "  const parsed = JSON.parse(data);",
+            "  const filename = `${parsed.name.toLowerCase()}_profile.txt`;",
+            "  const content = `Name: ${parsed.name}\\nRole: ${parsed.role}`;",
+            "  await writeFile(filename, content);",
+            "  return `Created ${filename} with profile information`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -105,19 +125,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "first thing",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'The first request was to read user_data.json and tell you the name';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "first thing",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'The first request was to read user_data.json and tell you the name';",
+            "}"
+          ]
+        }
       }
     }
   ],
@@ -126,7 +149,10 @@
       {
         "path": "alice_profile.txt",
         "exists": true,
-        "contains": ["Alice", "developer"]
+        "contains": [
+          "Alice",
+          "developer"
+        ]
       }
     ]
   }

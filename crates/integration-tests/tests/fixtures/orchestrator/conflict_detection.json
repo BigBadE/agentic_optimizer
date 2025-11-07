@@ -31,17 +31,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "shared\\.rs.*hello",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<void> {",
-          "  await editFile('shared.rs', 'fn main() {}', 'fn hello() -> String {\\n  \"Hello\".to_string()\\n}\\n\\nfn main() {}');",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -53,6 +42,20 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "shared\\.rs.*hello",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<void> {",
+            "  await editFile('shared.rs', 'fn main() {}', 'fn hello() -> String {\\n  \"Hello\".to_string()\\n}\\n\\nfn main() {}');",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -64,17 +67,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "shared\\.rs.*goodbye",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<void> {",
-          "  await editFile('shared.rs', 'fn main() {}', 'fn goodbye() -> String {\\n  \"Goodbye\".to_string()\\n}\\n\\nfn main() {}');",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -86,6 +78,20 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "shared\\.rs.*goodbye",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<void> {",
+            "  await editFile('shared.rs', 'fn main() {}', 'fn goodbye() -> String {\\n  \"Goodbye\".to_string()\\n}\\n\\nfn main() {}');",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -97,17 +103,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "file_a.rs",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<void> {",
-          "  await editFile('file_a.rs', 'fn func_a() {}', 'fn func_a() -> String {\\n  \"A\".to_string()\\n}');",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -119,6 +114,20 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "file_a.rs",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<void> {",
+            "  await editFile('file_a.rs', 'fn func_a() {}', 'fn func_a() -> String {\\n  \"A\".to_string()\\n}');",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -130,17 +139,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "file_b.rs",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<void> {",
-          "  await editFile('file_b.rs', 'fn func_b() {}', 'fn func_b() -> String {\\n  \"B\".to_string()\\n}');",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -152,6 +150,20 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "file_b.rs",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<void> {",
+            "  await editFile('file_b.rs', 'fn func_b() {}', 'fn func_b() -> String {\\n  \"B\".to_string()\\n}');",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -163,22 +175,25 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "conflict detection",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const shared = await readFile('shared.rs');",
-          "  const fileA = await readFile('file_a.rs');",
-          "  const fileB = await readFile('file_b.rs');",
-          "  return `Conflict detection verified. Files processed correctly:\\nshared.rs: ${shared.includes('fn hello()') && shared.includes('fn goodbye()')}\\nfile_a.rs: ${fileA.includes('func_a() -> String')}\\nfile_b.rs: ${fileB.includes('func_b() -> String')}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "conflict detection",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const shared = await readFile('shared.rs');",
+            "  const fileA = await readFile('file_a.rs');",
+            "  const fileB = await readFile('file_b.rs');",
+            "  return `Conflict detection verified. Files processed correctly:\\nshared.rs: ${shared.includes('fn hello()') && shared.includes('fn goodbye()')}\\nfile_a.rs: ${fileA.includes('func_a() -> String')}\\nfile_b.rs: ${fileB.includes('func_b() -> String')}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -190,21 +205,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "concurrent",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const files = await listFiles('.');",
-          "  const rsFiles = files.filter(f => f.endsWith('.rs'));",
-          "  return `Concurrent operations completed. Found ${rsFiles.length} Rust files. All operations executed without conflicts.`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "concurrent",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const files = await listFiles('.');",
+            "  const rsFiles = files.filter(f => f.endsWith('.rs'));",
+            "  return `Concurrent operations completed. Found ${rsFiles.length} Rust files. All operations executed without conflicts.`;",
+            "}"
+          ]
+        }
       }
     }
   ],

@@ -28,19 +28,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "acquiring lock",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // First task locks src/lib.rs",
-          "  await writeFile('src/lib.rs', '// Locked for modification');",
-          "  return 'Lock acquired and file modified';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -52,6 +39,22 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "acquiring lock",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // First task locks src/lib.rs",
+            "  await writeFile('src/lib.rs', '// Locked for modification');",
+            "  return 'Lock acquired and file modified';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -63,23 +66,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "independent files",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Task 1 modifies lib.rs",
-          "  await writeFile('src/lib.rs', '// Task 1 changes');",
-          "  ",
-          "  // Task 2 modifies utils.rs (different file, should work)",
-          "  await writeFile('src/utils.rs', '// Task 2 changes');",
-          "  ",
-          "  return 'Both independent files modified successfully';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -98,6 +84,26 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "independent files",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Task 1 modifies lib.rs",
+            "  await writeFile('src/lib.rs', '// Task 1 changes');",
+            "  ",
+            "  // Task 2 modifies utils.rs (different file, should work)",
+            "  await writeFile('src/utils.rs', '// Task 2 changes');",
+            "  ",
+            "  return 'Both independent files modified successfully';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -109,24 +115,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "releasing locks",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Simulate task completion and lock release",
-          "  await writeFile('src/lib.rs', '// First modification');",
-          "  // Lock should be released after task completes",
-          "  ",
-          "  // Subsequent task should be able to acquire lock",
-          "  await writeFile('src/lib.rs', '// Second modification after release');",
-          "  ",
-          "  return 'Lock released and reacquired successfully';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -138,6 +126,27 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "releasing locks",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Simulate task completion and lock release",
+            "  await writeFile('src/lib.rs', '// First modification');",
+            "  // Lock should be released after task completes",
+            "  ",
+            "  // Subsequent task should be able to acquire lock",
+            "  await writeFile('src/lib.rs', '// Second modification after release');",
+            "  ",
+            "  return 'Lock released and reacquired successfully';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -149,22 +158,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "conflict detection",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Verify conflict detection works by attempting sequential access",
-          "  await writeFile('src/lib.rs', '// Access 1');",
-          "  await writeFile('src/lib.rs', '// Access 2');",
-          "  ",
-          "  // If both succeed, conflict detection allowed sequential access",
-          "  return 'Sequential access to same file allowed after lock release';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -176,6 +169,25 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "conflict detection",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Verify conflict detection works by attempting sequential access",
+            "  await writeFile('src/lib.rs', '// Access 1');",
+            "  await writeFile('src/lib.rs', '// Access 2');",
+            "  ",
+            "  // If both succeed, conflict detection allowed sequential access",
+            "  return 'Sequential access to same file allowed after lock release';",
+            "}"
+          ]
+        }
       }
     }
   ],

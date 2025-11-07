@@ -23,24 +23,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "source files",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext(",
-          "    'src/**/*.rs',",
-          "    'Need all Rust source files',",
-          "    10",
-          "  );",
-          "  return 'Found Rust source files';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "source files",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext(",
+            "    'src/**/*.rs',",
+            "    'Need all Rust source files',",
+            "    10",
+            "  );",
+            "  return 'Found Rust source files';",
+            "}"
+          ]
+        }
       }
     }
   ],

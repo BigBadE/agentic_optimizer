@@ -1,7 +1,12 @@
 {
   "name": "Large Result Set Truncation",
   "description": "Tests context builder truncation when search returns many files",
-  "tags": ["context", "semantic-search", "edge-case", "large-results"],
+  "tags": [
+    "context",
+    "semantic-search",
+    "edge-case",
+    "large-results"
+  ],
   "setup": {
     "files": {
       "file01.rs": "fn test01() {}",
@@ -17,7 +22,10 @@
       "file11.rs": "fn test11() {}",
       "file12.rs": "fn test12() {}"
     },
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -29,19 +37,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "List all test functions",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Found 12 test functions across multiple files';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "List all test functions",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Found 12 test functions across multiple files';",
+            "}"
+          ]
+        }
       }
     }
   ],

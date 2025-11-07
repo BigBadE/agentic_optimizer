@@ -29,24 +29,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "promise chaining",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result1 = await readFile('task1.txt');",
-          "  const result2 = await readFile('task2.txt');",
-          "  const result3 = await readFile('task3.txt');",
-          "  ",
-          "  const combined = `${result1} -> ${result2} -> ${result3}`;",
-          "  await writeFile('sequential.txt', combined);",
-          "  ",
-          "  return `Sequential read complete: ${combined}`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -60,6 +42,27 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "promise chaining",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result1 = await readFile('task1.txt');",
+            "  const result2 = await readFile('task2.txt');",
+            "  const result3 = await readFile('task3.txt');",
+            "  ",
+            "  const combined = `${result1} -> ${result2} -> ${result3}`;",
+            "  await writeFile('sequential.txt', combined);",
+            "  ",
+            "  return `Sequential read complete: ${combined}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -71,43 +74,46 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "promise rejection",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  let successCount = 0;",
-          "  let errorCount = 0;",
-          "  ",
-          "  try {",
-          "    await readFile('task1.txt');",
-          "    successCount++;",
-          "  } catch (e) {",
-          "    errorCount++;",
-          "  }",
-          "  ",
-          "  try {",
-          "    await readFile('nonexistent.txt');",
-          "    successCount++;",
-          "  } catch (e) {",
-          "    errorCount++;",
-          "  }",
-          "  ",
-          "  try {",
-          "    await readFile('task2.txt');",
-          "    successCount++;",
-          "  } catch (e) {",
-          "    errorCount++;",
-          "  }",
-          "  ",
-          "  return `Success: ${successCount}, Errors: ${errorCount}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "promise rejection",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  let successCount = 0;",
+            "  let errorCount = 0;",
+            "  ",
+            "  try {",
+            "    await readFile('task1.txt');",
+            "    successCount++;",
+            "  } catch (e) {",
+            "    errorCount++;",
+            "  }",
+            "  ",
+            "  try {",
+            "    await readFile('nonexistent.txt');",
+            "    successCount++;",
+            "  } catch (e) {",
+            "    errorCount++;",
+            "  }",
+            "  ",
+            "  try {",
+            "    await readFile('task2.txt');",
+            "    successCount++;",
+            "  } catch (e) {",
+            "    errorCount++;",
+            "  }",
+            "  ",
+            "  return `Success: ${successCount}, Errors: ${errorCount}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -119,31 +125,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "complex async workflow",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Stage 1: Read input",
-          "  const input = await readFile('task1.txt');",
-          "  ",
-          "  // Stage 2: Process (uppercase)",
-          "  const processed = input.toUpperCase();",
-          "  await writeFile('stage1.txt', processed);",
-          "  ",
-          "  // Stage 3: Verify write",
-          "  const verified = await readFile('stage1.txt');",
-          "  ",
-          "  // Stage 4: Transform again",
-          "  const final = `[PROCESSED] ${verified}`;",
-          "  await writeFile('final_output.txt', final);",
-          "  ",
-          "  return `Workflow complete: ${final}`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -162,6 +143,34 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "complex async workflow",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Stage 1: Read input",
+            "  const input = await readFile('task1.txt');",
+            "  ",
+            "  // Stage 2: Process (uppercase)",
+            "  const processed = input.toUpperCase();",
+            "  await writeFile('stage1.txt', processed);",
+            "  ",
+            "  // Stage 3: Verify write",
+            "  const verified = await readFile('stage1.txt');",
+            "  ",
+            "  // Stage 4: Transform again",
+            "  const final = `[PROCESSED] ${verified}`;",
+            "  await writeFile('final_output.txt', final);",
+            "  ",
+            "  return `Workflow complete: ${final}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -173,36 +182,39 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "error propagation",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  async function innerFunction() {",
-          "    // This will throw",
-          "    const content = await readFile('does_not_exist.txt');",
-          "    return content;",
-          "  }",
-          "  ",
-          "  async function middleFunction() {",
-          "    // Error propagates through here",
-          "    return await innerFunction();",
-          "  }",
-          "  ",
-          "  try {",
-          "    await middleFunction();",
-          "    return 'Should not reach here';",
-          "  } catch (error) {",
-          "    return `Caught error at top level: ${error}`;",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_value_matches": "Caught error at top level"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "error propagation",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  async function innerFunction() {",
+            "    // This will throw",
+            "    const content = await readFile('does_not_exist.txt');",
+            "    return content;",
+            "  }",
+            "  ",
+            "  async function middleFunction() {",
+            "    // Error propagates through here",
+            "    return await innerFunction();",
+            "  }",
+            "  ",
+            "  try {",
+            "    await middleFunction();",
+            "    return 'Should not reach here';",
+            "  } catch (error) {",
+            "    return `Caught error at top level: ${error}`;",
+            "  }",
+            "}"
+          ]
         }
       }
     },
@@ -215,30 +227,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "bash and file operations asynchronously",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Read file",
-          "  const data = await readFile('task1.txt');",
-          "  ",
-          "  // Process in TypeScript (avoid bash pipe issues)",
-          "  const uppercase = data.toUpperCase();",
-          "  ",
-          "  // Write result",
-          "  await writeFile('bash_processed.txt', uppercase);",
-          "  ",
-          "  // Verify file was written",
-          "  const verify = await readFile('bash_processed.txt');",
-          "  const size = verify.length;",
-          "  ",
-          "  return `Processed via bash, size: ${size} bytes`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -250,6 +238,33 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "bash and file operations asynchronously",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Read file",
+            "  const data = await readFile('task1.txt');",
+            "  ",
+            "  // Process in TypeScript (avoid bash pipe issues)",
+            "  const uppercase = data.toUpperCase();",
+            "  ",
+            "  // Write result",
+            "  await writeFile('bash_processed.txt', uppercase);",
+            "  ",
+            "  // Verify file was written",
+            "  const verify = await readFile('bash_processed.txt');",
+            "  const size = verify.length;",
+            "  ",
+            "  return `Processed via bash, size: ${size} bytes`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -261,36 +276,39 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "returning complex objects",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code() {",
-          "  const files = [];",
-          "  ",
-          "  for (let i = 1; i <= 3; i++) {",
-          "    const content = await readFile(`task${i}.txt`);",
-          "    files.push({",
-          "      name: `task${i}.txt`,",
-          "      content: content.trim(),",
-          "      length: content.length",
-          "    });",
-          "  }",
-          "  ",
-          "  return {",
-          "    done: true,",
-          "    result: `Processed ${files.length} files`,",
-          "    files: files,",
-          "    totalSize: files.reduce((sum, f) => sum + f.length, 0)",
-          "  };",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "returning complex objects",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code() {",
+            "  const files = [];",
+            "  ",
+            "  for (let i = 1; i <= 3; i++) {",
+            "    const content = await readFile(`task${i}.txt`);",
+            "    files.push({",
+            "      name: `task${i}.txt`,",
+            "      content: content.trim(),",
+            "      length: content.length",
+            "    });",
+            "  }",
+            "  ",
+            "  return {",
+            "    done: true,",
+            "    result: `Processed ${files.length} files`,",
+            "    files: files,",
+            "    totalSize: files.reduce((sum, f) => sum + f.length, 0)",
+            "  };",
+            "}"
+          ]
         }
       }
     }

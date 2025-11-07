@@ -25,19 +25,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Modify",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('modified.txt', 'Modified content');",
-          "  const content = await readFile('modified.txt');",
-          "  return `File created with: ${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "ui": {
           "tasks_displayed": 1,
@@ -46,8 +33,8 @@
             "Modified content"
           ],
           "rendered_buffer_contains": [
-            "─── Tasks",
-            "─── Input",
+            "\u2500\u2500\u2500 Tasks",
+            "\u2500\u2500\u2500 Input",
             "Modified content"
           ]
         },
@@ -61,6 +48,22 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Modify",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('modified.txt', 'Modified content');",
+            "  const content = await readFile('modified.txt');",
+            "  return `File created with: ${content}`;",
+            "}"
+          ]
+        }
       }
     }
   ],
@@ -69,8 +72,8 @@
       "all_tasks_completed": true,
       "tasks_displayed": 1,
       "rendered_buffer_contains": [
-        "─── Tasks",
-        "─── Input"
+        "\u2500\u2500\u2500 Tasks",
+        "\u2500\u2500\u2500 Input"
       ]
     },
     "files": [

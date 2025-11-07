@@ -1,10 +1,17 @@
 {
   "name": "Syntax Validation Fails - Explicit Error Keyword",
   "description": "Tests syntax validation detecting explicit syntax error keywords",
-  "tags": ["validation", "syntax", "error-paths"],
+  "tags": [
+    "validation",
+    "syntax",
+    "error-paths"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [80, 24]
+    "terminal_size": [
+      80,
+      24
+    ]
   },
   "events": [
     {
@@ -16,19 +23,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Test syntax validation",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Error: syntax error at line 5: unexpected token }';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Test syntax validation",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Error: syntax error at line 5: unexpected token }';",
+            "}"
+          ]
+        }
       }
     }
   ],

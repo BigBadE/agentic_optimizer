@@ -23,21 +23,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Long running",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Task is running...';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 1
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Long running",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Task is running...';",
+            "}"
+          ]
         }
       }
     },
@@ -59,20 +62,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Interrupting",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Queued task completed';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Interrupting",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Queued task completed';",
+            "}"
+          ]
+        }
       }
     }
   ],

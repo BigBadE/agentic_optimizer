@@ -33,23 +33,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Show me src/lib.rs",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('src/lib.rs', 'Need to see library structure');",
-          "  if (result.success && result.files.length > 0) {",
-          "    return `Found library file with content: ${result.files[0].content}`;",
-          "  }",
-          "  return 'File not found';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Show me src/lib.rs",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('src/lib.rs', 'Need to see library structure');",
+            "  if (result.success && result.files.length > 0) {",
+            "    return `Found library file with content: ${result.files[0].content}`;",
+            "  }",
+            "  return 'File not found';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -61,24 +64,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Get all Rust files",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('**/*.rs', 'Need all Rust files', 10);",
-          "  if (result.success) {",
-          "    const allRust = result.files.every(f => f.path.endsWith('.rs'));",
-          "    return `Found ${result.files.length} files, all Rust: ${allRust}`;",
-          "  }",
-          "  return 'No files found';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Get all Rust files",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('**/*.rs', 'Need all Rust files', 10);",
+            "  if (result.success) {",
+            "    const allRust = result.files.every(f => f.path.endsWith('.rs'));",
+            "    return `Found ${result.files.length} files, all Rust: ${allRust}`;",
+            "  }",
+            "  return 'No files found';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -90,21 +96,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Get markdown docs",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('**/*.md', 'Need documentation files', 5);",
-          "  const hasReadme = result.files.some(f => f.path.includes('README.md'));",
-          "  return `Found ${result.files.length} markdown files, has README: ${hasReadme}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Get markdown docs",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('**/*.md', 'Need documentation files', 5);",
+            "  const hasReadme = result.files.some(f => f.path.includes('README.md'));",
+            "  return `Found ${result.files.length} markdown files, has README: ${hasReadme}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -116,24 +125,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "only src directory",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('src/**/*.rs', 'Need source files only', 10);",
-          "  if (result.success) {",
-          "    const allFromSrc = result.files.every(f => f.path.includes('src'));",
-          "    return `Found ${result.files.length} files, all from src: ${allFromSrc}`;",
-          "  }",
-          "  return 'No files found';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "only src directory",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('src/**/*.rs', 'Need source files only', 10);",
+            "  if (result.success) {",
+            "    const allFromSrc = result.files.every(f => f.path.includes('src'));",
+            "    return `Found ${result.files.length} files, all from src: ${allFromSrc}`;",
+            "  }",
+            "  return 'No files found';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -145,20 +157,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "max_files limit of 2",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('**/*.rs', 'Testing max_files limit', 2);",
-          "  return `Found ${result.files.length} files (max 2 limit)`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "max_files limit of 2",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('**/*.rs', 'Testing max_files limit', 2);",
+            "  return `Found ${result.files.length} files (max 2 limit)`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -170,24 +185,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "find .xyz files",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    const result = await requestContext('**/*.xyz', 'Looking for non-existent file type');",
-          "    return `Result: success=${result.success}, files=${result.files.length}`;",
-          "  } catch (error) {",
-          "    return `Error: No files found`;",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "find .xyz files",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    const result = await requestContext('**/*.xyz', 'Looking for non-existent file type');",
+            "    return `Result: success=${result.success}, files=${result.files.length}`;",
+            "  } catch (error) {",
+            "    return `Error: No files found`;",
+            "  }",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -199,20 +217,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Try nonexistent file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('nonexistent.rs', 'Looking for file that does not exist');",
-          "  return `Result: success=${result.success}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Try nonexistent file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('nonexistent.rs', 'Looking for file that does not exist');",
+            "  return `Result: success=${result.success}`;",
+            "}"
+          ]
+        }
       }
     }
   ],

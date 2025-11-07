@@ -50,23 +50,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Which module handles counter",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'All modules (Module00 through Module24) have counter functionality via the counter field and get_count() method.';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "context": {
           "min_files": 10,
           "semantic_search_used": true,
           "chunking_performed": true
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Which module handles counter",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'All modules (Module00 through Module24) have counter functionality via the counter field and get_count() method.';",
+            "}"
+          ]
         }
       }
     }

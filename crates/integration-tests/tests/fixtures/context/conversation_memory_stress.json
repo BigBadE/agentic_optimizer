@@ -27,20 +27,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "increment",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const counter = await readFile('counter.txt');",
-          "  const newValue = parseInt(counter) + 1;",
-          "  await writeFile('counter.txt', newValue.toString());",
-          "  return `Counter incremented to ${newValue}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -51,6 +37,23 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "increment",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const counter = await readFile('counter.txt');",
+            "  const newValue = parseInt(counter) + 1;",
+            "  await writeFile('counter.txt', newValue.toString());",
+            "  return `Counter incremented to ${newValue}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -62,20 +65,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Do it again",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const counter = await readFile('counter.txt');",
-          "  const newValue = parseInt(counter) + 1;",
-          "  await writeFile('counter.txt', newValue.toString());",
-          "  return `Counter incremented to ${newValue}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -86,6 +75,23 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Do it again",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const counter = await readFile('counter.txt');",
+            "  const newValue = parseInt(counter) + 1;",
+            "  await writeFile('counter.txt', newValue.toString());",
+            "  return `Counter incremented to ${newValue}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -97,20 +103,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Keep going",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const counter = await readFile('counter.txt');",
-          "  const newValue = parseInt(counter) + 1;",
-          "  await writeFile('counter.txt', newValue.toString());",
-          "  return `Counter incremented to ${newValue}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -121,6 +113,23 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Keep going",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const counter = await readFile('counter.txt');",
+            "  const newValue = parseInt(counter) + 1;",
+            "  await writeFile('counter.txt', newValue.toString());",
+            "  return `Counter incremented to ${newValue}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -132,23 +141,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Two more",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  let counter = await readFile('counter.txt');",
-          "  let value = parseInt(counter) + 1;",
-          "  await writeFile('counter.txt', value.toString());",
-          "  counter = await readFile('counter.txt');",
-          "  value = parseInt(counter) + 1;",
-          "  await writeFile('counter.txt', value.toString());",
-          "  return `Counter incremented twice to ${value}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -159,6 +151,26 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Two more",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  let counter = await readFile('counter.txt');",
+            "  let value = parseInt(counter) + 1;",
+            "  await writeFile('counter.txt', value.toString());",
+            "  counter = await readFile('counter.txt');",
+            "  value = parseInt(counter) + 1;",
+            "  await writeFile('counter.txt', value.toString());",
+            "  return `Counter incremented twice to ${value}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -170,20 +182,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "current value",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const counter = await readFile('counter.txt');",
-          "  return `Current counter value is ${counter}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "current value",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const counter = await readFile('counter.txt');",
+            "  return `Current counter value is ${counter}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -195,20 +210,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Log all the values",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const log = await readFile('log.txt');",
-          "  const entry = '\\nConversation log:\\n- Started at 0\\n- Incremented to 1\\n- Incremented to 2\\n- Incremented to 3\\n- Incremented twice to 5\\n- Current value: 5\\n';",
-          "  await writeFile('log.txt', log + entry);",
-          "  return 'Logged all conversation values';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -221,6 +222,23 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Log all the values",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const log = await readFile('log.txt');",
+            "  const entry = '\\nConversation log:\\n- Started at 0\\n- Incremented to 1\\n- Incremented to 2\\n- Incremented to 3\\n- Incremented twice to 5\\n- Current value: 5\\n';",
+            "  await writeFile('log.txt', log + entry);",
+            "  return 'Logged all conversation values';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -232,20 +250,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "entire conversation history",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const log = await readFile('log.txt');",
-          "  const summary = '\\nConversation summary:\\n- Total turns: 8\\n- File operations: multiple increments and reads\\n- Pattern: User requested increments, then status check, then logging\\n';",
-          "  await writeFile('log.txt', log + summary);",
-          "  return 'Added conversation history summary';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -258,6 +262,23 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "entire conversation history",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const log = await readFile('log.txt');",
+            "  const summary = '\\nConversation summary:\\n- Total turns: 8\\n- File operations: multiple increments and reads\\n- Pattern: User requested increments, then status check, then logging\\n';",
+            "  await writeFile('log.txt', log + summary);",
+            "  return 'Added conversation history summary';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -269,19 +290,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "very first thing",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'The first thing you asked was to read counter.txt and increment it by 1';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "very first thing",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'The first thing you asked was to read counter.txt and increment it by 1';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -293,18 +317,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Reset the counter",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('counter.txt', '0');",
-          "  return 'Reset counter to original value of 0';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -318,6 +330,21 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Reset the counter",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('counter.txt', '0');",
+            "  return 'Reset counter to original value of 0';",
+            "}"
+          ]
+        }
       }
     }
   ],

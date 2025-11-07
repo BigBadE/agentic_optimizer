@@ -1,4 +1,5 @@
 //! Prompt verification for testing prompt correctness.
+#![allow(dead_code)]
 
 use super::verification_result::VerificationResult;
 use super::verify::PromptVerify;

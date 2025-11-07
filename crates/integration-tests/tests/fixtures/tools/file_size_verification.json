@@ -27,19 +27,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create a file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = 'a'.repeat(100);",
-          "  await writeFile('exactly100.txt', content);",
-          "  return `Created file with ${content.length} characters`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -50,6 +37,22 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create a file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = 'a'.repeat(100);",
+            "  await writeFile('exactly100.txt', content);",
+            "  return `Created file with ${content.length} characters`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -61,18 +64,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "small file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('tiny.txt', 'Small content');",
-          "  return 'Created small file';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -82,6 +73,21 @@
             "size_lt": 50
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "small file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('tiny.txt', 'Small content');",
+            "  return 'Created small file';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -93,19 +99,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "large file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const bigContent = 'This is a really long file.\\n'.repeat(25);",
-          "  await writeFile('big.txt', bigContent);",
-          "  return `Created file with ${bigContent.length} characters`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -115,6 +108,22 @@
             "size_gt": 500
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "large file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const bigContent = 'This is a really long file.\\n'.repeat(25);",
+            "  await writeFile('big.txt', bigContent);",
+            "  return `Created file with ${bigContent.length} characters`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -126,22 +135,25 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "verify the setup files",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const small = await readFile('small.txt');",
-          "  const medium = await readFile('medium.txt');",
-          "  const large = await readFile('large.txt');",
-          "  return `Read ${small.length}, ${medium.length}, ${large.length} chars`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "verify the setup files",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const small = await readFile('small.txt');",
+            "  const medium = await readFile('medium.txt');",
+            "  const large = await readFile('large.txt');",
+            "  return `Read ${small.length}, ${medium.length}, ${large.length} chars`;",
+            "}"
+          ]
+        }
       }
     }
   ],

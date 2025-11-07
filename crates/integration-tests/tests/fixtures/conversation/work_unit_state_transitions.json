@@ -1,10 +1,17 @@
 {
   "name": "WorkUnit State Transitions",
   "description": "Tests WorkUnit state transitions (in_progress, completed, failed, cancelled, retrying)",
-  "tags": ["conversation", "work_unit", "state"],
+  "tags": [
+    "conversation",
+    "work_unit",
+    "state"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -16,36 +23,56 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Test state transitions",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const state_transitions = {",
-          "    in_progress: { status: 'in_progress', is_terminal: false },",
-          "    retrying: { status: 'retrying', is_terminal: false },",
-          "    completed: { status: 'completed', is_terminal: true },",
-          "    failed: { status: 'failed', is_terminal: true },",
-          "    cancelled: { status: 'cancelled', is_terminal: true }",
-          "  };",
-          "  ",
-          "  await writeFile('state_test.json', JSON.stringify(state_transitions, null, 2));",
-          "  return 'State transitions tested';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
-          {"path": "state_test.json", "exists": true, "contains": ["in_progress", "completed", "failed", "cancelled", "is_terminal"]}
+          {
+            "path": "state_test.json",
+            "exists": true,
+            "contains": [
+              "in_progress",
+              "completed",
+              "failed",
+              "cancelled",
+              "is_terminal"
+            ]
+          }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Test state transitions",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const state_transitions = {",
+            "    in_progress: { status: 'in_progress', is_terminal: false },",
+            "    retrying: { status: 'retrying', is_terminal: false },",
+            "    completed: { status: 'completed', is_terminal: true },",
+            "    failed: { status: 'failed', is_terminal: true },",
+            "    cancelled: { status: 'cancelled', is_terminal: true }",
+            "  };",
+            "  ",
+            "  await writeFile('state_test.json', JSON.stringify(state_transitions, null, 2));",
+            "  return 'State transitions tested';",
+            "}"
+          ]
+        }
       }
     }
   ],
   "final_verify": {
     "files": [
-      {"path": "state_test.json", "exists": true, "contains": ["retrying", "is_terminal"]}
+      {
+        "path": "state_test.json",
+        "exists": true,
+        "contains": [
+          "retrying",
+          "is_terminal"
+        ]
+      }
     ]
   }
 }

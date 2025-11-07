@@ -22,19 +22,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "What is 2 \\+ 2",
-        "match_type": "regex"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return '2 + 2 = 4';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "What is 2 \\+ 2",
+          "match_type": "regex"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return '2 + 2 = 4';",
+            "}"
+          ]
+        }
       }
     }
   ],

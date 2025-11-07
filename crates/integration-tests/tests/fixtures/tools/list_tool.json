@@ -29,20 +29,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "List files in src",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const files = await listFiles('src');",
-          "  return `Files in src: ${files.join(', ')}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "List files in src",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const files = await listFiles('src');",
+            "  return `Files in src: ${files.join(', ')}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -54,21 +57,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "subdirectories in src",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const files = await listFiles('src');",
-          "  const hasSubdir = files.includes('utils');",
-          "  return hasSubdir ? 'Found utils subdirectory' : 'No subdirectories';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "subdirectories in src",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const files = await listFiles('src');",
+            "  const hasSubdir = files.includes('utils');",
+            "  return hasSubdir ? 'Found utils subdirectory' : 'No subdirectories';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -80,21 +86,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "without hidden",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const files = await listFiles('.', { include_hidden: false });",
-          "  const hasHidden = files.some(f => f.startsWith('.'));",
-          "  return hasHidden ? 'Hidden files found' : `No hidden files: ${files.join(', ')}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "without hidden",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const files = await listFiles('.', { include_hidden: false });",
+            "  const hasHidden = files.some(f => f.startsWith('.'));",
+            "  return hasHidden ? 'Hidden files found' : `No hidden files: ${files.join(', ')}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -106,21 +115,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "WITH hidden",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const files = await listFiles('.', { include_hidden: true });",
-          "  const hasHidden = files.some(f => f === '.hidden');",
-          "  return hasHidden ? 'Found .hidden file' : 'No hidden files found';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "WITH hidden",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const files = await listFiles('.', { include_hidden: true });",
+            "  const hasHidden = files.some(f => f === '.hidden');",
+            "  return hasHidden ? 'Found .hidden file' : 'No hidden files found';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -132,24 +144,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "list nonexistent",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    await listFiles('nonexistent_dir');",
-          "    return 'Unexpectedly succeeded';",
-          "  } catch (error) {",
-          "    return `Expected error: Directory not found`;",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "list nonexistent",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    await listFiles('nonexistent_dir');",
+            "    return 'Unexpectedly succeeded';",
+            "  } catch (error) {",
+            "    return `Expected error: Directory not found`;",
+            "  }",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -161,24 +176,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "list a file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    await listFiles('src/main.rs');",
-          "    return 'Unexpectedly succeeded';",
-          "  } catch (error) {",
-          "    return `Expected error: Not a directory`;",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "list a file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    await listFiles('src/main.rs');",
+            "    return 'Unexpectedly succeeded';",
+            "  } catch (error) {",
+            "    return `Expected error: Not a directory`;",
+            "  }",
+            "}"
+          ]
+        }
       }
     }
   ],

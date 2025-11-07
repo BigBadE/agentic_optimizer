@@ -26,19 +26,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Task A",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Task A completed successfully';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Task A",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Task A completed successfully';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -50,19 +53,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Task B",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Task B completed after Task A';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Task B",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Task B completed after Task A';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -74,23 +80,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "multiple requests",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const results = [];",
-          "  results.push('Created function: fn example() {}');",
-          "  results.push('Written test: #[test] fn test_example() {}');",
-          "  results.push('Added documentation: /// Example function');",
-          "  return results.join('\\n');",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "multiple requests",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const results = [];",
+            "  results.push('Created function: fn example() {}');",
+            "  results.push('Written test: #[test] fn test_example() {}');",
+            "  results.push('Added documentation: /// Example function');",
+            "  return results.join('\\n');",
+            "}"
+          ]
+        }
       }
     }
   ],

@@ -1,10 +1,18 @@
 {
   "name": "TypeScript Callback - File Exists",
   "description": "Test TypeScript callback that validates file existence",
-  "tags": ["validation", "typescript_callback", "exit_requirement", "file_check"],
+  "tags": [
+    "validation",
+    "typescript_callback",
+    "exit_requirement",
+    "file_check"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -16,48 +24,38 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create config file",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  return {",
-          "    title: 'Create config file',",
-          "    steps: [",
-          "      {",
-          "        title: 'Create config',",
-          "        description: 'Write app.config.json',",
-          "        step_type: 'implementation',",
-          "        exit_requirement: async () => {",
-          "          const exists = await bash('test -f app.config.json && echo exists || echo missing');",
-          "          if (!exists.stdout.includes('exists')) {",
-          "            throw new Error('app.config.json was not created');",
-          "          }",
-          "        }",
-          "      }",
-          "    ]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create config file",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Create config file',",
+            "    steps: [",
+            "      {",
+            "        title: 'Create config',",
+            "        description: 'Write app.config.json',",
+            "        step_type: 'implementation',",
+            "        exit_requirement: async () => {",
+            "          const exists = await bash('test -f app.config.json && echo exists || echo missing');",
+            "          if (!exists.stdout.includes('exists')) {",
+            "            throw new Error('app.config.json was not created');",
+            "          }",
+            "        }",
+            "      }",
+            "    ]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Write app.config.json",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const config = { app: 'test-app', version: '1.0.0' };",
-          "  await writeFile('app.config.json', JSON.stringify(config, null, 2));",
-          "  return 'Created app.config.json';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -65,6 +63,22 @@
             "exists": true
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Write app.config.json",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const config = { app: 'test-app', version: '1.0.0' };",
+            "  await writeFile('app.config.json', JSON.stringify(config, null, 2));",
+            "  return 'Created app.config.json';",
+            "}"
+          ]
+        }
       }
     }
   ],
@@ -73,7 +87,9 @@
       {
         "path": "app.config.json",
         "exists": true,
-        "contains": ["test-app"]
+        "contains": [
+          "test-app"
+        ]
       }
     ]
   }

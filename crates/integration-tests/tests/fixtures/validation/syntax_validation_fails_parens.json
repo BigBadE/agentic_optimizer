@@ -1,10 +1,17 @@
 {
   "name": "Syntax Validation Fails - Mismatched Parentheses",
   "description": "Tests syntax validation detecting mismatched parentheses in response text",
-  "tags": ["validation", "syntax", "error-paths"],
+  "tags": [
+    "validation",
+    "syntax",
+    "error-paths"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [80, 24]
+    "terminal_size": [
+      80,
+      24
+    ]
   },
   "events": [
     {
@@ -16,19 +23,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Test syntax validation",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'fn calculate((x: i32, y: i32) -> i32 {\\n  (x + y * 2\\n}';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Test syntax validation",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'fn calculate((x: i32, y: i32) -> i32 {\\n  (x + y * 2\\n}';",
+            "}"
+          ]
+        }
       }
     }
   ],

@@ -26,23 +26,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "syntax validation with valid",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const validRust = `",
-          "pub fn hello() -> String {",
-          "    String::from(\\\"Hello, world!\\\")",
-          "}",
-          "`;",
-          "  await writeFile('src/hello.rs', validRust);",
-          "  return 'Valid Rust code written';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -55,6 +38,26 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "syntax validation with valid",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const validRust = `",
+            "pub fn hello() -> String {",
+            "    String::from(\\\"Hello, world!\\\")",
+            "}",
+            "`;",
+            "  await writeFile('src/hello.rs', validRust);",
+            "  return 'Valid Rust code written';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -66,19 +69,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "build validation stage",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Build stage test';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "build validation stage",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Build stage test';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -90,19 +96,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "test validation stage",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Test stage verification';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "test validation stage",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Test stage verification';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -114,19 +123,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "lint validation stage",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Lint stage test';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "lint validation stage",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Lint stage test';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -138,19 +150,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "stages can run independently",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Independent stage execution';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "stages can run independently",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Independent stage execution';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -162,18 +177,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "validation with file changes",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('src/test.rs', 'pub fn test() {}');",
-          "  return 'File changes validated';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -185,6 +188,21 @@
             ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "validation with file changes",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('src/test.rs', 'pub fn test() {}');",
+            "  return 'File changes validated';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -196,20 +214,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "multiple file changes",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('src/module1.rs', 'pub fn func1() {}');",
-          "  await writeFile('src/module2.rs', 'pub fn func2() {}');",
-          "  await writeFile('src/module3.rs', 'pub fn func3() {}');",
-          "  return 'Multiple files created';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "files": [
@@ -226,6 +230,23 @@
             "exists": true
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "multiple file changes",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('src/module1.rs', 'pub fn func1() {}');",
+            "  await writeFile('src/module2.rs', 'pub fn func2() {}');",
+            "  await writeFile('src/module3.rs', 'pub fn func3() {}');",
+            "  return 'Multiple files created';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -237,19 +258,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "validation result structure",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Structure test';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "validation result structure",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Structure test';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -261,19 +285,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "stage ordering",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Stage order test';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "stage ordering",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Stage order test';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -285,19 +312,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "quick check functionality",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Quick checks complete';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "quick check functionality",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Quick checks complete';",
+            "}"
+          ]
+        }
       }
     }
   ],

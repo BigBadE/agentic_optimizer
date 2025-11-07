@@ -75,6 +75,9 @@ pub struct Context {
     pub files: Vec<FileContext>,
     /// System-level instructions for the model.
     pub system_prompt: String,
+    /// Optional metadata for test infrastructure (ignored by real providers)
+    #[serde(default, skip_serializing_if = "std::collections::HashMap::is_empty")]
+    pub metadata: std::collections::HashMap<String, String>,
 }
 
 impl Context {
@@ -83,6 +86,7 @@ impl Context {
         Self {
             files: Vec::default(),
             system_prompt: system_prompt.into(),
+            metadata: std::collections::HashMap::new(),
         }
     }
 

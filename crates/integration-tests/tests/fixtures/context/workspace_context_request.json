@@ -23,24 +23,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "User struct",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext(",
-          "    'src/main.rs',",
-          "    'Need User struct implementation',",
-          "    5",
-          "  );",
-          "  return 'Found User struct in main.rs';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "User struct",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext(",
+            "    'src/main.rs',",
+            "    'Need User struct implementation',",
+            "    5",
+            "  );",
+            "  return 'Found User struct in main.rs';",
+            "}"
+          ]
+        }
       }
     }
   ],

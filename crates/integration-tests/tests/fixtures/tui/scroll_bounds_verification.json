@@ -24,21 +24,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "50 lines",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  let output = '';",
-          "  for (let i = 1; i <= 50; i++) {",
-          "    output += `Line ${i}\\n`;",
-          "  }",
-          "  return output;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
@@ -46,6 +31,24 @@
           "output_contains": [
             "Line 1",
             "Line 50"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "50 lines",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  let output = '';",
+            "  for (let i = 1; i <= 50; i++) {",
+            "    output += `Line ${i}\\n`;",
+            "  }",
+            "  return output;",
+            "}"
           ]
         }
       }

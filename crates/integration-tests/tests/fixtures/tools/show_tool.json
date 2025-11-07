@@ -10,7 +10,7 @@
     "files": {
       "src/main.rs": "fn main() {\n    println!(\"Hello\");\n}\n",
       "src/lib.rs": "pub fn add(a: i32, b: i32) -> i32 {\n    a + b\n}\n",
-      "unicode.txt": "Hello 世界 🌍\nRust 🦀 is great!\n"
+      "unicode.txt": "Hello \u4e16\u754c \ud83c\udf0d\nRust \ud83e\udd80 is great!\n"
     },
     "terminal_size": [
       80,
@@ -27,18 +27,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Show me the main.rs",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('src/main.rs');",
-          "  return `File contents:\\n${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "ui": {
           "output_contains": [
@@ -48,6 +36,21 @@
           ]
         },
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Show me the main.rs",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = await readFile('src/main.rs');",
+            "  return `File contents:\\n${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -59,20 +62,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "lines 1-2",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('src/main.rs', { start_line: 1, end_line: 2 });",
-          "  return `Lines 1-2:\\n${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "lines 1-2",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = await readFile('src/main.rs', { start_line: 1, end_line: 2 });",
+            "  return `Lines 1-2:\\n${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -84,20 +90,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Read unicode.txt",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('unicode.txt');",
-          "  return `Unicode content: ${content}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Read unicode.txt",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = await readFile('unicode.txt');",
+            "  return `Unicode content: ${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -109,24 +118,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "read nonexistent.rs",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    const content = await readFile('nonexistent.rs');",
-          "    return `Content: ${content}`;",
-          "  } catch (error) {",
-          "    return `Error: File not found`;",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "read nonexistent.rs",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    const content = await readFile('nonexistent.rs');",
+            "    return `Content: ${content}`;",
+            "  } catch (error) {",
+            "    return `Error: File not found`;",
+            "  }",
+            "}"
+          ]
+        }
       }
     }
   ],

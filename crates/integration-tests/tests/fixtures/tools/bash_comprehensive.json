@@ -26,21 +26,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "successful echo",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await bash('echo Hello World');",
-          "  return `Output: ${result.stdout}, Exit: ${result.exit_code}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "successful echo",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await bash('echo Hello World');",
+            "  return `Output: ${result.stdout}, Exit: ${result.exit_code}`;",
+            "}"
+          ]
         }
       }
     },
@@ -53,21 +56,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "failing command",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await bash('exit 42');",
-          "  return `Failed with code: ${result.exit_code}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "failing command",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await bash('exit 42');",
+            "  return `Failed with code: ${result.exit_code}`;",
+            "}"
+          ]
         }
       }
     },
@@ -80,24 +86,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "echo and grep",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await bash('echo \"foo bar baz\" | grep foo');",
-          "  if (result.exit_code === 0) {",
-          "    return `Grep found: ${result.stdout.trim()}`;",
-          "  }",
-          "  return `Grep failed with code ${result.exit_code}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "echo and grep",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await bash('echo \"foo bar baz\" | grep foo');",
+            "  if (result.exit_code === 0) {",
+            "    return `Grep found: ${result.stdout.trim()}`;",
+            "  }",
+            "  return `Grep failed with code ${result.exit_code}`;",
+            "}"
+          ]
         }
       }
     },
@@ -110,21 +119,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "stderr output",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await bash('echo error message >&2');",
-          "  return `Stderr: ${result.stderr.trim()}, Exit: ${result.exit_code}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "stderr output",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await bash('echo error message >&2');",
+            "  return `Stderr: ${result.stderr.trim()}, Exit: ${result.exit_code}`;",
+            "}"
+          ]
         }
       }
     },
@@ -137,25 +149,28 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Count lines",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await bash('echo -e \"1\\\\n2\\\\n3\\\\n4\\\\n5\" | wc -l');",
-          "  if (result.exit_code === 0) {",
-          "    const count = result.stdout.trim();",
-          "    return `Line count: ${count}`;",
-          "  }",
-          "  return `wc failed`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Count lines",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await bash('echo -e \"1\\\\n2\\\\n3\\\\n4\\\\n5\" | wc -l');",
+            "  if (result.exit_code === 0) {",
+            "    const count = result.stdout.trim();",
+            "    return `Line count: ${count}`;",
+            "  }",
+            "  return `wc failed`;",
+            "}"
+          ]
         }
       }
     },
@@ -168,21 +183,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "command substitution",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await bash('echo \"Current dir: $(pwd)\"');",
-          "  return `Result: ${result.stdout.trim()}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "command substitution",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await bash('echo \"Current dir: $(pwd)\"');",
+            "  return `Result: ${result.stdout.trim()}`;",
+            "}"
+          ]
         }
       }
     },
@@ -195,22 +213,25 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "multiline output",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await bash('echo -e \"line1\\\\nline2\\\\nline3\" | head -3');",
-          "  const lines = result.stdout.trim().split('\\n');",
-          "  return `Lines: ${lines.length}, First: ${lines[0]}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "multiline output",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await bash('echo -e \"line1\\\\nline2\\\\nline3\" | head -3');",
+            "  const lines = result.stdout.trim().split('\\n');",
+            "  return `Lines: ${lines.length}, First: ${lines[0]}`;",
+            "}"
+          ]
         }
       }
     },
@@ -223,24 +244,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "ls command",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await bash('ls');",
-          "  if (result.exit_code === 0) {",
-          "    const files = result.stdout.trim().split('\\n').filter(f => f);",
-          "    return `Found ${files.length} files`;",
-          "  }",
-          "  return `ls failed`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "ls command",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await bash('ls');",
+            "  if (result.exit_code === 0) {",
+            "    const files = result.stdout.trim().split('\\n').filter(f => f);",
+            "    return `Found ${files.length} files`;",
+            "  }",
+            "  return `ls failed`;",
+            "}"
+          ]
+        }
       }
     }
   ],

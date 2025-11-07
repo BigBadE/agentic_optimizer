@@ -58,11 +58,12 @@ pub fn create_runner_components(fixture: &TestFixture) -> Result<RunnerComponent
         (workspace_path, Some(workspace))
     };
 
-    // Setup LLM response patterns
-    for event in &fixture.events {
+    // Register all LLM response strategies upfront
+    for (event_idx, event) in fixture.events.iter().enumerate() {
         if let TestEvent::LlmResponse(llm_event) = event {
-            let typescript = llm_event.as_ref().response.typescript.join("\n");
-            provider.add_response(&llm_event.as_ref().trigger, typescript)?;
+            let event_id = llm_event.id.clone().unwrap_or_else(|| format!("event_{event_idx}"));
+            let strategy = llm_event.strategy.to_response_strategy()?;
+            provider.register_event(event_id, vec![strategy])?;
         }
     }
 

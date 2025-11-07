@@ -1,10 +1,17 @@
 {
   "name": "TaskList with Multiple Steps",
   "description": "Tests TaskList decomposition with 4+ steps executing in sequence",
-  "tags": ["executor", "decomposition", "multi-step"],
+  "tags": [
+    "executor",
+    "decomposition",
+    "multi-step"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -16,101 +23,146 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "multi-file project structure",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  return {",
-          "    title: 'Project Structure Setup',",
-          "    steps: [",
-          "      {title: 'Create README', description: 'Create README.md', step_type: 'implementation'},",
-          "      {title: 'Create source dir', description: 'Create src/ directory', step_type: 'implementation'},",
-          "      {title: 'Create test dir', description: 'Create tests/ directory', step_type: 'implementation'},",
-          "      {title: 'Create config', description: 'Create package.json', step_type: 'implementation'}",
-          "    ]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "multi-file project structure",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Project Structure Setup',",
+            "    steps: [",
+            "      {title: 'Create README', description: 'Create README.md', step_type: 'implementation'},",
+            "      {title: 'Create source dir', description: 'Create src/ directory', step_type: 'implementation'},",
+            "      {title: 'Create test dir', description: 'Create tests/ directory', step_type: 'implementation'},",
+            "      {title: 'Create config', description: 'Create package.json', step_type: 'implementation'}",
+            "    ]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create README.md",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('README.md', '# Project');",
-          "  return 'Created README.md';",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create README.md",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('README.md', '# Project');",
+            "  return 'Created README.md';",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create src/ directory",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('src/index.js', 'export default {};');",
-          "  return 'Created src/ directory';",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create src/ directory",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('src/index.js', 'export default {};');",
+            "  return 'Created src/ directory';",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create tests/ directory",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('tests/test.js', 'describe(\"test\", () => {});');",
-          "  return 'Created tests/ directory';",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create tests/ directory",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('tests/test.js', 'describe(\"test\", () => {});');",
+            "  return 'Created tests/ directory';",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create package.json",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('package.json', '{\"name\": \"project\"}');",
-          "  return 'Created package.json';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
-          {"path": "README.md", "exists": true},
-          {"path": "src/index.js", "exists": true},
-          {"path": "tests/test.js", "exists": true},
-          {"path": "package.json", "exists": true}
+          {
+            "path": "README.md",
+            "exists": true
+          },
+          {
+            "path": "src/index.js",
+            "exists": true
+          },
+          {
+            "path": "tests/test.js",
+            "exists": true
+          },
+          {
+            "path": "package.json",
+            "exists": true
+          }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create package.json",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('package.json', '{\"name\": \"project\"}');",
+            "  return 'Created package.json';",
+            "}"
+          ]
+        }
       }
     }
   ],
   "final_verify": {
     "files": [
-      {"path": "README.md", "exists": true, "contains": ["Project"]},
-      {"path": "src/index.js", "exists": true},
-      {"path": "tests/test.js", "exists": true},
-      {"path": "package.json", "exists": true, "contains": ["project"]}
+      {
+        "path": "README.md",
+        "exists": true,
+        "contains": [
+          "Project"
+        ]
+      },
+      {
+        "path": "src/index.js",
+        "exists": true
+      },
+      {
+        "path": "tests/test.js",
+        "exists": true
+      },
+      {
+        "path": "package.json",
+        "exists": true,
+        "contains": [
+          "project"
+        ]
+      }
     ]
   }
 }

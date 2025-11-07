@@ -26,21 +26,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Complete a simple task",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // TaskAction::Complete scenario",
-          "  return 'Task completed successfully';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Complete a simple task",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // TaskAction::Complete scenario",
+            "  return 'Task completed successfully';",
+            "}"
+          ]
         }
       }
     },
@@ -53,22 +56,25 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Gather context",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // TaskAction::GatherContext scenario",
-          "  const context = await readFile('test_context.txt');",
-          "  return `Gathered context: ${context}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "string"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Gather context",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // TaskAction::GatherContext scenario",
+            "  const context = await readFile('test_context.txt');",
+            "  return `Gathered context: ${context}`;",
+            "}"
+          ]
         }
       }
     },
@@ -81,23 +87,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "multiple decisions",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // First decision: gather context",
-          "  const ctx = await readFile('test_context.txt');",
-          "  // Second decision: process",
-          "  const processed = ctx.toUpperCase();",
-          "  await writeFile('decision_output.txt', processed);",
-          "  // Final decision: complete",
-          "  return 'Multiple decisions completed';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -109,6 +98,26 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "multiple decisions",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // First decision: gather context",
+            "  const ctx = await readFile('test_context.txt');",
+            "  // Second decision: process",
+            "  const processed = ctx.toUpperCase();",
+            "  await writeFile('decision_output.txt', processed);",
+            "  // Final decision: complete",
+            "  return 'Multiple decisions completed';",
+            "}"
+          ]
+        }
       }
     }
   ],

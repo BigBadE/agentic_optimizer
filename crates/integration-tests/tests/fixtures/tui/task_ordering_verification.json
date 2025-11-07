@@ -23,23 +23,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "First task",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'First task completed';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 1,
           "rendered_buffer_contains": [
             "First task at time 0"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "First task",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'First task completed';",
+            "}"
           ]
         }
       }
@@ -53,23 +56,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Second task",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Second task completed';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 2,
           "rendered_buffer_contains": [
             "Second task at time 1"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Second task",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Second task completed';",
+            "}"
           ]
         }
       }
@@ -83,23 +89,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Third task",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Third task completed';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 3,
           "rendered_buffer_contains": [
             "Third task at time 2"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Third task",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Third task completed';",
+            "}"
           ]
         }
       }

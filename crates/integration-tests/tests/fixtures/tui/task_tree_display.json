@@ -23,69 +23,78 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Show me a task tree",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<TaskList> {",
-          "  return {",
-          "    title: 'Parent Task',",
-          "    steps: [",
-          "      {",
-          "        title: 'First Child',",
-          "        description: 'First child task',",
-          "        step_type: 'implementation'",
-          "      },",
-          "      {",
-          "        title: 'Second Child',",
-          "        description: 'Second child task',",
-          "        step_type: 'validation'",
-          "      }",
-          "    ]",
-          "  };",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "TaskList"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Show me a task tree",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<TaskList> {",
+            "  return {",
+            "    title: 'Parent Task',",
+            "    steps: [",
+            "      {",
+            "        title: 'First Child',",
+            "        description: 'First child task',",
+            "        step_type: 'implementation'",
+            "      },",
+            "      {",
+            "        title: 'Second Child',",
+            "        description: 'Second child task',",
+            "        step_type: 'validation'",
+            "      }",
+            "    ]",
+            "  };",
+            "}"
+          ]
         }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "First child task",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'First child completed';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "First child task",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'First child completed';",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Second child task",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Second child completed';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Second child task",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Second child completed';",
+            "}"
+          ]
+        }
       }
     },
     {

@@ -1,12 +1,19 @@
 {
   "name": "TUI Error Message Display",
   "description": "Tests TUI error message rendering when task fails",
-  "tags": ["tui", "error-display", "error-paths"],
+  "tags": [
+    "tui",
+    "error-display",
+    "error-paths"
+  ],
   "setup": {
     "files": {
       "test.rs": "fn main() {}"
     },
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -18,69 +25,80 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create file that will fail",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  return {",
-          "    title: 'Create file that will fail',",
-          "    steps: [",
-          "      {",
-          "        title: 'Attempt file creation',",
-          "        description: 'Create output.txt',",
-          "        step_type: 'implementation',",
-          "        exit_requirement: async () => {",
-          "          const content = await readFile('output.txt');",
-          "          if (!content.includes('success')) {",
-          "            throw new Error('[SOFT] Output missing success marker');",
-          "          }",
-          "        }",
-          "      }",
-          "    ]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create file that will fail",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Create file that will fail',",
+            "    steps: [",
+            "      {",
+            "        title: 'Attempt file creation',",
+            "        description: 'Create output.txt',",
+            "        step_type: 'implementation',",
+            "        exit_requirement: async () => {",
+            "          const content = await readFile('output.txt');",
+            "          if (!content.includes('success')) {",
+            "            throw new Error('[SOFT] Output missing success marker');",
+            "          }",
+            "        }",
+            "      }",
+            "    ]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create output.txt",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('output.txt', 'incomplete');",
-          "  return 'Created output.txt (incomplete)';",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create output.txt",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('output.txt', 'incomplete');",
+            "  return 'Created output.txt (incomplete)';",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create output.txt",
-        "match_type": "exact"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('output.txt', 'success marker added');",
-          "  return 'Created output.txt with success marker';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
             "path": "output.txt",
-            "contains": ["success"]
+            "contains": [
+              "success"
+            ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create output.txt",
+          "match_type": "exact"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('output.txt', 'success marker added');",
+            "  return 'Created output.txt with success marker';",
+            "}"
+          ]
+        }
       }
     }
   ],

@@ -26,19 +26,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "hello world",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Created function: fn hello_world() { println!(\"Hello, World!\"); }';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "hello world",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Created function: fn hello_world() { println!(\"Hello, World!\"); }';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -50,19 +53,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Say hello",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Hello! I am ready to help you with your coding tasks.';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Say hello",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Hello! I am ready to help you with your coding tasks.';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -74,19 +80,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Continue",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'I remember we were working on a hello world function. How can I help further?';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Continue",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'I remember we were working on a hello world function. How can I help further?';",
+            "}"
+          ]
+        }
       }
     }
   ],

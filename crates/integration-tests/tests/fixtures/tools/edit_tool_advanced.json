@@ -25,20 +25,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Replace all",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await editFile('example.txt', 'Hello', 'Hi', { replace_all: true });",
-          "  const content = await readFile('example.txt');",
-          "  const count = (content.match(/Hi/g) || []).length;",
-          "  return `Replaced all occurrences. Found ${count} instances of Hi`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -56,6 +42,23 @@
           ]
         },
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Replace all",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await editFile('example.txt', 'Hello', 'Hi', { replace_all: true });",
+            "  const content = await readFile('example.txt');",
+            "  const count = (content.match(/Hi/g) || []).length;",
+            "  return `Replaced all occurrences. Found ${count} instances of Hi`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -67,19 +70,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "single occurrence",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await editFile('example.txt', 'Hi world', 'Greetings world');",
-          "  const content = await readFile('example.txt');",
-          "  return `File now contains: ${content.split('\\n')[0]}`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -91,6 +81,22 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "single occurrence",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await editFile('example.txt', 'Hi world', 'Greetings world');",
+            "  const content = await readFile('example.txt');",
+            "  return `File now contains: ${content.split('\\n')[0]}`;",
+            "}"
+          ]
+        }
       }
     }
   ],

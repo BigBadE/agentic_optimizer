@@ -36,17 +36,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "streaming output",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'All steps completed';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
@@ -54,6 +43,20 @@
           "task_status": "completed",
           "output_contains": [
             "All steps completed"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "streaming output",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'All steps completed';",
+            "}"
           ]
         }
       }
@@ -67,23 +70,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "status transition",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Status changed immediately';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 2,
           "output_contains": [
             "Status changed immediately"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "status transition",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Status changed immediately';",
+            "}"
           ]
         }
       }

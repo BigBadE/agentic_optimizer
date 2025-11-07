@@ -28,24 +28,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "small file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('small.txt', 'Testing basic file request');",
-          "  if (result.success && result.files.length > 0) {",
-          "    return `File size: ${result.files[0].size} bytes, Content: ${result.files[0].content.trim()}`;",
-          "  }",
-          "  return 'Failed to get file';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_value_matches": "File size:"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "small file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('small.txt', 'Testing basic file request');",
+            "  if (result.success && result.files.length > 0) {",
+            "    return `File size: ${result.files[0].size} bytes, Content: ${result.files[0].content.trim()}`;",
+            "  }",
+            "  return 'Failed to get file';",
+            "}"
+          ]
         }
       }
     },
@@ -58,23 +61,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "deeply nested",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('data/nested/deep.rs', 'Testing nested path resolution');",
-          "  if (result.success && result.files.length > 0) {",
-          "    return `Found nested file: ${result.files[0].path}`;",
-          "  }",
-          "  return 'Nested file not found';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "deeply nested",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('data/nested/deep.rs', 'Testing nested path resolution');",
+            "  if (result.success && result.files.length > 0) {",
+            "    return `Found nested file: ${result.files[0].path}`;",
+            "  }",
+            "  return 'Nested file not found';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -86,20 +92,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "path traversal",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('../../etc/passwd', 'Attempting path traversal');",
-          "  return `Result: success=${result.success}, files=${result.files.length}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "path traversal",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('../../etc/passwd', 'Attempting path traversal');",
+            "  return `Result: success=${result.success}, files=${result.files.length}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -111,20 +120,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "matches nothing",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('*.nonexistent', 'Pattern with no matches');",
-          "  return `Success: ${result.success}, Files: ${result.files.length}, Message: ${result.message}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "matches nothing",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('*.nonexistent', 'Pattern with no matches');",
+            "  return `Success: ${result.success}, Files: ${result.files.length}, Message: ${result.message}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -136,21 +148,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "max_files=1",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('*.txt', 'Testing max_files=1', 1);",
-          "  return `Files returned: ${result.files.length}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_value_matches": "Files returned: 1"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "max_files=1",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('*.txt', 'Testing max_files=1', 1);",
+            "  return `Files returned: ${result.files.length}`;",
+            "}"
+          ]
         }
       }
     },
@@ -163,23 +178,26 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "same file multiple times",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const r1 = await requestContext('small.txt', 'First request');",
-          "  const r2 = await requestContext('small.txt', 'Second request');",
-          "  const r3 = await requestContext('small.txt', 'Third request');",
-          "  return `All successful: ${r1.success && r2.success && r3.success}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_value_matches": "All successful: true"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "same file multiple times",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const r1 = await requestContext('small.txt', 'First request');",
+            "  const r2 = await requestContext('small.txt', 'Second request');",
+            "  const r3 = await requestContext('small.txt', 'Third request');",
+            "  return `All successful: ${r1.success && r2.success && r3.success}`;",
+            "}"
+          ]
         }
       }
     },
@@ -192,21 +210,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Mix glob patterns",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const txt = await requestContext('**/*.txt', 'Get all txt');",
-          "  const rs = await requestContext('**/*.rs', 'Get all rs');",
-          "  return `TXT: ${txt.files.length}, RS: ${rs.files.length}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Mix glob patterns",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const txt = await requestContext('**/*.txt', 'Get all txt');",
+            "  const rs = await requestContext('**/*.rs', 'Get all rs');",
+            "  return `TXT: ${txt.files.length}, RS: ${rs.files.length}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -218,25 +239,28 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "file size tracking",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('small.txt', 'Check size field');",
-          "  if (result.files.length > 0) {",
-          "    const hasSize = typeof result.files[0].size === 'number';",
-          "    return `Has size field: ${hasSize}`;",
-          "  }",
-          "  return 'No files';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_value_matches": "Has size field: true"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "file size tracking",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('small.txt', 'Check size field');",
+            "  if (result.files.length > 0) {",
+            "    const hasSize = typeof result.files[0].size === 'number';",
+            "    return `Has size field: ${hasSize}`;",
+            "  }",
+            "  return 'No files';",
+            "}"
+          ]
         }
       }
     }

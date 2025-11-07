@@ -29,25 +29,28 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Check file metadata",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('src/lib.rs', 'Check file metadata');",
-          "  if (result.success && result.files.length > 0) {",
-          "    const file = result.files[0];",
-          "    const sizeMatch = file.size === file.content.length;",
-          "    return `File size: ${file.size}, matches content: ${sizeMatch}`;",
-          "  }",
-          "  return 'No file found';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Check file metadata",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('src/lib.rs', 'Check file metadata');",
+            "  if (result.success && result.files.length > 0) {",
+            "    const file = result.files[0];",
+            "    const sizeMatch = file.size === file.content.length;",
+            "    return `File size: ${file.size}, matches content: ${sizeMatch}`;",
+            "  }",
+            "  return 'No file found';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -59,26 +62,29 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Verify executor content",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('src/executor.rs', 'Verify content is read correctly');",
-          "  if (result.success && result.files.length > 0) {",
-          "    const file = result.files[0];",
-          "    const hasModule = file.content.includes('Executor module');",
-          "    const hasStruct = file.content.includes('pub struct Executor');",
-          "    return `Has module comment: ${hasModule}, has struct: ${hasStruct}`;",
-          "  }",
-          "  return 'File not found';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Verify executor content",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('src/executor.rs', 'Verify content is read correctly');",
+            "  if (result.success && result.files.length > 0) {",
+            "    const file = result.files[0];",
+            "    const hasModule = file.content.includes('Executor module');",
+            "    const hasStruct = file.content.includes('pub struct Executor');",
+            "    return `Has module comment: ${hasModule}, has struct: ${hasStruct}`;",
+            "  }",
+            "  return 'File not found';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -90,20 +96,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "TypeScript glob pattern",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('**/*.rs', 'Get all Rust files', 10);",
-          "  return `Success: ${result.success}, Count: ${result.files.length}, Message: ${result.message}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "TypeScript glob pattern",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('**/*.rs', 'Get all Rust files', 10);",
+            "  return `Success: ${result.success}, Count: ${result.files.length}, Message: ${result.message}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -115,26 +124,29 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "invalid parameters",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    // Missing required 'reason' parameter - should fail",
-          "    const result = await requestContext('src/lib.rs');",
-          "    return `Unexpected success: ${result.success}`;",
-          "  } catch (error) {",
-          "    return `Caught error as expected: ${error.message}`;",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_value_matches": "Caught error as expected"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "invalid parameters",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    // Missing required 'reason' parameter - should fail",
+            "    const result = await requestContext('src/lib.rs');",
+            "    return `Unexpected success: ${result.success}`;",
+            "  } catch (error) {",
+            "    return `Caught error as expected: ${error.message}`;",
+            "  }",
+            "}"
+          ]
         }
       }
     },
@@ -147,21 +159,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "default max_files",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('**/*.rs', 'Testing default max_files');",
-          "  const withinLimit = result.files.length <= 5;",
-          "  return `Found ${result.files.length} files, within default limit of 5: ${withinLimit}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "default max_files",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('**/*.rs', 'Testing default max_files');",
+            "  const withinLimit = result.files.length <= 5;",
+            "  return `Found ${result.files.length} files, within default limit of 5: ${withinLimit}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -173,24 +188,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "TypeScript return structure",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const result = await requestContext('src/lib.rs', 'Testing from TypeScript');",
-          "  return JSON.stringify({",
-          "    done: true,",
-          "    found: result.success,",
-          "    fileCount: result.files.length",
-          "  });",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "TypeScript return structure",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const result = await requestContext('src/lib.rs', 'Testing from TypeScript');",
+            "  return JSON.stringify({",
+            "    done: true,",
+            "    found: result.success,",
+            "    fileCount: result.files.length",
+            "  });",
+            "}"
+          ]
+        }
       }
     }
   ],

@@ -25,18 +25,21 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "simple task",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "return { done: true, result: \"Success\" };"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "simple task",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "return { done: true, result: \"Success\" };"
+          ]
         }
       }
     },
@@ -49,19 +52,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Calculate something",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "const x = 1 + 1;",
-          "return { done: true, result: `Result is ${x}` };"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Calculate something",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "const x = 1 + 1;",
+            "return { done: true, result: `Result is ${x}` };"
+          ]
         }
       }
     },
@@ -74,18 +80,21 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "multiple approaches",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "return { done: true, result: \"First\" };"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "multiple approaches",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "return { done: true, result: \"First\" };"
+          ]
         }
       }
     }

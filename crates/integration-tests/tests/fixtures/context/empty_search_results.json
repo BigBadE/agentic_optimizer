@@ -1,12 +1,20 @@
 {
   "name": "Empty Search Results",
   "description": "Tests context builder behavior when semantic search returns no results",
-  "tags": ["context", "semantic-search", "edge-case", "empty-results"],
+  "tags": [
+    "context",
+    "semantic-search",
+    "edge-case",
+    "empty-results"
+  ],
   "setup": {
     "files": {
       "readme.md": "# Project README\n\nThis is a test project."
     },
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -18,19 +26,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "quantum entanglement",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'No quantum entanglement implementation found in this project';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "quantum entanglement",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'No quantum entanglement implementation found in this project';",
+            "}"
+          ]
+        }
       }
     }
   ],

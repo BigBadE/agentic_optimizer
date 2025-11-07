@@ -27,31 +27,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "async patterns",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const sequential = async () => {",
-          "    const d1 = await readFile('async1.txt');",
-          "    const d2 = await readFile('async2.txt');",
-          "    return `${d1}, ${d2}`;",
-          "  };",
-          "  const parallel = async () => {",
-          "    const [p1, p2] = await Promise.all([",
-          "      readFile('async1.txt'),",
-          "      readFile('async2.txt')",
-          "    ]);",
-          "    return `${p1}, ${p2}`;",
-          "  };",
-          "  const seq = await sequential();",
-          "  const par = await parallel();",
-          "  return `Sequential: ${seq} | Parallel: ${par}`;",
-          "}"
-        ]
-      },
       "verify": {
         "ui": {
           "tasks_displayed": 1,
@@ -63,6 +38,34 @@
           ]
         },
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "async patterns",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const sequential = async () => {",
+            "    const d1 = await readFile('async1.txt');",
+            "    const d2 = await readFile('async2.txt');",
+            "    return `${d1}, ${d2}`;",
+            "  };",
+            "  const parallel = async () => {",
+            "    const [p1, p2] = await Promise.all([",
+            "      readFile('async1.txt'),",
+            "      readFile('async2.txt')",
+            "    ]);",
+            "    return `${p1}, ${p2}`;",
+            "  };",
+            "  const seq = await sequential();",
+            "  const par = await parallel();",
+            "  return `Sequential: ${seq} | Parallel: ${par}`;",
+            "}"
+          ]
+        }
       }
     }
   ],

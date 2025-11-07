@@ -1,10 +1,17 @@
 {
   "name": "Syntax Validation Fails - Mismatched Braces",
   "description": "Tests syntax validation detecting mismatched braces in response text",
-  "tags": ["validation", "syntax", "error-paths"],
+  "tags": [
+    "validation",
+    "syntax",
+    "error-paths"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [80, 24]
+    "terminal_size": [
+      80,
+      24
+    ]
   },
   "events": [
     {
@@ -16,19 +23,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Test syntax validation",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'fn broken() {\\n  let x = 5;\\n  if x > 0 {\\n    println!(\"test\");\\n  // Missing closing brace for function';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Test syntax validation",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'fn broken() {\\n  let x = 5;\\n  if x > 0 {\\n    println!(\"test\");\\n  // Missing closing brace for function';",
+            "}"
+          ]
+        }
       }
     }
   ],

@@ -23,19 +23,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "First task",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'First task completed';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "First task",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'First task completed';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -47,19 +50,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Second task",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Second task completed';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Second task",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Second task completed';",
+            "}"
+          ]
+        }
       }
     }
   ],

@@ -26,21 +26,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Inspect",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const file1 = await readFile('data1.txt');",
-          "  const file2 = await readFile('data2.txt');",
-          "  const lines1 = file1.split('\\n').length;",
-          "  const lines2 = file2.split('\\n').length;",
-          "  return `File1: ${file1.length} bytes, ${lines1} lines | File2: ${file2.length} bytes, ${lines2} lines`;",
-          "}"
-        ]
-      },
       "verify": {
         "ui": {
           "tasks_displayed": 1,
@@ -50,6 +35,24 @@
           ]
         },
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Inspect",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const file1 = await readFile('data1.txt');",
+            "  const file2 = await readFile('data2.txt');",
+            "  const lines1 = file1.split('\\n').length;",
+            "  const lines2 = file2.split('\\n').length;",
+            "  return `File1: ${file1.length} bytes, ${lines1} lines | File2: ${file2.length} bytes, ${lines2} lines`;",
+            "}"
+          ]
+        }
       }
     }
   ],

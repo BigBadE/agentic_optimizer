@@ -1,12 +1,20 @@
 {
   "name": "File Conflict Detection",
   "description": "Tests detection of file conflicts when parallel tasks try to modify the same file",
-  "tags": ["orchestrator", "conflicts", "parallel", "file-operations"],
+  "tags": [
+    "orchestrator",
+    "conflicts",
+    "parallel",
+    "file-operations"
+  ],
   "setup": {
     "files": {
       "shared.txt": "initial content"
     },
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -18,70 +26,82 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Process shared file",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  return {",
-          "    title: 'Process shared file',",
-          "    steps: [",
-          "      {",
-          "        title: 'Read and uppercase',",
-          "        description: 'Read shared.txt and convert to uppercase',",
-          "        step_type: 'implementation'",
-          "      },",
-          "      {",
-          "        title: 'Append timestamp',",
-          "        description: 'Append current operation marker',",
-          "        step_type: 'implementation'",
-          "      }",
-          "    ]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Process shared file",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Process shared file',",
+            "    steps: [",
+            "      {",
+            "        title: 'Read and uppercase',",
+            "        description: 'Read shared.txt and convert to uppercase',",
+            "        step_type: 'implementation'",
+            "      },",
+            "      {",
+            "        title: 'Append timestamp',",
+            "        description: 'Append current operation marker',",
+            "        step_type: 'implementation'",
+            "      }",
+            "    ]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "convert to uppercase",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('shared.txt');",
-          "  await writeFile('shared.txt', content.toUpperCase());",
-          "  return 'Converted to uppercase';",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "convert to uppercase",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = await readFile('shared.txt');",
+            "  await writeFile('shared.txt', content.toUpperCase());",
+            "  return 'Converted to uppercase';",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Append current operation marker",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('shared.txt');",
-          "  await writeFile('shared.txt', content + ' - MODIFIED');",
-          "  return 'Appended marker';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
             "path": "shared.txt",
-            "contains": ["INITIAL CONTENT", "MODIFIED"]
+            "contains": [
+              "INITIAL CONTENT",
+              "MODIFIED"
+            ]
           }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Append current operation marker",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = await readFile('shared.txt');",
+            "  await writeFile('shared.txt', content + ' - MODIFIED');",
+            "  return 'Appended marker';",
+            "}"
+          ]
+        }
       }
     }
   ],
@@ -90,7 +110,10 @@
       {
         "path": "shared.txt",
         "exists": true,
-        "contains": ["INITIAL CONTENT", "MODIFIED"]
+        "contains": [
+          "INITIAL CONTENT",
+          "MODIFIED"
+        ]
       }
     ]
   }

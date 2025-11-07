@@ -28,21 +28,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "List files in current directory",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "function agent_code() {",
-          "  const result = bash('ls -la');",
-          "  return { done: true, result: result.stdout };",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "List files in current directory",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "function agent_code() {",
+            "  const result = bash('ls -la');",
+            "  return { done: true, result: result.stdout };",
+            "}"
+          ]
         }
       }
     },
@@ -55,22 +58,25 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Check if Cargo.toml exists",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code() {",
-          "  const result = await bash('test -f Cargo.toml && echo \"exists\" || echo \"not found\"');",
-          "  const exists = result.stdout.trim() === 'exists';",
-          "  return { done: true, result: `File ${exists ? 'exists' : 'does not exist'}` };",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Check if Cargo.toml exists",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code() {",
+            "  const result = await bash('test -f Cargo.toml && echo \"exists\" || echo \"not found\"');",
+            "  const exists = result.stdout.trim() === 'exists';",
+            "  return { done: true, result: `File ${exists ? 'exists' : 'does not exist'}` };",
+            "}"
+          ]
         }
       }
     },
@@ -83,32 +89,35 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Calculate factorial then echo result",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code() {",
-          "  // Calculate factorial of 5",
-          "  let factorial = 1;",
-          "  for (let i = 2; i <= 5; i++) {",
-          "    factorial *= i;",
-          "  }",
-          "  ",
-          "  // Echo the result",
-          "  const result = await bash(`echo \"Factorial of 5 is ${factorial}\"`);",
-          "  ",
-          "  return {",
-          "    done: true,",
-          "    result: `Calculated ${factorial}, output: ${result.stdout.trim()}`",
-          "  };",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Calculate factorial then echo result",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code() {",
+            "  // Calculate factorial of 5",
+            "  let factorial = 1;",
+            "  for (let i = 2; i <= 5; i++) {",
+            "    factorial *= i;",
+            "  }",
+            "  ",
+            "  // Echo the result",
+            "  const result = await bash(`echo \"Factorial of 5 is ${factorial}\"`);",
+            "  ",
+            "  return {",
+            "    done: true,",
+            "    result: `Calculated ${factorial}, output: ${result.stdout.trim()}`",
+            "  };",
+            "}"
+          ]
         }
       }
     },
@@ -121,34 +130,37 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Run multiple sequential bash commands",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code() {",
-          "  // Get current directory",
-          "  const pwd_result = await bash('pwd');",
-          "  const current_dir = pwd_result.stdout.trim();",
-          "  ",
-          "  // Count files",
-          "  const ls_result = await bash('ls -1 | wc -l');",
-          "  const file_count = ls_result.stdout.trim();",
-          "  ",
-          "  return {",
-          "    done: true,",
-          "    result: {",
-          "      directory: current_dir,",
-          "      file_count: parseInt(file_count)",
-          "    }",
-          "  };",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Run multiple sequential bash commands",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code() {",
+            "  // Get current directory",
+            "  const pwd_result = await bash('pwd');",
+            "  const current_dir = pwd_result.stdout.trim();",
+            "  ",
+            "  // Count files",
+            "  const ls_result = await bash('ls -1 | wc -l');",
+            "  const file_count = ls_result.stdout.trim();",
+            "  ",
+            "  return {",
+            "    done: true,",
+            "    result: {",
+            "      directory: current_dir,",
+            "      file_count: parseInt(file_count)",
+            "    }",
+            "  };",
+            "}"
+          ]
         }
       }
     },
@@ -161,34 +173,37 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Check git status with error handling",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code() {",
-          "  const git_result = await bash('git status 2>&1');",
-          "  ",
-          "  if (git_result.exit_code === 0) {",
-          "    return {",
-          "      done: true,",
-          "      result: 'Git repository found',",
-          "      status: git_result.stdout",
-          "    };",
-          "  } else {",
-          "    return {",
-          "      done: true,",
-          "      result: 'Not a git repository or git not installed',",
-          "      error: git_result.stderr",
-          "    };",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Check git status with error handling",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code() {",
+            "  const git_result = await bash('git status 2>&1');",
+            "  ",
+            "  if (git_result.exit_code === 0) {",
+            "    return {",
+            "      done: true,",
+            "      result: 'Git repository found',",
+            "      status: git_result.stdout",
+            "    };",
+            "  } else {",
+            "    return {",
+            "      done: true,",
+            "      result: 'Not a git repository or git not installed',",
+            "      error: git_result.stderr",
+            "    };",
+            "  }",
+            "}"
+          ]
         }
       }
     },
@@ -201,37 +216,40 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Parse file listing and transform data",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code() {",
-          "  // Get file listing with sizes",
-          "  const result = await bash('ls -lh | tail -n +2');",
-          "  const lines = result.stdout.split('\\n').filter(line => line.trim());",
-          "  ",
-          "  // Parse each line to extract filename and size",
-          "  const files = lines.map(line => {",
-          "    const parts = line.split(/\\s+/);",
-          "    return {",
-          "      size: parts[4],",
-          "      name: parts.slice(8).join(' ')",
-          "    };",
-          "  }).filter(f => f.name);",
-          "  ",
-          "  return {",
-          "    done: true,",
-          "    result: `Found ${files.length} files`,",
-          "    files: files.slice(0, 5) // Return first 5",
-          "  };",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Parse file listing and transform data",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code() {",
+            "  // Get file listing with sizes",
+            "  const result = await bash('ls -lh | tail -n +2');",
+            "  const lines = result.stdout.split('\\n').filter(line => line.trim());",
+            "  ",
+            "  // Parse each line to extract filename and size",
+            "  const files = lines.map(line => {",
+            "    const parts = line.split(/\\s+/);",
+            "    return {",
+            "      size: parts[4],",
+            "      name: parts.slice(8).join(' ')",
+            "    };",
+            "  }).filter(f => f.name);",
+            "  ",
+            "  return {",
+            "    done: true,",
+            "    result: `Found ${files.length} files`,",
+            "    files: files.slice(0, 5) // Return first 5",
+            "  };",
+            "}"
+          ]
         }
       }
     },
@@ -244,38 +262,41 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Detect platform and provide platform-specific info",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code() {",
-          "  const uname_result = await bash('uname -s 2>&1 || echo \"Windows\"');",
-          "  const platform = uname_result.stdout.trim();",
-          "  ",
-          "  let message = '';",
-          "  if (platform.includes('Linux')) {",
-          "    message = 'Running on Linux';",
-          "  } else if (platform.includes('Darwin')) {",
-          "    message = 'Running on macOS';",
-          "  } else if (platform.includes('MINGW') || platform.includes('MSYS') || platform.includes('Windows')) {",
-          "    message = 'Running on Windows';",
-          "  } else {",
-          "    message = 'Unknown platform: ' + platform;",
-          "  }",
-          "  ",
-          "  return {",
-          "    done: true,",
-          "    result: message,",
-          "    platform: platform",
-          "  };",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Detect platform and provide platform-specific info",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code() {",
+            "  const uname_result = await bash('uname -s 2>&1 || echo \"Windows\"');",
+            "  const platform = uname_result.stdout.trim();",
+            "  ",
+            "  let message = '';",
+            "  if (platform.includes('Linux')) {",
+            "    message = 'Running on Linux';",
+            "  } else if (platform.includes('Darwin')) {",
+            "    message = 'Running on macOS';",
+            "  } else if (platform.includes('MINGW') || platform.includes('MSYS') || platform.includes('Windows')) {",
+            "    message = 'Running on Windows';",
+            "  } else {",
+            "    message = 'Unknown platform: ' + platform;",
+            "  }",
+            "  ",
+            "  return {",
+            "    done: true,",
+            "    result: message,",
+            "    platform: platform",
+            "  };",
+            "}"
+          ]
         }
       }
     },
@@ -288,48 +309,51 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Perform multi-step project analysis",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code() {",
-          "  // Step 1: Check if it's a Rust project",
-          "  const cargo_check = await bash('test -f Cargo.toml && echo \"yes\" || echo \"no\"');",
-          "  const is_rust = cargo_check.stdout.trim() === 'yes';",
-          "  ",
-          "  if (!is_rust) {",
-          "    return { done: true, result: 'Not a Rust project' };",
-          "  }",
-          "  ",
-          "  // Step 2: Count Rust files",
-          "  const rust_files = await bash('find . -name \"*.rs\" -type f | wc -l');",
-          "  const file_count = parseInt(rust_files.stdout.trim());",
-          "  ",
-          "  // Step 3: Count files in tests directory",
-          "  const test_check = await bash('find . -path \"*/tests/*.rs\" -type f | wc -l');",
-          "  const test_count = parseInt(test_check.stdout.trim());",
-          "  ",
-          "  // Step 4: Build summary",
-          "  const summary = {",
-          "    project_type: 'Rust',",
-          "    rust_files: file_count,",
-          "    test_files: test_count,",
-          "    has_tests: test_count > 0",
-          "  };",
-          "  ",
-          "  return {",
-          "    done: true,",
-          "    result: `Rust project with ${file_count} files and ${test_count} test files`,",
-          "    summary: summary",
-          "  };",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Perform multi-step project analysis",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code() {",
+            "  // Step 1: Check if it's a Rust project",
+            "  const cargo_check = await bash('test -f Cargo.toml && echo \"yes\" || echo \"no\"');",
+            "  const is_rust = cargo_check.stdout.trim() === 'yes';",
+            "  ",
+            "  if (!is_rust) {",
+            "    return { done: true, result: 'Not a Rust project' };",
+            "  }",
+            "  ",
+            "  // Step 2: Count Rust files",
+            "  const rust_files = await bash('find . -name \"*.rs\" -type f | wc -l');",
+            "  const file_count = parseInt(rust_files.stdout.trim());",
+            "  ",
+            "  // Step 3: Count files in tests directory",
+            "  const test_check = await bash('find . -path \"*/tests/*.rs\" -type f | wc -l');",
+            "  const test_count = parseInt(test_check.stdout.trim());",
+            "  ",
+            "  // Step 4: Build summary",
+            "  const summary = {",
+            "    project_type: 'Rust',",
+            "    rust_files: file_count,",
+            "    test_files: test_count,",
+            "    has_tests: test_count > 0",
+            "  };",
+            "  ",
+            "  return {",
+            "    done: true,",
+            "    result: `Rust project with ${file_count} files and ${test_count} test files`,",
+            "    summary: summary",
+            "  };",
+            "}"
+          ]
         }
       }
     },
@@ -342,38 +366,41 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Build JSON output from bash results",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code() {",
-          "  // Get current date/time",
-          "  const date_result = await bash('date +\"%Y-%m-%d %H:%M:%S\"');",
-          "  ",
-          "  // Get hostname",
-          "  const host_result = await bash('hostname || echo \"unknown\"');",
-          "  ",
-          "  // Get working directory",
-          "  const pwd_result = await bash('pwd');",
-          "  ",
-          "  return {",
-          "    done: true,",
-          "    result: 'System information collected',",
-          "    data: {",
-          "      timestamp: date_result.stdout.trim(),",
-          "      hostname: host_result.stdout.trim(),",
-          "      working_directory: pwd_result.stdout.trim(),",
-          "      collected_at: new Date().toISOString()",
-          "    }",
-          "  };",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {
           "return_type": "object"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Build JSON output from bash results",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code() {",
+            "  // Get current date/time",
+            "  const date_result = await bash('date +\"%Y-%m-%d %H:%M:%S\"');",
+            "  ",
+            "  // Get hostname",
+            "  const host_result = await bash('hostname || echo \"unknown\"');",
+            "  ",
+            "  // Get working directory",
+            "  const pwd_result = await bash('pwd');",
+            "  ",
+            "  return {",
+            "    done: true,",
+            "    result: 'System information collected',",
+            "    data: {",
+            "      timestamp: date_result.stdout.trim(),",
+            "      hostname: host_result.stdout.trim(),",
+            "      working_directory: pwd_result.stdout.trim(),",
+            "      collected_at: new Date().toISOString()",
+            "    }",
+            "  };",
+            "}"
+          ]
         }
       }
     }

@@ -23,20 +23,23 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Test validation pipeline",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Simple valid response for default pipeline",
-          "  return 'Pipeline test complete';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Test validation pipeline",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Simple valid response for default pipeline",
+            "  return 'Pipeline test complete';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -48,19 +51,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "custom pipeline",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Custom pipeline test';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "custom pipeline",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Custom pipeline test';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -72,19 +78,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "empty pipeline",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'No validation stages';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "empty pipeline",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'No validation stages';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -96,19 +105,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "single stage",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Single stage validation';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "single stage",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Single stage validation';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -120,19 +132,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "stage metadata",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Metadata verification';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "stage metadata",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Metadata verification';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -144,19 +159,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "score normalization",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Score test';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "score normalization",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Score test';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -168,19 +186,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "quick validation",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Quick check complete';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "quick validation",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Quick check complete';",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -192,19 +213,22 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "pipeline chaining",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Chained pipeline test';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "pipeline chaining",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Chained pipeline test';",
+            "}"
+          ]
+        }
       }
     }
   ],

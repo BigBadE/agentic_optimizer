@@ -23,27 +23,32 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "doesn't exist",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    const content = await readFile('nonexistent_file.txt');",
-          "    return `File content: ${content}`;",
-          "  } catch (error) {",
-          "    return `Error reading file: ${error}`;",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 1,
-          "output_contains": ["Error"]
+          "output_contains": [
+            "Error"
+          ]
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "doesn't exist",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    const content = await readFile('nonexistent_file.txt');",
+            "    return `File content: ${content}`;",
+            "  } catch (error) {",
+            "    return `Error reading file: ${error}`;",
+            "  }",
+            "}"
+          ]
         }
       }
     }

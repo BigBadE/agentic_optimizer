@@ -22,22 +22,25 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "archive",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Thread created and ready for archiving';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "tasks_displayed": 1,
           "thread_count": 1
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "archive",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Thread created and ready for archiving';",
+            "}"
+          ]
         }
       }
     }

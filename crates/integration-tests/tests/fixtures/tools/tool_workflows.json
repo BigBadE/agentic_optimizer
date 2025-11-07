@@ -1,6 +1,6 @@
 {
   "name": "Complete Tool Workflows",
-  "description": "Tests complete workflows combining multiple tools: read→edit→verify, create→list→delete, tool registry operations",
+  "description": "Tests complete workflows combining multiple tools: read\u2192edit\u2192verify, create\u2192list\u2192delete, tool registry operations",
   "tags": [
     "tools",
     "workflow",
@@ -25,28 +25,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Read lib.rs",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Step 1: Read original",
-          "  const original = await readFile('src/lib.rs');",
-          "  const hasAdd = original.includes('a + b');",
-          "  ",
-          "  // Step 2: Edit",
-          "  await editFile('src/lib.rs', 'a + b', 'a - b');",
-          "  ",
-          "  // Step 3: Verify",
-          "  const updated = await readFile('src/lib.rs');",
-          "  const hasSubtract = updated.includes('a - b');",
-          "  ",
-          "  return `Original had add: ${hasAdd}, Updated has subtract: ${hasSubtract}`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -61,6 +39,31 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Read lib.rs",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Step 1: Read original",
+            "  const original = await readFile('src/lib.rs');",
+            "  const hasAdd = original.includes('a + b');",
+            "  ",
+            "  // Step 2: Edit",
+            "  await editFile('src/lib.rs', 'a + b', 'a - b');",
+            "  ",
+            "  // Step 3: Verify",
+            "  const updated = await readFile('src/lib.rs');",
+            "  const hasSubtract = updated.includes('a - b');",
+            "  ",
+            "  return `Original had add: ${hasAdd}, Updated has subtract: ${hasSubtract}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -72,35 +75,6 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create 5 test files",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Step 1: Create files",
-          "  for (let i = 1; i <= 5; i++) {",
-          "    await writeFile(`test${i}.txt`, `Test file ${i}`);",
-          "  }",
-          "  ",
-          "  // Step 2: List files",
-          "  const files = await listFiles('.');",
-          "  const testFiles = files.filter(f => f.startsWith('test'));",
-          "  ",
-          "  // Step 3: Delete all test files",
-          "  for (const file of testFiles) {",
-          "    await deleteFile(file);",
-          "  }",
-          "  ",
-          "  // Step 4: Verify deletion",
-          "  const remaining = await listFiles('.');",
-          "  const remainingTest = remaining.filter(f => f.startsWith('test'));",
-          "  ",
-          "  return `Created ${testFiles.length} files, deleted all, remaining test files: ${remainingTest.length}`;",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
           {
@@ -125,6 +99,38 @@
           }
         ],
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create 5 test files",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Step 1: Create files",
+            "  for (let i = 1; i <= 5; i++) {",
+            "    await writeFile(`test${i}.txt`, `Test file ${i}`);",
+            "  }",
+            "  ",
+            "  // Step 2: List files",
+            "  const files = await listFiles('.');",
+            "  const testFiles = files.filter(f => f.startsWith('test'));",
+            "  ",
+            "  // Step 3: Delete all test files",
+            "  for (const file of testFiles) {",
+            "    await deleteFile(file);",
+            "  }",
+            "  ",
+            "  // Step 4: Verify deletion",
+            "  const remaining = await listFiles('.');",
+            "  const remainingTest = remaining.filter(f => f.startsWith('test'));",
+            "  ",
+            "  return `Created ${testFiles.length} files, deleted all, remaining test files: ${remainingTest.length}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -136,21 +142,24 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "List all available tools",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  // Mock tool registry listing",
-          "  const tools = ['readFile', 'writeFile', 'editFile', 'deleteFile', 'listFiles', 'runBash'];",
-          "  return `Available tools: ${tools.join(', ')}`;",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "List all available tools",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  // Mock tool registry listing",
+            "  const tools = ['readFile', 'writeFile', 'editFile', 'deleteFile', 'listFiles', 'runBash'];",
+            "  return `Available tools: ${tools.join(', ')}`;",
+            "}"
+          ]
+        }
       }
     },
     {
@@ -162,24 +171,27 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "unknown tool",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  try {",
-          "    // This would normally throw if we tried to call a nonexistent tool",
-          "    throw new Error('Unknown tool: nonexistent_tool');",
-          "  } catch (error) {",
-          "    return `Caught expected error: ${error}`;",
-          "  }",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "unknown tool",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  try {",
+            "    // This would normally throw if we tried to call a nonexistent tool",
+            "    throw new Error('Unknown tool: nonexistent_tool');",
+            "  } catch (error) {",
+            "    return `Caught expected error: ${error}`;",
+            "  }",
+            "}"
+          ]
+        }
       }
     }
   ],

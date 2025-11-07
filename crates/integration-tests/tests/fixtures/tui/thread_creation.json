@@ -22,22 +22,25 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "First thread",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Response in first thread';",
-          "}"
-        ]
-      },
       "verify": {
         "execution": {},
         "ui": {
           "thread_count": 1,
           "tasks_displayed": 1
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "First thread",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Response in first thread';",
+            "}"
+          ]
         }
       }
     }

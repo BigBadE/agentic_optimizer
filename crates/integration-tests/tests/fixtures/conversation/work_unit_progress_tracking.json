@@ -1,10 +1,17 @@
 {
   "name": "WorkUnit Progress Tracking",
   "description": "Tests WorkUnit progress percentage calculation",
-  "tags": ["conversation", "work_unit", "progress"],
+  "tags": [
+    "conversation",
+    "work_unit",
+    "progress"
+  ],
   "setup": {
     "files": {},
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -16,37 +23,56 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Track task progress",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const progress_tracking = {",
-          "    no_subtasks: { subtasks: [], progress: 50 },",
-          "    zero_percent: { total: 4, completed: 0, progress: 0 },",
-          "    twenty_five_percent: { total: 4, completed: 1, progress: 25 },",
-          "    fifty_percent: { total: 4, completed: 2, progress: 50 },",
-          "    seventy_five_percent: { total: 4, completed: 3, progress: 75 },",
-          "    one_hundred_percent: { total: 4, completed: 4, progress: 100 }",
-          "  };",
-          "  ",
-          "  await writeFile('progress_test.json', JSON.stringify(progress_tracking, null, 2));",
-          "  return 'Progress tracking calculated';",
-          "}"
-        ]
-      },
       "verify": {
         "files": [
-          {"path": "progress_test.json", "exists": true, "contains": ["progress", "completed", "total"]}
+          {
+            "path": "progress_test.json",
+            "exists": true,
+            "contains": [
+              "progress",
+              "completed",
+              "total"
+            ]
+          }
         ]
+      },
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Track task progress",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const progress_tracking = {",
+            "    no_subtasks: { subtasks: [], progress: 50 },",
+            "    zero_percent: { total: 4, completed: 0, progress: 0 },",
+            "    twenty_five_percent: { total: 4, completed: 1, progress: 25 },",
+            "    fifty_percent: { total: 4, completed: 2, progress: 50 },",
+            "    seventy_five_percent: { total: 4, completed: 3, progress: 75 },",
+            "    one_hundred_percent: { total: 4, completed: 4, progress: 100 }",
+            "  };",
+            "  ",
+            "  await writeFile('progress_test.json', JSON.stringify(progress_tracking, null, 2));",
+            "  return 'Progress tracking calculated';",
+            "}"
+          ]
+        }
       }
     }
   ],
   "final_verify": {
     "files": [
-      {"path": "progress_test.json", "exists": true, "contains": ["twenty_five_percent", "fifty_percent", "one_hundred_percent"]}
+      {
+        "path": "progress_test.json",
+        "exists": true,
+        "contains": [
+          "twenty_five_percent",
+          "fifty_percent",
+          "one_hundred_percent"
+        ]
+      }
     ]
   }
 }

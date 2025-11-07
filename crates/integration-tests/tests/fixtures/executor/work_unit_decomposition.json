@@ -1,12 +1,20 @@
 {
   "name": "WorkUnit Task Decomposition",
   "description": "Tests WorkUnit creation with subtasks when agent returns TaskList",
-  "tags": ["executor", "work_unit", "task_list", "threads"],
+  "tags": [
+    "executor",
+    "work_unit",
+    "task_list",
+    "threads"
+  ],
   "setup": {
     "files": {
       "project.txt": "This is a multi-step project"
     },
-    "terminal_size": [120, 40]
+    "terminal_size": [
+      120,
+      40
+    ]
   },
   "events": [
     {
@@ -18,83 +26,98 @@
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Create a complete report",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<any> {",
-          "  return {",
-          "    title: 'Complete Report Creation',",
-          "    steps: [",
-          "      {title: 'Research Phase', description: 'Gather project information', step_type: 'research', dependencies: []},",
-          "      {title: 'Planning Phase', description: 'Plan report structure', step_type: 'planning', dependencies: ['Research Phase']},",
-          "      {title: 'Implementation Phase', description: 'Write the report content', step_type: 'implementation', dependencies: ['Planning Phase']},",
-          "      {title: 'Validation Phase', description: 'Review and validate report', step_type: 'validation', dependencies: ['Implementation Phase']}",
-          "    ]",
-          "  };",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Create a complete report",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Complete Report Creation',",
+            "    steps: [",
+            "      {title: 'Research Phase', description: 'Gather project information', step_type: 'research', dependencies: []},",
+            "      {title: 'Planning Phase', description: 'Plan report structure', step_type: 'planning', dependencies: ['Research Phase']},",
+            "      {title: 'Implementation Phase', description: 'Write the report content', step_type: 'implementation', dependencies: ['Planning Phase']},",
+            "      {title: 'Validation Phase', description: 'Review and validate report', step_type: 'validation', dependencies: ['Implementation Phase']}",
+            "    ]",
+            "  };",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Gather project information",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const content = await readFile('project.txt');",
-          "  return `Research complete: ${content}`;",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Gather project information",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const content = await readFile('project.txt');",
+            "  return `Research complete: ${content}`;",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Plan report structure",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  return 'Report will have: Introduction, Body, Conclusion';",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Plan report structure",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'Report will have: Introduction, Body, Conclusion';",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Write the report content",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  await writeFile('report.md', '# Complete Report\\n\\n## Introduction\\nProject analysis\\n\\n## Body\\nDetailed findings\\n\\n## Conclusion\\nSummary');",
-          "  return 'Report written successfully';",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Write the report content",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('report.md', '# Complete Report\\n\\n## Introduction\\nProject analysis\\n\\n## Body\\nDetailed findings\\n\\n## Conclusion\\nSummary');",
+            "  return 'Report written successfully';",
+            "}"
+          ]
+        }
       }
     },
     {
       "type": "llm_response",
-      "trigger": {
-        "pattern": "Review and validate report",
-        "match_type": "contains"
-      },
-      "response": {
-        "typescript": [
-          "async function agent_code(): Promise<string> {",
-          "  const report = await readFile('report.md');",
-          "  return report.includes('Introduction') && report.includes('Conclusion') ? 'Validation passed' : 'Validation failed';",
-          "}"
-        ]
+      "strategy": {
+        "type": "once",
+        "trigger": {
+          "pattern": "Review and validate report",
+          "match_type": "contains"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const report = await readFile('report.md');",
+            "  return report.includes('Introduction') && report.includes('Conclusion') ? 'Validation passed' : 'Validation failed';",
+            "}"
+          ]
+        }
       }
     }
   ],
@@ -103,7 +126,11 @@
       {
         "path": "report.md",
         "exists": true,
-        "contains": ["Introduction", "Body", "Conclusion"]
+        "contains": [
+          "Introduction",
+          "Body",
+          "Conclusion"
+        ]
       }
     ],
     "ui": {

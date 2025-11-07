@@ -112,18 +112,20 @@ impl<'fixture> UnifiedVerifier<'fixture> {
         if let Some(prompt_verify) = &verify.prompt {
             if let Some(provider_ref) = provider {
                 // Get the prompt for this specific event ID or fall back to last matched
-                let matched_prompt = if let Some(event_id) = event.id() {
-                    provider_ref
-                        .get_prompt_for_event(event_id)
-                        .ok()
-                        .and_then(identity)
-                } else {
-                    provider_ref
-                        .get_last_matched_prompt()
-                        .await
-                        .ok()
-                        .and_then(identity)
-                };
+                let matched_prompt = event.id().map_or_else(
+                    || {
+                        provider_ref
+                            .get_last_matched_prompt()
+                            .ok()
+                            .and_then(identity)
+                    },
+                    |event_id| {
+                        provider_ref
+                            .get_prompt_for_event(event_id)
+                            .ok()
+                            .and_then(identity)
+                    },
+                );
                 PromptVerifier::verify_prompt(
                     &mut self.result,
                     matched_prompt.as_deref(),

@@ -74,9 +74,7 @@ impl<B: Backend> TuiApp<B> {
                 input_handler::handle_ctrl_n(self.focused_pane, &mut self.input_manager);
                 false
             }
-            KeyCode::Enter => {
-                self.handle_enter_key(key.modifiers.contains(KeyModifiers::SHIFT))
-            }
+            KeyCode::Enter => self.handle_enter_key(key.modifiers.contains(KeyModifiers::SHIFT)),
             _ => {
                 self.handle_other_key(key);
                 false

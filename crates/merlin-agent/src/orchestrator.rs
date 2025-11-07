@@ -32,6 +32,8 @@ pub struct RoutingOrchestrator {
     provider_registry: Option<Arc<ProviderRegistry>>,
     /// Thread storage for conversation management
     thread_store: Option<Arc<Mutex<ThreadStore>>>,
+    /// Whether to enable embedding/vector search initialization
+    enable_embeddings: bool,
 }
 
 impl RoutingOrchestrator {
@@ -58,6 +60,7 @@ impl RoutingOrchestrator {
             validator,
             workspace,
             provider_registry: None,
+            enable_embeddings: true,
             thread_store: None,
         })
     }
@@ -89,6 +92,7 @@ impl RoutingOrchestrator {
             workspace,
             provider_registry: Some(provider_registry),
             thread_store: None,
+            enable_embeddings: true,
         })
     }
 
@@ -103,6 +107,16 @@ impl RoutingOrchestrator {
     #[must_use]
     pub fn with_workspace(mut self, workspace_path: PathBuf) -> Self {
         self.workspace = WorkspaceState::new(workspace_path);
+        self
+    }
+
+    /// Sets whether to enable embedding/vector search initialization.
+    ///
+    /// When disabled, the context fetcher will skip expensive embedding operations.
+    /// This is useful for test fixtures that don't need semantic search.
+    #[must_use]
+    pub fn with_embeddings(mut self, enable: bool) -> Self {
+        self.enable_embeddings = enable;
         self
     }
 
@@ -241,7 +255,8 @@ impl RoutingOrchestrator {
             .with_tool(Arc::new(ListFilesTool::new(workspace_root)))
             .with_tool(Arc::new(ContextRequestTool::new(workspace_root.clone())));
         let tool_registry = Arc::new(tool_registry);
-        let context_fetcher = ContextFetcher::new(workspace_root.clone());
+        let context_fetcher =
+            ContextFetcher::new_with_embeddings(workspace_root.clone(), self.enable_embeddings);
 
         let executor = if let Some(ref registry) = self.provider_registry {
             // Use injected provider registry (for testing)

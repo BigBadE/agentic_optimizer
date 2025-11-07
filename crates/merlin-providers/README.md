@@ -10,13 +10,13 @@ This crate provides integration with external LLM services. Each provider implem
 
 - `groq.rs` - Groq provider (Llama models)
 - `openrouter.rs` - OpenRouter provider (multi-model access)
-- `mock.rs` - Mock provider for testing
 
 ## Public API
 
 - `GroqProvider` - Groq API integration
 - `OpenRouterProvider` - OpenRouter API integration
-- `MockProvider` - Testing mock with configurable responses
+
+**Note**: `MockProvider` has been moved to `integration-tests` crate for better test isolation and performance.
 
 ## Providers
 

@@ -12,18 +12,14 @@ pub use console;
 pub use dirs;
 pub use filetime;
 pub use flate2;
-pub use futures;
 pub use glob;
 pub use ignore;
-pub use ollama_rs;
 pub use petgraph;
 pub use regex;
-pub use reqwest;
 pub use serde_json;
 pub use tempfile;
 pub use toml;
 pub use tracing;
-pub use tracing_subscriber;
 pub use uuid;
 pub use walkdir;
 

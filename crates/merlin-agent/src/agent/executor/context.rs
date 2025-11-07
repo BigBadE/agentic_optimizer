@@ -6,7 +6,6 @@ use merlin_core::{
     ui::{TaskProgress, UiChannel, UiEvent},
 };
 use std::fmt::Write as _;
-use std::mem::replace;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 
@@ -63,9 +62,8 @@ impl ContextBuilder {
         });
 
         let mut fetcher = self.context_fetcher.lock().await;
-        let project_root = fetcher.project_root().clone();
-        *fetcher = replace(&mut *fetcher, ContextFetcher::new(project_root))
-            .with_progress_callback(progress_callback);
+        // Update progress callback without destroying cached state
+        fetcher.set_progress_callback(progress_callback);
 
         // Send substep for file gathering
         ui_channel.send(UiEvent::TaskStepStarted {

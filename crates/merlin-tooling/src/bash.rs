@@ -1,4 +1,4 @@
-use std::{env, process::Command};
+use std::process::Command;
 
 use async_trait::async_trait;
 use merlin_deps::serde_json::from_value;
@@ -6,10 +6,15 @@ use tokio::task::spawn_blocking;
 
 use crate::tool::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};
 
-/// Tool that executes shell commands asynchronously.
+/// Tool that executes shell commands asynchronously using `sh`.
 ///
-/// Uses `tokio::process::Command` for true async execution that integrates
-/// seamlessly with Deno Core's event loop and Tokio's async runtime.
+/// Uses `tokio::task::spawn_blocking` with `std::process::Command` to avoid
+/// blocking the Tokio runtime. Commands are executed via `sh -c` for POSIX
+/// compliance and optimal performance across all platforms.
+///
+/// ## Performance Note
+/// On Windows (MINGW64/Git Bash), `bash` has ~6 second startup overhead when
+/// spawned from Rust's `std::process::Command`, while `sh` has only ~55ms.
 #[derive(Debug, Clone, Copy)]
 pub struct BashTool;
 
@@ -33,14 +38,11 @@ impl BashTool {
         merlin_deps::tracing::debug!("About to call spawn_blocking for command: {}", command);
         let output = spawn_blocking(move || {
             merlin_deps::tracing::debug!("Inside spawn_blocking, about to run command");
-            // Use bash on all platforms for consistency
-            // On Windows, try GIT_BASH env var if bash is not in PATH
-            // On Unix systems, bash is standard
-            let bash_cmd = if cfg!(windows) {
-                env::var("GIT_BASH").unwrap_or_else(|_| "bash".to_owned())
-            } else {
-                "bash".to_owned()
-            };
+            // Use sh for better performance on all platforms
+            // On Windows (MINGW64/Git Bash), bash has ~6s startup overhead when spawned
+            // from Rust's std::process::Command, while sh has only ~55ms overhead
+            // sh is POSIX compliant and sufficient for all our use cases
+            let bash_cmd = "sh";
 
             let result = Command::new(bash_cmd)
                 .arg("-c")
@@ -58,7 +60,7 @@ impl BashTool {
         .map_err(|err| ToolError::ExecutionFailed(format!("Task join failed: {err}")))?
         .map_err(|err| {
             ToolError::ExecutionFailed(format!(
-                "Command execution failed (is bash available in PATH?): {err}"
+                "Command execution failed (is sh available in PATH?): {err}"
             ))
         })?;
 

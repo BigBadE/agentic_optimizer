@@ -2,7 +2,7 @@
 
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_cli::TuiApp;
-use merlin_cli::config::ConfigManager;
+use merlin_cli::config::{Config, ConfigManager};
 use merlin_cli::ui::event_source::InputEventSource;
 use merlin_cli::ui::input::InputManager;
 use merlin_cli::ui::layout;
@@ -15,15 +15,26 @@ use merlin_deps::ratatui::Terminal;
 use merlin_deps::ratatui::backend::Backend;
 use merlin_routing::{Result, RoutingError, UiEvent};
 use std::path::PathBuf;
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::Instant;
 use tokio::sync::{broadcast, mpsc};
+
+/// Shared test config manager (no disk I/O)
+static TEST_CONFIG_MANAGER: OnceLock<ConfigManager> = OnceLock::new();
+
+/// Get or create the shared test config manager
+fn get_test_config_manager() -> &'static ConfigManager {
+    TEST_CONFIG_MANAGER.get_or_init(|| ConfigManager {
+        inner: Arc::new(RwLock::new(Config::default())),
+        config_path: PathBuf::from("/tmp/test-config.toml"),
+    })
+}
 
 /// Creates a new `TuiApp` for testing with custom backend and event source
 ///
 /// # Errors
 /// Returns an error if terminal initialization fails.
-pub async fn new_test_app<B: Backend>(
+pub fn new_test_app<B: Backend>(
     backend: B,
     event_source: Box<dyn InputEventSource + Send>,
     tasks_dir: impl Into<Option<PathBuf>>,
@@ -46,11 +57,8 @@ pub async fn new_test_app<B: Backend>(
         state.loading_tasks = true;
     }
 
-    // Initialize config manager for tests
-    let config_manager = ConfigManager::new()
-        .await
-        .map_err(|err| RoutingError::Other(format!("Failed to create config manager: {err}")))?;
-
+    // Get shared test config manager (no disk I/O)
+    let config_manager = get_test_config_manager();
     let theme = config_manager
         .get()
         .map_err(|err| RoutingError::Other(format!("Failed to read config: {err}")))?
@@ -94,7 +102,7 @@ pub async fn new_test_app<B: Backend>(
         thread_store,
         orchestrator,
         log_file: None,
-        config_manager,
+        config_manager: config_manager.clone(),
         last_task_receiver: None,
     };
 

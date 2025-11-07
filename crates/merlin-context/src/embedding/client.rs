@@ -2,8 +2,8 @@
 
 use crate::models::ModelConfig;
 use merlin_core::{CoreResult as Result, Error};
-use merlin_deps::ollama_rs::Ollama;
-use merlin_deps::ollama_rs::generation::embeddings::request::GenerateEmbeddingsRequest;
+use ollama_rs::Ollama;
+use ollama_rs::generation::embeddings::request::GenerateEmbeddingsRequest;
 use std::cmp::Ordering;
 use std::collections::HashMap;
 use std::env;

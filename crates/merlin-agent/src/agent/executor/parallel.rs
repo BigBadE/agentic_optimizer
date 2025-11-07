@@ -1,35 +1,19 @@
-//! Parallel task execution with dependency resolution
+//! Sequential task execution with dependency resolution and parallel I/O
+//!
+//! Steps execute sequentially (to allow `&mut runtime` access), but expensive
+//! I/O operations within each step (LLM calls, file ops) execute in parallel
+//! on the thread pool via `tokio::spawn`.
 
 use std::collections::{HashMap, HashSet};
-use std::future::Future;
-use std::pin::Pin;
 use std::sync::Arc;
 use std::time::Instant;
 use tokio::sync::Mutex;
-use tokio::task::JoinSet;
 
-use merlin_core::{Result, RoutingError, TaskStep, WorkUnit};
+use merlin_core::{Result, RoutingError, SubtaskStatus, TaskStep, WorkUnit};
 
 use super::step_executor::{
     StepExecutionParams, StepExecutor, StepResult, TaskListExecutionParams,
 };
-
-/// Type alias for parallel execution future return type
-type ParallelExecutionFuture<'lifetime> =
-    Pin<Box<dyn Future<Output = Result<StepResult>> + Send + 'lifetime>>;
-
-/// Type alias for step result join set
-type StepJoinSet = JoinSet<(String, Result<StepResult>)>;
-
-/// Context for spawning step execution tasks
-struct StepSpawnContext<'ctx> {
-    /// Task list execution parameters
-    params: &'ctx TaskListExecutionParams<'ctx>,
-    /// Results from completed steps
-    results_by_title: &'ctx HashMap<String, StepResult>,
-    /// Whether dependencies are being tracked
-    has_dependencies: bool,
-}
 
 /// Check for deadlock condition
 ///
@@ -70,62 +54,6 @@ fn build_combined_output(
         }
     }
     combined_output.join("\n\n")
-}
-
-/// Spawn a step execution task
-fn spawn_step_task(
-    join_set: &mut StepJoinSet,
-    step: &TaskStep,
-    context: &StepSpawnContext<'_>,
-    index: usize,
-) {
-    merlin_deps::tracing::debug!(
-        "Starting step {}/{}: {}{}",
-        index + 1,
-        context.params.task_list.steps.len(),
-        step.title,
-        if context.has_dependencies {
-            " (parallel)"
-        } else {
-            ""
-        }
-    );
-
-    // Clone data for the async task
-    let step_clone = step.clone();
-    let base_context = context.params.base_context.clone();
-    let provider = Arc::clone(context.params.provider);
-    let tool_registry = Arc::clone(context.params.tool_registry);
-    let runtime = Arc::clone(context.params.runtime);
-    let task_id = context.params.task_id;
-    let ui_channel = context.params.ui_channel.clone();
-    let recursion_depth = context.params.recursion_depth;
-    let step_title = step.title.clone();
-
-    // Build previous_results as a Vec in step order (for consistency)
-    let previous_results: Vec<StepResult> = context
-        .params
-        .task_list
-        .steps
-        .iter()
-        .filter_map(|task_step| context.results_by_title.get(&task_step.title).cloned())
-        .collect();
-
-    join_set.spawn(async move {
-        let result = StepExecutor::execute_step_impl(StepExecutionParams {
-            step: &step_clone,
-            base_context: &base_context,
-            previous_results: &previous_results,
-            provider: &provider,
-            tool_registry: &tool_registry,
-            runtime: &runtime,
-            task_id,
-            ui_channel: &ui_channel,
-            recursion_depth,
-        })
-        .await;
-        (step_title, result)
-    });
 }
 
 /// Mark subtask as started in `WorkUnit`
@@ -199,80 +127,96 @@ async fn update_work_unit_on_completion(
         let completed_subtasks = work_unit_guard
             .subtasks
             .iter()
-            .filter(|s| matches!(s.status, merlin_core::SubtaskStatus::Completed))
+            .filter(|subtask| matches!(subtask.status, SubtaskStatus::Completed))
             .count();
 
         merlin_deps::tracing::debug!(
-            "WorkUnit progress: {progress_pct}% ({completed_subtasks}/{total_subtasks} subtasks completed)"
-        );
-
-        // Send both progress events for compatibility
-        params.ui_channel.progress(
-            params.task_id,
-            format!("step-{completed_count}"),
-            format!("Completed: {step_title} ({progress_pct}%)"),
-        );
-
-        params.ui_channel.work_unit_progress(
-            params.task_id,
+            "WorkUnit progress after step '{}': {:.1}% ({}/{} completed, verified {}/{})",
+            step_title,
             progress_pct,
+            completed_count,
+            total_subtasks,
             completed_subtasks,
             total_subtasks,
         );
     } else {
-        merlin_deps::tracing::warn!(
-            "Step '{}' not found in task_list.steps",
-            step_title
-        );
+        merlin_deps::tracing::warn!("Step '{}' not found in task_list.steps", step_title);
     }
 }
 
-/// Execute a task list with dependency-aware parallel execution
+/// Execute a single step and update tracking state
 ///
 /// # Errors
-/// Returns an error if any step fails or if circular dependencies are detected
-pub(super) fn execute_task_list_parallel<'lifetime>(
-    params: &'lifetime TaskListExecutionParams<'lifetime>,
-) -> ParallelExecutionFuture<'lifetime> {
-    Box::pin(execute_task_list_parallel_impl(params))
-}
+/// Returns an error if step execution fails
+async fn execute_and_track_step(
+    params: &mut TaskListExecutionParams<'_>,
+    index: usize,
+    step: &TaskStep,
+    results_by_title: &HashMap<String, StepResult>,
+    completed: &mut HashSet<String>,
+) -> Result<StepResult> {
+    merlin_deps::tracing::debug!(
+        "Executing step {}/{}: {}",
+        index + 1,
+        params.task_list.steps.len(),
+        step.title
+    );
 
-/// Determine concurrency level for execution
-fn determine_concurrency(params: &TaskListExecutionParams<'_>) -> (bool, usize) {
-    let has_dependencies = params
+    // Mark subtask as started in WorkUnit if tracking
+    if let Some(work_unit) = params.work_unit {
+        mark_subtask_started(work_unit, index).await;
+    }
+
+    // Build previous_results as a Vec in step order (for consistency)
+    let previous_results: Vec<StepResult> = params
         .task_list
         .steps
         .iter()
-        .any(|step| !step.dependencies.is_empty());
+        .filter_map(|task_step| results_by_title.get(&task_step.title).cloned())
+        .collect();
 
-    let max_concurrent = if has_dependencies { 4 } else { 1 };
+    // Execute step - this is where parallel I/O escapes happen
+    let step_result = StepExecutor::execute_step_impl(StepExecutionParams {
+        step,
+        base_context: params.base_context,
+        previous_results: &previous_results,
+        provider: params.provider,
+        tool_registry: params.tool_registry,
+        runtime: params.runtime,
+        task_id: params.task_id,
+        ui_channel: params.ui_channel,
+        recursion_depth: params.recursion_depth,
+    })
+    .await?;
 
-    if has_dependencies {
-        merlin_deps::tracing::info!(
-            "Using parallel execution for task list '{}' (dependencies detected)",
-            params.task_list.title
-        );
+    completed.insert(step.title.clone());
+
+    // Mark subtask as completed in WorkUnit if tracking
+    if let Some(work_unit) = params.work_unit {
+        update_work_unit_on_completion(work_unit, params, &step.title, &step_result, completed)
+            .await;
     }
 
-    (has_dependencies, max_concurrent)
+    Ok(step_result)
 }
 
-/// Implementation of parallel task list execution
+/// Execute a task list with dependency-aware sequential execution
+///
+/// Steps execute sequentially (to access `&mut runtime`), but each step
+/// spawns parallel work for I/O operations (LLM calls, file validation).
 ///
 /// # Errors
 /// Returns an error if any step fails or if circular dependencies are detected
-async fn execute_task_list_parallel_impl<'lifetime>(
-    params: &'lifetime TaskListExecutionParams<'lifetime>,
+pub(super) async fn execute_task_list_parallel(
+    params: &mut TaskListExecutionParams<'_>,
 ) -> Result<StepResult> {
     let start = Instant::now();
 
     // Store results by step title for dependency resolution
     let mut results_by_title: HashMap<String, StepResult> = HashMap::new();
 
-    // Track completion and execution state
+    // Track completion
     let mut completed: HashSet<String> = HashSet::new();
-    let mut running: HashSet<String> = HashSet::new();
-    let mut join_set: StepJoinSet = JoinSet::new();
 
     merlin_deps::tracing::debug!(
         "Executing task list '{}' with {} steps at depth {}, work_unit tracking: {}",
@@ -282,77 +226,44 @@ async fn execute_task_list_parallel_impl<'lifetime>(
         params.work_unit.is_some()
     );
 
-    let (has_dependencies, max_concurrent) = determine_concurrency(params);
+    let has_dependencies = params
+        .task_list
+        .steps
+        .iter()
+        .any(|step| !step.dependencies.is_empty());
+
+    if has_dependencies {
+        merlin_deps::tracing::info!(
+            "Using dependency-aware execution for task list '{}'",
+            params.task_list.title
+        );
+    }
 
     loop {
-        // Find steps ready to execute (dependencies met, not running/completed)
-        let ready_steps: Vec<(usize, &TaskStep)> = params
+        // Find next step ready to execute (dependencies met, not completed)
+        let next_step = params
             .task_list
             .steps
             .iter()
             .enumerate()
-            .filter(|(_idx, step)| {
+            .find(|(_idx, step)| {
                 !completed.contains(&step.title)
-                    && !running.contains(&step.title)
                     && step.dependencies.iter().all(|dep| completed.contains(dep))
-            })
-            .collect();
+            });
 
-        // Start new tasks up to concurrency limit
-        let spawn_context = StepSpawnContext {
-            params,
-            results_by_title: &results_by_title,
-            has_dependencies,
-        };
-
-        for (index, step) in ready_steps {
-            if running.len() >= max_concurrent {
+        let Some((index, step)) = next_step else {
+            // Check if we're done: all steps completed
+            if completed.len() == params.task_list.steps.len() {
                 break;
             }
 
-            // Mark subtask as started in WorkUnit if tracking
-            if let Some(work_unit) = params.work_unit {
-                mark_subtask_started(work_unit, index).await;
-            }
-
-            running.insert(step.title.clone());
-            spawn_step_task(&mut join_set, step, &spawn_context, index);
-        }
-
-        // Check if we're done: all steps completed
-        if completed.len() == params.task_list.steps.len() {
-            break;
-        }
-
-        // If nothing is running, something went wrong (circular dependencies?)
-        if join_set.is_empty() {
+            // Otherwise, we have a deadlock
             return check_for_deadlock(params, &completed);
-        }
+        };
 
-        // Wait for at least one step to complete
-        if let Some(joined) = join_set.join_next().await {
-            let (step_title, result) =
-                joined.map_err(|err| RoutingError::ExecutionFailed(err.to_string()))?;
-
-            let step_result = result?;
-
-            running.remove(&step_title);
-            completed.insert(step_title.clone());
-
-            // Mark subtask as completed in WorkUnit if tracking
-            if let Some(work_unit) = params.work_unit {
-                update_work_unit_on_completion(
-                    work_unit,
-                    params,
-                    &step_title,
-                    &step_result,
-                    &completed,
-                )
-                .await;
-            }
-
-            results_by_title.insert(step_title, step_result);
-        }
+        let step_result =
+            execute_and_track_step(params, index, step, &results_by_title, &mut completed).await?;
+        results_by_title.insert(step.title.clone(), step_result);
     }
 
     Ok(StepResult {

@@ -9,8 +9,8 @@ use merlin_core::{Message, MessageId, TaskResult, ThreadId, TokenUsage, WorkUnit
 use merlin_deps::ratatui::backend::Backend;
 use merlin_routing::{RoutingError, Task, TaskId, UiChannel, UiEvent};
 use merlin_tooling::ToolError;
-use tokio::spawn;
 use tokio::sync::{mpsc, oneshot};
+use tokio::task::spawn_local;
 
 use super::tui_app::TuiApp;
 
@@ -320,7 +320,7 @@ impl<B: Backend> TuiApp<B> {
         global_ui_sender: mpsc::UnboundedSender<UiEvent>,
         forwarder_done_tx: oneshot::Sender<()>,
     ) {
-        spawn(async move {
+        spawn_local(async move {
             while let Some(event) = internal_rx.recv().await {
                 // Send to task-specific channel (test waits on this) - now bounded
                 if task_event_tx.send(event.clone()).await.is_err() {
@@ -374,7 +374,7 @@ impl<B: Backend> TuiApp<B> {
         let ui_channel = UiChannel::from_sender(internal_tx);
         let log_file = self.log_file.as_ref().and_then(|f| f.try_clone().ok());
 
-        spawn(execute_and_handle_task(InternalExecutionParams {
+        spawn_local(execute_and_handle_task(InternalExecutionParams {
             orchestrator,
             user_input,
             parent_task_id,

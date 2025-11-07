@@ -46,6 +46,8 @@ Implements recursive step-based execution where agents return either a String re
 
 **Agent System:**
 - `AgentExecutor` - Execute agent tasks with TypeScript runtime
+  - Caches TypeScript signatures at initialization for performance
+  - Reuses persistent TypeScript runtime across tasks
 - `StepExecutor` - Recursive step-based execution with exit requirements
 - `ExitRequirementValidators` - Built-in validators for step completion
 - `StepTracker` - Track execution steps

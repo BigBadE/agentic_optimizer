@@ -32,38 +32,82 @@ check_file_sizes() {
 }
 
 check_allows() {
-  # Only two exact allow patterns are permitted:
-  #
-  # 1. #![cfg_attr(
-  #        test,
-  #        allow(
-  #            clippy::tests_outside_test_module,
-  #            reason = "Allow for integration tests"
-  #        )
-  #    )]
-  #
-  # 2. #[allow(
-  #        unsafe_code,
-  #        reason = "Arc<dyn Tool> is not Trace, but safe to use as documented above"
-  #    )]
+  # Canonical allowed forms (no whitespace)
+  local allowed1='#![cfg_attr(test,allow(clippy::tests_outside_test_module,reason="Allow for integration tests"))]'
+  local allowed2='#[allow(unsafe_code,reason="Arc<dyn Tool> is not Trace, but safe to use as documented above")]'
 
-  local violations_found=false
+  # Normalize by removing whitespace
+  local norm_allowed1 norm_allowed2
+  norm_allowed1=$(printf '%s' "$allowed1" | tr -d '[:space:]')
+  norm_allowed2=$(printf '%s' "$allowed2" | tr -d '[:space:]')
 
-  # Find all Rust files with allow annotations
-  # Use find + grep since rg may not be in PATH in all environments
-  while IFS= read -r file; do
-    # Check each file individually for proper validation
-    if ! validate_allows_in_file "$file"; then
-      violations_found=true
+  # Find Rust files that might have allow or cfg_attr
+  mapfile -t files < <(
+    find crates -type f -name '*.rs' -print0 |
+    xargs -0 grep -lE '#!?\\[(allow|cfg_attr)' 2>/dev/null
+  )
+
+  local violations=false
+
+  for file in "${files[@]}"; do
+    if ! awk -v allowed1="$norm_allowed1" -v allowed2="$norm_allowed2" '
+      function norm(s) { gsub(/[[:space:]]+/, "", s); return s }
+
+      BEGIN { in_attr = 0; attr = "" }
+
+      {
+        # If currently collecting an attribute, continue
+        if (in_attr) {
+          attr = attr $0
+          if (index($0, "]")) {
+            n = norm(attr)
+            if (n != allowed1 && n != allowed2) {
+              print "DISALLOWED: " FILENAME
+              print attr
+              exit 1
+            }
+            in_attr = 0
+            attr = ""
+          }
+          next
+        }
+
+        # Detect start of an attribute with allow or cfg_attr
+        if ($0 ~ /#(!)?\[[^]]*(allow|cfg_attr)[^]]*$/) {
+          attr = $0
+          if (index($0, "]")) {
+            n = norm(attr)
+            if (n != allowed1 && n != allowed2) {
+              print "DISALLOWED: " FILENAME
+              print attr
+              exit 1
+            }
+            attr = ""
+          } else {
+            in_attr = 1
+          }
+        }
+      }
+
+      END {
+        if (in_attr && attr != "") {
+          n = norm(attr)
+          if (n != allowed1 && n != allowed2) {
+            print "DISALLOWED: " FILENAME
+            print attr
+            exit 1
+          }
+        }
+      }
+    ' "$file"; then
+      violations=true
     fi
-  done < <(find crates -name '*.rs' -type f -exec grep -l '#\[allow(' {} \; 2>/dev/null)
+  done
 
-  if [ "$violations_found" = true ]; then
-    return 1
-  fi
-
-  return 0
+  $violations && return 1 || return 0
 }
+
+
 
 validate_allows_in_file() {
   local file="$1"

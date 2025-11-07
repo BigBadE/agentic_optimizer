@@ -46,6 +46,7 @@ thiserror = "2.0"
 tokio = { version = "1.48", features = ["macros", "rt-multi-thread", "fs", "sync", "time", "process"] }
 toml = "0.9"
 tracing = "0.1"
+tracing-futures = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.18", features = ["v4", "serde"] }
 walkdir = "2.5"
@@ -87,7 +88,7 @@ opt-level = 3
 [profile.release]
 codegen-units = 1
 lto = "thin"
-panic = "abort"
+# Note: panic="abort" removed to allow dylib builds to work
 opt-level = 3
 
 [profile.bench]
@@ -129,6 +130,7 @@ suspicious = "deny"
 only_used_in_recursion = { level = "allow", priority = 1 }
 
 # Nursery
+future_not_send = { level = "allow", priority = 1 }
 missing_const_for_fn = { level = "allow", priority = 1 }
 significant_drop_tightening = { level = "allow", priority = 1 }
 

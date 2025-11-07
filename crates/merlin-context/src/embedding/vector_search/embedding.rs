@@ -1,6 +1,6 @@
 //! Embedding operations for files and chunks.
 
-use merlin_deps::futures::stream::{FuturesUnordered, StreamExt as _};
+use futures::stream::{FuturesUnordered, StreamExt as _};
 use merlin_deps::tracing::{info, warn};
 use std::collections::HashMap;
 use std::fs;

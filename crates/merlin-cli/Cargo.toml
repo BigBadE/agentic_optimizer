@@ -20,9 +20,11 @@ merlin-local.workspace = true
 merlin-providers.workspace = true
 merlin-routing.workspace = true
 merlin-tooling.workspace = true
+futures.workspace = true
 pico-args.workspace = true
 serde.workspace = true
 tokio.workspace = true
+tracing-subscriber.workspace = true
 
 [dev-dependencies]
 assert_cmd.workspace = true

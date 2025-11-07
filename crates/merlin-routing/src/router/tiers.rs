@@ -174,39 +174,6 @@ mod tests {
         Ok(())
     }
 
-    /// Tests routing with custom model registry and mock provider.
-    ///
-    /// # Errors
-    /// Returns an error if router creation or routing fails.
-    ///
-    /// # Panics
-    /// Panics if assertions fail during test execution.
-    #[tokio::test]
-    async fn test_custom_model_registry() -> Result<()> {
-        use merlin_core::ModelProvider;
-        use merlin_providers::MockProvider;
-        use std::sync::Arc;
-
-        // Create mock provider for testing
-        let mock_provider: Arc<dyn ModelProvider> =
-            Arc::new(MockProvider::new("test").with_default_response("Mock response for testing"));
-
-        let provider_registry = ProviderRegistry::with_mock_provider(&mock_provider)?;
-        let mut model_registry = ModelRegistry::new();
-
-        // Register local models only
-        model_registry.register_range(1..=10, Model::Qwen25Coder7B);
-
-        let router = StrategyRouter::with_model_registry(model_registry, provider_registry);
-
-        let task = Task::new("Test task".to_owned()).with_difficulty(5);
-        let decision = router.route(&task).await?;
-
-        assert_eq!(decision.model, Model::Qwen25Coder7B);
-
-        Ok(())
-    }
-
     /// Tests that availability checker returns true for all models.
     ///
     /// # Panics

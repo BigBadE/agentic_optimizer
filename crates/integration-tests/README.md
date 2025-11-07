@@ -13,7 +13,7 @@ This crate provides comprehensive integration testing using JSON fixtures. All c
 - `lib.rs` - Main exports
 - `fixture.rs` - `TestFixture` definition types
 - `event_source.rs` - `FixtureEventSource` for injecting test events into TUI
-- `runner.rs` - `UnifiedTestRunner`, `PatternMockProvider`
+- `runner/` - `UnifiedTestRunner` and task completion logic
 - `verifier.rs` - `UnifiedVerifier` for test verification (main orchestrator)
 - `verification_result.rs` - `VerificationResult` type
 - `execution_verifier.rs` - Execution and return value verification logic
@@ -139,6 +139,23 @@ If fixtures need to write, don't specify a workspace:
 ```
 
 Non-workspace fixtures use temp directories and can write freely.
+
+## Performance Optimization
+
+Fixtures automatically optimize embedding initialization based on workspace type:
+
+- **Temp workspace fixtures** (no `workspace` field in setup): Skip embedding initialization entirely
+- **Test workspace fixtures** (`workspace: "rust-project"` etc.): Load cached embeddings from test-workspaces directory
+
+This conditional approach reduces test time by ~42% with no manual configuration needed.
+
+**Performance metrics** (140 fixtures):
+- Current (optimized): ~10.5s wall clock, ~194s sequential
+- Before optimization: ~18s wall clock, ~275s sequential
+
+**Implementation**: Fixtures detect workspace type and pass `enable_embeddings` flag to `RoutingOrchestrator.with_embeddings()`.
+
+See [TIMING.md](../../TIMING.md) for detailed performance analysis.
 
 ## Public API
 

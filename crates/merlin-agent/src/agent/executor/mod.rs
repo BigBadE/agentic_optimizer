@@ -3,6 +3,7 @@
 mod context;
 mod logging;
 mod parallel;
+mod response_processing;
 mod step_executor;
 pub(crate) mod typescript;
 
@@ -11,6 +12,7 @@ mod tests;
 
 use context::{ContextBuilder, ConversationHistory};
 use logging::ContextLogger;
+use response_processing::{ResponseProcessingParams, ResponseProcessor};
 pub use step_executor::{
     AgentExecutionParams, StepExecutionParams, StepExecutor, StepResult, TaskListExecutionParams,
 };
@@ -30,12 +32,13 @@ use merlin_context::ContextFetcher;
 use merlin_core::AgentResponse;
 use merlin_core::ModelProvider;
 use merlin_core::{
-    Context, Response, Result, RoutingConfig, RoutingError, StepType, Task, TaskId, TaskList,
-    TaskResult, TaskStep, TokenUsage, ValidationResult, WorkUnit,
+    Context, Result, RoutingConfig, RoutingError, StepType, Task, TaskId, TaskResult, TaskStep,
     ui::{UiChannel, UiEvent},
 };
-use merlin_routing::{ModelRouter, ProviderRegistry, RoutingDecision};
+use merlin_deps::tracing::{Level, span};
+use merlin_routing::{ModelRouter, ProviderRegistry};
 use merlin_tooling::{PersistentTypeScriptRuntime, ToolRegistry, generate_typescript_signatures};
+use tracing_futures::Instrument as _;
 
 /// Parameters for executing with step executor
 struct ExecutorParams<'exec> {
@@ -50,27 +53,6 @@ struct ExecutorParams<'exec> {
     /// UI channel for events
     ui_channel: &'exec UiChannel,
 }
-
-/// Parameters for processing agent response
-struct ResponseProcessingParams<'resp> {
-    /// Agent response to process
-    agent_response: AgentResponse,
-    /// Task ID
-    task_id: TaskId,
-    /// Task being executed
-    task: &'resp Task,
-    /// Routing decision
-    decision: &'resp RoutingDecision,
-    /// Context used
-    context: &'resp Context,
-    /// Provider used
-    provider: &'resp Arc<dyn ModelProvider>,
-    /// Duration in milliseconds
-    duration_ms: u64,
-    /// UI channel for events
-    ui_channel: &'resp UiChannel,
-}
-
 /// Parameters for creating an `AgentExecutor` with a custom provider registry
 pub struct AgentExecutorParams {
     /// Model router
@@ -88,7 +70,6 @@ pub struct AgentExecutorParams {
 }
 
 /// Agent executor that streams task execution with tool calling
-#[derive(Clone)]
 pub struct AgentExecutor {
     router: Arc<dyn ModelRouter>,
     validator: Arc<dyn Validator>,
@@ -98,7 +79,9 @@ pub struct AgentExecutor {
     /// Provider registry for accessing model providers
     provider_registry: Arc<ProviderRegistry>,
     /// Persistent TypeScript runtime for agent code execution
-    runtime: Arc<PersistentTypeScriptRuntime>,
+    runtime: PersistentTypeScriptRuntime,
+    /// Cached TypeScript signatures (computed once at initialization)
+    typescript_signatures: Arc<String>,
 }
 
 impl AgentExecutor {
@@ -121,12 +104,19 @@ impl AgentExecutor {
         // Create persistent runtime with tools
         let tools = tool_registry.list_tools();
         let mut tools_map = HashMap::new();
-        for tool in tools {
+        for tool in &tools {
             if let Some(tool_arc) = tool_registry.get_tool(tool.name()) {
                 tools_map.insert(tool.name().to_owned(), tool_arc);
             }
         }
-        let runtime = Arc::new(PersistentTypeScriptRuntime::new(tools_map));
+        let runtime = PersistentTypeScriptRuntime::new(&tools_map).map_err(|err| {
+            RoutingError::Other(format!("Failed to create TypeScript runtime: {err}"))
+        })?;
+
+        // Generate and cache TypeScript signatures once
+        let signatures = generate_typescript_signatures(&tools).map_err(|err| {
+            RoutingError::Other(format!("Failed to generate TypeScript signatures: {err}"))
+        })?;
 
         Ok(Self {
             router,
@@ -136,6 +126,7 @@ impl AgentExecutor {
             context_dump_enabled: Arc::new(AtomicBool::new(false)),
             provider_registry,
             runtime,
+            typescript_signatures: Arc::new(signatures),
         })
     }
 
@@ -151,12 +142,19 @@ impl AgentExecutor {
         // Create persistent runtime with tools
         let tools = params.tool_registry.list_tools();
         let mut tools_map = HashMap::new();
-        for tool in tools {
+        for tool in &tools {
             if let Some(tool_arc) = params.tool_registry.get_tool(tool.name()) {
                 tools_map.insert(tool.name().to_owned(), tool_arc);
             }
         }
-        let runtime = Arc::new(PersistentTypeScriptRuntime::new(tools_map));
+        let runtime = PersistentTypeScriptRuntime::new(&tools_map).map_err(|err| {
+            RoutingError::Other(format!("Failed to create TypeScript runtime: {err}"))
+        })?;
+
+        // Generate and cache TypeScript signatures once
+        let signatures = generate_typescript_signatures(&tools).map_err(|err| {
+            RoutingError::Other(format!("Failed to generate TypeScript signatures: {err}"))
+        })?;
 
         Ok(Self {
             router: params.router,
@@ -166,6 +164,7 @@ impl AgentExecutor {
             context_dump_enabled: Arc::new(AtomicBool::new(false)),
             provider_registry: params.provider_registry,
             runtime,
+            typescript_signatures: Arc::new(signatures),
         })
     }
 
@@ -173,8 +172,7 @@ impl AgentExecutor {
     pub fn enable_context_dump(&mut self) {
         self.context_dump_enabled.store(true, Ordering::Relaxed);
     }
-
-    /// Disable context dumping
+    /// Disable context dumping to debug.log
     pub fn disable_context_dump(&mut self) {
         self.context_dump_enabled.store(false, Ordering::Relaxed);
     }
@@ -184,8 +182,7 @@ impl AgentExecutor {
         let mut conv_history = self.context_builder.conversation_history.lock().await;
         *conv_history = history;
     }
-
-    /// Add a message to conversation history
+    /// Add to conversation history for context building
     pub async fn add_to_conversation(&mut self, role: String, content: String) {
         let mut conv_history = self.context_builder.conversation_history.lock().await;
         conv_history.push((role, content));
@@ -194,45 +191,53 @@ impl AgentExecutor {
     /// Execute a task using the task list execution model
     ///
     /// # Errors
-    ///
     /// Returns an error if routing, provider creation, execution, or validation fails
     pub async fn execute_task(&mut self, task: Task, ui_channel: UiChannel) -> Result<TaskResult> {
-        let start = Instant::now();
-        let task_id = task.id;
+        let span = span!(Level::INFO, "execute_task", task_id = ?task.id);
 
-        // Route and get provider
-        let decision = self.router.route(&task).await?;
-        let provider = self.provider_registry.get_provider(decision.model)?;
+        async move {
+            let start = Instant::now();
+            let task_id = task.id;
 
-        // Build context with tool signatures
-        let context = self
-            .build_context_and_log(&task, &ui_channel, task_id)
-            .await?;
+            // Route and get provider
+            let decision = self.router.route(&task).await?;
+            let provider = self.provider_registry.get_provider(decision.model)?;
 
-        // Execute agent - returns String | TaskList
-        let agent_response = self
-            .execute_with_step_executor(ExecutorParams {
-                task: &task,
-                context: &context,
-                provider: &provider,
-                task_id,
-                ui_channel: &ui_channel,
-            })
-            .await?;
+            // Build context with tool signatures
+            let context = self
+                .build_context_and_log(&task, &ui_channel, task_id)
+                .await?;
 
-        let duration_ms = start.elapsed().as_millis() as u64;
+            // Execute agent - returns String | TaskList
+            let agent_response = self
+                .execute_with_step_executor(ExecutorParams {
+                    task: &task,
+                    context: &context,
+                    provider: &provider,
+                    task_id,
+                    ui_channel: &ui_channel,
+                })
+                .await?;
 
-        // Handle response type
-        self.process_agent_response(ResponseProcessingParams {
-            agent_response,
-            task_id,
-            task: &task,
-            decision: &decision,
-            context: &context,
-            provider: &provider,
-            duration_ms,
-            ui_channel: &ui_channel,
-        })
+            let duration_ms = start.elapsed().as_millis() as u64;
+
+            // Handle response type
+            let mut processor =
+                ResponseProcessor::new(&self.validator, &self.tool_registry, &mut self.runtime);
+            processor
+                .process_response(ResponseProcessingParams {
+                    agent_response,
+                    task_id,
+                    task: &task,
+                    decision: &decision,
+                    context: &context,
+                    provider: &provider,
+                    duration_ms,
+                    ui_channel: &ui_channel,
+                })
+                .await
+        }
+        .instrument(span)
         .await
     }
 
@@ -241,170 +246,36 @@ impl AgentExecutor {
     /// # Errors
     /// Returns an error if agent execution fails
     async fn execute_with_step_executor(
-        &self,
+        &mut self,
         params: ExecutorParams<'_>,
     ) -> Result<AgentResponse> {
-        let temp_step = TaskStep {
-            title: params.task.description.clone(),
-            description: params.task.description.clone(),
-            step_type: StepType::Implementation,
-            exit_requirement: None, // No validation
-            context: None,
-            dependencies: Vec::new(),
-        };
+        let span = span!(Level::INFO, "execute_with_step_executor", task_id = ?params.task_id);
 
-        let response = StepExecutor::execute_with_agent(AgentExecutionParams {
-            step: &temp_step,
-            context: params.context,
-            provider: params.provider,
-            tool_registry: &self.tool_registry,
-            runtime: &self.runtime,
-            task_id: params.task_id,
-            ui_channel: params.ui_channel,
-        })
-        .await?;
+        async move {
+            let temp_step = TaskStep {
+                title: params.task.description.clone(),
+                description: params.task.description.clone(),
+                step_type: StepType::Implementation,
+                exit_requirement: None, // No validation
+                context: None,
+                dependencies: Vec::new(),
+            };
 
-        Ok(response)
-    }
+            let response = StepExecutor::execute_with_agent(AgentExecutionParams {
+                step: &temp_step,
+                context: params.context,
+                provider: params.provider,
+                tool_registry: &self.tool_registry,
+                runtime: &mut self.runtime,
+                task_id: params.task_id,
+                ui_channel: params.ui_channel,
+            })
+            .await?;
 
-    /// Process agent response and create task result
-    ///
-    /// # Errors
-    /// Returns an error if validation or task list execution fails
-    async fn process_agent_response(
-        &self,
-        params: ResponseProcessingParams<'_>,
-    ) -> Result<TaskResult> {
-        match params.agent_response {
-            AgentResponse::DirectResult(ref result) => {
-                self.process_direct_result(result.clone(), params).await
-            }
-            AgentResponse::TaskList(ref task_list) => {
-                self.process_task_list(task_list.clone(), params).await
-            }
+            Ok(response)
         }
-    }
-
-    /// Process direct result response
-    ///
-    /// # Errors
-    /// Returns an error if validation fails
-    async fn process_direct_result(
-        &self,
-        result: String,
-        params: ResponseProcessingParams<'_>,
-    ) -> Result<TaskResult> {
-        merlin_deps::tracing::debug!("Agent returned DirectResult");
-        let response = Response {
-            text: result,
-            confidence: 1.0,
-            tokens_used: TokenUsage::default(),
-            provider: params.decision.model.to_string(),
-            latency_ms: params.duration_ms,
-        };
-
-        let validation = self.validate_response(&response, params.task).await?;
-
-        Ok(TaskResult {
-            task_id: params.task_id,
-            response,
-            tier_used: params.decision.model.to_string(),
-            tokens_used: TokenUsage::default(),
-            validation,
-            duration_ms: params.duration_ms,
-            work_unit: None,
-        })
-    }
-
-    /// Process task list response
-    ///
-    /// # Errors
-    /// Returns an error if execution or validation fails
-    async fn process_task_list(
-        &self,
-        task_list: TaskList,
-        params: ResponseProcessingParams<'_>,
-    ) -> Result<TaskResult> {
-        merlin_deps::tracing::debug!(
-            "Agent returned TaskList with {} steps",
-            task_list.steps.len()
-        );
-
-        // Create WorkUnit to track decomposed work
-        let mut work_unit = WorkUnit::new(params.task_id, params.provider.name().to_owned());
-
-        // Add subtasks for each step in the TaskList
-        for step in &task_list.steps {
-            let difficulty = Self::estimate_step_difficulty(step.step_type);
-            work_unit.add_subtask(step.title.clone(), difficulty);
-            merlin_deps::tracing::debug!("Added subtask: {} (difficulty: {})", step.title, difficulty);
-        }
-
-        merlin_deps::tracing::debug!(
-            "Created WorkUnit with {} subtasks, initial progress: {}%",
-            work_unit.subtasks.len(),
-            work_unit.progress_percentage()
-        );
-
-        // Wrap WorkUnit in Arc<Mutex<>> for shared mutable access during execution
-        let work_unit_shared = Arc::new(Mutex::new(work_unit));
-
-        // Send WorkUnit to UI for mid-execution tracking
-        params
-            .ui_channel
-            .work_unit_started(params.task_id, Arc::clone(&work_unit_shared));
-
-        let step_result = StepExecutor::execute_task_list(TaskListExecutionParams {
-            task_list: &task_list,
-            base_context: params.context,
-            provider: params.provider,
-            tool_registry: &self.tool_registry,
-            runtime: &self.runtime,
-            task_id: params.task_id,
-            ui_channel: params.ui_channel,
-            recursion_depth: 0,
-            work_unit: Some(&work_unit_shared),
-        })
-        .await?;
-
-        let response = Response {
-            text: step_result.text,
-            confidence: 1.0,
-            tokens_used: TokenUsage::default(),
-            provider: params.decision.model.to_string(),
-            latency_ms: step_result.duration_ms,
-        };
-
-        let validation = self.validate_response(&response, params.task).await?;
-
-        // Clone work unit from Arc<Mutex<>> (TUI may still hold a reference)
-        let final_work_unit = {
-            let mut work_unit_guard = work_unit_shared.lock().await;
-            work_unit_guard.duration_ms = step_result.duration_ms;
-            work_unit_guard.complete();
-            work_unit_guard.clone()
-        };
-
-        Ok(TaskResult {
-            task_id: params.task_id,
-            response,
-            tier_used: params.decision.model.to_string(),
-            tokens_used: TokenUsage::default(),
-            validation,
-            duration_ms: step_result.duration_ms,
-            work_unit: Some(final_work_unit),
-        })
-    }
-
-    /// Estimate difficulty for a step type
-    const fn estimate_step_difficulty(step_type: StepType) -> u8 {
-        match step_type {
-            StepType::Research => 3,
-            StepType::Planning => 4,
-            StepType::Implementation => 7,
-            StepType::Validation => 5,
-            StepType::Documentation => 2,
-        }
+        .instrument(span)
+        .await
     }
 
     /// Build context and log
@@ -417,56 +288,35 @@ impl AgentExecutor {
         ui_channel: &UiChannel,
         task_id: TaskId,
     ) -> Result<Context> {
-        ui_channel.send(UiEvent::TaskStepStarted {
-            task_id,
-            step_id: "context_analysis".to_owned(),
-            step_type: "thinking".to_owned(),
-            content: "Analyzing query intent".to_owned(),
-        });
+        let span = span!(Level::INFO, "build_context_and_log", task_id = ?task_id);
 
-        // Generate TypeScript signatures for all tools
-        let tools = self.tool_registry.list_tools();
-        let signatures = generate_typescript_signatures(&tools).map_err(|err| {
-            RoutingError::Other(format!("Failed to generate TypeScript signatures: {err}"))
-        })?;
+        async move {
+            ui_channel.send(UiEvent::TaskStepStarted {
+                task_id,
+                step_id: "context_analysis".to_owned(),
+                step_type: "thinking".to_owned(),
+                content: "Analyzing query intent".to_owned(),
+            });
 
-        let context = self
-            .context_builder
-            .build_context_for_typescript(task, ui_channel, &signatures)
-            .await?;
+            // Use cached TypeScript signatures
+            let context = self
+                .context_builder
+                .build_context_for_typescript(task, ui_channel, &self.typescript_signatures)
+                .await?;
 
-        ui_channel.send(UiEvent::TaskStepCompleted {
-            task_id,
-            step_id: "context_analysis".to_owned(),
-        });
+            ui_channel.send(UiEvent::TaskStepCompleted {
+                task_id,
+                step_id: "context_analysis".to_owned(),
+            });
 
-        ContextLogger::log_context_breakdown(&context, &self.context_builder).await;
-        if self.context_dump_enabled.load(Ordering::Relaxed) {
-            ContextLogger::dump_context_to_log(&context, task, &self.context_builder).await;
+            ContextLogger::log_context_breakdown(&context, &self.context_builder).await;
+            if self.context_dump_enabled.load(Ordering::Relaxed) {
+                ContextLogger::dump_context_to_log(&context, task, &self.context_builder).await;
+            }
+
+            Ok(context)
         }
-
-        Ok(context)
-    }
-
-    /// Validate response and log failures
-    ///
-    /// # Errors
-    /// Returns an error if validation fails
-    async fn validate_response(
-        &self,
-        response: &Response,
-        task: &Task,
-    ) -> Result<ValidationResult> {
-        self.validator
-            .validate(response, task)
-            .await
-            .map_err(|validation_error| {
-                merlin_deps::tracing::info!(
-                    "Validation failed. Model response was:\n{}\n\nError: {:?}",
-                    response.text,
-                    validation_error
-                );
-                validation_error
-            })
+        .instrument(span)
+        .await
     }
 }

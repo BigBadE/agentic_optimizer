@@ -17,6 +17,7 @@ mod fixture_loader;
 mod mock_provider;
 mod prompt_verifier;
 mod runner;
+mod timing;
 mod tui_test_helpers;
 mod ui_verifier;
 mod verification_result;
@@ -29,6 +30,7 @@ pub use fixture::{
 };
 pub use mock_provider::MockProvider;
 pub use runner::UnifiedTestRunner;
+pub use timing::{TimingData, TimingLayer};
 pub use verification_result::VerificationResult;
 pub use verifier::UnifiedVerifier;
 pub use verify::{

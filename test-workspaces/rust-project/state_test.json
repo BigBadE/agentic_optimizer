@@ -1,0 +1,22 @@
+{
+  "in_progress": {
+    "status": "in_progress",
+    "is_terminal": false
+  },
+  "retrying": {
+    "status": "retrying",
+    "is_terminal": false
+  },
+  "completed": {
+    "status": "completed",
+    "is_terminal": true
+  },
+  "failed": {
+    "status": "failed",
+    "is_terminal": true
+  },
+  "cancelled": {
+    "status": "cancelled",
+    "is_terminal": true
+  }
+}

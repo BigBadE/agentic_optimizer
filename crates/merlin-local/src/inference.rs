@@ -2,7 +2,7 @@ use crate::OllamaManager;
 use crate::models::{OllamaGenerateRequest, OllamaGenerateResponse};
 use async_trait::async_trait;
 use merlin_core::{Context, CoreResult, Error, ModelProvider, Query, Response, Result, TokenUsage};
-use merlin_deps::reqwest::Client;
+use reqwest::Client;
 use std::time::Instant;
 
 /// Local model provider using `Ollama`.

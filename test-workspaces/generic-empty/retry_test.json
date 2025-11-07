@@ -1,0 +1,18 @@
+{
+  "initial": {
+    "status": "in_progress",
+    "retry_count": 0
+  },
+  "first_retry": {
+    "status": "retrying",
+    "retry_count": 1
+  },
+  "second_retry": {
+    "status": "retrying",
+    "retry_count": 2
+  },
+  "max_retries": {
+    "status": "retrying",
+    "retry_count": 3
+  }
+}

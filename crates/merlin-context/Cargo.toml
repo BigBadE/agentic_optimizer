@@ -8,6 +8,8 @@ bincode.workspace = true
 merlin-core.workspace = true
 merlin-deps.workspace = true
 merlin-languages.workspace = true
+futures.workspace = true
+ollama-rs.workspace = true
 serde.workspace = true
 tokio.workspace = true
 

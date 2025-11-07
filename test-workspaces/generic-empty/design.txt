@@ -1,0 +1,1 @@
+Architecture: Modular design with clear interfaces

@@ -59,9 +59,10 @@ This crate provides the tool system that enables agents to interact with the fil
 - Safe file manipulation
 
 ### Command Execution
-- Cross-platform shell execution (bash/PowerShell)
-- Output capture
-- Error handling
+- Cross-platform shell execution using `sh` (POSIX-compliant)
+- Output capture and exit code handling
+- Performance optimized: ~55ms overhead on Windows vs ~6s for bash
+- Error handling with detailed diagnostics
 
 ### TypeScript Runtime
 - Execute TypeScript code in sandboxed environment

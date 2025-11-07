@@ -56,10 +56,7 @@ fn verify_rendered_buffer_contains(
             ));
         } else {
             // Show first 500 chars of buffer for debugging (char-aware truncation)
-            let preview = buffer_content
-                .chars()
-                .take(500)
-                .collect::<String>();
+            let preview = buffer_content.chars().take(500).collect::<String>();
             let preview = if buffer_content.chars().count() > 500 {
                 format!("{preview}...")
             } else {
@@ -133,10 +130,11 @@ fn find_region_by_boundary(buffer_content: &str, region_name: &str) -> Option<St
     let mut end_idx = remaining.len();
 
     for pattern in &next_boundary_patterns {
-        if let Some(idx) = remaining.find(pattern) {
-            if idx < end_idx && idx > 0 {
-                end_idx = idx;
-            }
+        if let Some(idx) = remaining.find(pattern)
+            && idx < end_idx
+            && idx > 0
+        {
+            end_idx = idx;
         }
     }
 
@@ -170,27 +168,24 @@ fn verify_single_region(
     let region_name = &region_verify.region;
 
     // Try to extract the region by boundary markers
-    let region_content = match find_region_by_boundary(full_buffer, region_name) {
-        Some(content) => content,
-        None => {
-            // Check if any boundary marker exists at all
-            let all_boundaries = ["─── Tasks ", "─── Output ", "─── Input ", "─── Threads "];
-            let found_any = all_boundaries
-                .iter()
-                .filter(|b| full_buffer.contains(*b))
-                .collect::<Vec<_>>();
+    let Some(region_content) = find_region_by_boundary(full_buffer, region_name) else {
+        // Check if any boundary marker exists at all
+        let all_boundaries = ["─── Tasks ", "─── Output ", "─── Input ", "─── Threads "];
+        let found_any = all_boundaries
+            .iter()
+            .filter(|boundary| full_buffer.contains(*boundary))
+            .collect::<Vec<_>>();
 
-            let debug_info = if found_any.is_empty() {
-                "No UI boundaries found in buffer at all".to_owned()
-            } else {
-                format!("Found boundaries: {found_any:?}")
-            };
+        let debug_info = if found_any.is_empty() {
+            "No UI boundaries found in buffer at all".to_owned()
+        } else {
+            format!("Found boundaries: {found_any:?}")
+        };
 
-            result.add_failure(format!(
-                "Could not find region '{region_name}' in rendered buffer. {debug_info}"
-            ));
-            return;
-        }
+        result.add_failure(format!(
+            "Could not find region '{region_name}' in rendered buffer. {debug_info}"
+        ));
+        return;
     };
 
     // Verify patterns that should appear
@@ -221,7 +216,12 @@ fn verify_single_region(
 
     // Verify line ordering
     if !region_verify.lines_in_order.is_empty() {
-        verify_lines_in_order(result, region_name, &region_content, &region_verify.lines_in_order);
+        verify_lines_in_order(
+            result,
+            region_name,
+            &region_content,
+            &region_verify.lines_in_order,
+        );
     }
 }
 

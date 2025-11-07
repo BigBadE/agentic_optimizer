@@ -10,6 +10,7 @@ boa_engine.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tracing-futures.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

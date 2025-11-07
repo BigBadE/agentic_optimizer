@@ -3,7 +3,6 @@ use merlin_deps::tracing::{debug, info};
 use std::collections::HashSet;
 use std::env;
 use std::fmt::Write as _;
-use std::mem::replace;
 use std::path::{Path, PathBuf};
 use tokio::fs::read_to_string;
 
@@ -24,12 +23,24 @@ pub struct ContextFetcher {
 impl ContextFetcher {
     /// Create a new context fetcher
     pub fn new(project_root: PathBuf) -> Self {
+        Self::new_with_embeddings(project_root, true)
+    }
+
+    /// Create a new context fetcher with optional embedding initialization
+    ///
+    /// # Arguments
+    /// * `project_root` - Project root directory
+    /// * `enable_embeddings` - Whether to initialize embedding/vector search system
+    pub fn new_with_embeddings(project_root: PathBuf, enable_embeddings: bool) -> Self {
         // Check if we should skip expensive operations (for tests)
         let skip_embeddings = env::var("MERLIN_SKIP_EMBEDDINGS").is_ok();
 
-        // Create context builder unless skipping embeddings
+        // Create context builder unless explicitly disabled or env var set
         let context_builder = if skip_embeddings {
             debug!("Skipping context builder initialization (MERLIN_SKIP_EMBEDDINGS set)");
+            None
+        } else if !enable_embeddings {
+            debug!("Skipping context builder initialization (embeddings disabled)");
             None
         } else {
             let builder = ContextBuilder::new(project_root.clone());
@@ -49,11 +60,16 @@ impl ContextFetcher {
         &self.project_root
     }
 
-    /// Set a progress callback for embedding operations
+    /// Set a progress callback for embedding operations (builder pattern)
     #[must_use]
     pub fn with_progress_callback(mut self, callback: ProgressCallback) -> Self {
         self.progress_callback = Some(callback);
         self
+    }
+
+    /// Set a progress callback for embedding operations (mutable update)
+    pub fn set_progress_callback(&mut self, callback: ProgressCallback) {
+        self.progress_callback = Some(callback);
     }
 
     /// Extract file references from text
@@ -166,9 +182,9 @@ impl ContextFetcher {
 
         // Use context builder if available
         if let Some(builder) = &mut self.context_builder {
+            // Update progress callback without destroying cached state
             if let Some(callback) = self.progress_callback.clone() {
-                *builder = replace(builder, ContextBuilder::new(self.project_root.clone()))
-                    .with_progress_callback(callback);
+                builder.set_progress_callback(callback);
             }
 
             let context = builder

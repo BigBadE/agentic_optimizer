@@ -7,7 +7,7 @@ use merlin_deps::tracing::warn;
 use merlin_tooling::ToolError;
 use std::sync::Arc;
 use tokio::spawn;
-use tokio::sync::{mpsc, Mutex};
+use tokio::sync::{Mutex, mpsc};
 
 /// Event types for UI updates
 pub mod events;
@@ -94,10 +94,7 @@ impl UiChannel {
 
     /// Sends `WorkUnit` started event with live reference
     pub fn work_unit_started(&self, task_id: TaskId, work_unit: Arc<Mutex<WorkUnit>>) {
-        self.send(UiEvent::WorkUnitStarted {
-            task_id,
-            work_unit,
-        });
+        self.send(UiEvent::WorkUnitStarted { task_id, work_unit });
     }
 
     /// Sends `WorkUnit` progress update

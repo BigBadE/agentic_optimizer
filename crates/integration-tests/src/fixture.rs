@@ -54,7 +54,7 @@ pub enum TestEvent {
     /// Key press event
     KeyPress(KeyPressEvent),
     /// LLM response event
-    LlmResponse(LlmResponseEvent),
+    LlmResponse(Box<LlmResponseEvent>),
     /// Wait event
     Wait(WaitEvent),
     /// Verification event (for mid-execution state verification)
@@ -125,7 +125,7 @@ pub struct LlmResponseEvent {
     /// Optional verification after event execution
     #[serde(default)]
     pub verify_after: VerifyConfig,
-    /// Optional verification (legacy, maps to verify_after)
+    /// Optional verification (legacy, maps to `verify_after`)
     #[serde(default)]
     pub verify: VerifyConfig,
     /// Capture the prompt sent to the LLM (for verification)

@@ -39,7 +39,9 @@ This crate provides intelligent context management for LLM interactions:
 
 **94 public items** including:
 - `ContextBuilder` - Build context from project files
+  - `set_progress_callback()` - Update progress callback without invalidating cache
 - `ContextFetcher` - Fetch context with semantic search
+  - `set_progress_callback()` - Update progress callback without invalidating cache
 - `EmbeddingClient` - Generate embeddings via API
 - `EmbeddingProvider` - Embedding provider enum (OpenAI, Voyage)
 - `VectorStore` - In-memory vector storage
@@ -47,6 +49,8 @@ This crate provides intelligent context management for LLM interactions:
 - `BM25Index` - BM25 text search
 - `FileChunk` - Chunked file representation
 - `chunk_file()` - Chunk files with language awareness
+
+**Performance Note**: `ContextBuilder` and `ContextFetcher` cache vector indices and embeddings. Use `set_progress_callback()` to update callbacks without destroying cached state (critical for performance in test environments).
 
 ## Features
 

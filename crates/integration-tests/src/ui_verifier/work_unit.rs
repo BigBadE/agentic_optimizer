@@ -6,18 +6,17 @@ use merlin_cli::TuiApp;
 use merlin_core::{SubtaskStatus, WorkStatus, WorkUnit};
 use merlin_deps::ratatui::backend::TestBackend;
 
-/// Get `WorkUnit` from TaskDisplay (live during execution) or last message (after completion)
+/// Get `WorkUnit` from `TaskDisplay` (live during execution) or last message (after completion)
 async fn get_work_unit(app: &TuiApp<TestBackend>) -> Option<WorkUnit> {
     // First check if there's a live WorkUnit in the active task
-    if let Some(active_task_id) = app.state.active_task_id {
-        if let Some(task_display) = app.task_manager.get_task(active_task_id) {
-            if let Some(ref work_unit_arc) = task_display.work_unit {
-                // Clone the WorkUnit from Arc<Mutex<>> - wait for lock
-                let work_unit_guard = work_unit_arc.lock().await;
-                let work_unit = work_unit_guard.clone();
-                return Some(work_unit);
-            }
-        }
+    if let Some(active_task_id) = app.state.active_task_id
+        && let Some(task_display) = app.task_manager.get_task(active_task_id)
+        && let Some(ref work_unit_arc) = task_display.work_unit
+    {
+        // Clone the WorkUnit from Arc<Mutex<>> - wait for lock
+        let work_unit_guard = work_unit_arc.lock().await;
+        let work_unit = work_unit_guard.clone();
+        return Some(work_unit);
     }
 
     // Fall back to checking the message's WorkUnit (after completion)

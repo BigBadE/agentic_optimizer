@@ -16,6 +16,7 @@ async-trait.workspace = true
 serde.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tracing-futures.workspace = true
 
 [dev-dependencies]
 num_cpus.workspace = true

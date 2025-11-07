@@ -56,9 +56,9 @@ impl Default for ProvidersConfig {
 #[derive(Clone)]
 pub struct ConfigManager {
     /// Shared config state
-    inner: Arc<RwLock<Config>>,
+    pub inner: Arc<RwLock<Config>>,
     /// Path to config file
-    config_path: PathBuf,
+    pub config_path: PathBuf,
 }
 
 impl ConfigManager {

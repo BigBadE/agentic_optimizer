@@ -5,13 +5,11 @@ use merlin_core::{
     TaskList, TaskStep, ui::UiEvent,
 };
 use merlin_deps::serde_json::to_string;
+use merlin_deps::tracing::{Level, span};
 use merlin_routing::UiChannel;
+use merlin_tooling::bulk_extraction::ExtractedTaskStep;
 use merlin_tooling::{PersistentTypeScriptRuntime, ToolingJsValueHandle};
-
-/// Convert from tooling `JsValueHandle` to core `JsValueHandle`
-fn to_core_handle(handle: &ToolingJsValueHandle) -> CoreJsValueHandle {
-    CoreJsValueHandle::new(handle.id().to_owned())
-}
+use tracing_futures::Instrument as _;
 
 /// Extract TypeScript code from markdown code blocks
 ///
@@ -56,247 +54,136 @@ pub fn extract_typescript_code(text: &str) -> Option<String> {
 /// # Errors
 /// Returns an error if code execution fails or result parsing fails
 pub async fn execute_typescript_code(
-    runtime: &PersistentTypeScriptRuntime,
+    runtime: &mut PersistentTypeScriptRuntime,
     task_id: TaskId,
     code: &str,
     ui_channel: &UiChannel,
 ) -> Result<AgentResponse> {
-    // Send step started event
-    ui_channel.send(UiEvent::TaskStepStarted {
-        task_id,
-        step_id: "typescript_execution".to_owned(),
-        step_type: "tool_call".to_owned(),
-        content: "Executing TypeScript code".to_owned(),
-    });
+    let span = span!(Level::INFO, "execute_typescript_code", task_id = ?task_id);
 
-    // Execute code
-    merlin_deps::tracing::debug!("Executing TypeScript code:\n{}", code);
-    let result_handle = runtime.execute(code).await.map_err(|err| {
-        merlin_deps::tracing::info!(
-            "TypeScript execution failed. Code was:\n{}\n\nError: {}",
-            code,
-            err
-        );
-
-        // Send step failed event
-        ui_channel.send(UiEvent::TaskStepFailed {
+    async move {
+        // Send step started event
+        ui_channel.send(UiEvent::TaskStepStarted {
             task_id,
             step_id: "typescript_execution".to_owned(),
-            error: err.to_string(),
+            step_type: "tool_call".to_owned(),
+            content: "Executing TypeScript code".to_owned(),
         });
 
-        RoutingError::Other(format!("TypeScript execution failed: {err}"))
-    })?;
+        // Execute code with detailed timing
+        merlin_deps::tracing::debug!("Executing TypeScript code:\n{}", code);
+        let result_handle = {
+            let exec_span = span!(Level::INFO, "typescript_runtime_execute");
+            runtime
+                .execute(code)
+                .instrument(exec_span)
+                .await
+                .map_err(|err| {
+                    merlin_deps::tracing::info!(
+                        "TypeScript execution failed. Code was:\n{}\n\nError: {}",
+                        code,
+                        err
+                    );
 
-    // Parse result as String or TaskList by checking JavaScript object properties
-    let agent_response = parse_agent_response_from_handle(runtime, result_handle).await?;
+                    // Send step failed event
+                    ui_channel.send(UiEvent::TaskStepFailed {
+                        task_id,
+                        step_id: "typescript_execution".to_owned(),
+                        error: err.to_string(),
+                    });
 
-    // Send step completed event
-    ui_channel.send(UiEvent::TaskStepCompleted {
-        task_id,
-        step_id: "typescript_execution".to_owned(),
-    });
+                    RoutingError::Other(format!("TypeScript execution failed: {err}"))
+                })?
+        };
 
-    merlin_deps::tracing::debug!("TypeScript execution result: {:?}", agent_response);
+        // Parse result as String or TaskList by checking JavaScript object properties
+        let agent_response = parse_agent_response_from_handle(runtime, result_handle).await?;
 
-    Ok(agent_response)
+        // Send step completed event
+        ui_channel.send(UiEvent::TaskStepCompleted {
+            task_id,
+            step_id: "typescript_execution".to_owned(),
+        });
+
+        merlin_deps::tracing::debug!("TypeScript execution result: {:?}", agent_response);
+
+        Ok(agent_response)
+    }
+    .instrument(span)
+    .await
 }
 
 /// Parse agent result from JavaScript handle as String or `TaskList`
 ///
+/// Uses bulk extraction to minimize overhead - single operation instead of ~50-60 IPC calls
+///
 /// # Errors
-/// Returns error if property extraction fails or `TaskList` is malformed
+/// Returns error if extraction fails or `TaskList` is malformed
 async fn parse_agent_response_from_handle(
-    runtime: &PersistentTypeScriptRuntime,
+    runtime: &mut PersistentTypeScriptRuntime,
     handle: ToolingJsValueHandle,
 ) -> Result<AgentResponse> {
-    // Try to extract TaskList properties
-    // If value is not an object, get_property will fail - in that case, it's a DirectResult
-    let title_result = runtime
-        .get_property(handle.clone(), "title".to_owned())
-        .await;
+    let span = span!(Level::INFO, "parse_agent_response_from_handle");
 
-    let steps_result = runtime
-        .get_property(handle.clone(), "steps".to_owned())
-        .await;
-
-    // If we can't get properties (not an object), it's definitely a DirectResult
-    let (Ok(title_handle), Ok(steps_array_handle)) = (title_result, steps_result) else {
-        // Not an object, convert to JSON string for DirectResult
-        let json_value = runtime
-            .to_json(handle)
+    async move {
+        // Try bulk extraction first - single operation
+        let extracted = runtime
+            .extract_task_list(&handle)
             .await
-            .map_err(|err| RoutingError::Other(format!("Failed to convert to JSON: {err}")))?;
-        let json_string = to_string(&json_value)
-            .map_err(|err| RoutingError::Other(format!("Failed to serialize JSON: {err}")))?;
-        merlin_deps::tracing::debug!("Agent response is DirectResult (not an object)");
-        return Ok(AgentResponse::DirectResult(json_string));
-    };
+            .map_err(|err| RoutingError::Other(format!("Failed to extract TaskList: {err}")))?;
 
-    // Check if title/steps are nullish (undefined/null)
-    let title_is_nullish = runtime
-        .is_nullish(title_handle.clone())
-        .await
-        .unwrap_or(true);
-    let steps_is_nullish = runtime
-        .is_nullish(steps_array_handle.clone())
-        .await
-        .unwrap_or(true);
+        if let Some(task_list) = extracted {
+            // Convert extracted task list to core types
+            let steps = convert_extracted_steps(task_list.steps)?;
 
-    if title_is_nullish || steps_is_nullish {
-        // Not a TaskList, convert to JSON string for DirectResult
-        let json_value = runtime
-            .to_json(handle)
-            .await
-            .map_err(|err| RoutingError::Other(format!("Failed to convert to JSON: {err}")))?;
-        let json_string = to_string(&json_value)
-            .map_err(|err| RoutingError::Other(format!("Failed to serialize JSON: {err}")))?;
-        merlin_deps::tracing::debug!("Agent response is DirectResult (no title/steps)");
-        return Ok(AgentResponse::DirectResult(json_string));
-    }
-
-    // Extract title
-    let title = runtime
-        .get_string(title_handle)
-        .await
-        .map_err(|err| RoutingError::Other(format!("Failed to get title string: {err}")))?;
-
-    // Extract steps array
-    let steps_len = runtime
-        .get_array_length(steps_array_handle.clone())
-        .await
-        .map_err(|err| RoutingError::Other(format!("Failed to get steps array length: {err}")))?;
-
-    let mut steps = Vec::with_capacity(steps_len);
-    for idx in 0..steps_len {
-        let element_handle = runtime
-            .get_array_element(steps_array_handle.clone(), idx)
-            .await
-            .map_err(|err| RoutingError::Other(format!("Failed to get step {idx}: {err}")))?;
-
-        let step = extract_task_step(runtime, element_handle).await?;
-        steps.push(step);
-    }
-
-    merlin_deps::tracing::debug!(
-        "Parsed agent response as TaskList with {} steps",
-        steps.len()
-    );
-
-    Ok(AgentResponse::TaskList(TaskList { title, steps }))
-}
-
-/// Extract a `TaskStep` from a JavaScript object handle
-///
-/// # Errors
-/// Returns error if required properties are missing or malformed
-async fn extract_task_step(
-    runtime: &PersistentTypeScriptRuntime,
-    handle: ToolingJsValueHandle,
-) -> Result<TaskStep> {
-    // Extract required fields
-    let title_handle = runtime
-        .get_property(handle.clone(), "title".to_owned())
-        .await
-        .map_err(|err| RoutingError::Other(format!("Step missing title: {err}")))?;
-
-    let title = runtime
-        .get_string(title_handle)
-        .await
-        .map_err(|err| RoutingError::Other(format!("Failed to get step title: {err}")))?;
-
-    let description_handle = runtime
-        .get_property(handle.clone(), "description".to_owned())
-        .await
-        .map_err(|err| RoutingError::Other(format!("Step missing description: {err}")))?;
-
-    let description = runtime
-        .get_string(description_handle)
-        .await
-        .map_err(|err| RoutingError::Other(format!("Failed to get step description: {err}")))?;
-
-    let step_type_handle = runtime
-        .get_property(handle.clone(), "step_type".to_owned())
-        .await
-        .map_err(|err| RoutingError::Other(format!("Step missing step_type: {err}")))?;
-
-    let step_type_str = runtime
-        .get_string(step_type_handle)
-        .await
-        .map_err(|err| RoutingError::Other(format!("Failed to get step_type: {err}")))?;
-
-    let step_type = parse_step_type(&step_type_str)?;
-
-    // Extract optional exit_requirement (function handle)
-    let exit_requirement = if let Ok(req_handle) = runtime
-        .get_property(handle.clone(), "exit_requirement".to_owned())
-        .await
-    {
-        // Check if nullish
-        if runtime.is_nullish(req_handle.clone()).await.unwrap_or(true) {
-            None
+            merlin_deps::tracing::debug!(
+                "Parsed agent response as TaskList with {} steps",
+                steps.len()
+            );
+            Ok(AgentResponse::TaskList(TaskList {
+                title: task_list.title,
+                steps,
+            }))
         } else {
-            // Convert tooling handle to core handle and keep the function reference alive
-            Some(to_core_handle(&req_handle))
+            // Not a TaskList - convert to JSON string (DirectResult)
+            let json_value = runtime
+                .to_json(handle)
+                .await
+                .map_err(|err| RoutingError::Other(format!("Failed to convert to JSON: {err}")))?;
+            let json_string = to_string(&json_value)
+                .map_err(|err| RoutingError::Other(format!("Failed to serialize JSON: {err}")))?;
+            merlin_deps::tracing::debug!("Agent response is DirectResult");
+            Ok(AgentResponse::DirectResult(json_string))
         }
-    } else {
-        None
-    };
-
-    // Extract optional dependencies
-    let dependencies = extract_dependencies(runtime, handle.clone())
-        .await
-        .unwrap_or_default();
-
-    Ok(TaskStep {
-        title,
-        description,
-        step_type,
-        exit_requirement,
-        context: None, // Not currently supported in extraction
-        dependencies,
-    })
+    }
+    .instrument(span)
+    .await
 }
 
-/// Extract dependencies array from step
+/// Convert extracted steps to core `TaskStep` types
 ///
 /// # Errors
-/// Returns error if dependencies array is malformed
-async fn extract_dependencies(
-    runtime: &PersistentTypeScriptRuntime,
-    handle: ToolingJsValueHandle,
-) -> Result<Vec<String>> {
-    let deps_array_handle = runtime
-        .get_property(handle, "dependencies".to_owned())
-        .await
-        .map_err(|err| RoutingError::Other(format!("Failed to get dependencies: {err}")))?;
+/// Returns error if `step_type` is invalid
+fn convert_extracted_steps(extracted_steps: Vec<ExtractedTaskStep>) -> Result<Vec<TaskStep>> {
+    let mut steps = Vec::with_capacity(extracted_steps.len());
 
-    if runtime
-        .is_nullish(deps_array_handle.clone())
-        .await
-        .unwrap_or(true)
-    {
-        return Ok(Vec::new());
+    for extracted in extracted_steps {
+        let step_type = parse_step_type(&extracted.step_type)?;
+
+        // Convert exit_requirement handle ID to core handle
+        let exit_requirement = extracted.exit_requirement.map(CoreJsValueHandle::new);
+
+        steps.push(TaskStep {
+            title: extracted.title,
+            description: extracted.description,
+            step_type,
+            exit_requirement,
+            context: None, // Not currently supported
+            dependencies: extracted.dependencies,
+        });
     }
 
-    let deps_len = runtime
-        .get_array_length(deps_array_handle.clone())
-        .await
-        .map_err(|err| RoutingError::Other(format!("Failed to get dependencies length: {err}")))?;
-    let mut dependencies = Vec::with_capacity(deps_len);
-
-    for idx in 0..deps_len {
-        let element_handle = runtime
-            .get_array_element(deps_array_handle.clone(), idx)
-            .await
-            .map_err(|err| RoutingError::Other(format!("Failed to get dependency {idx}: {err}")))?;
-        let dep_string = runtime.get_string(element_handle).await.map_err(|err| {
-            RoutingError::Other(format!("Failed to get dependency {idx} string: {err}"))
-        })?;
-        dependencies.push(dep_string);
-    }
-
-    Ok(dependencies)
+    Ok(steps)
 }
 
 /// Parse step type string

@@ -1681,6 +1681,7 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1889,6 +1890,7 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
+ "tracing-futures",
 ]
 
 [[package]]
@@ -1949,6 +1951,7 @@ version = "0.1.0"
 dependencies = [
  "assert_cmd",
  "bincode",
+ "futures",
  "merlin-agent",
  "merlin-context",
  "merlin-core",
@@ -1962,6 +1965,7 @@ dependencies = [
  "predicates",
  "serde",
  "tokio",
+ "tracing-subscriber",
 ]
 
 [[package]]
@@ -1969,9 +1973,11 @@ name = "merlin-context"
 version = "0.1.0"
 dependencies = [
  "bincode",
+ "futures",
  "merlin-core",
  "merlin-deps",
  "merlin-languages",
+ "ollama-rs",
  "serde",
  "tokio",
 ]
@@ -1983,6 +1989,7 @@ dependencies = [
  "async-trait",
  "merlin-deps",
  "merlin-tooling",
+ "reqwest",
  "serde",
  "thiserror",
  "tokio",
@@ -2001,14 +2008,11 @@ dependencies = [
  "dirs",
  "filetime",
  "flate2",
- "futures",
  "glob",
  "ignore",
- "ollama-rs",
  "petgraph",
  "ratatui",
  "regex",
- "reqwest",
  "serde_json",
  "swc_common",
  "swc_ecma_ast",
@@ -2020,7 +2024,6 @@ dependencies = [
  "tempfile",
  "toml",
  "tracing",
- "tracing-subscriber",
  "tui-textarea",
  "unicode-width 0.2.0",
  "uuid",
@@ -2041,6 +2044,7 @@ dependencies = [
  "async-trait",
  "merlin-core",
  "merlin-deps",
+ "reqwest",
  "serde",
  "thiserror",
  "tokio",
@@ -2053,6 +2057,7 @@ dependencies = [
  "async-trait",
  "merlin-core",
  "merlin-deps",
+ "reqwest",
  "serde",
  "tokio",
 ]
@@ -2084,6 +2089,7 @@ dependencies = [
  "serde",
  "thiserror",
  "tokio",
+ "tracing-futures",
 ]
 
 [[package]]
@@ -4050,6 +4056,16 @@ checksum = "b9d12581f227e93f094d3af2ae690a574abb8a2b9b7a96e7cfe9647b2b617678"
 dependencies = [
  "once_cell",
  "valuable",
+]
+
+[[package]]
+name = "tracing-futures"
+version = "0.2.5"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "97d095ae15e245a057c8e8451bab9b3ee1e1f68e9ba2b4fbc18d0ac5237835f2"
+dependencies = [
+ "pin-project",
+ "tracing",
 ]
 
 [[package]]

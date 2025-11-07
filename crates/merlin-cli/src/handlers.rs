@@ -2,14 +2,14 @@
 
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_deps::anyhow::Result;
-use merlin_deps::tracing_subscriber::{
-    EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
-};
 use merlin_routing::RoutingConfig;
 use std::fs::OpenOptions;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
 use tokio::fs as async_fs;
+use tracing_subscriber::{
+    EnvFilter, Registry, fmt, layer::SubscriberExt as _, util::SubscriberInitExt as _,
+};
 
 use crate::cli::Validation;
 use crate::interactive::run_tui_interactive;

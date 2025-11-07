@@ -2,6 +2,7 @@
 
 use cli::Cli;
 use merlin_deps::anyhow::{Context as _, Result};
+use tokio::task::LocalSet;
 
 mod cli;
 mod config;
@@ -21,7 +22,13 @@ mod utils;
 async fn main() -> Result<()> {
     let cli = Cli::parse().context("Failed to parse command-line arguments")?;
 
-    handlers::handle_interactive(cli.project, cli.validation, cli.local, cli.context_dump).await?;
+    // Wrap entire execution in LocalSet to support !Send TypeScript runtime
+    LocalSet::new()
+        .run_until(async {
+            handlers::handle_interactive(cli.project, cli.validation, cli.local, cli.context_dump)
+                .await
+        })
+        .await?;
 
     Ok(())
 }

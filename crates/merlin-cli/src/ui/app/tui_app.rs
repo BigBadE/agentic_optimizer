@@ -59,9 +59,3 @@ pub struct TuiApp<B: Backend> {
     /// Latest task-specific event receiver for testing
     pub last_task_receiver: Option<mpsc::Receiver<UiEvent>>,
 }
-
-// Note: all input is sourced from `event_source` to allow test injection without
-// altering application behavior.
-//
-// Test utilities (new_for_test, test_state, etc.) are in app/test_util.rs,
-// only compiled with the test-util feature.

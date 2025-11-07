@@ -1,6 +1,6 @@
+use futures::StreamExt as _;
 use merlin_deps::async_trait::async_trait;
 use merlin_deps::crossterm::event::{Event, EventStream};
-use merlin_deps::futures::StreamExt as _;
 use std::io;
 
 /// Abstraction over the input event source used by the TUI.

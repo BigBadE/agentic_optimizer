@@ -1,19 +1,18 @@
 //! Step executor for recursive task decomposition with exit requirements
 
-use std::{future::Future, pin::Pin, result, sync::Arc, time::Instant};
+use std::{result, sync::Arc, time::Instant};
 
 use merlin_core::{
     AgentResponse, Context, ContextSpec, JsValueHandle, ModelProvider, Query, Result, RoutingError,
     TaskId, TaskList, TaskStep, ValidationErrorType, WorkUnit,
 };
+use merlin_deps::tracing::{Level, span};
 use merlin_routing::UiChannel;
 use merlin_tooling::{PersistentTypeScriptRuntime, ToolRegistry, ToolingJsValueHandle};
 use tokio::sync::Mutex;
+use tracing_futures::Instrument as _;
 
 use super::typescript::{execute_typescript_code, extract_typescript_code};
-
-/// Future returned by async step execution
-type StepFuture<'fut> = Pin<Box<dyn Future<Output = Result<StepResult>> + Send + 'fut>>;
 
 /// Maximum recursion depth for task decomposition
 const MAX_RECURSION_DEPTH: usize = 10;
@@ -45,7 +44,7 @@ pub struct StepExecutionParams<'params> {
     /// Tool registry
     pub tool_registry: &'params Arc<ToolRegistry>,
     /// Persistent TypeScript runtime
-    pub runtime: &'params Arc<PersistentTypeScriptRuntime>,
+    pub runtime: &'params mut PersistentTypeScriptRuntime,
     /// Task ID for UI events
     pub task_id: TaskId,
     /// UI channel
@@ -65,7 +64,7 @@ pub struct TaskListExecutionParams<'params> {
     /// Tool registry
     pub tool_registry: &'params Arc<ToolRegistry>,
     /// Persistent TypeScript runtime
-    pub runtime: &'params Arc<PersistentTypeScriptRuntime>,
+    pub runtime: &'params mut PersistentTypeScriptRuntime,
     /// Task ID for UI events
     pub task_id: TaskId,
     /// UI channel
@@ -87,7 +86,7 @@ pub struct AgentExecutionParams<'params> {
     /// Tool registry
     pub tool_registry: &'params Arc<ToolRegistry>,
     /// Persistent TypeScript runtime
-    pub runtime: &'params Arc<PersistentTypeScriptRuntime>,
+    pub runtime: &'params mut PersistentTypeScriptRuntime,
     /// Task ID for UI events
     pub task_id: TaskId,
     /// UI channel
@@ -98,14 +97,6 @@ pub struct AgentExecutionParams<'params> {
 pub struct StepExecutor;
 
 impl StepExecutor {
-    /// Execute a single step with retry logic and exit requirement validation
-    ///
-    /// # Errors
-    /// Returns an error if max retries exceeded or critical failure occurs
-    pub fn execute_step(params: StepExecutionParams<'_>) -> StepFuture<'_> {
-        Box::pin(async move { Self::execute_step_impl(params).await })
-    }
-
     /// Handle validation error and determine retry strategy
     ///
     /// # Errors
@@ -139,7 +130,7 @@ impl StepExecutor {
     /// `Ok(None)` if validation failed and should retry,
     /// `Err` if execution failed
     async fn process_step_attempt(
-        params: &StepExecutionParams<'_>,
+        params: &mut StepExecutionParams<'_>,
         context: &Context,
         attempt: &mut usize,
         start: Instant,
@@ -184,8 +175,8 @@ impl StepExecutor {
             }
 
             AgentResponse::TaskList(task_list) => {
-                let combined_result =
-                    super::parallel::execute_task_list_parallel(&TaskListExecutionParams {
+                let combined_result = Box::pin(super::parallel::execute_task_list_parallel(
+                    &mut TaskListExecutionParams {
                         task_list: &task_list,
                         base_context: context,
                         provider: params.provider,
@@ -195,8 +186,9 @@ impl StepExecutor {
                         ui_channel: params.ui_channel,
                         recursion_depth: params.recursion_depth + 1,
                         work_unit: None, // No tracking for nested decompositions
-                    })
-                    .await?;
+                    },
+                ))
+                .await?;
 
                 Self::validate_exit_requirement(
                     params.step.exit_requirement.as_ref(),
@@ -218,7 +210,9 @@ impl StepExecutor {
     ///
     /// # Errors
     /// Returns an error if max retries exceeded or critical failure occurs
-    pub(super) async fn execute_step_impl(params: StepExecutionParams<'_>) -> Result<StepResult> {
+    pub(super) async fn execute_step_impl(
+        mut params: StepExecutionParams<'_>,
+    ) -> Result<StepResult> {
         if params.recursion_depth >= MAX_RECURSION_DEPTH {
             return Err(RoutingError::Other(format!(
                 "Maximum recursion depth ({MAX_RECURSION_DEPTH}) exceeded"
@@ -249,19 +243,19 @@ impl StepExecutor {
             );
 
             if let Some(result) =
-                Self::process_step_attempt(&params, &context, &mut attempt, start).await?
+                Self::process_step_attempt(&mut params, &context, &mut attempt, start).await?
             {
                 return Ok(result);
             }
         }
     }
 
-    /// Execute a task list with dependency-aware parallel execution
+    /// Execute a task list with dependency-aware sequential execution
     ///
     /// # Errors
     /// Returns an error if any step fails
-    pub fn execute_task_list(params: TaskListExecutionParams<'_>) -> StepFuture<'_> {
-        Box::pin(async move { super::parallel::execute_task_list_parallel(&params).await })
+    pub async fn execute_task_list(mut params: TaskListExecutionParams<'_>) -> Result<StepResult> {
+        super::parallel::execute_task_list_parallel(&mut params).await
     }
 
     /// Execute task with agent and parse response
@@ -271,33 +265,42 @@ impl StepExecutor {
     pub(crate) async fn execute_with_agent(
         params: AgentExecutionParams<'_>,
     ) -> Result<AgentResponse> {
-        let description = params.step.description.as_str();
-        let context = params.context;
-        let provider = params.provider;
-        let runtime = params.runtime;
-        let task_id = params.task_id;
-        let ui_channel = params.ui_channel;
+        let span = span!(Level::INFO, "execute_with_agent", task_id = ?params.task_id);
 
-        let query = Query::new(description.to_owned());
+        async move {
+            let description = params.step.description.as_str();
+            let context = params.context;
+            let provider = params.provider;
+            let runtime = params.runtime;
+            let task_id = params.task_id;
+            let ui_channel = params.ui_channel;
 
-        // Execute query with provider
-        let response = provider
-            .generate(&query, context)
-            .await
-            .map_err(|err| RoutingError::Other(format!("Provider error: {err}")))?;
+            let query = Query::new(description.to_owned());
 
-        merlin_deps::tracing::debug!("Agent response: {}", response.text);
+            // Execute query with provider
+            let response = provider
+                .generate(&query, context)
+                .await
+                .map_err(|err| RoutingError::Other(format!("Provider error: {err}")))?;
 
-        // Extract and execute TypeScript code
-        let typescript_code = extract_typescript_code(&response.text).ok_or_else(|| {
-            RoutingError::Other(format!(
-                "No TypeScript code found in response: {}",
-                response.text
-            ))
-        })?;
+            merlin_deps::tracing::debug!("Agent response: {}", response.text);
 
-        // Execute TypeScript code - returns AgentResponse (String | TaskList) directly
-        execute_typescript_code(runtime, task_id, &typescript_code, ui_channel).await
+            // Extract and execute TypeScript code
+            let typescript_code = extract_typescript_code(&response.text).ok_or_else(|| {
+                RoutingError::Other(format!(
+                    "No TypeScript code found in response: {}",
+                    response.text
+                ))
+            })?;
+
+            // Execute TypeScript code - returns AgentResponse (String | TaskList) directly
+            let result =
+                execute_typescript_code(runtime, task_id, &typescript_code, ui_channel).await?;
+
+            Ok(result)
+        }
+        .instrument(span)
+        .await
     }
 
     /// Add previous step results to context
@@ -353,7 +356,7 @@ impl StepExecutor {
     /// Returns `ValidationErrorType` if validation fails
     async fn validate_exit_requirement(
         requirement: Option<&JsValueHandle>,
-        runtime: &Arc<PersistentTypeScriptRuntime>,
+        runtime: &mut PersistentTypeScriptRuntime,
     ) -> result::Result<(), ValidationErrorType> {
         // If no exit requirement specified, validation passes
         let Some(func_handle) = requirement else {

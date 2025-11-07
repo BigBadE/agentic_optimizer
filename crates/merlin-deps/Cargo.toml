@@ -4,7 +4,9 @@ version.workspace = true
 edition.workspace = true
 
 [lib]
-crate-type = ["dylib"]
+# Build both dylib (faster dev builds) and rlib (for LTO/flamegraph in release)
+# Compiler will prefer dylib in dev, rlib used for LTO in release
+crate-type = ["dylib", "rlib"]
 
 [dependencies]
 # Core dependencies
@@ -15,19 +17,15 @@ chrono = { workspace = true }
 console = { workspace = true }
 dirs = { workspace = true }
 flate2 = { workspace = true }
-futures = { workspace = true }
 glob = { workspace = true }
 ignore = { workspace = true }
-ollama-rs = { workspace = true }
 petgraph = { workspace = true }
 regex = { workspace = true }
-reqwest = { workspace = true }
 serde_json = { workspace = true }
 tempfile = { workspace = true }
 filetime = { workspace = true }
 toml = { workspace = true }
 tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
 uuid = { workspace = true }
 walkdir = { workspace = true }
 

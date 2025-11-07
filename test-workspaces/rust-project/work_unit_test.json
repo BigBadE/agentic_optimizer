@@ -1,0 +1,22 @@
+{
+  "task_id": "12345678",
+  "tier_used": "local",
+  "subtasks": [
+    {
+      "description": "Create README",
+      "difficulty": 3,
+      "status": "pending"
+    },
+    {
+      "description": "Create src directory",
+      "difficulty": 2,
+      "status": "pending"
+    },
+    {
+      "description": "Create tests directory",
+      "difficulty": 2,
+      "status": "pending"
+    }
+  ],
+  "progress_percentage": 0
+}

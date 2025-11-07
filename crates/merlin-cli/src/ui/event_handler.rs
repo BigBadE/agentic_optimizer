@@ -45,10 +45,7 @@ impl<'handler> EventHandler<'handler> {
                 self.handle_task_progress(task_id, progress);
             }
 
-            UiEvent::WorkUnitStarted {
-                task_id,
-                work_unit,
-            } => {
+            UiEvent::WorkUnitStarted { task_id, work_unit } => {
                 self.handle_work_unit_started(task_id, work_unit);
             }
 
@@ -171,11 +168,7 @@ impl<'handler> EventHandler<'handler> {
         }
     }
 
-    fn handle_work_unit_started(
-        &mut self,
-        task_id: TaskId,
-        work_unit: Arc<Mutex<WorkUnit>>,
-    ) {
+    fn handle_work_unit_started(&mut self, task_id: TaskId, work_unit: Arc<Mutex<WorkUnit>>) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             task.work_unit = Some(work_unit);
         }

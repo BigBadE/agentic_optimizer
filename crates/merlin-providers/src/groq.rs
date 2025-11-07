@@ -1,6 +1,6 @@
 use async_trait::async_trait;
 use merlin_core::{Context, CoreResult, Error, ModelProvider, Query, Response, Result, TokenUsage};
-use merlin_deps::reqwest::Client;
+use reqwest::Client;
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::time::Instant;

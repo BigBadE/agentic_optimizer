@@ -45,11 +45,16 @@ impl ContextBuilder {
         self
     }
 
-    /// Set a progress callback for embedding operations
+    /// Set a progress callback for embedding operations (builder pattern)
     #[must_use]
     pub fn with_progress_callback(mut self, callback: ProgressCallback) -> Self {
         self.progress_callback = Some(callback);
         self
+    }
+
+    /// Set a progress callback for embedding operations (mutable update)
+    pub fn set_progress_callback(&mut self, callback: ProgressCallback) {
+        self.progress_callback = Some(callback);
     }
 
     /// Build a `Context` for the provided query.

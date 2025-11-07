@@ -8,11 +8,10 @@ use merlin_routing::{Model, ModelRouter, RoutingDecision, Task as RoutingTask};
 use std::{
     collections::HashMap,
     sync::{
-        Arc, Mutex as StdMutex,
+        Arc, Mutex,
         atomic::{AtomicUsize, Ordering},
     },
 };
-use tokio::sync::Mutex as TokioMutex;
 
 /// Pattern response configuration
 struct PatternResponse {
@@ -70,19 +69,23 @@ impl PatternResponse {
 type EventPromptMap = HashMap<String, String>;
 
 /// Mock provider for testing
+///
+/// Uses `std::sync::Mutex` instead of `tokio::sync::Mutex` for performance.
+/// The lock is never held across await points, so sync mutex is optimal here.
+/// With 370+ calls per test run, this design choice saves significant overhead.
 pub struct MockProvider {
     /// Provider name
     name: &'static str,
-    /// Pattern responses
-    responses: Arc<TokioMutex<Vec<PatternResponse>>>,
+    /// Pattern responses (uses sync Mutex for fast uncontended locks)
+    responses: Arc<Mutex<Vec<PatternResponse>>>,
     /// Call counter for debugging
     call_count: Arc<AtomicUsize>,
     /// Captured prompts for verification
-    captured_prompts: Arc<StdMutex<Vec<String>>>,
+    captured_prompts: Arc<Mutex<Vec<String>>>,
     /// Event ID to prompt mapping for scoped verification
-    event_prompts: Arc<StdMutex<EventPromptMap>>,
+    event_prompts: Arc<Mutex<EventPromptMap>>,
     /// Verification errors (root cause messages only)
-    verification_errors: Arc<StdMutex<Vec<String>>>,
+    verification_errors: Arc<Mutex<Vec<String>>>,
 }
 
 impl MockProvider {
@@ -91,11 +94,11 @@ impl MockProvider {
     pub fn new(name: &'static str) -> Self {
         Self {
             name,
-            responses: Arc::new(TokioMutex::new(Vec::new())),
+            responses: Arc::new(Mutex::new(Vec::new())),
             call_count: Arc::new(AtomicUsize::new(0)),
-            captured_prompts: Arc::new(StdMutex::new(Vec::new())),
-            event_prompts: Arc::new(StdMutex::new(HashMap::new())),
-            verification_errors: Arc::new(StdMutex::new(Vec::new())),
+            captured_prompts: Arc::new(Mutex::new(Vec::new())),
+            event_prompts: Arc::new(Mutex::new(HashMap::new())),
+            verification_errors: Arc::new(Mutex::new(Vec::new())),
         }
     }
 
@@ -149,13 +152,17 @@ impl MockProvider {
     ///
     /// # Errors
     /// Returns error if lock acquisition fails
-    pub async fn get_last_matched_prompt(&self) -> Result<Option<String>> {
-        let responses = self.responses.lock().await;
-        Ok(responses
-            .iter()
-            .rev()
-            .find(|resp| resp.used)
-            .and_then(|resp| resp.captured_prompt.clone()))
+    pub fn get_last_matched_prompt(&self) -> Result<Option<String>> {
+        self.responses
+            .lock()
+            .map(|responses| {
+                responses
+                    .iter()
+                    .rev()
+                    .find(|resp| resp.used)
+                    .and_then(|resp| resp.captured_prompt.clone())
+            })
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))
     }
 
     /// Get all verification errors
@@ -173,9 +180,12 @@ impl MockProvider {
     ///
     /// # Errors
     /// Returns error if pattern is invalid
-    pub async fn add_response(&self, trigger: &TriggerConfig, typescript: String) -> Result<()> {
+    pub fn add_response(&self, trigger: &TriggerConfig, typescript: String) -> Result<()> {
         let response = PatternResponse::new(trigger, typescript)?;
-        self.responses.lock().await.push(response);
+        self.responses
+            .lock()
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
+            .push(response);
         Ok(())
     }
 
@@ -183,9 +193,12 @@ impl MockProvider {
     ///
     /// # Errors
     /// Returns error if lock acquisition fails
-    pub async fn reset(&self) -> Result<()> {
+    pub fn reset(&self) -> Result<()> {
         {
-            let mut responses = self.responses.lock().await;
+            let mut responses = self
+                .responses
+                .lock()
+                .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
             for response in responses.iter_mut() {
                 response.used = false;
             }
@@ -210,8 +223,11 @@ impl MockProvider {
     ///
     /// # Errors
     /// Returns error if no matching pattern found
-    async fn find_matching_pattern(&self, candidates: &[String]) -> Result<(String, String)> {
-        let mut responses = self.responses.lock().await;
+    fn find_matching_pattern(&self, candidates: &[String]) -> Result<(String, String)> {
+        let mut responses = self
+            .responses
+            .lock()
+            .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?;
 
         let mut matched_prompt = None;
         let mut matched_response = None;
@@ -291,13 +307,13 @@ impl ModelProvider for MockProvider {
             },
         ];
 
-        let (prompt_for_matching, typescript_code) = self.find_matching_pattern(&candidates).await?;
+        let (prompt_for_matching, typescript_code) = self.find_matching_pattern(&candidates)?;
 
         // Capture matched prompt
         self.captured_prompts
             .lock()
             .map_err(|err| RoutingError::Other(format!("Lock error: {err}")))?
-            .push(prompt_for_matching.clone());
+            .push(prompt_for_matching);
 
         Ok(Response {
             text: format!("```typescript\n{typescript_code}\n```"),

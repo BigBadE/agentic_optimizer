@@ -13,8 +13,14 @@ use crate::ToolResult;
 /// # Errors
 /// Returns error if conversion fails
 pub fn js_value_to_json(value: &JsValue, context: &mut Context) -> ToolResult<Value> {
-    js_value_to_json_static(value, context)
-        .map_err(|err| ToolError::ExecutionFailed(format!("Failed to convert JS value: {err}")))
+    use merlin_deps::tracing::{Level, span};
+
+    let span = span!(Level::INFO, "js_value_to_json");
+    let enter_guard = span.enter();
+    let result = js_value_to_json_static(value, context)
+        .map_err(|err| ToolError::ExecutionFailed(format!("Failed to convert JS value: {err}")));
+    drop(enter_guard);
+    result
 }
 
 /// Convert JS value to JSON (static version for closures)

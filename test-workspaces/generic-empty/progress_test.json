@@ -1,0 +1,31 @@
+{
+  "no_subtasks": {
+    "subtasks": [],
+    "progress": 50
+  },
+  "zero_percent": {
+    "total": 4,
+    "completed": 0,
+    "progress": 0
+  },
+  "twenty_five_percent": {
+    "total": 4,
+    "completed": 1,
+    "progress": 25
+  },
+  "fifty_percent": {
+    "total": 4,
+    "completed": 2,
+    "progress": 50
+  },
+  "seventy_five_percent": {
+    "total": 4,
+    "completed": 3,
+    "progress": 75
+  },
+  "one_hundred_percent": {
+    "total": 4,
+    "completed": 4,
+    "progress": 100
+  }
+}

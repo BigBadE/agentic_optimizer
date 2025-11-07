@@ -13,6 +13,7 @@ use std::sync::Arc;
 use tokio::fs::{create_dir, write};
 use tokio::fs::{metadata, read_to_string};
 use tokio::sync::Mutex;
+use tracing_futures::Instrument as _;
 
 use crate::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};
 
@@ -173,7 +174,11 @@ impl ContextRequestTool {
     /// # Errors
     /// Returns an error if file cannot be read or is too large
     async fn read_file(&self, path: &Path) -> Result<String, ToolError> {
+        use merlin_deps::tracing::{Level, span};
+
+        let metadata_span = span!(Level::INFO, "file_metadata", path = ?path);
         let file_metadata = metadata(path)
+            .instrument(metadata_span)
             .await
             .map_err(|err| ToolError::ExecutionFailed(format!("Failed to read metadata: {err}")))?;
 
@@ -185,7 +190,9 @@ impl ContextRequestTool {
             )));
         }
 
+        let read_span = span!(Level::INFO, "file_read", path = ?path, size = file_metadata.len());
         read_to_string(path)
+            .instrument(read_span)
             .await
             .map_err(|err| ToolError::ExecutionFailed(format!("Failed to read file: {err}")))
     }

@@ -93,12 +93,12 @@ pub fn create_runner_components(fixture: &TestFixture) -> Result<RunnerComponent
         let thread_storage_path = final_workspace_path.join(".merlin").join("threads");
         let store = ThreadStore::new(thread_storage_path)?;
         let thread_store = Arc::new(Mutex::new(store));
-        RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?
+        RoutingOrchestrator::new_with_router(config, router, registry)?
             .with_workspace(final_workspace_path.clone())
             .with_embeddings(enable_embeddings)
             .with_thread_store(thread_store)
     } else {
-        RoutingOrchestrator::new_with_router(config, router, Arc::new(registry))?
+        RoutingOrchestrator::new_with_router(config, router, registry)?
             .with_workspace(final_workspace_path.clone())
             .with_embeddings(enable_embeddings)
     };

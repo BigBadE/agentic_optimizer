@@ -22,14 +22,13 @@ struct TaskExecutionParams {
 }
 
 /// High-level orchestrator that coordinates all routing components
-#[derive(Clone)]
 pub struct RoutingOrchestrator {
     config: RoutingConfig,
     router: Arc<dyn ModelRouter>,
     validator: Arc<dyn Validator>,
     workspace: Arc<WorkspaceState>,
     /// Provider registry (for testing, allows injecting mock providers)
-    provider_registry: Option<Arc<ProviderRegistry>>,
+    provider_registry: Option<ProviderRegistry>,
     /// Thread storage for conversation management
     thread_store: Option<Arc<Mutex<ThreadStore>>>,
     /// Whether to enable embedding/vector search initialization
@@ -77,7 +76,7 @@ impl RoutingOrchestrator {
     pub fn new_with_router(
         config: RoutingConfig,
         router: Arc<dyn ModelRouter>,
-        provider_registry: Arc<ProviderRegistry>,
+        provider_registry: ProviderRegistry,
     ) -> Result<Self> {
         // Validation with default stages, early exit disabled
         let validator = Arc::new(ValidationPipeline::with_default_stages());
@@ -254,7 +253,6 @@ impl RoutingOrchestrator {
             .with_tool(Arc::new(DeleteFileTool::new(workspace_root)))
             .with_tool(Arc::new(ListFilesTool::new(workspace_root)))
             .with_tool(Arc::new(ContextRequestTool::new(workspace_root.clone())));
-        let tool_registry = Arc::new(tool_registry);
         let context_fetcher =
             ContextFetcher::new_with_embeddings(workspace_root.clone(), self.enable_embeddings);
 
@@ -267,7 +265,7 @@ impl RoutingOrchestrator {
                 tool_registry,
                 context_fetcher,
                 config: self.config.clone(),
-                provider_registry: Arc::clone(registry),
+                provider_registry: registry.clone(),
             })?
         } else {
             // Create new provider registry (production)

@@ -33,7 +33,7 @@ async fn test_agent_executor_creation() {
 
     let validator = Arc::new(ValidationPipeline::with_default_stages());
     let workspace_root = PathBuf::from(".");
-    let tool_registry = Arc::new(ToolRegistry::with_workspace(workspace_root.clone()));
+    let tool_registry = ToolRegistry::with_workspace(workspace_root.clone());
     let context_fetcher = ContextFetcher::new(workspace_root);
 
     let executor = AgentExecutor::new(router, validator, tool_registry, context_fetcher, &config);
@@ -51,7 +51,7 @@ async fn test_agent_executor_creation() {
 #[tokio::test]
 async fn test_tool_registry_integration() {
     let tool_registry =
-        Arc::new(ToolRegistry::with_workspace(PathBuf::from(".")).with_tool(Arc::new(BashTool)));
+        ToolRegistry::with_workspace(PathBuf::from(".")).with_tool(Arc::new(BashTool));
 
     assert!(tool_registry.get_tool("bash").is_some());
     assert!(tool_registry.get_tool("nonexistent").is_none());

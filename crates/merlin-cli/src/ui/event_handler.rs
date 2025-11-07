@@ -7,7 +7,6 @@ use merlin_deps::tracing::warn;
 use merlin_routing::{MessageLevel, TaskId, TaskProgress, TaskResult, UiEvent};
 use merlin_tooling::ToolError;
 use std::sync::Arc;
-use std::time::{Instant, SystemTime};
 use tokio::sync::Mutex;
 
 /// Handles UI events and updates task manager and state
@@ -137,17 +136,8 @@ impl<'handler> EventHandler<'handler> {
     ) {
         let task_display = TaskDisplay {
             description,
-            status: TaskStatus::Running,
-            progress: None,
-            output_lines: Vec::default(),
-            created_at: SystemTime::now(),
-            timestamp: Instant::now(),
             thread_id,
-            output: String::new(),
-            steps: Vec::default(),
-            current_step: None,
-            retry_count: 0,
-            work_unit: None,
+            ..Default::default()
         };
 
         self.task_manager.add_task(task_id, task_display);
@@ -305,7 +295,7 @@ impl<'handler> EventHandler<'handler> {
                 step_id,
                 step_type: step_type.to_string(),
                 content,
-                status: TaskStepStatus::Running,
+                ..Default::default()
             };
 
             // Set as current step (replaces previous step)

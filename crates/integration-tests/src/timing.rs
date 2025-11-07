@@ -25,6 +25,26 @@ pub struct SpanTiming {
     pub metadata: HashMap<String, String>,
 }
 
+impl Default for SpanTiming {
+    /// Creates a new `SpanTiming` with default values
+    ///
+    /// Default values:
+    /// - Empty name
+    /// - Current instant as start time
+    /// - No duration (not yet completed)
+    /// - No parent span
+    /// - Empty metadata
+    fn default() -> Self {
+        Self {
+            name: String::new(),
+            start: Instant::now(),
+            duration: None,
+            parent_id: None,
+            metadata: HashMap::new(),
+        }
+    }
+}
+
 /// Collected timing data from all spans
 #[derive(Debug, Clone, Default)]
 pub struct TimingData {
@@ -155,10 +175,8 @@ where
 
         let timing = SpanTiming {
             name: attrs.metadata().name().to_owned(),
-            start: Instant::now(),
-            duration: None,
             parent_id: attrs.parent().cloned(),
-            metadata: HashMap::new(),
+            ..Default::default()
         };
 
         // Track root spans

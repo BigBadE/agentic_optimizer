@@ -105,7 +105,7 @@ fn verify_focus_changed(
         return;
     };
 
-    let focus_changed = !matches!(app.focused_pane, FocusedPane::Input);
+    let focus_changed = !matches!(app.ui_components.focused_pane, FocusedPane::Input);
     if focus_changed == expected {
         result.add_success(format!("Focus changed check matches: {expected}"));
     } else {

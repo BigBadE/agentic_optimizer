@@ -60,28 +60,28 @@ pub struct AgentExecutorParams {
     /// Validator
     pub validator: Arc<dyn Validator>,
     /// Tool registry
-    pub tool_registry: Arc<ToolRegistry>,
+    pub tool_registry: ToolRegistry,
     /// Context fetcher
     pub context_fetcher: ContextFetcher,
     /// Routing configuration
     pub config: RoutingConfig,
     /// Provider registry
-    pub provider_registry: Arc<ProviderRegistry>,
+    pub provider_registry: ProviderRegistry,
 }
 
 /// Agent executor that streams task execution with tool calling
 pub struct AgentExecutor {
     router: Arc<dyn ModelRouter>,
     validator: Arc<dyn Validator>,
-    tool_registry: Arc<ToolRegistry>,
+    tool_registry: ToolRegistry,
     context_builder: ContextBuilder,
-    context_dump_enabled: Arc<AtomicBool>,
+    context_dump_enabled: AtomicBool,
     /// Provider registry for accessing model providers
-    provider_registry: Arc<ProviderRegistry>,
+    provider_registry: ProviderRegistry,
     /// Persistent TypeScript runtime for agent code execution
     runtime: PersistentTypeScriptRuntime,
     /// Cached TypeScript signatures (computed once at initialization)
-    typescript_signatures: Arc<String>,
+    typescript_signatures: String,
 }
 
 impl AgentExecutor {
@@ -92,12 +92,12 @@ impl AgentExecutor {
     pub fn new(
         router: Arc<dyn ModelRouter>,
         validator: Arc<dyn Validator>,
-        tool_registry: Arc<ToolRegistry>,
+        tool_registry: ToolRegistry,
         context_fetcher: ContextFetcher,
         config: &RoutingConfig,
     ) -> Result<Self> {
-        let provider_registry = Arc::new(ProviderRegistry::new(config.clone())?);
-        let context_fetcher_arc = Arc::new(Mutex::new(context_fetcher));
+        let provider_registry = ProviderRegistry::new(config.clone())?;
+        let context_fetcher_arc = Arc::new(context_fetcher);
         let conversation_history = Arc::new(Mutex::new(Vec::new()));
         let context_builder = ContextBuilder::new(context_fetcher_arc, conversation_history);
 
@@ -123,10 +123,10 @@ impl AgentExecutor {
             validator,
             tool_registry,
             context_builder,
-            context_dump_enabled: Arc::new(AtomicBool::new(false)),
+            context_dump_enabled: AtomicBool::new(false),
             provider_registry,
             runtime,
-            typescript_signatures: Arc::new(signatures),
+            typescript_signatures: signatures,
         })
     }
 
@@ -135,7 +135,7 @@ impl AgentExecutor {
     /// # Errors
     /// Returns an error if initialization fails.
     pub fn with_provider_registry(params: AgentExecutorParams) -> Result<Self> {
-        let context_fetcher_arc = Arc::new(Mutex::new(params.context_fetcher));
+        let context_fetcher_arc = Arc::new(params.context_fetcher);
         let conversation_history = Arc::new(Mutex::new(Vec::new()));
         let context_builder = ContextBuilder::new(context_fetcher_arc, conversation_history);
 
@@ -161,10 +161,10 @@ impl AgentExecutor {
             validator: params.validator,
             tool_registry: params.tool_registry,
             context_builder,
-            context_dump_enabled: Arc::new(AtomicBool::new(false)),
+            context_dump_enabled: AtomicBool::new(false),
             provider_registry: params.provider_registry,
             runtime,
-            typescript_signatures: Arc::new(signatures),
+            typescript_signatures: signatures,
         })
     }
 

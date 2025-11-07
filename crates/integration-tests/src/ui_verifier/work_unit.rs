@@ -9,8 +9,8 @@ use merlin_deps::ratatui::backend::TestBackend;
 /// Get `WorkUnit` from `TaskDisplay` (live during execution) or last message (after completion)
 async fn get_work_unit(app: &TuiApp<TestBackend>) -> Option<WorkUnit> {
     // First check if there's a live WorkUnit in the active task
-    if let Some(active_task_id) = app.state.active_task_id
-        && let Some(task_display) = app.task_manager.get_task(active_task_id)
+    if let Some(active_task_id) = app.ui_components.state.active_task_id
+        && let Some(task_display) = app.ui_components.task_manager.get_task(active_task_id)
         && let Some(ref work_unit_arc) = task_display.work_unit
     {
         // Clone the WorkUnit from Arc<Mutex<>> - wait for lock
@@ -20,7 +20,7 @@ async fn get_work_unit(app: &TuiApp<TestBackend>) -> Option<WorkUnit> {
     }
 
     // Fall back to checking the message's WorkUnit (after completion)
-    let orch = app.orchestrator.as_ref()?;
+    let orch = app.runtime_state.orchestrator.as_ref()?;
     let store_arc = orch.thread_store()?;
     let store = store_arc.lock().ok()?;
     let threads = store.active_threads();

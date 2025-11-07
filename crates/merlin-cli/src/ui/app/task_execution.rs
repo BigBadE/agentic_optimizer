@@ -355,7 +355,7 @@ impl<B: Backend> TuiApp<B> {
         let (task_event_tx, task_event_rx) = mpsc::channel(128);
 
         // Clone global UI channel for broadcasting to UI
-        let global_ui_sender = self.event_sender.clone();
+        let global_ui_sender = self.event_system.sender.clone();
 
         // Create internal channel for task execution (bounded with backpressure)
         let (internal_tx, internal_rx) = mpsc::channel::<UiEvent>(128);
@@ -372,7 +372,11 @@ impl<B: Backend> TuiApp<B> {
         );
 
         let ui_channel = UiChannel::from_sender(internal_tx);
-        let log_file = self.log_file.as_ref().and_then(|f| f.try_clone().ok());
+        let log_file = self
+            .runtime_state
+            .log_file
+            .as_ref()
+            .and_then(|f| f.try_clone().ok());
 
         spawn_local(execute_and_handle_task(InternalExecutionParams {
             orchestrator,
@@ -386,6 +390,6 @@ impl<B: Backend> TuiApp<B> {
         }));
 
         // Store receiver for test access
-        self.last_task_receiver = Some(task_event_rx);
+        self.event_system.last_task_receiver = Some(task_event_rx);
     }
 }

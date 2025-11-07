@@ -29,13 +29,19 @@ This crate provides the user-facing CLI and interactive Terminal UI (TUI) for th
 - `theme.rs` - UI theming
 
 ### Application Logic (`ui/app/`)
-- `tui_app.rs` - Main TUI application
+- `tui_app.rs` - Main TUI application with focused sub-structs
+  - `TuiApp` - Main application (5 logically grouped fields)
+  - `EventSystem` - Event handling and communication channels
+  - `UiComponents` - UI rendering and state management
+  - `RuntimeState` - Runtime orchestration and persistence
 - `event_loop.rs` - Event loop
 - `input_handler.rs` - Input processing
 - `key_handling.rs` - Keyboard shortcuts
 - `lifecycle.rs` - Application lifecycle
 - `navigation.rs` - UI navigation
 - `task_operations.rs` - Task operations
+- `task_execution.rs` - Task execution coordination
+- `thread_operations.rs` - Thread management
 - `conversation.rs` - Conversation UI
 - `test_helpers.rs` - Testing utilities
 

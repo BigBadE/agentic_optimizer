@@ -5,6 +5,7 @@ use std::env;
 use std::fmt::Write as _;
 use std::path::{Path, PathBuf};
 use tokio::fs::read_to_string;
+use tokio::sync::Mutex;
 
 use crate::{ContextBuilder, ProgressCallback};
 use merlin_core::{Context, FileContext, Query};
@@ -14,10 +15,10 @@ use merlin_core::{Result, RoutingError};
 pub struct ContextFetcher {
     /// Root directory of the project
     project_root: PathBuf,
-    /// Context builder for file scanning and analysis
-    context_builder: Option<ContextBuilder>,
-    /// Optional progress callback for embedding operations
-    progress_callback: Option<ProgressCallback>,
+    /// Context builder for file scanning and analysis (uses async Mutex for lazy initialization across awaits)
+    context_builder: Mutex<Option<ContextBuilder>>,
+    /// Optional progress callback for embedding operations (uses async Mutex for thread-safety)
+    progress_callback: Mutex<Option<ProgressCallback>>,
 }
 
 impl ContextFetcher {
@@ -50,8 +51,8 @@ impl ContextFetcher {
 
         Self {
             project_root,
-            context_builder,
-            progress_callback: None,
+            context_builder: Mutex::new(context_builder),
+            progress_callback: Mutex::new(None),
         }
     }
 
@@ -61,15 +62,21 @@ impl ContextFetcher {
     }
 
     /// Set a progress callback for embedding operations (builder pattern)
+    ///
+    /// # Panics
+    /// Panics if called during an active async operation that holds the callback lock
     #[must_use]
-    pub fn with_progress_callback(mut self, callback: ProgressCallback) -> Self {
-        self.progress_callback = Some(callback);
+    pub fn with_progress_callback(self, callback: ProgressCallback) -> Self {
+        // Try to acquire lock immediately (should succeed as this is builder pattern)
+        if let Ok(mut guard) = self.progress_callback.try_lock() {
+            *guard = Some(callback);
+        }
         self
     }
 
-    /// Set a progress callback for embedding operations (mutable update)
-    pub fn set_progress_callback(&mut self, callback: ProgressCallback) {
-        self.progress_callback = Some(callback);
+    /// Set a progress callback for embedding operations (async update)
+    pub async fn set_progress_callback(&self, callback: ProgressCallback) {
+        *self.progress_callback.lock().await = Some(callback);
     }
 
     /// Extract file references from text
@@ -170,7 +177,7 @@ impl ContextFetcher {
     ///
     /// # Errors
     /// Returns an error if context building fails
-    pub async fn build_context_for_query(&mut self, query: &Query) -> Result<Context> {
+    pub async fn build_context_for_query(&self, query: &Query) -> Result<Context> {
         info!("Building context for query: {}", query.text);
 
         // Extract explicitly mentioned files
@@ -181,9 +188,10 @@ impl ContextFetcher {
         );
 
         // Use context builder if available
-        if let Some(builder) = &mut self.context_builder {
+        if let Some(builder) = &mut *self.context_builder.lock().await {
             // Update progress callback without destroying cached state
-            if let Some(callback) = self.progress_callback.clone() {
+            let callback_opt = self.progress_callback.lock().await.clone();
+            if let Some(callback) = callback_opt {
                 builder.set_progress_callback(callback);
             }
 
@@ -218,7 +226,7 @@ impl ContextFetcher {
     /// # Errors
     /// Returns an error if context building fails
     pub async fn build_context_from_conversation(
-        &mut self,
+        &self,
         messages: &[(String, String)], // (role, content) pairs
         current_query: &Query,
     ) -> Result<Context> {

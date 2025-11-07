@@ -16,7 +16,7 @@ pub async fn verify_state(
         return;
     };
 
-    let state = &app.state;
+    let state = &app.ui_components.state;
 
     // Verify conversation count (excluding system messages)
     if let Some(expected_count) = verify.conversation_count {

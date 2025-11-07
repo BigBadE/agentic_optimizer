@@ -18,16 +18,22 @@ use crate::ui::task_manager::TaskManager;
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_routing::UiEvent;
 
-/// Main TUI application
-pub struct TuiApp<B: Backend> {
-    /// Terminal instance used to render the UI
-    pub terminal: Terminal<B>,
+/// Event handling and communication channels
+pub struct EventSystem {
     /// Channel receiving UI events from background tasks
-    pub event_receiver: mpsc::UnboundedReceiver<UiEvent>,
+    pub receiver: mpsc::UnboundedReceiver<UiEvent>,
     /// Channel for sending UI events (kept internal)
-    pub event_sender: mpsc::UnboundedSender<UiEvent>,
+    pub sender: mpsc::UnboundedSender<UiEvent>,
     /// Broadcast channel for UI events (observers can subscribe)
-    pub ui_event_broadcast: broadcast::Sender<UiEvent>,
+    pub broadcast: broadcast::Sender<UiEvent>,
+    /// Source of input events (abstracted for testing)
+    pub source: Box<dyn InputEventSource + Send>,
+    /// Latest task-specific event receiver for testing
+    pub last_task_receiver: Option<mpsc::Receiver<UiEvent>>,
+}
+
+/// UI component management and rendering state
+pub struct UiComponents {
     /// Manages tasks and their ordering/visibility
     pub task_manager: TaskManager,
     /// Current UI state, including selections and flags
@@ -40,22 +46,34 @@ pub struct TuiApp<B: Backend> {
     pub focused_pane: FocusedPane,
     /// A pending input to be consumed by the app loop
     pub pending_input: Option<String>,
-    /// Optional task persistence handler for saving/loading tasks
-    pub persistence: Option<TaskPersistence>,
-    /// Source of input events (abstracted for testing)
-    pub event_source: Box<dyn InputEventSource + Send>,
-    /// Last time the UI was rendered (for forcing periodic updates)
-    pub last_render_time: Instant,
     /// Cache of actual rendered layout dimensions
     pub layout_cache: layout::LayoutCache,
+    /// Last time the UI was rendered (for forcing periodic updates)
+    pub last_render_time: Instant,
+}
+
+/// Runtime state and orchestration
+pub struct RuntimeState {
     /// Thread storage and management (shared with orchestrator)
     pub thread_store: Arc<Mutex<ThreadStore>>,
     /// Orchestrator for executing tasks
     pub orchestrator: Option<Arc<RoutingOrchestrator>>,
+    /// Optional task persistence handler for saving/loading tasks
+    pub persistence: Option<TaskPersistence>,
     /// Log file for task execution
     pub log_file: Option<fs::File>,
+}
+
+/// Main TUI application
+pub struct TuiApp<B: Backend> {
+    /// Terminal instance used to render the UI
+    pub terminal: Terminal<B>,
+    /// Event handling and communication
+    pub event_system: EventSystem,
+    /// UI components and state
+    pub ui_components: UiComponents,
+    /// Runtime state and orchestration
+    pub runtime_state: RuntimeState,
     /// Configuration manager with auto-save
     pub config_manager: ConfigManager,
-    /// Latest task-specific event receiver for testing
-    pub last_task_receiver: Option<mpsc::Receiver<UiEvent>>,
 }

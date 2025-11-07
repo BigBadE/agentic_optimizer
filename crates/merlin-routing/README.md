@@ -41,6 +41,8 @@ This crate provides intelligent routing between different LLM tiers based on tas
 - `ResponseCache` - Semantic caching
 - `MetricsCollector`, `MetricsReport` - Performance metrics
 - `ModelRegistry`, `ProviderRegistry` - Model management
+  - `ProviderRegistry` owns its configuration (RoutingConfig)
+  - Internally uses Arc for providers (HashMap<Model, Arc<dyn ModelProvider>>)
 
 ## Features
 

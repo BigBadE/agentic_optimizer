@@ -10,7 +10,7 @@ use std::sync::{Arc, Mutex};
 use std::time::Instant;
 use tokio::sync::{broadcast, mpsc};
 
-use super::tui_app::TuiApp;
+use super::tui_app::{EventSystem, RuntimeState, TuiApp, UiComponents};
 use crate::config::ConfigManager;
 use crate::ui::event_source::CrosstermEventSource;
 use crate::ui::input::InputManager;
@@ -74,24 +74,30 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
 
         let app = Self {
             terminal,
-            event_receiver: receiver,
-            event_sender: sender,
-            ui_event_broadcast: broadcast_sender,
-            task_manager: TaskManager::default(),
-            state,
-            input_manager: InputManager::default(),
-            renderer: Renderer::new(theme),
-            focused_pane: FocusedPane::Input,
-            pending_input: None,
-            persistence,
-            event_source: Box::new(CrosstermEventSource::new()),
-            last_render_time: Instant::now(),
-            layout_cache: layout::LayoutCache::new(),
-            thread_store,
-            orchestrator,
-            log_file,
+            event_system: EventSystem {
+                receiver,
+                sender,
+                broadcast: broadcast_sender,
+                source: Box::new(CrosstermEventSource::new()),
+                last_task_receiver: None,
+            },
+            ui_components: UiComponents {
+                task_manager: TaskManager::default(),
+                state,
+                input_manager: InputManager::default(),
+                renderer: Renderer::new(theme),
+                focused_pane: FocusedPane::Input,
+                pending_input: None,
+                layout_cache: layout::LayoutCache::new(),
+                last_render_time: Instant::now(),
+            },
+            runtime_state: RuntimeState {
+                thread_store,
+                orchestrator,
+                persistence,
+                log_file,
+            },
             config_manager,
-            last_task_receiver: None,
         };
 
         Ok(app)
@@ -122,16 +128,17 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
 impl<B: Backend> TuiApp<B> {
     /// Loads tasks asynchronously
     pub async fn load_tasks_async(&mut self) {
-        if let Some(persistence) = &self.persistence {
+        if let Some(persistence) = &self.runtime_state.persistence {
             let mut loaded_count = 0usize;
             if let Ok(tasks) = persistence.load_all_tasks().await {
                 loaded_count = tasks.len();
                 for (task_id, task_display) in tasks {
-                    self.task_manager
+                    self.ui_components
+                        .task_manager
                         .insert_task_for_load(task_id, task_display);
                 }
 
-                self.task_manager.rebuild_order();
+                self.ui_components.task_manager.rebuild_order();
 
                 // Don't auto-select any task on load - user should manually select
                 // Adjust scroll to show placeholder at bottom (selected by default)
@@ -139,7 +146,7 @@ impl<B: Backend> TuiApp<B> {
             }
 
             merlin_deps::tracing::info!("Loaded {} tasks from persistence", loaded_count);
-            self.state.loading_tasks = false;
+            self.ui_components.state.loading_tasks = false;
         }
     }
 
@@ -149,6 +156,7 @@ impl<B: Backend> TuiApp<B> {
     /// Returns an error if thread loading fails
     pub fn load_threads(&self) -> Result<()> {
         let mut store = self
+            .runtime_state
             .thread_store
             .lock()
             .map_err(|err| RoutingError::Other(format!("Thread store lock error: {err}")))?;

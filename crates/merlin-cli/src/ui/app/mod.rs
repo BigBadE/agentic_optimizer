@@ -14,6 +14,6 @@ mod task_execution;
 mod task_operations;
 
 mod thread_operations;
-mod tui_app;
+pub mod tui_app;
 
 pub use tui_app::TuiApp;

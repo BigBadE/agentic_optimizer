@@ -10,6 +10,7 @@ pub mod ui;
 
 // Public API exports for integration testing
 pub use ui::TuiApp;
+pub use ui::app;
 pub use ui::event_handler;
 pub use ui::event_source::InputEventSource;
 pub use ui::input::InputManager;

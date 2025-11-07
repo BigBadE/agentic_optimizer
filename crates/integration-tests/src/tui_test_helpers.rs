@@ -2,6 +2,7 @@
 
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_cli::TuiApp;
+use merlin_cli::app::tui_app::{EventSystem, RuntimeState, UiComponents};
 use merlin_cli::config::{Config, ConfigManager};
 use merlin_cli::ui::event_source::InputEventSource;
 use merlin_cli::ui::input::InputManager;
@@ -86,24 +87,30 @@ pub fn new_test_app<B: Backend>(
 
     let app = TuiApp {
         terminal,
-        event_receiver: receiver,
-        event_sender: sender,
-        ui_event_broadcast: broadcast_sender,
-        task_manager: TaskManager::default(),
-        state,
-        input_manager: InputManager::default(),
-        renderer: Renderer::new(theme),
-        focused_pane: FocusedPane::Input,
-        pending_input: None,
-        persistence,
-        event_source,
-        last_render_time: Instant::now(),
-        layout_cache: layout::LayoutCache::new(),
-        thread_store,
-        orchestrator,
-        log_file: None,
+        event_system: EventSystem {
+            receiver,
+            sender,
+            broadcast: broadcast_sender,
+            source: event_source,
+            last_task_receiver: None,
+        },
+        ui_components: UiComponents {
+            task_manager: TaskManager::default(),
+            state,
+            input_manager: InputManager::default(),
+            renderer: Renderer::new(theme),
+            focused_pane: FocusedPane::Input,
+            pending_input: None,
+            layout_cache: layout::LayoutCache::new(),
+            last_render_time: Instant::now(),
+        },
+        runtime_state: RuntimeState {
+            thread_store,
+            orchestrator,
+            persistence,
+            log_file: None,
+        },
         config_manager: config_manager.clone(),
-        last_task_receiver: None,
     };
 
     Ok(app)
@@ -111,15 +118,15 @@ pub fn new_test_app<B: Backend>(
 
 /// Process pending UI events for testing (non-blocking)
 pub fn process_ui_events<B: Backend>(app: &mut TuiApp<B>) {
-    while let Ok(ui_event) = app.event_receiver.try_recv() {
+    while let Ok(ui_event) = app.event_system.receiver.try_recv() {
         // Broadcast to observers
-        drop(app.ui_event_broadcast.send(ui_event.clone()));
+        drop(app.event_system.broadcast.send(ui_event.clone()));
 
         // Handle the event
-        let persistence = app.persistence.as_ref();
+        let persistence = app.runtime_state.persistence.as_ref();
         let mut handler = merlin_cli::ui::event_handler::EventHandler::new(
-            &mut app.task_manager,
-            &mut app.state,
+            &mut app.ui_components.task_manager,
+            &mut app.ui_components.state,
             persistence,
         );
         handler.handle_event(ui_event);
@@ -131,7 +138,8 @@ pub fn process_ui_events<B: Backend>(app: &mut TuiApp<B>) {
 /// # Errors
 /// Returns error if reading event fails
 pub async fn next_input_event<B: Backend>(app: &mut TuiApp<B>) -> Result<Option<CrosstermEvent>> {
-    app.event_source
+    app.event_system
+        .source
         .next_event()
         .await
         .map_err(|err| RoutingError::Other(err.to_string()))
@@ -160,7 +168,7 @@ pub fn handle_input<B: Backend>(app: &mut TuiApp<B>, event: &CrosstermEvent) {
 /// # Errors
 /// Returns error if no task has been spawned yet
 pub fn get_task_receiver<B: Backend>(app: &mut TuiApp<B>) -> Result<mpsc::Receiver<UiEvent>> {
-    app.last_task_receiver.take().ok_or_else(|| {
+    app.event_system.last_task_receiver.take().ok_or_else(|| {
         RoutingError::Other("No task receiver available - did you spawn a task?".to_owned())
     })
 }

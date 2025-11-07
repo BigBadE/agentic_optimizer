@@ -27,11 +27,11 @@
 //! # async fn example() -> Result<(), Box<dyn std::error::Error>> {
 //! let router = Arc::new(StrategyRouter::with_default_strategies()?);
 //! let validator = Arc::new(ValidationPipeline::with_default_stages());
-//! let tool_registry = Arc::new(ToolRegistry::default());
+//! let tool_registry = ToolRegistry::default();
 //! let context_fetcher = ContextFetcher::new(".".into());
 //! let config = RoutingConfig::default();
 //!
-//! let _executor = AgentExecutor::new(router, validator, tool_registry, context_fetcher, config)?;
+//! let _executor = AgentExecutor::new(router, validator, tool_registry, context_fetcher, &config)?;
 //! # Ok(())
 //! # }
 //! ```

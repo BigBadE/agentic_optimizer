@@ -169,16 +169,12 @@ fn deserialize_task(serializable: SerializableTask) -> (TaskId, TaskDisplay) {
     let task_display = TaskDisplay {
         description: serializable.description,
         status,
-        progress: None,
         output_lines: serializable.output_lines,
         created_at: serializable.created_at,
         timestamp,
         thread_id: serializable.thread_id,
         output: serializable.output_text,
-        steps: Vec::default(),
-        current_step: None,
-        retry_count: 0,
-        work_unit: None, // No live WorkUnit for persisted tasks
+        ..Default::default()
     };
 
     (serializable.id, task_display)

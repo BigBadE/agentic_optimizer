@@ -42,7 +42,7 @@ pub struct StepExecutionParams<'params> {
     /// Provider for execution
     pub provider: &'params Arc<dyn ModelProvider>,
     /// Tool registry
-    pub tool_registry: &'params Arc<ToolRegistry>,
+    pub tool_registry: &'params ToolRegistry,
     /// Persistent TypeScript runtime
     pub runtime: &'params mut PersistentTypeScriptRuntime,
     /// Task ID for UI events
@@ -62,7 +62,7 @@ pub struct TaskListExecutionParams<'params> {
     /// Provider for execution
     pub provider: &'params Arc<dyn ModelProvider>,
     /// Tool registry
-    pub tool_registry: &'params Arc<ToolRegistry>,
+    pub tool_registry: &'params ToolRegistry,
     /// Persistent TypeScript runtime
     pub runtime: &'params mut PersistentTypeScriptRuntime,
     /// Task ID for UI events
@@ -84,7 +84,7 @@ pub struct AgentExecutionParams<'params> {
     /// Provider for execution
     pub provider: &'params Arc<dyn ModelProvider>,
     /// Tool registry
-    pub tool_registry: &'params Arc<ToolRegistry>,
+    pub tool_registry: &'params ToolRegistry,
     /// Persistent TypeScript runtime
     pub runtime: &'params mut PersistentTypeScriptRuntime,
     /// Task ID for UI events

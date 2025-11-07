@@ -15,7 +15,7 @@ pub type ConversationHistory = Vec<(String, String)>;
 /// Context builder for agent execution
 #[derive(Clone)]
 pub struct ContextBuilder {
-    context_fetcher: Arc<Mutex<ContextFetcher>>,
+    context_fetcher: Arc<ContextFetcher>,
     /// Conversation history for context building
     pub conversation_history: Arc<Mutex<ConversationHistory>>,
 }
@@ -24,7 +24,7 @@ impl ContextBuilder {
     /// Create new context builder
     #[must_use]
     pub fn new(
-        context_fetcher: Arc<Mutex<ContextFetcher>>,
+        context_fetcher: Arc<ContextFetcher>,
         conversation_history: Arc<Mutex<ConversationHistory>>,
     ) -> Self {
         Self {
@@ -61,9 +61,10 @@ impl ContextBuilder {
             });
         });
 
-        let mut fetcher = self.context_fetcher.lock().await;
         // Update progress callback without destroying cached state
-        fetcher.set_progress_callback(progress_callback);
+        self.context_fetcher
+            .set_progress_callback(progress_callback)
+            .await;
 
         // Send substep for file gathering
         ui_channel.send(UiEvent::TaskStepStarted {
@@ -78,12 +79,12 @@ impl ContextBuilder {
             let conv_history = self.conversation_history.lock().await;
             if conv_history.is_empty() {
                 drop(conv_history);
-                fetcher
+                self.context_fetcher
                     .build_context_for_query(&query)
                     .await
                     .map_err(|err| RoutingError::Other(format!("Failed to build context: {err}")))?
             } else {
-                fetcher
+                self.context_fetcher
                     .build_context_from_conversation(&conv_history, &query)
                     .await
                     .map_err(|err| RoutingError::Other(format!("Failed to build context: {err}")))?

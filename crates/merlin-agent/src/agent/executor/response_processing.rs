@@ -38,7 +38,7 @@ pub struct ResponseProcessor<'proc> {
     /// Validator for responses
     validator: &'proc Arc<dyn Validator>,
     /// Tool registry
-    tool_registry: &'proc Arc<ToolRegistry>,
+    tool_registry: &'proc ToolRegistry,
     /// Persistent TypeScript runtime
     runtime: &'proc mut PersistentTypeScriptRuntime,
 }
@@ -47,7 +47,7 @@ impl<'proc> ResponseProcessor<'proc> {
     /// Create a new response processor
     pub fn new(
         validator: &'proc Arc<dyn Validator>,
-        tool_registry: &'proc Arc<ToolRegistry>,
+        tool_registry: &'proc ToolRegistry,
         runtime: &'proc mut PersistentTypeScriptRuntime,
     ) -> Self {
         Self {

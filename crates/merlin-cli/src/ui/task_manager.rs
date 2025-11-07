@@ -48,6 +48,34 @@ pub struct TaskDisplay {
     pub work_unit: Option<Arc<Mutex<WorkUnit>>>,
 }
 
+impl Default for TaskDisplay {
+    /// Creates a new `TaskDisplay` with sensible defaults
+    ///
+    /// Default values:
+    /// - Empty description
+    /// - Status: Running
+    /// - No progress
+    /// - Empty output
+    /// - Current timestamp
+    /// - Zero retry count
+    fn default() -> Self {
+        Self {
+            description: String::new(),
+            status: TaskStatus::Running,
+            progress: None,
+            output_lines: Vec::new(),
+            created_at: SystemTime::now(),
+            timestamp: Instant::now(),
+            thread_id: None,
+            output: String::new(),
+            steps: Vec::new(),
+            current_step: None,
+            retry_count: 0,
+            work_unit: None,
+        }
+    }
+}
+
 /// Status of a task step
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TaskStepStatus {
@@ -72,6 +100,18 @@ pub struct TaskStepInfo {
     pub content: String,
     /// Status of the step
     pub status: TaskStepStatus,
+}
+
+impl Default for TaskStepInfo {
+    /// Creates a new `TaskStepInfo` with empty values and Running status
+    fn default() -> Self {
+        Self {
+            step_id: String::new(),
+            step_type: String::new(),
+            content: String::new(),
+            status: TaskStepStatus::Running,
+        }
+    }
 }
 
 /// Manages task storage and ordering
@@ -149,21 +189,15 @@ mod tests {
             .checked_sub(Duration::from_secs(time_offset_secs))
             .unwrap_or_else(SystemTime::now);
 
+        let timestamp = Instant::now()
+            .checked_sub(Duration::from_secs(time_offset_secs))
+            .unwrap_or_else(Instant::now);
+
         TaskDisplay {
             description: description.to_owned(),
-            status: TaskStatus::Running,
-            progress: None,
-            output_lines: vec![],
             created_at,
-            timestamp: Instant::now()
-                .checked_sub(Duration::from_secs(time_offset_secs))
-                .unwrap_or_else(Instant::now),
-            thread_id: None,
-            output: String::default(),
-            steps: vec![],
-            current_step: None,
-            retry_count: 0,
-            work_unit: None,
+            timestamp,
+            ..Default::default()
         }
     }
 

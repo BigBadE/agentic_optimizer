@@ -5,6 +5,7 @@
 use merlin_deps::crossterm::event::{Event, KeyCode, KeyEvent};
 use merlin_routing::TaskId;
 use std::collections::HashSet;
+use std::hash::BuildHasher;
 
 use crate::ui::input::InputManager;
 use crate::ui::renderer::FocusedPane;
@@ -56,11 +57,11 @@ pub fn handle_output_key(
 }
 
 /// Handles key events when the tasks pane is focused
-pub fn handle_task_key(
+pub fn handle_task_key<S: BuildHasher>(
     key: &KeyEvent,
     active_task_id: &mut Option<TaskId>,
     pending_delete_task_id: &mut Option<TaskId>,
-    expanded_conversations: &mut HashSet<TaskId>,
+    expanded_conversations: &mut HashSet<TaskId, S>,
     task_manager: &TaskManager,
 ) {
     match key.code {

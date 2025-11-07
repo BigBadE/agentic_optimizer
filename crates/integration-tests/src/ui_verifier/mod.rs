@@ -42,9 +42,9 @@ impl UiVerifier {
             return;
         };
 
-        let state = &app.state;
-        let task_manager = &app.task_manager;
-        let input_manager = &app.input_manager;
+        let state = &app.ui_components.state;
+        let task_manager = &app.ui_components.task_manager;
+        let input_manager = &app.ui_components.input_manager;
 
         verify_input_related_fields(result, input_manager, verify);
         Self::verify_focused_pane(result, app, verify);
@@ -70,7 +70,7 @@ impl UiVerifier {
         verify: &UiVerify,
     ) {
         if let Some(expected_focus) = verify.focused_pane.as_deref() {
-            let actual_focus = match app.focused_pane {
+            let actual_focus = match app.ui_components.focused_pane {
                 FocusedPane::Input => "input",
                 FocusedPane::Tasks => "tasks",
                 FocusedPane::Output => "output",

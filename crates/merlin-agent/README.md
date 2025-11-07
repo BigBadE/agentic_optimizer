@@ -46,6 +46,8 @@ Implements recursive step-based execution where agents return either a String re
 
 **Agent System:**
 - `AgentExecutor` - Execute agent tasks with TypeScript runtime
+  - Owns tool registry, provider registry, and TypeScript runtime
+  - Shares router and validator across executor instances (Arc)
   - Caches TypeScript signatures at initialization for performance
   - Reuses persistent TypeScript runtime across tasks
 - `StepExecutor` - Recursive step-based execution with exit requirements

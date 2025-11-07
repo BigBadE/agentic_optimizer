@@ -6,7 +6,7 @@ use merlin_deps::ratatui::backend::Backend;
 impl<B: Backend> TuiApp<B> {
     /// Navigates up in the thread list
     pub(super) fn navigate_threads_up(&mut self) {
-        let Ok(store) = self.thread_store.lock() else {
+        let Ok(store) = self.runtime_state.thread_store.lock() else {
             return;
         };
         let active_threads = store.active_threads();
@@ -14,24 +14,26 @@ impl<B: Backend> TuiApp<B> {
             return;
         }
 
-        if let Some(current_id) = self.state.active_thread_id {
+        if let Some(current_id) = self.ui_components.state.active_thread_id {
             // Find current thread index
             if let Some(current_index) = active_threads
                 .iter()
                 .position(|thread| thread.id == current_id)
                 && current_index > 0
             {
-                self.state.active_thread_id = Some(active_threads[current_index - 1].id);
+                self.ui_components.state.active_thread_id =
+                    Some(active_threads[current_index - 1].id);
             }
         } else {
             // No selection, select last thread
-            self.state.active_thread_id = active_threads.last().map(|thread| thread.id);
+            self.ui_components.state.active_thread_id =
+                active_threads.last().map(|thread| thread.id);
         }
     }
 
     /// Navigates down in the thread list
     pub(super) fn navigate_threads_down(&mut self) {
-        let Ok(store) = self.thread_store.lock() else {
+        let Ok(store) = self.runtime_state.thread_store.lock() else {
             return;
         };
         let active_threads = store.active_threads();
@@ -39,24 +41,26 @@ impl<B: Backend> TuiApp<B> {
             return;
         }
 
-        if let Some(current_id) = self.state.active_thread_id {
+        if let Some(current_id) = self.ui_components.state.active_thread_id {
             // Find current thread index
             if let Some(current_index) = active_threads
                 .iter()
                 .position(|thread| thread.id == current_id)
                 && current_index < active_threads.len() - 1
             {
-                self.state.active_thread_id = Some(active_threads[current_index + 1].id);
+                self.ui_components.state.active_thread_id =
+                    Some(active_threads[current_index + 1].id);
             }
         } else {
             // No selection, select first thread
-            self.state.active_thread_id = active_threads.first().map(|thread| thread.id);
+            self.ui_components.state.active_thread_id =
+                active_threads.first().map(|thread| thread.id);
         }
     }
 
     /// Creates a new thread
     pub(super) fn create_new_thread(&mut self) {
-        let Ok(mut store) = self.thread_store.lock() else {
+        let Ok(mut store) = self.runtime_state.thread_store.lock() else {
             return;
         };
 
@@ -73,19 +77,19 @@ impl<B: Backend> TuiApp<B> {
         }
 
         // Select the new thread
-        self.state.active_thread_id = Some(thread_id);
+        self.ui_components.state.active_thread_id = Some(thread_id);
         merlin_deps::tracing::info!("Created new thread {thread_id}");
     }
 
     /// Branches from the current message
     pub(super) fn branch_from_current(&mut self) {
         // Get the current thread and message
-        let Some(thread_id) = self.state.active_thread_id else {
+        let Some(thread_id) = self.ui_components.state.active_thread_id else {
             merlin_deps::tracing::warn!("No thread selected for branching");
             return;
         };
 
-        let Ok(mut store) = self.thread_store.lock() else {
+        let Ok(mut store) = self.runtime_state.thread_store.lock() else {
             return;
         };
 
@@ -115,7 +119,7 @@ impl<B: Backend> TuiApp<B> {
                 }
 
                 // Select the new branch
-                self.state.active_thread_id = Some(branch_id);
+                self.ui_components.state.active_thread_id = Some(branch_id);
                 merlin_deps::tracing::info!("Created branch {branch_id} from thread {thread_id}");
             }
             Err(err) => {
@@ -126,11 +130,11 @@ impl<B: Backend> TuiApp<B> {
 
     /// Archives the currently selected thread
     pub(super) fn archive_selected_thread(&mut self) {
-        let Some(thread_id) = self.state.active_thread_id else {
+        let Some(thread_id) = self.ui_components.state.active_thread_id else {
             return;
         };
 
-        let Ok(mut store) = self.thread_store.lock() else {
+        let Ok(mut store) = self.runtime_state.thread_store.lock() else {
             return;
         };
 
@@ -140,7 +144,7 @@ impl<B: Backend> TuiApp<B> {
         }
 
         // Clear selection and move to next thread
-        self.state.active_thread_id = None;
+        self.ui_components.state.active_thread_id = None;
         drop(store); // Release lock before navigating
         self.navigate_threads_down();
 

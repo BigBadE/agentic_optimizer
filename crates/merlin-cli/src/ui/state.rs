@@ -88,6 +88,20 @@ pub struct ConversationEntry {
     pub text: String,
 }
 
+impl Default for ConversationEntry {
+    /// Creates a new `ConversationEntry` with default values
+    ///
+    /// Default values:
+    /// - Role: User
+    /// - Empty text
+    fn default() -> Self {
+        Self {
+            role: ConversationRole::User,
+            text: String::new(),
+        }
+    }
+}
+
 /// Conversation role
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum ConversationRole {

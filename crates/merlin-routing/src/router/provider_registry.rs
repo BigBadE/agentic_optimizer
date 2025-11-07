@@ -20,7 +20,7 @@ pub struct ProviderRegistry {
     /// Map from model to provider instance
     providers: HashMap<Model, Arc<dyn ModelProvider>>,
     /// Configuration for API keys and settings
-    config: Arc<RoutingConfig>,
+    config: RoutingConfig,
 }
 
 impl ProviderRegistry {
@@ -29,7 +29,6 @@ impl ProviderRegistry {
     /// # Errors
     /// Returns an error if API keys are missing for enabled tiers.
     pub fn new(config: RoutingConfig) -> Result<Self> {
-        let config = Arc::new(config);
         let mut providers = HashMap::new();
 
         // Initialize all providers that are enabled
@@ -163,7 +162,7 @@ impl ProviderRegistry {
     /// # Errors
     /// Returns an error if configuration is invalid.
     pub fn with_mock_provider(provider: &Arc<dyn ModelProvider>) -> Result<Self> {
-        let config = Arc::new(RoutingConfig::default());
+        let config = RoutingConfig::default();
         let mut providers = HashMap::new();
 
         // Register the mock provider for all models

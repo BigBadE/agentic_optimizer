@@ -209,7 +209,7 @@ impl<'fixture> UnifiedVerifier<'fixture> {
             return;
         };
 
-        let task_manager = &app.task_manager;
+        let task_manager = &app.ui_components.task_manager;
 
         // Verify incomplete tasks
         for expected_incomplete in &verify.incomplete_tasks {

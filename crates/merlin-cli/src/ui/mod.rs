@@ -17,7 +17,7 @@ pub mod theme;
 
 // Internal modules (visible for testing)
 /// TUI application and main event loop (contains sub-modules)
-mod app;
+pub mod app;
 /// Event handler for UI events
 pub mod event_handler;
 /// Layout calculation utilities

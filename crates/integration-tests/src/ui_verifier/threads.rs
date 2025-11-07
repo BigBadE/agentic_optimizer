@@ -9,10 +9,11 @@ use merlin_deps::ratatui::backend::TestBackend;
 
 /// Helper to get thread count from either orchestrator or app thread store
 fn get_thread_count(app: &TuiApp<TestBackend>) -> usize {
-    app.orchestrator.as_ref().map_or_else(
+    app.runtime_state.orchestrator.as_ref().map_or_else(
         || {
             // Fallback to app's thread store if no orchestrator
-            app.thread_store
+            app.runtime_state
+                .thread_store
                 .lock()
                 .ok()
                 .map_or(0, |store| store.active_threads().len())
@@ -34,16 +35,20 @@ fn get_thread_count(app: &TuiApp<TestBackend>) -> usize {
 
 /// Helper to get thread list from either orchestrator or app thread store
 fn get_threads(app: &TuiApp<TestBackend>) -> Vec<Thread> {
-    app.orchestrator.as_ref().map_or_else(
+    app.runtime_state.orchestrator.as_ref().map_or_else(
         || {
             // Fallback to app's thread store
-            app.thread_store.lock().ok().map_or_else(Vec::new, |store| {
-                store
-                    .active_threads()
-                    .iter()
-                    .map(|thread| (*thread).clone())
-                    .collect()
-            })
+            app.runtime_state
+                .thread_store
+                .lock()
+                .ok()
+                .map_or_else(Vec::new, |store| {
+                    store
+                        .active_threads()
+                        .iter()
+                        .map(|thread| (*thread).clone())
+                        .collect()
+                })
         },
         |orchestrator| {
             // Get from orchestrator's thread store

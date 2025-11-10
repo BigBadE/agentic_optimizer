@@ -84,7 +84,7 @@ impl<'proc> ResponseProcessor<'proc> {
         result: String,
         params: ResponseProcessingParams<'_>,
     ) -> Result<TaskResult> {
-        merlin_deps::tracing::debug!("Agent returned DirectResult");
+        tracing::debug!("Agent returned DirectResult");
         let response = Response {
             text: result,
             confidence: 1.0,
@@ -115,7 +115,7 @@ impl<'proc> ResponseProcessor<'proc> {
         task_list: TaskList,
         params: ResponseProcessingParams<'_>,
     ) -> Result<TaskResult> {
-        merlin_deps::tracing::debug!(
+        tracing::debug!(
             "Agent returned TaskList with {} steps",
             task_list.steps.len()
         );
@@ -127,14 +127,10 @@ impl<'proc> ResponseProcessor<'proc> {
         for step in &task_list.steps {
             let difficulty = Self::estimate_step_difficulty(step.step_type);
             work_unit.add_subtask(step.title.clone(), difficulty);
-            merlin_deps::tracing::debug!(
-                "Added subtask: {} (difficulty: {})",
-                step.title,
-                difficulty
-            );
+            tracing::debug!("Added subtask: {} (difficulty: {})", step.title, difficulty);
         }
 
-        merlin_deps::tracing::debug!(
+        tracing::debug!(
             "Created WorkUnit with {} subtasks, initial progress: {}%",
             work_unit.subtasks.len(),
             work_unit.progress_percentage()
@@ -214,7 +210,7 @@ impl<'proc> ResponseProcessor<'proc> {
             .validate(response, task)
             .await
             .map_err(|validation_error| {
-                merlin_deps::tracing::info!(
+                tracing::info!(
                     "Validation failed. Model response was:\n{}\n\nError: {:?}",
                     response.text,
                     validation_error

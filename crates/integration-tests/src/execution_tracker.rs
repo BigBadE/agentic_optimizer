@@ -4,8 +4,8 @@
 //! a fixture run, allowing verifiers to reference results from any test in the fixture.
 
 use merlin_core::TaskResult;
-use merlin_deps::serde_json::Value;
 use merlin_tooling::{ToolError, ToolResult};
+use serde_json::Value;
 use std::collections::HashMap;
 
 /// Record of a single test execution

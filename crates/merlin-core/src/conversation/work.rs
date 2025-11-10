@@ -103,7 +103,7 @@ impl WorkUnit {
     /// Marks a subtask as completed
     pub fn complete_subtask(&mut self, subtask_id: SubtaskId, result: Option<String>) {
         if let Some(subtask) = self.subtasks.iter_mut().find(|sub| sub.id == subtask_id) {
-            merlin_deps::tracing::debug!(
+            tracing::debug!(
                 "Completing subtask {:?} ('{}') - previous status: {:?}",
                 subtask_id,
                 subtask.description,
@@ -113,7 +113,7 @@ impl WorkUnit {
             subtask.result = result;
             subtask.error = None;
         } else {
-            merlin_deps::tracing::warn!(
+            tracing::warn!(
                 "Attempted to complete subtask {:?} but it was not found. Available: {:?}",
                 subtask_id,
                 self.subtasks
@@ -173,7 +173,7 @@ impl WorkUnit {
         } else {
             // If not all subtasks are completed, keep status as InProgress
             // This can happen during async execution when complete() is called before all subtasks finish
-            merlin_deps::tracing::debug!(
+            tracing::debug!(
                 "WorkUnit.complete() called but only {}/{} subtasks are completed",
                 self.subtasks
                     .iter()

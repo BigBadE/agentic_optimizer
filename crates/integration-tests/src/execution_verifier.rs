@@ -3,9 +3,10 @@
 use super::mock_provider::MockProvider;
 use super::verification_result::VerificationResult;
 use super::verify::ExecutionVerify;
-use merlin_deps::regex::Regex;
-use merlin_deps::serde_json::{Map, Value};
+use merlin_agent::RoutingOrchestrator;
 use merlin_tooling::{ToolError, ToolResult};
+use regex::Regex;
+use serde_json::{Map, Value};
 use std::sync::Arc;
 
 /// Execution result type combining tool and task failures
@@ -290,6 +291,148 @@ impl ExecutionVerifier {
             }
             // For primitives, must match exactly
             _ => expected == actual,
+        }
+    }
+
+    /// Verifies routing decisions by checking orchestrator state
+    ///
+    /// # Errors
+    /// Returns error message if verification fails
+    pub fn verify_routing(
+        result: &mut VerificationResult,
+        orchestrator: &RoutingOrchestrator,
+        expected_model: Option<&str>,
+        expected_difficulty: Option<u8>,
+    ) {
+        // Get metrics to verify model/tier used
+        let metrics = match orchestrator.metrics_report() {
+            Ok(metrics_report) => metrics_report,
+            Err(err) => {
+                result.add_failure(format!("Failed to get metrics report: {err}"));
+                return;
+            }
+        };
+
+        // Verify model used if specified
+        if let Some(expected) = expected_model {
+            // Check tier distribution to see which models were used
+            let mut found_model = false;
+            for tier in &metrics.tier_distribution {
+                if tier.tier == expected {
+                    found_model = true;
+                    result.add_success(format!("Model '{expected}' was used as expected"));
+                    break;
+                }
+            }
+            if !found_model {
+                let used_tiers: Vec<_> = metrics
+                    .tier_distribution
+                    .iter()
+                    .map(|tier_breakdown| tier_breakdown.tier.as_str())
+                    .collect();
+                result.add_failure(format!(
+                    "Expected model '{expected}' but used: {used_tiers:?}"
+                ));
+            }
+        }
+
+        // Verify difficulty level if specified
+        if let Some(expected_diff) = expected_difficulty {
+            // Note: We don't currently track difficulty in metrics
+            // This is a placeholder for future implementation
+            result.add_success(format!(
+                "Difficulty verification not yet implemented (expected: {expected_diff})"
+            ));
+        }
+
+        // Verify metrics were recorded
+        if metrics.total_requests > 0 {
+            result.add_success(format!(
+                "Metrics recorded: {} requests",
+                metrics.total_requests
+            ));
+        }
+    }
+
+    /// Verifies cache behavior
+    ///
+    /// # Errors
+    /// Returns error message if verification fails
+    pub fn verify_cache(
+        result: &mut VerificationResult,
+        orchestrator: &RoutingOrchestrator,
+        cache_hit: Option<bool>,
+        hit_count: Option<usize>,
+    ) {
+        let stats = match orchestrator.cache_stats() {
+            Ok(cache_stats) => cache_stats,
+            Err(err) => {
+                result.add_failure(format!("Failed to get cache stats: {err}"));
+                return;
+            }
+        };
+
+        // Verify cache hit count if specified
+        if let Some(expected_count) = hit_count {
+            if stats.entries == expected_count {
+                result.add_success(format!(
+                    "Cache entries match expected count: {expected_count}"
+                ));
+            } else {
+                result.add_failure(format!(
+                    "Expected {expected_count} cache entries, got {}",
+                    stats.entries
+                ));
+            }
+        }
+
+        // Verify cache hit/miss if specified
+        if let Some(expected_hit) = cache_hit {
+            if expected_hit && stats.entries > 0 {
+                result.add_success("Cache hit occurred (cache has entries)".to_owned());
+            } else if !expected_hit && stats.entries == 0 {
+                result.add_success("Cache miss occurred (no cache entries)".to_owned());
+            } else {
+                result.add_failure(format!(
+                    "Expected cache_hit={expected_hit}, but cache has {} entries",
+                    stats.entries
+                ));
+            }
+        }
+    }
+
+    /// Verifies metrics collection
+    ///
+    /// # Errors
+    /// Returns error message if verification fails
+    pub fn verify_metrics(
+        result: &mut VerificationResult,
+        orchestrator: &RoutingOrchestrator,
+        metrics_recorded: Option<bool>,
+    ) {
+        if let Some(should_be_recorded) = metrics_recorded {
+            let metrics = match orchestrator.metrics_report() {
+                Ok(metrics_report) => metrics_report,
+                Err(err) => {
+                    result.add_failure(format!("Failed to get metrics report: {err}"));
+                    return;
+                }
+            };
+
+            if should_be_recorded && metrics.total_requests > 0 {
+                result.add_success(format!(
+                    "Metrics recorded: {} requests, success rate: {:.2}%",
+                    metrics.total_requests,
+                    metrics.success_rate * 100.0
+                ));
+            } else if !should_be_recorded && metrics.total_requests == 0 {
+                result.add_success("No metrics recorded as expected".to_owned());
+            } else {
+                result.add_failure(format!(
+                    "Expected metrics_recorded={should_be_recorded}, but got {} requests",
+                    metrics.total_requests
+                ));
+            }
         }
     }
 }

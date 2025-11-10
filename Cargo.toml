@@ -14,7 +14,6 @@ edition = "2024"
 merlin-agent = { path = "crates/merlin-agent" }
 merlin-context = { path = "crates/merlin-context" }
 merlin-core = { path = "crates/merlin-core" }
-merlin-deps = { path = "crates/merlin-deps" }
 merlin-languages = { path = "crates/merlin-languages" }
 merlin-local = { path = "crates/merlin-local" }
 merlin-providers = { path = "crates/merlin-providers" }
@@ -26,7 +25,7 @@ anyhow = "1.0"
 async-trait = "0.1"
 bincode = "2.0"
 boa_engine = { version = "0.21", features = ["annex-b"] }
-chrono = "0.4"
+chrono = { version = "0.4", features = ["serde"] }
 console = "0.16"
 dirs = "6.0"
 pico-args = "0.5"
@@ -51,11 +50,26 @@ tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 uuid = { version = "1.18", features = ["v4", "serde"] }
 walkdir = "2.5"
 
+# Unified transitive dependencies to prevent multiple compilation units
+# These force all dependencies to use the same version, avoiding merlin-deps rebuilds
+compact_str = "0.8"
+foldhash = "0.2"
+hashbrown = "0.16"
+getrandom = "0.3"
+itertools = "0.14"
+phf = "0.13"
+phf_generator = "0.13"
+phf_macros = "0.13"
+phf_shared = "0.13"
+rand = "0.9"
+rand_core = "0.9"
+siphasher = "1.0"
+unicode-width = "0.2"
+
 # TUI dependencies (carefully managed for compatibility)
 crossterm = { version = "0.28", features = ["event-stream"] }  # Cannot update to 0.29 - incompatible with tui-textarea 0.7
 ratatui = "0.29"
 tui-textarea = "0.7"
-unicode-width = "0.2"
 
 # SWC TypeScript transpiler (update all together for compatibility)
 swc_common = "15.0"
@@ -87,11 +101,12 @@ opt-level = 3
 
 [profile.release]
 codegen-units = 1
-lto = "thin"
-# Note: panic="abort" removed to allow dylib builds to work
+lto = false
+# Note: LTO disabled to allow dylib builds on Windows
 opt-level = 3
 
 [profile.bench]
+inherits = "dev"
 debug = true
 strip = false
 

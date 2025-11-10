@@ -4,7 +4,7 @@ use super::work_unit::verify_work_unit;
 use crate::verification_result::VerificationResult;
 use crate::verify::StateVerify;
 use merlin_cli::TuiApp;
-use merlin_deps::ratatui::backend::TestBackend;
+use ratatui::backend::TestBackend;
 
 /// Verify state
 pub async fn verify_state(

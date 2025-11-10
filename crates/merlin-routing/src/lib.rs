@@ -57,8 +57,11 @@ pub use merlin_core::{
 pub use analyzer::{
     Action, Intent, IntentExtractor, LocalTaskAnalyzer, Scope, TaskAnalyzer, TaskDecomposer,
 };
-pub use cache::{CachedResponse, ResponseCache};
-pub use metrics::{DailyReport, MetricsCollector, MetricsReport, RequestMetrics, TierBreakdown};
+pub use cache::{CacheStats, CachedResponse, ResponseCache};
+pub use metrics::{
+    DailyReport, MetricsCollector, MetricsReport, RequestMetrics, RequestMetricsParams,
+    TierBreakdown,
+};
 pub use router::{
     AvailabilityChecker, Model, ModelRegistry, ModelRouter, ProviderRegistry, RoutingDecision,
     StrategyRouter, TierCategory,

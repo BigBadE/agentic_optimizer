@@ -1,0 +1,177 @@
+{
+  "name": "Recursion Depth 9 Succeeds",
+  "description": "Tests that recursion depth of 9 (one below MAX_RECURSION_DEPTH=10) succeeds",
+  "tags": [
+    "executor",
+    "recursion",
+    "limits"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create nested structure depth 9",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "depth_result.txt",
+            "exists": true,
+            "contains": [
+              "depth 9"
+            ]
+          }
+        ]
+      },
+      "strategy": {
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Level 1',",
+              "    steps: [{",
+              "      title: 'Level 2',",
+              "      description: 'Go to level 2',",
+              "      step_type: 'implementation'",
+              "    }]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Level 2',",
+              "    steps: [{",
+              "      title: 'Level 3',",
+              "      description: 'Go to level 3',",
+              "      step_type: 'implementation'",
+              "    }]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Level 3',",
+              "    steps: [{",
+              "      title: 'Level 4',",
+              "      description: 'Go to level 4',",
+              "      step_type: 'implementation'",
+              "    }]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Level 4',",
+              "    steps: [{",
+              "      title: 'Level 5',",
+              "      description: 'Go to level 5',",
+              "      step_type: 'implementation'",
+              "    }]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Level 5',",
+              "    steps: [{",
+              "      title: 'Level 6',",
+              "      description: 'Go to level 6',",
+              "      step_type: 'implementation'",
+              "    }]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Level 6',",
+              "    steps: [{",
+              "      title: 'Level 7',",
+              "      description: 'Go to level 7',",
+              "      step_type: 'implementation'",
+              "    }]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Level 7',",
+              "    steps: [{",
+              "      title: 'Level 8',",
+              "      description: 'Go to level 8',",
+              "      step_type: 'implementation'",
+              "    }]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<any> {",
+              "  return {",
+              "    title: 'Level 8',",
+              "    steps: [{",
+              "      title: 'Level 9',",
+              "      description: 'Go to level 9',",
+              "      step_type: 'implementation'",
+              "    }]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('depth_result.txt', 'Completed at depth 9');",
+              "  return 'Successfully completed at depth 9';",
+              "}"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "depth_result.txt",
+        "exists": true,
+        "contains": [
+          "depth 9"
+        ]
+      }
+    ],
+    "execution": {}
+  }
+}

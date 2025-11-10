@@ -4,13 +4,23 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-merlin-deps.workspace = true
+anyhow.workspace = true
 async-trait.workspace = true
 boa_engine.workspace = true
+glob.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+swc_common.workspace = true
+swc_ecma_ast.workspace = true
+swc_ecma_codegen.workspace = true
+swc_ecma_parser.workspace = true
+swc_ecma_transforms_typescript.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tracing.workspace = true
 tracing-futures.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

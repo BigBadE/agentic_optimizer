@@ -1,8 +1,8 @@
 //! Core task types and basic structures
 
-use merlin_deps::uuid::Uuid;
 use serde::{Deserialize, Serialize};
 use std::path::PathBuf;
+use uuid::Uuid;
 
 use crate::conversation::Subtask;
 
@@ -45,6 +45,20 @@ impl Task {
     pub fn new(description: String) -> Self {
         Self {
             id: TaskId::default(),
+            description,
+            difficulty: 5,
+            priority: Priority::Medium,
+            dependencies: Vec::default(),
+            context_needs: ContextRequirements::default(),
+            state: TaskState::Created,
+            decision_history: Vec::default(),
+        }
+    }
+
+    /// Creates a task with a pre-existing ID (for UI synchronization).
+    pub fn from_id(id: TaskId, description: String) -> Self {
+        Self {
+            id,
             description,
             difficulty: 5,
             priority: Priority::Medium,

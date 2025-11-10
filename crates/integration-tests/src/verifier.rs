@@ -10,7 +10,7 @@ use super::verification_result::VerificationResult;
 use super::verify::{ExecutionVerify, FinalVerify, VerifyConfig};
 use merlin_cli::TuiApp;
 use merlin_cli::ui::task_manager::TaskStatus;
-use merlin_deps::ratatui::backend::TestBackend;
+use ratatui::backend::TestBackend;
 use std::path::Path;
 use std::result::Result;
 use std::sync::Arc;
@@ -87,6 +87,9 @@ impl<'fixture> UnifiedVerifier<'fixture> {
                 exec_verify,
                 *provider,
             );
+
+            // Verify routing/cache/metrics if orchestrator is available
+            self.verify_routing_cache_metrics(*tui_app, exec_verify);
         }
 
         // Verify files if specified
@@ -158,6 +161,9 @@ impl<'fixture> UnifiedVerifier<'fixture> {
             if !exec_verify.validation_failures.is_empty() {
                 self.verify_validation_stages(execution_tracker, exec_verify);
             }
+
+            // Verify routing/cache/metrics if orchestrator is available
+            self.verify_routing_cache_metrics(tui_app, exec_verify);
         }
 
         // Verify final files
@@ -178,6 +184,49 @@ impl<'fixture> UnifiedVerifier<'fixture> {
         }
 
         Ok(())
+    }
+
+    /// Verify routing, cache, and metrics if orchestrator is available
+    fn verify_routing_cache_metrics(
+        &mut self,
+        tui_app: Option<&TuiApp<TestBackend>>,
+        exec_verify: &ExecutionVerify,
+    ) {
+        let Some(app) = tui_app else {
+            return;
+        };
+        let Some(orchestrator) = &app.runtime_state.orchestrator else {
+            return;
+        };
+
+        // Verify routing decisions
+        if exec_verify.model_used.is_some() || exec_verify.expected_difficulty.is_some() {
+            ExecutionVerifier::verify_routing(
+                &mut self.result,
+                orchestrator,
+                exec_verify.model_used.as_deref(),
+                exec_verify.expected_difficulty,
+            );
+        }
+
+        // Verify cache behavior
+        if exec_verify.cache_hit.is_some() || exec_verify.cache_hit_count.is_some() {
+            ExecutionVerifier::verify_cache(
+                &mut self.result,
+                orchestrator,
+                exec_verify.cache_hit,
+                exec_verify.cache_hit_count,
+            );
+        }
+
+        // Verify metrics collection
+        if exec_verify.metrics_recorded.is_some() {
+            ExecutionVerifier::verify_metrics(
+                &mut self.result,
+                orchestrator,
+                exec_verify.metrics_recorded,
+            );
+        }
     }
 
     /// Verify task states (incomplete/failed tasks)

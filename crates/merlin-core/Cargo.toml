@@ -4,15 +4,24 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
-merlin-deps.workspace = true
 merlin-tooling = { path = "../merlin-tooling" }
 async-trait.workspace = true
+chrono.workspace = true
+dirs.workspace = true
 reqwest.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+uuid.workspace = true
 
 [dev-dependencies]
+anyhow.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
 tokio.workspace = true
 
 [lints]

@@ -25,7 +25,7 @@ use std::{
     },
     time::Instant,
 };
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 use crate::Validator;
 use merlin_context::ContextFetcher;
@@ -35,9 +35,9 @@ use merlin_core::{
     Context, Result, RoutingConfig, RoutingError, StepType, Task, TaskId, TaskResult, TaskStep,
     ui::{UiChannel, UiEvent},
 };
-use merlin_deps::tracing::{Level, span};
 use merlin_routing::{ModelRouter, ProviderRegistry};
 use merlin_tooling::{PersistentTypeScriptRuntime, ToolRegistry, generate_typescript_signatures};
+use tracing::{Level, span};
 use tracing_futures::Instrument as _;
 
 /// Parameters for executing with step executor
@@ -80,8 +80,8 @@ pub struct AgentExecutor {
     provider_registry: ProviderRegistry,
     /// Persistent TypeScript runtime for agent code execution
     runtime: PersistentTypeScriptRuntime,
-    /// Cached TypeScript signatures (computed once at initialization)
-    typescript_signatures: String,
+    /// Cached compiled TypeScript agent prompt (computed once at initialization, includes tool signatures)
+    compiled_typescript_prompt: String,
 }
 
 impl AgentExecutor {
@@ -98,7 +98,7 @@ impl AgentExecutor {
     ) -> Result<Self> {
         let provider_registry = ProviderRegistry::new(config.clone())?;
         let context_fetcher_arc = Arc::new(context_fetcher);
-        let conversation_history = Arc::new(Mutex::new(Vec::new()));
+        let conversation_history = Arc::new(RwLock::new(Vec::new()));
         let context_builder = ContextBuilder::new(context_fetcher_arc, conversation_history);
 
         // Create persistent runtime with tools
@@ -118,6 +118,9 @@ impl AgentExecutor {
             RoutingError::Other(format!("Failed to generate TypeScript signatures: {err}"))
         })?;
 
+        // Compile TypeScript agent prompt once (load template + inject signatures)
+        let compiled_prompt = Self::compile_typescript_prompt(&signatures)?;
+
         Ok(Self {
             router,
             validator,
@@ -126,7 +129,7 @@ impl AgentExecutor {
             context_dump_enabled: AtomicBool::new(false),
             provider_registry,
             runtime,
-            typescript_signatures: signatures,
+            compiled_typescript_prompt: compiled_prompt,
         })
     }
 
@@ -136,7 +139,7 @@ impl AgentExecutor {
     /// Returns an error if initialization fails.
     pub fn with_provider_registry(params: AgentExecutorParams) -> Result<Self> {
         let context_fetcher_arc = Arc::new(params.context_fetcher);
-        let conversation_history = Arc::new(Mutex::new(Vec::new()));
+        let conversation_history = Arc::new(RwLock::new(Vec::new()));
         let context_builder = ContextBuilder::new(context_fetcher_arc, conversation_history);
 
         // Create persistent runtime with tools
@@ -156,6 +159,9 @@ impl AgentExecutor {
             RoutingError::Other(format!("Failed to generate TypeScript signatures: {err}"))
         })?;
 
+        // Compile TypeScript agent prompt once (load template + inject signatures)
+        let compiled_prompt = Self::compile_typescript_prompt(&signatures)?;
+
         Ok(Self {
             router: params.router,
             validator: params.validator,
@@ -164,8 +170,26 @@ impl AgentExecutor {
             context_dump_enabled: AtomicBool::new(false),
             provider_registry: params.provider_registry,
             runtime,
-            typescript_signatures: signatures,
+            compiled_typescript_prompt: compiled_prompt,
         })
+    }
+
+    /// Compile TypeScript agent prompt with tool signatures
+    ///
+    /// # Errors
+    /// Returns an error if prompt loading or compilation fails
+    fn compile_typescript_prompt(tool_signatures: &str) -> Result<String> {
+        use merlin_core::prompts::load_prompt;
+
+        const TOOL_SIGNATURES_PLACEHOLDER: &str = "{tool_signatures}";
+
+        // Load TypeScript agent prompt template
+        let prompt_template = load_prompt("typescript_agent").map_err(|err| {
+            RoutingError::Other(format!("Failed to load typescript_agent prompt: {err}"))
+        })?;
+
+        // Replace placeholder with actual signatures
+        Ok(prompt_template.replace(TOOL_SIGNATURES_PLACEHOLDER, tool_signatures))
     }
 
     /// Enable context dumping to debug.log
@@ -179,12 +203,12 @@ impl AgentExecutor {
 
     /// Set conversation history for context building
     pub async fn set_conversation_history(&mut self, history: ConversationHistory) {
-        let mut conv_history = self.context_builder.conversation_history.lock().await;
+        let mut conv_history = self.context_builder.conversation_history.write().await;
         *conv_history = history;
     }
     /// Add to conversation history for context building
     pub async fn add_to_conversation(&mut self, role: String, content: String) {
-        let mut conv_history = self.context_builder.conversation_history.lock().await;
+        let mut conv_history = self.context_builder.conversation_history.write().await;
         conv_history.push((role, content));
     }
 
@@ -201,7 +225,9 @@ impl AgentExecutor {
 
             // Route and get provider
             let decision = self.router.route(&task).await?;
-            let provider = self.provider_registry.get_provider(decision.model)?;
+            let provider = self
+                .provider_registry
+                .get_provider_for_task(task.difficulty, decision.model)?;
 
             // Build context with tool signatures
             let context = self
@@ -300,10 +326,10 @@ impl AgentExecutor {
                 content: "Analyzing query intent".to_owned(),
             });
 
-            // Use cached TypeScript signatures
+            // Use cached compiled prompt (already has signatures injected)
             let context = self
                 .context_builder
-                .build_context_for_typescript(task, ui_channel, &self.typescript_signatures)
+                .build_context_for_typescript(task, ui_channel, &self.compiled_typescript_prompt)
                 .await?;
 
             ui_channel.send(UiEvent::TaskStepCompleted {

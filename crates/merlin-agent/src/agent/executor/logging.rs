@@ -17,7 +17,7 @@ impl ContextLogger {
 
     /// Log context breakdown to debug.log
     pub async fn log_context_breakdown(context: &Context, context_builder: &ContextBuilder) {
-        use merlin_deps::tracing::info;
+        use tracing::info;
         const BAR_WIDTH: usize = 50;
 
         info!("=====================================");
@@ -61,7 +61,7 @@ impl ContextLogger {
         total_tokens: usize,
         bar_width: usize,
     ) {
-        use merlin_deps::tracing::info;
+        use tracing::info;
 
         if total_tokens == 0 {
             return;
@@ -114,7 +114,7 @@ impl ContextLogger {
         task: &Task,
         context_builder: &ContextBuilder,
     ) {
-        use merlin_deps::tracing::info;
+        use tracing::info;
 
         info!("================== CONTEXT DUMP ==================");
         info!("Task: {}", task.description);
@@ -129,7 +129,7 @@ impl ContextLogger {
 
     /// Log system prompt section
     fn log_system_prompt(context: &Context) {
-        use merlin_deps::tracing::info;
+        use tracing::info;
 
         info!("=== SYSTEM PROMPT ===");
         info!("{}", context.system_prompt);
@@ -138,7 +138,7 @@ impl ContextLogger {
 
     /// Log statistics section
     fn log_statistics(context: &Context) {
-        use merlin_deps::tracing::info;
+        use tracing::info;
 
         info!("=== STATISTICS ===");
         info!("Estimated tokens: {}", context.token_estimate());

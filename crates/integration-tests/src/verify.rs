@@ -1,7 +1,7 @@
 //! Verification configuration structures for fixture tests
 
-use merlin_deps::serde_json::Value;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 
 /// Verification configuration
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -79,6 +79,24 @@ pub struct ExecutionVerify {
     /// Whether conflict detection triggered
     #[serde(default)]
     pub conflict_detected: Option<bool>,
+    /// Model/tier used for execution (e.g., `Llama318BInstruct`, `Claude35Sonnet`)
+    #[serde(default)]
+    pub model_used: Option<String>,
+    /// Expected difficulty level (1-10)
+    #[serde(default)]
+    pub expected_difficulty: Option<u8>,
+    /// Whether response came from cache
+    #[serde(default)]
+    pub cache_hit: Option<bool>,
+    /// Number of cache hits expected
+    #[serde(default)]
+    pub cache_hit_count: Option<usize>,
+    /// Whether metrics were recorded
+    #[serde(default)]
+    pub metrics_recorded: Option<bool>,
+    /// Expected number of escalation attempts
+    #[serde(default)]
+    pub escalation_attempts: Option<usize>,
 }
 
 /// File verification

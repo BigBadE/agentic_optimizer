@@ -1,5 +1,6 @@
 //! Thread, message, and conversation types.
 
+use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 
 use super::ThreadColor;
@@ -21,11 +22,16 @@ pub struct Thread {
     pub parent_thread: Option<BranchPoint>,
     /// Whether this thread is archived (hidden from main view)
     pub archived: bool,
+    /// When this thread was created
+    pub created_at: DateTime<Utc>,
+    /// When this thread was last updated (message added or modified)
+    pub updated_at: DateTime<Utc>,
 }
 
 impl Thread {
     /// Creates a new thread with the given name and color
     pub fn new(name: String, color: ThreadColor) -> Self {
+        let now = Utc::now();
         Self {
             id: ThreadId::new(),
             name,
@@ -33,6 +39,8 @@ impl Thread {
             messages: Vec::new(),
             parent_thread: None,
             archived: false,
+            created_at: now,
+            updated_at: now,
         }
     }
 
@@ -43,6 +51,7 @@ impl Thread {
         parent_thread_id: ThreadId,
         parent_message_id: MessageId,
     ) -> Self {
+        let now = Utc::now();
         Self {
             id: ThreadId::new(),
             name,
@@ -53,12 +62,20 @@ impl Thread {
                 message_id: parent_message_id,
             }),
             archived: false,
+            created_at: now,
+            updated_at: now,
         }
     }
 
     /// Adds a message to this thread
     pub fn add_message(&mut self, message: Message) {
         self.messages.push(message);
+        self.updated_at = Utc::now();
+    }
+
+    /// Updates the timestamp to mark this thread as recently active
+    pub fn touch(&mut self) {
+        self.updated_at = Utc::now();
     }
 
     /// Returns the most recent message in this thread
@@ -107,7 +124,7 @@ impl Message {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::anyhow::Result;
+    use anyhow::Result;
 
     /// Tests basic thread creation and initialization.
     ///
@@ -143,7 +160,7 @@ mod tests {
 
         let branch_point = thread
             .parent_thread
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected parent thread"))?;
+            .ok_or_else(|| anyhow::anyhow!("Expected parent thread"))?;
         assert_eq!(branch_point.thread_id, parent_id);
         assert_eq!(branch_point.message_id, parent_msg_id);
         Ok(())

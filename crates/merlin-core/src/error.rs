@@ -1,10 +1,10 @@
 use core::result::Result as CoreResult;
 use std::io::Error as IoError;
 
-use merlin_deps::serde_json::Error as SerdeJsonError;
-use merlin_deps::toml::de::Error as TomlError;
 use reqwest::Error as ReqwestError;
+use serde_json::Error as SerdeJsonError;
 use thiserror::Error;
+use toml::de::Error as TomlError;
 
 /// Result type for core operations.
 pub type Result<T> = CoreResult<T, Error>;

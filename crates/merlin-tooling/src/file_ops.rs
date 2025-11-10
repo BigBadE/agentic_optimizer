@@ -3,7 +3,7 @@
 //! These tools provide safe file system access for agents executing in the TypeScript runtime.
 
 use async_trait::async_trait;
-use merlin_deps::serde_json::{Value, json};
+use serde_json::{Value, json};
 use std::fs;
 use std::path::PathBuf;
 
@@ -100,7 +100,7 @@ declare function writeFile(path: string, content: string): Promise<void>;"
         // Resolve and validate path
         let full_path = self.resolve_path(path)?;
 
-        merlin_deps::tracing::info!(
+        tracing::info!(
             "WriteFileTool: writing {} bytes to {:?} (resolved from '{}')",
             content.len(),
             full_path,
@@ -112,7 +112,7 @@ declare function writeFile(path: string, content: string): Promise<void>;"
             ToolError::ExecutionFailed(format!("Failed to write file '{path}': {err}"))
         })?;
 
-        merlin_deps::tracing::info!("WriteFileTool: successfully wrote file {:?}", full_path);
+        tracing::info!("WriteFileTool: successfully wrote file {:?}", full_path);
 
         Ok(ToolOutput::success(format!(
             "Wrote {} bytes to {path}",
@@ -318,8 +318,8 @@ impl Tool for ListFilesTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::anyhow::Result;
-    use merlin_deps::tempfile::TempDir;
+    use anyhow::Result;
+    use tempfile::TempDir;
 
     /// Tests successful file writing.
     ///
@@ -395,10 +395,10 @@ mod tests {
 
         let files = result
             .data
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected files data"))?;
+            .ok_or_else(|| anyhow::anyhow!("Expected files data"))?;
         let files_array = files
             .as_array()
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected array"))?;
+            .ok_or_else(|| anyhow::anyhow!("Expected array"))?;
         assert_eq!(files_array.len(), 3);
         assert!(files_array.contains(&json!("file1.txt")));
         assert!(files_array.contains(&json!("file2.txt")));
@@ -424,10 +424,10 @@ mod tests {
 
         let files = result
             .data
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected files data"))?;
+            .ok_or_else(|| anyhow::anyhow!("Expected files data"))?;
         let files_array = files
             .as_array()
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected array"))?;
+            .ok_or_else(|| anyhow::anyhow!("Expected array"))?;
         assert_eq!(files_array.len(), 0);
         Ok(())
     }

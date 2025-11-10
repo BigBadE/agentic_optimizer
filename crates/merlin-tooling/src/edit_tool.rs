@@ -3,8 +3,8 @@
 //! Provides safe text replacement operations within files.
 
 use async_trait::async_trait;
-use merlin_deps::serde_json::{Value, from_value};
 use serde::{Deserialize, Serialize};
+use serde_json::{Value, from_value};
 use std::fs;
 use std::path::PathBuf;
 
@@ -185,9 +185,9 @@ declare function editFile(path: string, old_string: string, new_string: string, 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::anyhow::Result;
-    use merlin_deps::serde_json::json;
-    use merlin_deps::tempfile::TempDir;
+    use anyhow::Result;
+    use serde_json::json;
+    use tempfile::TempDir;
 
     /// Tests single string replacement in a file.
     ///

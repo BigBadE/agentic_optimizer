@@ -29,13 +29,9 @@ Implements recursive step-based execution where agents return either a String re
 - `build_isolation.rs` - `IsolatedBuildEnv` for isolated builds
 
 ### Validation Pipeline (`validator/`)
-- `pipeline.rs` - `ValidationPipeline` orchestrator
-- `citations.rs` - Citation validation
+- `pipeline.rs` - `ValidationPipeline` orchestrator with multi-stage validation
 - Stages:
-  - `syntax.rs` - Syntax validation
-  - `lint.rs` - Linting validation
-  - `test.rs` - Test execution
-  - `build.rs` - Build validation
+  - `syntax.rs` - Syntax validation (currently the only active stage)
 
 ### Exit Requirement Validators (`exit_validators.rs`)
 - Built-in callback validators for step completion
@@ -44,12 +40,20 @@ Implements recursive step-based execution where agents return either a String re
 
 ## Public API
 
+**Orchestration:**
+- `RoutingOrchestrator` - High-level task orchestration
+  - Automatic tier escalation on failures
+  - Response caching for cost reduction
+  - Metrics collection for performance tracking
+  - Thread-based conversation management
+  - Methods: `cache_stats()`, `metrics_report()`, `clear_cache()`
+
 **Agent System:**
 - `AgentExecutor` - Execute agent tasks with TypeScript runtime
   - Owns tool registry, provider registry, and TypeScript runtime
   - Shares router and validator across executor instances (Arc)
-  - Caches TypeScript signatures at initialization for performance
-  - Reuses persistent TypeScript runtime across tasks
+  - Caches compiled TypeScript agent prompt at initialization for performance
+  - Reuses persistent TypeScript runtime across tasks with code wrapping cache
 - `StepExecutor` - Recursive step-based execution with exit requirements
 - `ExitRequirementValidators` - Built-in validators for step completion
 - `StepTracker` - Track execution steps
@@ -75,6 +79,9 @@ Implements recursive step-based execution where agents return either a String re
 - Recursive decomposition - steps can return TaskLists
 - Exit requirements validate each step completion
 - Retry logic with hard/soft error classification
+- **Automatic tier escalation**: On execution failure, task difficulty increases by 2 points (capped at 10) and retries with a higher-tier model (up to 3 attempts total)
+- **Response caching**: Identical tasks with same difficulty are cached to reduce API costs and latency
+- **Metrics tracking**: All task executions are tracked with latency, cost, success rate, and tier usage
 - Context specification per step (files, previous results, explicit content)
 - Full tool access at all times
 - Dependency tracking

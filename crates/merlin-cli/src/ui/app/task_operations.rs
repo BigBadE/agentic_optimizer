@@ -1,7 +1,7 @@
 //! Task operations, deletion, and scroll management
 
-use merlin_deps::ratatui::backend::Backend;
-use merlin_deps::tracing::warn;
+use ratatui::backend::Backend;
+use tracing::warn;
 
 use super::conversation;
 use super::tui_app::TuiApp;
@@ -14,7 +14,7 @@ impl<B: Backend> TuiApp<B> {
     pub fn get_conversation_history(&self) -> Vec<(String, String)> {
         // If continuing a conversation, load history from that task
         if let Some(task_id) = self.ui_components.state.continuing_conversation_from {
-            merlin_deps::tracing::info!(
+            tracing::info!(
                 "TuiApp::get_conversation_history() - continuing from task {:?}",
                 task_id
             );
@@ -41,7 +41,7 @@ impl<B: Backend> TuiApp<B> {
             })
             .collect();
 
-        merlin_deps::tracing::info!(
+        tracing::info!(
             "TuiApp::get_conversation_history() returning {} messages",
             history.len()
         );

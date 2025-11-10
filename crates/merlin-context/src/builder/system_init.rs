@@ -16,11 +16,11 @@ pub fn spawn_background_embedding(project_root: PathBuf) {
         let mut bg_manager = VectorSearchManager::new(&project_root);
         // Don't set progress callback - background task shouldn't update UI
 
-        merlin_deps::tracing::info!("Background: Starting full embedding initialization...");
+        tracing::info!("Background: Starting full embedding initialization...");
         if let Err(bg_error) = bg_manager.initialize().await {
-            merlin_deps::tracing::warn!("Background embedding generation failed: {bg_error}");
+            tracing::warn!("Background embedding generation failed: {bg_error}");
         } else {
-            merlin_deps::tracing::info!("Background: Embedding generation completed successfully");
+            tracing::info!("Background: Embedding generation completed successfully");
         }
     });
 }
@@ -40,11 +40,11 @@ pub async fn initialize_systems_parallel(
         return Ok(());
     }
 
-    merlin_deps::tracing::info!("Initializing vector search...");
+    tracing::info!("Initializing vector search...");
 
     // Vector search initialization (I/O-bound, async)
     // Truly non-blocking: loads cache if available, spawns background task otherwise
-    merlin_deps::tracing::info!("Loading embedding cache (non-blocking)...");
+    tracing::info!("Loading embedding cache (non-blocking)...");
     let mut manager = VectorSearchManager::new(project_root);
 
     if let Some(callback) = progress_callback {
@@ -54,13 +54,11 @@ pub async fn initialize_systems_parallel(
     // Try partial init first (fast, uses cache only)
     match manager.initialize_partial().await {
         Ok(()) => {
-            merlin_deps::tracing::info!("Using cached embeddings immediately");
+            tracing::info!("Using cached embeddings immediately");
             *vector_manager = Some(manager);
         }
         Err(error) => {
-            merlin_deps::tracing::warn!(
-                "No cache available, spawning background embedding generation: {error}"
-            );
+            tracing::warn!("No cache available, spawning background embedding generation: {error}");
             spawn_background_embedding(project_root.to_path_buf());
 
             // Store the manager anyway (empty but ready for BM25 fallback)
@@ -68,8 +66,6 @@ pub async fn initialize_systems_parallel(
         }
     }
 
-    merlin_deps::tracing::info!(
-        "Vector search initialized (embeddings may continue in background)"
-    );
+    tracing::info!("Vector search initialized (embeddings may continue in background)");
     Ok(())
 }

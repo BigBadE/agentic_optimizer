@@ -5,13 +5,17 @@ edition.workspace = true
 
 [dependencies]
 bincode.workspace = true
+ignore.workspace = true
 merlin-core.workspace = true
-merlin-deps.workspace = true
 merlin-languages.workspace = true
 futures.workspace = true
 ollama-rs.workspace = true
+regex.workspace = true
 serde.workspace = true
+tempfile.workspace = true
 tokio.workspace = true
+tracing.workspace = true
+walkdir.workspace = true
 
 [dev-dependencies]
 tokio.workspace = true

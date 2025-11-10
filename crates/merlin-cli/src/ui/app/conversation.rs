@@ -36,7 +36,7 @@ pub fn get_conversation_history_from_task(
         }
     }
 
-    merlin_deps::tracing::info!(
+    tracing::info!(
         "get_conversation_history_from_task() returning {} messages from task",
         history.len()
     );

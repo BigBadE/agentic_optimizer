@@ -12,13 +12,12 @@ use super::verification_result::VerificationResult;
 use super::verifier::{UnifiedVerifier, VerifyEventContext};
 use merlin_cli::TuiApp;
 use merlin_core::{Result, RoutingError};
-use merlin_deps::ratatui::backend::TestBackend;
-use merlin_deps::tempfile::TempDir;
-use merlin_deps::tracing;
+use ratatui::backend::TestBackend;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::Instant;
+use tempfile::TempDir;
 use tokio::time::{Duration as TokioDuration, sleep};
 
 mod runner_setup;

@@ -1,7 +1,7 @@
 //! Fixture loading and discovery utilities
 
 use merlin_core::{Result, RoutingError};
-use merlin_deps::serde_json::from_str;
+use serde_json::from_str;
 use std::fs;
 use std::path::{Path, PathBuf};
 

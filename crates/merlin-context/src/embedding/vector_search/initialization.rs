@@ -1,11 +1,11 @@
 //! Vector search manager initialization logic.
 
-use merlin_deps::tracing::info;
 use std::collections::{HashMap, HashSet};
 use std::env;
 use std::path::{Path, PathBuf};
 use std::result::Result as StdResult;
 use std::time::SystemTime;
+use tracing::info;
 
 use crate::embedding::vector_search::cache::{CachedEmbedding, VectorCache};
 use crate::embedding::{BM25Index, VectorStore};
@@ -38,7 +38,7 @@ impl InitializationHelper {
 
     /// Collect all source files in the project
     pub fn collect_source_files(project_root: &Path) -> Vec<PathBuf> {
-        use merlin_deps::ignore::WalkBuilder;
+        use ignore::WalkBuilder;
 
         let mut files = Vec::default();
 

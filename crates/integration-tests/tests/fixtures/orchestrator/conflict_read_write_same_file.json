@@ -1,0 +1,103 @@
+{
+  "name": "Conflict - Read/Write Same File",
+  "description": "Tests conflict detection when one task reads while another writes to the same file",
+  "tags": [
+    "orchestrator",
+    "conflicts",
+    "parallel",
+    "read-write"
+  ],
+  "setup": {
+    "files": {
+      "data.txt": "original data"
+    },
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Read and write data.txt simultaneously",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "data.txt",
+            "exists": true
+          },
+          {
+            "path": "copy.txt",
+            "exists": true
+          }
+        ]
+      },
+      "strategy": {
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code() {",
+              "  return {",
+              "    title: 'Read/Write Operations',",
+              "    steps: [",
+              "      {",
+              "        title: 'Copy data.txt to copy.txt',",
+              "        description: 'Read data.txt and copy to copy.txt',",
+              "        step_type: 'implementation'",
+              "      },",
+              "      {",
+              "        title: 'Modify data.txt',",
+              "        description: 'Update data.txt content',",
+              "        step_type: 'implementation'",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  const content = await readFile('data.txt');",
+              "  await writeFile('copy.txt', content);",
+              "  return 'Copied data.txt to copy.txt';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('data.txt', 'modified data');",
+              "  return 'Modified data.txt';",
+              "}"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "data.txt",
+        "exists": true
+      },
+      {
+        "path": "copy.txt",
+        "exists": true,
+        "contains": [
+          "data"
+        ]
+      }
+    ],
+    "execution": {}
+  }
+}

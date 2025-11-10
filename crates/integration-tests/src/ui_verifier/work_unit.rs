@@ -4,7 +4,7 @@ use crate::ui_verifier::VerificationResult;
 use crate::verify::WorkUnitVerify;
 use merlin_cli::TuiApp;
 use merlin_core::{SubtaskStatus, WorkStatus, WorkUnit};
-use merlin_deps::ratatui::backend::TestBackend;
+use ratatui::backend::TestBackend;
 
 /// Get `WorkUnit` from `TaskDisplay` (live during execution) or last message (after completion)
 async fn get_work_unit(app: &TuiApp<TestBackend>) -> Option<WorkUnit> {

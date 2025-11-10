@@ -5,8 +5,8 @@
 //! the config is automatically persisted to disk.
 
 use crate::ui::theme::Theme;
-use merlin_deps::dirs::home_dir;
-use merlin_deps::toml::{from_str, to_string_pretty};
+use dirs::home_dir;
+use merlin_core::config::{ApiKeys, TierConfig};
 use serde::{Deserialize, Serialize};
 use std::env;
 use std::io;
@@ -14,6 +14,7 @@ use std::ops::{Deref, DerefMut};
 use std::path::PathBuf;
 use std::sync::{Arc, RwLock};
 use tokio::fs as async_fs;
+use toml::{from_str, to_string_pretty};
 
 const ENV_OPENROUTER_API_KEY: &str = "OPENROUTER_API_KEY";
 
@@ -26,6 +27,12 @@ pub struct Config {
     /// UI theme
     #[serde(default)]
     pub theme: Theme,
+    /// Model tier configuration (for `RoutingConfig` compatibility)
+    #[serde(default)]
+    pub tiers: TierConfig,
+    /// API keys for model providers (for `RoutingConfig` compatibility)
+    #[serde(default)]
+    pub api_keys: ApiKeys,
 }
 
 /// Configuration for remote model providers
@@ -196,7 +203,7 @@ impl Drop for ConfigGuard<'_> {
             }
 
             if let Err(err) = manager_clone.save_to_disk().await {
-                merlin_deps::tracing::warn!("Failed to auto-save config: {err}");
+                tracing::warn!("Failed to auto-save config: {err}");
             }
         });
     }
@@ -205,9 +212,9 @@ impl Drop for ConfigGuard<'_> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::toml::to_string_pretty;
     use std::error::Error as StdError;
     use tokio::time::{Duration, sleep};
+    use toml::to_string_pretty;
 
     /// Tests default configuration values.
     ///

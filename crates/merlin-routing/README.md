@@ -56,6 +56,11 @@ This crate provides intelligent routing between different LLM tiers based on tas
 - Local tier (Ollama) - Free, fast
 - Groq tier - Free with rate limits
 - Premium tier (OpenRouter, Anthropic) - Paid, high quality
+- **Difficulty-based model selection**: Tasks with difficulty 1-10 automatically route to appropriate tier
+- **Automatic escalation**: Failed tasks can be retried at higher tiers by increasing difficulty (managed by merlin-agent orchestrator)
+- **Provider overrides**: Configure `provider_low` (1-3), `provider_mid` (4-6), `provider_high` (7-10) in config to override tier-based routing
+  - When all difficulty levels are covered by overrides, tier-based providers (Local/Groq/Premium) are not initialized
+  - Useful for using a single provider (e.g., ClaudeCode) for all tasks without needing API keys for other providers
 
 ### Caching
 - Semantic caching for repeated queries

@@ -38,8 +38,6 @@
 
 /// Agent execution and self-assessment
 pub mod agent;
-/// Workspace state management
-pub mod executor;
 /// High-level orchestration of routing components
 pub mod orchestrator;
 /// Thread persistence and management
@@ -51,7 +49,6 @@ pub use agent::{
     AgentExecutor, ContextFetcher, ContextManager, StepExecutionParams, StepExecutor, StepResult,
     StepTracker,
 };
-pub use executor::WorkspaceState;
 pub use orchestrator::RoutingOrchestrator;
 pub use thread_store::ThreadStore;
 pub use validator::{

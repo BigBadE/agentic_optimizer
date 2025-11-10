@@ -6,8 +6,8 @@
 use std::collections::HashMap;
 use std::hash::BuildHasher;
 
-use merlin_deps::boa_engine::{Context, JsValue};
-use merlin_deps::uuid::Uuid;
+use boa_engine::{Context, JsValue};
+use uuid::Uuid;
 
 use super::handle::JsValueHandle;
 use crate::{ToolError, ToolResult};
@@ -58,11 +58,11 @@ pub fn extract_task_list<S: BuildHasher>(
 
     // Try to get title and steps properties
     let title_value = obj
-        .get(merlin_deps::boa_engine::js_string!("title"), context)
+        .get(boa_engine::js_string!("title"), context)
         .map_err(|err| ToolError::ExecutionFailed(format!("Failed to get title: {err}")))?;
 
     let steps_value = obj
-        .get(merlin_deps::boa_engine::js_string!("steps"), context)
+        .get(boa_engine::js_string!("steps"), context)
         .map_err(|err| ToolError::ExecutionFailed(format!("Failed to get steps: {err}")))?;
 
     // Check if title/steps are nullish
@@ -85,7 +85,7 @@ pub fn extract_task_list<S: BuildHasher>(
         .ok_or_else(|| ToolError::ExecutionFailed("Steps is not an array".to_owned()))?;
 
     let steps_len = steps_obj
-        .get(merlin_deps::boa_engine::js_string!("length"), context)
+        .get(boa_engine::js_string!("length"), context)
         .map_err(|err| ToolError::ExecutionFailed(format!("Failed to get length: {err}")))?
         .to_u32(context)
         .unwrap_or(0) as usize;
@@ -120,7 +120,7 @@ fn extract_single_step<S: BuildHasher>(
 
     // Extract title
     let title_value = obj
-        .get(merlin_deps::boa_engine::js_string!("title"), context)
+        .get(boa_engine::js_string!("title"), context)
         .map_err(|err| ToolError::ExecutionFailed(format!("Step missing title: {err}")))?;
     let title = title_value
         .to_string(context)
@@ -129,7 +129,7 @@ fn extract_single_step<S: BuildHasher>(
 
     // Extract description
     let desc_value = obj
-        .get(merlin_deps::boa_engine::js_string!("description"), context)
+        .get(boa_engine::js_string!("description"), context)
         .map_err(|err| ToolError::ExecutionFailed(format!("Step missing description: {err}")))?;
     let description = desc_value
         .to_string(context)
@@ -138,7 +138,7 @@ fn extract_single_step<S: BuildHasher>(
 
     // Extract step_type
     let type_value = obj
-        .get(merlin_deps::boa_engine::js_string!("step_type"), context)
+        .get(boa_engine::js_string!("step_type"), context)
         .map_err(|err| ToolError::ExecutionFailed(format!("Step missing step_type: {err}")))?;
     let step_type = type_value
         .to_string(context)
@@ -146,10 +146,7 @@ fn extract_single_step<S: BuildHasher>(
         .to_std_string_escaped();
 
     // Extract optional exit_requirement (store function handle)
-    let exit_requirement = match obj.get(
-        merlin_deps::boa_engine::js_string!("exit_requirement"),
-        context,
-    ) {
+    let exit_requirement = match obj.get(boa_engine::js_string!("exit_requirement"), context) {
         Ok(req_value) if !req_value.is_null() && !req_value.is_undefined() => {
             // Store the function in value_storage and return its handle ID
             let handle_id = Uuid::new_v4().to_string();
@@ -160,7 +157,7 @@ fn extract_single_step<S: BuildHasher>(
     };
 
     // Extract optional dependencies array
-    let dependencies = match obj.get(merlin_deps::boa_engine::js_string!("dependencies"), context) {
+    let dependencies = match obj.get(boa_engine::js_string!("dependencies"), context) {
         Ok(deps_value) if !deps_value.is_null() && !deps_value.is_undefined() => {
             extract_string_array(&deps_value, context)?
         }
@@ -186,7 +183,7 @@ fn extract_string_array(value: &JsValue, context: &mut Context) -> ToolResult<Ve
         .ok_or_else(|| ToolError::ExecutionFailed("Value is not an array".to_owned()))?;
 
     let len = obj
-        .get(merlin_deps::boa_engine::js_string!("length"), context)
+        .get(boa_engine::js_string!("length"), context)
         .map_err(|err| ToolError::ExecutionFailed(format!("Failed to get array length: {err}")))?
         .to_u32(context)
         .unwrap_or(0) as usize;

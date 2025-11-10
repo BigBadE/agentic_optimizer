@@ -70,6 +70,7 @@ This crate provides the tool system that enables agents to interact with the fil
 - Tool integration with proper Promise handling
 - Type definition generation
 - Failed tool executions return resolved Promises (not rejected) for proper error handling
+- **Performance:** Code wrapping cache reduces SWC parser overhead by ~95% for repeated code patterns
 
 ## Testing Status
 

@@ -1,6 +1,6 @@
 //! Utility functions for CLI operations
 
-use merlin_deps::anyhow::{Context as _, Result};
+use anyhow::{Context as _, Result};
 use std::env;
 use std::fs;
 use std::fs::canonicalize;
@@ -63,7 +63,7 @@ pub fn cleanup_old_tasks(merlin_dir: &Path) -> Result<()> {
     // Keep only the 50 most recent, delete the rest
     for (path, _) in task_files.iter().skip(MAX_TASKS) {
         if let Err(error) = fs::remove_file(path) {
-            merlin_deps::tracing::warn!("failed to remove old task file {:?}: {}", path, error);
+            tracing::warn!("failed to remove old task file {:?}: {}", path, error);
         }
     }
 

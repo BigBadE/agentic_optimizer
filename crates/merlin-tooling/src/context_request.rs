@@ -4,9 +4,9 @@
 //! when they need more information to complete a task.
 
 use async_trait::async_trait;
-use merlin_deps::glob::glob;
-use merlin_deps::serde_json::{from_value, to_value};
+use glob::glob;
 use serde::{Deserialize, Serialize};
+use serde_json::{from_value, to_value};
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 #[cfg(test)]
@@ -174,7 +174,7 @@ impl ContextRequestTool {
     /// # Errors
     /// Returns an error if file cannot be read or is too large
     async fn read_file(&self, path: &Path) -> Result<String, ToolError> {
-        use merlin_deps::tracing::{Level, span};
+        use tracing::{Level, span};
 
         let metadata_span = span!(Level::INFO, "file_metadata", path = ?path);
         let file_metadata = metadata(path)
@@ -219,7 +219,7 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
         let args: ContextRequestArgs = from_value(input.params)
             .map_err(|err| ToolError::InvalidInput(format!("Invalid arguments: {err}")))?;
 
-        merlin_deps::tracing::info!(
+        tracing::info!(
             "Context request: pattern='{}', reason='{}'",
             args.pattern,
             args.reason
@@ -260,7 +260,7 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
                     });
                 }
                 Err(err) => {
-                    merlin_deps::tracing::warn!("Failed to read {}: {}", path.display(), err);
+                    tracing::warn!("Failed to read {}: {}", path.display(), err);
                 }
             }
         }
@@ -271,7 +271,7 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
             format!("Added {} files to context", context_files.len())
         };
 
-        merlin_deps::tracing::info!(
+        tracing::info!(
             "Context request result: {} files added",
             context_files.len()
         );
@@ -292,8 +292,8 @@ declare function requestContext(pattern: string, reason: string, max_files?: num
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::anyhow::Result;
-    use merlin_deps::tempfile::TempDir;
+    use anyhow::Result;
+    use tempfile::TempDir;
 
     /// Tests context request for an exact file match.
     ///
@@ -312,7 +312,7 @@ mod tests {
         let tool = ContextRequestTool::new(temp_dir.path().to_path_buf());
 
         let input = ToolInput {
-            params: merlin_deps::serde_json::json!({
+            params: serde_json::json!({
                 "pattern": "test.rs",
                 "reason": "Testing exact file match"
             }),
@@ -323,7 +323,7 @@ mod tests {
 
         let data = output
             .data
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("No data in output"))?;
+            .ok_or_else(|| anyhow::anyhow!("No data in output"))?;
         let result: ContextRequestResult = from_value(data)?;
 
         assert!(result.success);
@@ -351,7 +351,7 @@ mod tests {
         let tool = ContextRequestTool::new(temp_dir.path().to_path_buf());
 
         let input = ToolInput {
-            params: merlin_deps::serde_json::json!({
+            params: serde_json::json!({
                 "pattern": "**/*.rs",
                 "reason": "Testing glob pattern",
                 "max_files": 10
@@ -363,7 +363,7 @@ mod tests {
 
         let data = output
             .data
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("No data in output"))?;
+            .ok_or_else(|| anyhow::anyhow!("No data in output"))?;
         let result: ContextRequestResult = from_value(data)?;
 
         assert!(result.success);

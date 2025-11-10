@@ -1,0 +1,26 @@
+{
+  "name": "Output Pane Visible On Startup",
+  "description": "Tests that the output pane is visible and rendered on startup even with no task selected",
+  "tags": [
+    "tui",
+    "ui",
+    "startup",
+    "output-pane"
+  ],
+  "setup": {
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [],
+  "final_verify": {
+    "ui": {
+      "rendered_buffer_contains": [
+        "─── Focused",
+        "─── Threads",
+        "─── Input"
+      ]
+    }
+  }
+}

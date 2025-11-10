@@ -1,0 +1,96 @@
+{
+  "name": "File Conflict - Concurrent Writes",
+  "description": "Tests that concurrent writes to the same file are detected and serialized",
+  "tags": [
+    "orchestrator",
+    "conflicts",
+    "parallel",
+    "file-operations"
+  ],
+  "setup": {
+    "files": {
+      "shared.txt": "initial"
+    },
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Update shared.txt from two tasks",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "shared.txt",
+            "exists": true
+          }
+        ]
+      },
+      "strategy": {
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code() {",
+              "  return {",
+              "    title: 'Update Shared File',",
+              "    steps: [",
+              "      {",
+              "        title: 'Task 1: Append A',",
+              "        description: 'Append A to shared.txt',",
+              "        step_type: 'implementation'",
+              "      },",
+              "      {",
+              "        title: 'Task 2: Append B',",
+              "        description: 'Append B to shared.txt',",
+              "        step_type: 'implementation'",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  const content = await readFile('shared.txt');",
+              "  await writeFile('shared.txt', content + 'A');",
+              "  return 'Appended A';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  const content = await readFile('shared.txt');",
+              "  await writeFile('shared.txt', content + 'B');",
+              "  return 'Appended B';",
+              "}"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "shared.txt",
+        "exists": true,
+        "contains": [
+          "initial"
+        ]
+      }
+    ],
+    "execution": {}
+  }
+}

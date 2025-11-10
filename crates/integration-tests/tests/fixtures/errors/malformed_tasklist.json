@@ -1,0 +1,59 @@
+{
+  "name": "Error: Malformed TaskList",
+  "description": "Tests handling of malformed TaskList objects from LLM",
+  "tags": [
+    "errors",
+    "tasklist",
+    "validation",
+    "edge-cases"
+  ],
+  "setup": {
+    "files": {},
+    "env_vars": {
+      "MERLIN_FOLDER": "__temp__"
+    },
+    "terminal_size": [
+      80,
+      24
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Return malformed TaskList",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {
+          "expected_failure": "Invalid step_type: undefined"
+        }
+      },
+      "strategy": {
+        "type": "once",
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Malformed',",
+            "    steps: [",
+            "      {",
+            "        missing_title: 'Bad step'",
+            "      }",
+            "    ]",
+            "  };",
+            "}"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "expected_failure": "Invalid step_type: undefined"
+    }
+  }
+}

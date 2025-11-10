@@ -77,20 +77,23 @@ Fixtures are JSON files with the following structure:
 
 ## Fixture Organization
 
-**111 JSON fixtures** organized by component:
+**137 JSON fixtures** organized by component:
 
-- `agent/` - Agent execution tests (4 fixtures)
+- `agent/` - Agent execution tests (1 fixture)
 - `basic/` - Simple response tests (1 fixture)
-- `context/` - Context building (11 fixtures)
-- `execution/` - File operations (5 fixtures)
-- `executor/` - Task execution (3 fixtures)
+- `context/` - Context building (29 fixtures)
+- `conversation/` - Work unit tracking (3 fixtures)
+- `errors/` - Error handling (2 fixtures)
+- `execution/` - File operations (14 fixtures)
+- `executor/` - Task execution (4 fixtures)
 - `orchestrator/` - Orchestration (7 fixtures)
+- `prompts/` - Prompt verification (1 fixture)
 - `threads/` - Thread management (1 fixture)
-- `tools/` - Tool tests (8 fixtures)
-- `tui/` - TUI tests (13 fixtures, including comprehensive rendered buffer verification)
+- `tools/` - Tool tests (16 fixtures)
+- `tui/` - TUI tests (18 fixtures, including comprehensive rendered buffer verification)
 - `typescript/` - TypeScript runtime (11 fixtures)
-- `validation/` - Validation pipeline (3 fixtures)
-- `workspace/` - Workspace isolation (3 fixtures)
+- `validation/` - Validation pipeline (15 fixtures)
+- `workflows/` - Complex workflows (1 fixture)
 
 ## Architecture
 
@@ -244,6 +247,35 @@ Matches based on query string patterns:
 
 The system uses the real `StrategyRouter` from `merlin-routing` with a custom `ModelRegistry` that routes all difficulty levels to the mock provider. This ensures tests exercise the actual routing logic while using controlled mock responses.
 
+### Routing and Performance Verification
+
+Fixtures can verify routing decisions, cache behavior, and metrics collection:
+
+```json
+{
+  "verify": {
+    "execution": {
+      "model_used": "Qwen25Coder32B",
+      "expected_difficulty": 5,
+      "cache_hit": false,
+      "cache_hit_count": 0,
+      "metrics_recorded": true,
+      "escalation_attempts": 1
+    }
+  }
+}
+```
+
+**Available fields:**
+- `model_used`: Expected model/tier (e.g., `Llama318BInstruct`, `Claude35Sonnet`)
+- `expected_difficulty`: Expected difficulty level (1-10)
+- `cache_hit`: Whether response came from cache (true/false)
+- `cache_hit_count`: Expected number of cache entries
+- `metrics_recorded`: Whether metrics were recorded (true/false)
+- `escalation_attempts`: Expected number of tier escalation attempts
+
+All fields are optional. The verifier accesses the orchestrator's metrics report and cache stats to validate these expectations.
+
 ### Retry Testing
 
 Fixtures can test retry logic with routing-based retry responses:
@@ -281,12 +313,16 @@ Fixtures can test retry logic with routing-based retry responses:
 - TypeScript execution results
 - File modifications
 - TUI state (via read-only accessors)
+- Routing decisions (model/tier used)
+- Cache behavior (hit/miss, entry count)
+- Metrics collection (requests, success rate)
+- Tier escalation attempts
 
 ## Testing Status
 
-**✅ Comprehensive** (100% pass rate - 111/111 passing, ~4s total runtime)
+**✅ Comprehensive** (100% pass rate - 137/137 passing, ~4s total runtime)
 
-- **All crates tested**: Via 111 fixtures covering all major components
+- **All crates tested**: Via 137 fixtures covering all major components
 - **Auto-discovery**: Single test runner with parallel execution
 - **Coverage verified**: Via `scripts/commit.sh` and `scripts/verify.sh`
 - **Conversation count verification**: Excludes system messages, only counts User/Assistant

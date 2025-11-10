@@ -1,9 +1,9 @@
 //! JavaScript/JSON value conversion utilities.
 
-use merlin_deps::boa_engine::object::JsObject;
-use merlin_deps::boa_engine::object::builtins::JsArray;
-use merlin_deps::boa_engine::{Context, JsResult, JsValue};
-use merlin_deps::serde_json::{Map, Number, Value};
+use boa_engine::object::JsObject;
+use boa_engine::object::builtins::JsArray;
+use boa_engine::{Context, JsResult, JsValue};
+use serde_json::{Map, Number, Value};
 
 use crate::ToolError;
 use crate::ToolResult;
@@ -13,7 +13,7 @@ use crate::ToolResult;
 /// # Errors
 /// Returns error if conversion fails
 pub fn js_value_to_json(value: &JsValue, context: &mut Context) -> ToolResult<Value> {
-    use merlin_deps::tracing::{Level, span};
+    use tracing::{Level, span};
 
     let span = span!(Level::INFO, "js_value_to_json");
     let enter_guard = span.enter();

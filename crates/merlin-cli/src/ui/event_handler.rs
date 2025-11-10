@@ -2,12 +2,12 @@ use super::persistence::TaskPersistence;
 use super::state::{ConversationEntry, ConversationRole, UiState};
 use super::task_manager::{TaskDisplay, TaskManager, TaskStatus, TaskStepInfo, TaskStepStatus};
 use merlin_core::{ThreadId, WorkUnit};
-use merlin_deps::serde_json::Value;
-use merlin_deps::tracing::warn;
 use merlin_routing::{MessageLevel, TaskId, TaskProgress, TaskResult, UiEvent};
 use merlin_tooling::ToolError;
+use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
+use tracing::warn;
 
 /// Handles UI events and updates task manager and state
 pub struct EventHandler<'handler> {
@@ -134,13 +134,22 @@ impl<'handler> EventHandler<'handler> {
         description: String,
         thread_id: Option<ThreadId>,
     ) {
-        let task_display = TaskDisplay {
-            description,
-            thread_id,
-            ..Default::default()
-        };
+        // Task may already exist if it was created immediately on input submit
+        // If so, just update the thread_id if provided
+        if let Some(existing_task) = self.task_manager.get_task_mut(task_id) {
+            if let Some(tid) = thread_id {
+                existing_task.thread_id = Some(tid);
+            }
+        } else {
+            // Task doesn't exist yet, create it
+            let task_display = TaskDisplay {
+                description,
+                thread_id,
+                ..Default::default()
+            };
+            self.task_manager.add_task(task_id, task_display);
+        }
 
-        self.task_manager.add_task(task_id, task_display);
         self.state.active_running_tasks.insert(task_id);
 
         // Update active_thread_id when a task with a thread starts
@@ -287,15 +296,13 @@ impl<'handler> EventHandler<'handler> {
         &mut self,
         task_id: TaskId,
         step_id: String,
-        step_type: &str,
-        content: String,
+        _step_type: &str,
+        _content: String,
     ) {
         if let Some(task) = self.task_manager.get_task_mut(task_id) {
             let step_info = TaskStepInfo {
                 step_id,
-                step_type: step_type.to_string(),
-                content,
-                ..Default::default()
+                status: TaskStepStatus::Running,
             };
 
             // Set as current step (replaces previous step)

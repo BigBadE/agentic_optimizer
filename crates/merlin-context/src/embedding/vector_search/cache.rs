@@ -2,13 +2,13 @@
 
 use bincode::config::standard as bincode_config;
 use bincode::{Decode, Encode, decode_from_slice, encode_to_vec};
-use merlin_deps::tracing::info;
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::time::SystemTime;
 use tokio::task::spawn_blocking;
+use tracing::info;
 
 use merlin_core::{CoreResult as Result, Error};
 

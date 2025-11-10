@@ -1,7 +1,7 @@
 //! File scanning utilities for discovering source files in a project.
 
-use merlin_deps::walkdir::{DirEntry, WalkDir};
 use std::path::Path;
+use walkdir::{DirEntry, WalkDir};
 
 use core::result::Result as CoreResult;
 use merlin_core::FileContext;

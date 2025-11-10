@@ -1,8 +1,8 @@
 use crate::conversation::{ThreadId, WorkUnit};
 use crate::task::{TaskId, TaskResult};
-use merlin_deps::serde_json::Value;
 use merlin_tooling::ToolError;
 use serde::{Deserialize, Serialize};
+use serde_json::Value;
 use std::sync::Arc;
 use tokio::sync::Mutex;
 

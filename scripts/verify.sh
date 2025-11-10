@@ -126,11 +126,9 @@ for arg in "$@"; do
   case "$arg" in
     --cov)
       RUN_COVERAGE=true
-      shift
       ;;
     --fixture)
       FIXTURE_ONLY=true
-      shift
       ;;
     *)
       # ignore unknown args (forward compatibility)

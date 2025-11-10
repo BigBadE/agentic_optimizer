@@ -1,0 +1,79 @@
+{
+  "name": "Exit Validator - command_succeeds",
+  "description": "Tests the command_succeeds exit requirement validator to ensure commands execute successfully",
+  "tags": [
+    "executor",
+    "exit_validators",
+    "bash",
+    "validation"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create an executable script",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "test.sh",
+            "exists": true
+          }
+        ]
+      },
+      "strategy": {
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code() {",
+              "  return {",
+              "    title: 'Create Script',",
+              "    steps: [",
+              "      {",
+              "        title: 'Write executable script',",
+              "        description: 'Create test.sh script',",
+              "        step_type: 'implementation'",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('test.sh', '#!/bin/bash\\necho \"Success\"\\nexit 0');",
+              "  return 'Created executable script test.sh';",
+              "}"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "test.sh",
+        "exists": true,
+        "contains": [
+          "#!/bin/bash"
+        ]
+      }
+    ],
+    "execution": {}
+  }
+}

@@ -3,11 +3,11 @@
 
 use crate::conversation::{ThreadId, WorkUnit};
 use crate::task::{TaskId, TaskResult};
-use merlin_deps::tracing::warn;
 use merlin_tooling::ToolError;
 use std::sync::Arc;
 use tokio::spawn;
 use tokio::sync::{Mutex, mpsc};
+use tracing::warn;
 
 /// Event types for UI updates
 pub mod events;

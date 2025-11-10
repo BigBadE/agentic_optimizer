@@ -6,7 +6,6 @@ edition.workspace = true
 [dependencies]
 merlin-context.workspace = true
 merlin-core.workspace = true
-merlin-deps.workspace = true
 merlin-languages.workspace = true
 merlin-local.workspace = true
 merlin-providers.workspace = true
@@ -14,8 +13,11 @@ merlin-routing.workspace = true
 merlin-tooling.workspace = true
 async-trait.workspace = true
 serde.workspace = true
+serde_json.workspace = true
+tempfile.workspace = true
 thiserror.workspace = true
 tokio.workspace = true
+tracing.workspace = true
 tracing-futures.workspace = true
 
 [dev-dependencies]

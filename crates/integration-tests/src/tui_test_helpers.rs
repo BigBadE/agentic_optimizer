@@ -1,5 +1,6 @@
 //! Test helper functions for TUI testing
 
+use crossterm::event::{Event as CrosstermEvent, KeyEventKind};
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_cli::TuiApp;
 use merlin_cli::app::tui_app::{EventSystem, RuntimeState, UiComponents};
@@ -11,10 +12,9 @@ use merlin_cli::ui::persistence::TaskPersistence;
 use merlin_cli::ui::renderer::{FocusedPane, Renderer};
 use merlin_cli::ui::state::UiState;
 use merlin_cli::ui::task_manager::TaskManager;
-use merlin_deps::crossterm::event::{Event as CrosstermEvent, KeyEventKind};
-use merlin_deps::ratatui::Terminal;
-use merlin_deps::ratatui::backend::Backend;
 use merlin_routing::{Result, RoutingError, UiEvent};
+use ratatui::Terminal;
+use ratatui::backend::Backend;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 use std::time::Instant;

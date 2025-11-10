@@ -2,7 +2,7 @@
 
 use crate::Error as CoreError;
 use crate::task::{TaskId, ValidationResult};
-use merlin_deps::serde_json::Error as JsonError;
+use serde_json::Error as JsonError;
 use std::path::PathBuf;
 use std::result::Result as StdResult;
 use std::{fmt, io};

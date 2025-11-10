@@ -1,6 +1,6 @@
 # merlin-providers
 
-External LLM provider adapters (Groq, OpenRouter, Mock).
+External LLM provider adapters (Claude Code, Groq, OpenRouter, Mock).
 
 ## Purpose
 
@@ -8,17 +8,37 @@ This crate provides integration with external LLM services. Each provider implem
 
 ## Module Structure
 
+- `claude_code.rs` - Claude Code provider (Anthropic API)
 - `groq.rs` - Groq provider (Llama models)
 - `openrouter.rs` - OpenRouter provider (multi-model access)
 
 ## Public API
 
+- `ClaudeCodeProvider` - Claude Code API integration
 - `GroqProvider` - Groq API integration
 - `OpenRouterProvider` - OpenRouter API integration
 
 **Note**: `MockProvider` has been moved to `integration-tests` crate for better test isolation and performance.
 
 ## Providers
+
+### ClaudeCodeProvider
+Claude Code CLI integration using your Claude subscription.
+
+**Features:**
+- Uses Claude Code subscription (no API billing)
+- Invokes `claude` CLI as subprocess
+- High-quality responses
+- Default model: `claude-sonnet-4-5-20250929`
+
+**Setup:**
+```bash
+# Install Claude Code CLI and authenticate
+# https://docs.claude.com/claude-code
+claude setup-token
+
+# No API key needed - uses your Claude subscription
+```
 
 ### GroqProvider
 Groq API integration with fast inference using Llama models.
@@ -59,7 +79,7 @@ Testing provider with configurable responses.
 
 **✅ Well-tested**
 
-- **Unit tests**: All 3 provider files have tests
+- **Unit tests**: All 4 provider files have tests
 - **MockProvider**: Heavily used in fixture-based tests
 - **Integration tests**: Extensive fixture coverage in integration-tests crate
 
@@ -80,10 +100,10 @@ Testing provider with configurable responses.
 ## Usage Example
 
 ```rust
-use merlin_providers::GroqProvider;
+use merlin_providers::ClaudeCodeProvider;
 use merlin_core::{ModelProvider, Query, Context};
 
-let provider = GroqProvider::default()?;
+let provider = ClaudeCodeProvider::new()?;
 let query = Query::new("Explain this code");
 let context = Context::new("You are a coding assistant");
 

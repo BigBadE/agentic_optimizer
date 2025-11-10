@@ -93,6 +93,35 @@ impl StrategyRouter {
 #[async_trait]
 impl ModelRouter for StrategyRouter {
     async fn route(&self, task: &Task) -> Result<RoutingDecision> {
+        // Check for difficulty-based provider override first
+        if let Ok(provider) = self
+            .provider_registry
+            .get_provider_for_difficulty(task.difficulty)
+        {
+            let reasoning = format!(
+                "Using configured provider override for difficulty level {}",
+                task.difficulty
+            );
+
+            // Use a placeholder model since we're using a direct provider
+            let model = self.model_registry.select_model(task.difficulty)?;
+            let mut decision = RoutingDecision::new(model, reasoning);
+
+            // Override with actual provider name
+            provider.name().clone_into(&mut decision.provider_name);
+
+            tracing::info!(
+                "🎯 Routing decision: {} (override) | Difficulty: {} | Cost: ${:.6} | Latency: {}ms",
+                provider.name(),
+                task.difficulty,
+                decision.estimated_cost,
+                decision.estimated_latency_ms
+            );
+
+            return Ok(decision);
+        }
+
+        // Fall back to model-based routing
         let model = self.model_registry.select_model(task.difficulty)?;
 
         // Check if model is enabled in provider registry
@@ -116,7 +145,7 @@ impl ModelRouter for StrategyRouter {
 
         let decision = RoutingDecision::new(model, reasoning);
 
-        merlin_deps::tracing::info!(
+        tracing::info!(
             "🎯 Routing decision: {} | Difficulty: {} | Cost: ${:.6} | Latency: {}ms",
             model,
             task.difficulty,

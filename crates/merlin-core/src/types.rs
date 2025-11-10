@@ -164,10 +164,10 @@ impl FileContext {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::anyhow::Result;
-    use merlin_deps::serde_json::{from_str, to_string};
-    use merlin_deps::tempfile::TempDir;
+    use anyhow::Result;
+    use serde_json::{from_str, to_string};
     use std::fs::write;
+    use tempfile::TempDir;
 
     // REMOVED: test_query_new - Constructor test
 

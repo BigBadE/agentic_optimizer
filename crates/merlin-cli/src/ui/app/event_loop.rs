@@ -1,8 +1,8 @@
 //! Main event loop and event processing logic
 
-use merlin_deps::crossterm::event::{Event, KeyEventKind};
-use merlin_deps::ratatui::backend::Backend;
-use merlin_routing::{Result, RoutingError, UiEvent};
+use crossterm::event::{Event, KeyEventKind};
+use merlin_routing::{Result, RoutingError, Task, UiEvent};
+use ratatui::backend::Backend;
 use std::sync::Arc;
 use std::time::Instant;
 
@@ -13,6 +13,7 @@ use crate::ui::app::navigation::ScrollContext;
 use crate::ui::event_handler::EventHandler;
 use crate::ui::renderer::{FocusedPane, RenderCtx, UiCtx};
 use crate::ui::state::{ConversationEntry, ConversationRole};
+use crate::ui::task_manager::TaskDisplay;
 
 impl<B: Backend> TuiApp<B> {
     /// Run the main event loop until quit
@@ -38,7 +39,8 @@ impl<B: Backend> TuiApp<B> {
                             break;
                         }
                         Err(error) => {
-                            return Err(RoutingError::Other(error.to_string()));
+                            let error_msg: String = error.to_string();
+                            return Err(RoutingError::Other(error_msg));
                         }
                     }
                 }
@@ -126,12 +128,45 @@ impl<B: Backend> TuiApp<B> {
 
         self.ui_components.state.processing_status = Some("[Processing...]".to_string());
 
+        // Create thread immediately if none exists, so UI shows it right away
+        if self.ui_components.state.active_thread_id.is_none()
+            && let Ok(mut store) = self.runtime_state.thread_store.lock()
+        {
+            let thread_name = input.chars().take(30).collect::<String>();
+            let thread = store.create_thread(thread_name);
+            let tid = thread.id;
+            if let Err(save_err) = store.save_thread(&thread) {
+                tracing::warn!("Failed to create thread: {save_err}");
+            }
+            self.ui_components.state.active_thread_id = Some(tid);
+        }
+
+        // Create task ID immediately so it shows in the UI before async execution starts
+        let task = Task::new(input.clone());
+        let task_id = task.id;
+
+        // Add task to UI immediately with the user's input as the description
+        let task_display = TaskDisplay {
+            description: input.clone(),
+            thread_id: self.ui_components.state.active_thread_id,
+            ..Default::default()
+        };
+        self.ui_components
+            .task_manager
+            .add_task(task_id, task_display);
+        self.ui_components
+            .state
+            .active_running_tasks
+            .insert(task_id);
+        self.ui_components.state.active_task_id = Some(task_id);
+
         if let Some(ref orchestrator) = self.runtime_state.orchestrator {
             let conversation_history = self.get_conversation_history();
             let parent_task_id = self.ui_components.state.continuing_conversation_from;
 
             self.spawn_task_execution(TaskExecutionParams {
                 orchestrator: Arc::clone(orchestrator),
+                task_id,
                 user_input: input,
                 parent_task_id,
                 conversation_history,
@@ -183,7 +218,6 @@ impl<B: Backend> TuiApp<B> {
             self.ui_components.state.auto_scroll_output_to_bottom = false;
         }
 
-        let layout_cache = &mut self.ui_components.layout_cache;
         let renderer = &self.ui_components.renderer;
         let task_manager = &self.ui_components.task_manager;
         let state = &self.ui_components.state;
@@ -193,17 +227,16 @@ impl<B: Backend> TuiApp<B> {
 
         self.terminal
             .draw(|frame| {
-                let mut ctx = RenderCtx {
+                let ctx = RenderCtx {
                     ui_ctx: UiCtx {
                         task_manager,
                         state,
                     },
                     input: input_manager,
                     focused: focused_pane,
-                    layout_cache,
                     thread_store,
                 };
-                renderer.render(frame, &mut ctx);
+                renderer.render(frame, &ctx);
             })
             .map_err(|err| RoutingError::Other(err.to_string()))?;
 

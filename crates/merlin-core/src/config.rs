@@ -26,6 +26,20 @@ pub struct ApiKeys {
     pub openrouter_api_key: Option<String>,
 }
 
+/// Provider type for difficulty-based routing.
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(rename_all = "lowercase")]
+pub enum ProviderType {
+    /// Local Ollama models
+    Local,
+    /// Groq API
+    Groq,
+    /// `OpenRouter` API
+    OpenRouter,
+    /// Claude Code CLI
+    ClaudeCode,
+}
+
 /// Model tier configuration.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TierConfig {
@@ -43,6 +57,15 @@ pub struct TierConfig {
     pub max_retries: usize,
     /// Timeout in seconds for model requests
     pub timeout_seconds: u64,
+    /// Provider override for difficulty 1-3 (simple tasks)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_low: Option<ProviderType>,
+    /// Provider override for difficulty 4-6 (moderate tasks)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_mid: Option<ProviderType>,
+    /// Provider override for difficulty 7-10 (complex tasks)
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub provider_high: Option<ProviderType>,
 }
 
 impl Default for TierConfig {
@@ -55,6 +78,22 @@ impl Default for TierConfig {
             premium_enabled: true,
             max_retries: 3,
             timeout_seconds: 300,
+            provider_low: None,
+            provider_mid: None,
+            provider_high: None,
+        }
+    }
+}
+
+impl TierConfig {
+    /// Get the provider for a specific difficulty level (1-10).
+    #[must_use]
+    pub fn provider_for_difficulty(&self, difficulty: u8) -> Option<ProviderType> {
+        match difficulty {
+            1..=3 => self.provider_low.clone(),
+            4..=6 => self.provider_mid.clone(),
+            7..=10 => self.provider_high.clone(),
+            _ => None,
         }
     }
 }
@@ -174,7 +213,7 @@ impl ProjectConfig {
     /// # Errors
     /// Returns an error if the config file cannot be read or parsed
     pub fn load_from_file(path: &Path) -> Result<Self> {
-        use merlin_deps::toml::from_str;
+        use toml::from_str;
 
         let contents = fs::read_to_string(path)
             .map_err(|err| RoutingError::Other(format!("Failed to read config: {err}")))?;
@@ -189,7 +228,7 @@ impl RoutingConfig {
     /// # Errors
     /// Returns an error if the home directory cannot be determined
     pub fn config_dir() -> Result<PathBuf> {
-        use merlin_deps::dirs::home_dir;
+        use dirs::home_dir;
         let home = home_dir()
             .ok_or_else(|| RoutingError::Other("Could not determine home directory".to_owned()))?;
         Ok(home.join(".merlin"))
@@ -225,15 +264,16 @@ impl RoutingConfig {
     /// # Errors
     /// Returns an error if the file cannot be read or parsed
     pub fn load_from_file(path: &Path) -> Result<Self> {
-        use merlin_deps::toml::from_str;
+        use toml::from_str;
         let contents = fs::read_to_string(path)
             .map_err(|error| RoutingError::Other(format!("Failed to read config: {error}")))?;
         let config: Self = from_str(&contents)
             .map_err(|error| RoutingError::Other(format!("Failed to parse config: {error}")))?;
 
-        merlin_deps::tracing::debug!(
-            "Loaded config from {:?}: groq_api_key={}, openrouter_api_key={}",
+        tracing::debug!(
+            "Loaded config from {:?}: groq_enabled={}, groq_api_key={}, openrouter_api_key={}, provider_low={:?}, provider_mid={:?}, provider_high={:?}",
             path,
+            config.tiers.groq_enabled,
             if config.api_keys.groq_api_key.is_some() {
                 "present"
             } else {
@@ -243,7 +283,10 @@ impl RoutingConfig {
                 "present"
             } else {
                 "missing"
-            }
+            },
+            config.tiers.provider_low,
+            config.tiers.provider_mid,
+            config.tiers.provider_high
         );
 
         Ok(config)
@@ -254,7 +297,7 @@ impl RoutingConfig {
     /// # Errors
     /// Returns an error if the file cannot be written
     pub fn save_to_file(&self, path: &Path) -> Result<()> {
-        use merlin_deps::toml::to_string_pretty;
+        use toml::to_string_pretty;
         if let Some(parent) = path.parent() {
             fs::create_dir_all(parent).map_err(|error| {
                 RoutingError::Other(format!("Failed to create config directory: {error}"))
@@ -295,7 +338,7 @@ impl RoutingConfig {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::anyhow::Result;
+    use anyhow::Result;
 
     /// Tests API key loading from TOML configuration file.
     ///
@@ -306,8 +349,8 @@ mod tests {
     /// Panics if assertions fail during test execution.
     #[test]
     fn test_api_key_loading_from_toml() -> Result<()> {
-        use merlin_deps::tempfile::NamedTempFile;
         use std::io::Write as _;
+        use tempfile::NamedTempFile;
 
         // Create a temporary config file with API keys
         let toml_content = r#"
@@ -370,12 +413,12 @@ openrouter_api_key = "test_openrouter_key_456"
             let config = RoutingConfig::load_from_file(&config_path)?;
 
             // Just verify it loaded without crashing
-            merlin_deps::tracing::debug!("Loaded config from {config_path:?}");
-            merlin_deps::tracing::debug!(
+            tracing::debug!("Loaded config from {config_path:?}");
+            tracing::debug!(
                 "  groq_api_key present: {}",
                 config.api_keys.groq_api_key.is_some()
             );
-            merlin_deps::tracing::debug!(
+            tracing::debug!(
                 "  openrouter_api_key present: {}",
                 config.api_keys.openrouter_api_key.is_some()
             );

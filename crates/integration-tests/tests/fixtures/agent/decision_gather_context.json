@@ -1,0 +1,90 @@
+{
+  "name": "Agent Decision - Gather Context",
+  "description": "Tests that agent gathers context before making decisions on ambiguous tasks",
+  "tags": [
+    "agent",
+    "decision-logic",
+    "context-gathering"
+  ],
+  "setup": {
+    "files": {
+      "existing.txt": "existing content"
+    },
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Update the file",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "existing.txt",
+            "exists": true
+          }
+        ]
+      },
+      "strategy": {
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code() {",
+              "  return {",
+              "    title: 'Update File',",
+              "    steps: [",
+              "      {",
+              "        title: 'Read existing content',",
+              "        description: 'Read existing.txt to understand current state',",
+              "        step_type: 'analysis'",
+              "      },",
+              "      {",
+              "        title: 'Update content',",
+              "        description: 'Update the file with new content',",
+              "        step_type: 'implementation'",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  const content = await readFile('existing.txt');",
+              "  return 'Read existing content: ' + content;",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('existing.txt', 'updated content');",
+              "  return 'Updated existing.txt';",
+              "}"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "existing.txt",
+        "exists": true
+      }
+    ],
+    "execution": {}
+  }
+}

@@ -4,11 +4,11 @@ use merlin_core::{
     AgentResponse, JsValueHandle as CoreJsValueHandle, Result, RoutingError, StepType, TaskId,
     TaskList, TaskStep, ui::UiEvent,
 };
-use merlin_deps::serde_json::to_string;
-use merlin_deps::tracing::{Level, span};
 use merlin_routing::UiChannel;
 use merlin_tooling::bulk_extraction::ExtractedTaskStep;
 use merlin_tooling::{PersistentTypeScriptRuntime, ToolingJsValueHandle};
+use serde_json::to_string;
+use tracing::{Level, span};
 use tracing_futures::Instrument as _;
 
 /// Extract TypeScript code from markdown code blocks
@@ -71,7 +71,7 @@ pub async fn execute_typescript_code(
         });
 
         // Execute code with detailed timing
-        merlin_deps::tracing::debug!("Executing TypeScript code:\n{}", code);
+        tracing::debug!("Executing TypeScript code:\n{}", code);
         let result_handle = {
             let exec_span = span!(Level::INFO, "typescript_runtime_execute");
             runtime
@@ -79,7 +79,7 @@ pub async fn execute_typescript_code(
                 .instrument(exec_span)
                 .await
                 .map_err(|err| {
-                    merlin_deps::tracing::info!(
+                    tracing::info!(
                         "TypeScript execution failed. Code was:\n{}\n\nError: {}",
                         code,
                         err
@@ -105,7 +105,7 @@ pub async fn execute_typescript_code(
             step_id: "typescript_execution".to_owned(),
         });
 
-        merlin_deps::tracing::debug!("TypeScript execution result: {:?}", agent_response);
+        tracing::debug!("TypeScript execution result: {:?}", agent_response);
 
         Ok(agent_response)
     }
@@ -136,7 +136,7 @@ async fn parse_agent_response_from_handle(
             // Convert extracted task list to core types
             let steps = convert_extracted_steps(task_list.steps)?;
 
-            merlin_deps::tracing::debug!(
+            tracing::debug!(
                 "Parsed agent response as TaskList with {} steps",
                 steps.len()
             );
@@ -152,7 +152,7 @@ async fn parse_agent_response_from_handle(
                 .map_err(|err| RoutingError::Other(format!("Failed to convert to JSON: {err}")))?;
             let json_string = to_string(&json_value)
                 .map_err(|err| RoutingError::Other(format!("Failed to serialize JSON: {err}")))?;
-            merlin_deps::tracing::debug!("Agent response is DirectResult");
+            tracing::debug!("Agent response is DirectResult");
             Ok(AgentResponse::DirectResult(json_string))
         }
     }

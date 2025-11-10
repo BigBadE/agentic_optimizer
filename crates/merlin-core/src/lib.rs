@@ -40,7 +40,7 @@ pub use types::{
 
 // Re-export types from merged modules (formerly merlin-types)
 pub use config::{
-    ProjectConfig, RoutingConfig, TierConfig, ValidationCheckType, ValidationChecks,
+    ProjectConfig, ProviderType, RoutingConfig, TierConfig, ValidationCheckType, ValidationChecks,
     ValidationConfig,
 };
 pub use conversation::{

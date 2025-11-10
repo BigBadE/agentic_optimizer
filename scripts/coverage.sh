@@ -20,7 +20,6 @@ for arg in "$@"; do
   case "$arg" in
     --fixture)
       FIXTURE_ONLY=true
-      shift
       ;;
     *)
       # ignore unknown args (forward compatibility)
@@ -32,16 +31,17 @@ done
 echo "[coverage] Running tests with coverage instrumentation..."
 
 # Respect CARGO_TARGET_DIR if set externally, otherwise use default
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")"/.. && pwd)"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")"/.. && pwd)"
+ROOT_DIR="${SCRIPT_DIR}"
 TARGET_DIR="${CARGO_TARGET_DIR:-${ROOT_DIR}/target}"
 LLVM_COV_DIR="${TARGET_DIR}/llvm-cov-target"
 CARGO_PROFILE="${CARGO_PROFILE:-dev}"
 
 # Clean any existing prof files and temp directories for a clean build
-rm -rf benchmarks/data/coverage 2>/dev/null
-rm -f "${LLVM_COV_DIR}"/*.prof* 2>/dev/null
-rm -f "${LLVM_COV_DIR}"/*-profraw-list 2>/dev/null
-rm -rf "${LLVM_COV_DIR}"/temp_lcov_* 2>/dev/null
+rm -rf benchmarks/data/coverage 2>/dev/null || true
+rm -f "${LLVM_COV_DIR}"/*.prof* 2>/dev/null || true
+rm -f "${LLVM_COV_DIR}"/*-profraw-list 2>/dev/null || true
+rm -rf "${LLVM_COV_DIR}"/temp_lcov_* 2>/dev/null || true
 mkdir -p benchmarks/data/coverage
 
 if [ "$FIXTURE_ONLY" = true ]; then
@@ -66,7 +66,7 @@ if [ "$FIXTURE_ONLY" = true ]; then
   grcov benchmarks/data/coverage/latest_fixtures_only.info \
     -s "${ROOT_DIR}" \
     -t html \
-    -o benchmarks/data/coverage/html\
+    -o benchmarks/data/coverage/html
 
   # Delete the prof files that cargo llvm-cov creates
   rm -f "${LLVM_COV_DIR}/"*.profraw 2>/dev/null

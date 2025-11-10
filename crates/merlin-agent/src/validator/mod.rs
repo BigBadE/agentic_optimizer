@@ -3,8 +3,6 @@
 //! This module provides a validation framework with multiple stages
 //! (syntax, lint, test, build) that can be run sequentially or with early exit.
 
-/// Citation validation for agent responses
-pub mod citations;
 /// Validation pipeline implementation
 pub mod pipeline;
 /// Individual validation stages
@@ -14,7 +12,6 @@ use async_trait::async_trait;
 use merlin_core::Response;
 use merlin_core::{Result, Task, ValidationResult};
 
-pub use citations::{Citation, CitationStatistics, CitationValidator};
 pub use pipeline::{ValidationPipeline, ValidationStage};
 pub use stages::SyntaxValidationStage;
 

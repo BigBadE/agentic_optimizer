@@ -1,0 +1,103 @@
+{
+  "name": "Parallel Independent Files",
+  "description": "Tests that parallel tasks on independent files execute without conflicts",
+  "tags": [
+    "orchestrator",
+    "parallel",
+    "file-operations",
+    "no-conflict"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create file1.txt and file2.txt in parallel",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "file1.txt",
+            "exists": true
+          },
+          {
+            "path": "file2.txt",
+            "exists": true
+          }
+        ]
+      },
+      "strategy": {
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code() {",
+              "  return {",
+              "    title: 'Create Files in Parallel',",
+              "    steps: [",
+              "      {",
+              "        title: 'Create file1.txt',",
+              "        description: 'Create first file',",
+              "        step_type: 'implementation'",
+              "      },",
+              "      {",
+              "        title: 'Create file2.txt',",
+              "        description: 'Create second file',",
+              "        step_type: 'implementation'",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('file1.txt', 'content1');",
+              "  return 'Created file1.txt';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('file2.txt', 'content2');",
+              "  return 'Created file2.txt';",
+              "}"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "file1.txt",
+        "exists": true,
+        "contains": [
+          "content1"
+        ]
+      },
+      {
+        "path": "file2.txt",
+        "exists": true,
+        "contains": [
+          "content2"
+        ]
+      }
+    ],
+    "execution": {}
+  }
+}

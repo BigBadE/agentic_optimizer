@@ -27,8 +27,8 @@ pub fn generate_typescript_signatures(tools: &[&dyn Tool]) -> Result<String, Fmt
 mod tests {
     use super::*;
     use crate::{ToolInput, ToolOutput, ToolResult};
+    use anyhow::Result;
     use async_trait::async_trait;
-    use merlin_deps::anyhow::Result;
 
     struct MockTool;
 

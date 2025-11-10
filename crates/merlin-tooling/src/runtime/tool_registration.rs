@@ -9,9 +9,9 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::thread::scope;
 
-use merlin_deps::boa_engine::JsNativeError;
-use merlin_deps::boa_engine::{Context, JsResult, JsValue, NativeFunction};
-use merlin_deps::serde_json::Value;
+use boa_engine::JsNativeError;
+use boa_engine::{Context, JsResult, JsValue, NativeFunction};
+use serde_json::Value;
 use tokio::runtime::Builder;
 
 use super::conversion::{js_value_to_json_static, json_to_js_value_static};
@@ -40,11 +40,11 @@ pub fn register_tool_functions(
             // 3. The closure only captures Arc which is safe to share
             unsafe {
             NativeFunction::from_closure(move |_this, args, ctx| {
-                merlin_deps::tracing::debug!("Tool '{}' called from JavaScript", tool_clone.name());
+                tracing::debug!("Tool '{}' called from JavaScript", tool_clone.name());
 
                 // Get parameters - handle both object and positional argument patterns
                 let params = if args.is_empty() {
-                    merlin_deps::serde_json::json!({})
+                    serde_json::json!({})
                 } else if args.len() == 1 {
                     // Single argument - could be object or simple value
                     js_value_to_json_static(&args[0], ctx)?
@@ -115,15 +115,15 @@ fn convert_positional_args(
             let reason = if args.len() > 1 {
                 js_value_to_json_static(&args[1], ctx)?
             } else {
-                merlin_deps::serde_json::json!("")
+                serde_json::json!("")
             };
             let max_files = if args.len() > 2 {
                 js_value_to_json_static(&args[2], ctx)?
             } else {
-                merlin_deps::serde_json::json!(5) // Default max_files
+                serde_json::json!(5) // Default max_files
             };
 
-            Ok(merlin_deps::serde_json::json!({
+            Ok(serde_json::json!({
                 "pattern": pattern,
                 "reason": reason,
                 "max_files": max_files
@@ -139,7 +139,7 @@ fn convert_positional_args(
             let path = js_value_to_json_static(&args[0], ctx)?;
             let file_content = js_value_to_json_static(&args[1], ctx)?;
 
-            Ok(merlin_deps::serde_json::json!({
+            Ok(serde_json::json!({
                 "path": path,
                 "content": file_content
             }))
@@ -167,7 +167,7 @@ fn convert_positional_args(
                 false
             };
 
-            Ok(merlin_deps::serde_json::json!({
+            Ok(serde_json::json!({
                 "path": path,
                 "old_string": old_string,
                 "new_string": new_string,

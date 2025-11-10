@@ -7,10 +7,10 @@ use merlin_core::{
     ModelProvider, PromptType, Query, Result, RoutingContext, RoutingError, TaskId, TaskList,
     TaskStep, ValidationErrorType, WorkUnit,
 };
-use merlin_deps::tracing::{Level, span};
 use merlin_routing::UiChannel;
 use merlin_tooling::{PersistentTypeScriptRuntime, ToolRegistry, ToolingJsValueHandle};
 use tokio::sync::Mutex;
+use tracing::{Level, span};
 use tracing_futures::Instrument as _;
 
 use super::typescript::{execute_typescript_code, extract_typescript_code};
@@ -120,13 +120,14 @@ impl StepExecutor {
         match validation_result {
             Ok(()) => Ok(()),
             Err(ValidationErrorType::Hard(err)) => {
-                merlin_deps::tracing::warn!("Hard validation error for step '{step_title}': {err}");
+                tracing::warn!("Hard validation error for step '{step_title}': {err}");
                 *attempt += 1;
-                // TODO: Implement model tier escalation
+                // NOTE: Model tier escalation happens at the RoutingOrchestrator level,
+                // not at the step level. Hard errors propagate up to trigger task-level escalation.
                 Err(ExecutionResult::HardError)
             }
             Err(ValidationErrorType::Soft(err)) => {
-                merlin_deps::tracing::info!("Soft validation error for step '{step_title}': {err}");
+                tracing::info!("Soft validation error for step '{step_title}': {err}");
                 *attempt += 1;
                 // TODO: Add feedback to context for next attempt
                 Err(ExecutionResult::SoftError)
@@ -159,7 +160,7 @@ impl StepExecutor {
         })
         .await?;
 
-        merlin_deps::tracing::debug!(
+        tracing::debug!(
             "Step '{}' returned {}",
             params.step.description,
             match &response {
@@ -257,7 +258,7 @@ impl StepExecutor {
                 params.previous_results,
             );
 
-            merlin_deps::tracing::debug!(
+            tracing::debug!(
                 "Executing step '{}' (attempt {})",
                 params.step.description,
                 attempt + 1
@@ -311,7 +312,7 @@ impl StepExecutor {
 
             let query = Query::new(description.to_owned()).with_routing_context(routing_context);
 
-            merlin_deps::tracing::debug!(
+            tracing::debug!(
                 "Executing query with routing: context={:?}, prompt={:?}, retry={}",
                 query.routing_context.context_type,
                 query.routing_context.prompt_type,
@@ -324,7 +325,7 @@ impl StepExecutor {
                 .await
                 .map_err(|err| RoutingError::Other(format!("Provider error: {err}")))?;
 
-            merlin_deps::tracing::debug!("Agent response: {}", response.text);
+            tracing::debug!("Agent response: {}", response.text);
 
             // Extract and execute TypeScript code
             let typescript_code = extract_typescript_code(&response.text).ok_or_else(|| {
@@ -373,7 +374,7 @@ impl StepExecutor {
             if let Some(ref files) = spec.files {
                 for file_pattern in files {
                     // TODO: Implement file pattern matching and addition
-                    merlin_deps::tracing::debug!("Adding files matching: {}", file_pattern.pattern);
+                    tracing::debug!("Adding files matching: {}", file_pattern.pattern);
                 }
             }
 
@@ -404,7 +405,7 @@ impl StepExecutor {
             return Ok(());
         };
 
-        merlin_deps::tracing::debug!(
+        tracing::debug!(
             "Validating exit requirement with function handle: {}",
             func_handle.id()
         );
@@ -415,11 +416,11 @@ impl StepExecutor {
         // Call the stored JavaScript function directly
         match runtime.call_function(tooling_handle).await {
             Ok(_result_handle) => {
-                merlin_deps::tracing::debug!("Exit requirement validation passed");
+                tracing::debug!("Exit requirement validation passed");
                 Ok(())
             }
             Err(err) => {
-                merlin_deps::tracing::debug!("Exit requirement validation failed: {err}");
+                tracing::debug!("Exit requirement validation failed: {err}");
                 Err(ValidationErrorType::Soft(format!(
                     "Exit requirement validation failed: {err}"
                 )))

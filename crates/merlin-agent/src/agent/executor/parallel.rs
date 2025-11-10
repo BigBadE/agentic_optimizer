@@ -75,7 +75,7 @@ async fn update_work_unit_on_completion(
 ) {
     let mut work_unit_guard = work_unit.lock().await;
 
-    merlin_deps::tracing::debug!(
+    tracing::debug!(
         "Updating WorkUnit for completed step: '{}' (result length: {})",
         step_title,
         step_result.text.len()
@@ -88,7 +88,7 @@ async fn update_work_unit_on_completion(
         .iter()
         .position(|step| step.title == step_title)
     {
-        merlin_deps::tracing::debug!(
+        tracing::debug!(
             "Found step at index {}, subtask count: {}",
             step_index,
             work_unit_guard.subtasks.len()
@@ -96,7 +96,7 @@ async fn update_work_unit_on_completion(
 
         if let Some(subtask) = work_unit_guard.subtasks.get(step_index) {
             let subtask_id = subtask.id;
-            merlin_deps::tracing::debug!(
+            tracing::debug!(
                 "Marking subtask {} (id: {:?}, current status: {:?}) as completed",
                 step_index,
                 subtask_id,
@@ -106,14 +106,14 @@ async fn update_work_unit_on_completion(
 
             // Verify it was actually completed
             if let Some(updated_subtask) = work_unit_guard.subtasks.get(step_index) {
-                merlin_deps::tracing::debug!(
+                tracing::debug!(
                     "After update, subtask {} status: {:?}",
                     step_index,
                     updated_subtask.status
                 );
             }
         } else {
-            merlin_deps::tracing::warn!(
+            tracing::warn!(
                 "No subtask found at index {} (step_title: '{}')",
                 step_index,
                 step_title
@@ -130,7 +130,7 @@ async fn update_work_unit_on_completion(
             .filter(|subtask| matches!(subtask.status, SubtaskStatus::Completed))
             .count();
 
-        merlin_deps::tracing::debug!(
+        tracing::debug!(
             "WorkUnit progress after step '{}': {:.1}% ({}/{} completed, verified {}/{})",
             step_title,
             progress_pct,
@@ -140,7 +140,7 @@ async fn update_work_unit_on_completion(
             total_subtasks,
         );
     } else {
-        merlin_deps::tracing::warn!("Step '{}' not found in task_list.steps", step_title);
+        tracing::warn!("Step '{}' not found in task_list.steps", step_title);
     }
 }
 
@@ -155,7 +155,7 @@ async fn execute_and_track_step(
     results_by_title: &HashMap<String, StepResult>,
     completed: &mut HashSet<String>,
 ) -> Result<StepResult> {
-    merlin_deps::tracing::debug!(
+    tracing::debug!(
         "Executing step {}/{}: {}",
         index + 1,
         params.task_list.steps.len(),
@@ -220,7 +220,7 @@ pub(super) async fn execute_task_list_parallel(
     // Track completion
     let mut completed: HashSet<String> = HashSet::new();
 
-    merlin_deps::tracing::debug!(
+    tracing::debug!(
         "Executing task list '{}' with {} steps at depth {}, work_unit tracking: {}",
         params.task_list.title,
         params.task_list.steps.len(),
@@ -235,7 +235,7 @@ pub(super) async fn execute_task_list_parallel(
         .any(|step| !step.dependencies.is_empty());
 
     if has_dependencies {
-        merlin_deps::tracing::info!(
+        tracing::info!(
             "Using dependency-aware execution for task list '{}'",
             params.task_list.title
         );

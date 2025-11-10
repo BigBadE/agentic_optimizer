@@ -6,9 +6,9 @@ use std::sync::Arc;
 
 use merlin_agent::RoutingOrchestrator;
 use merlin_core::{Message, MessageId, TaskResult, ThreadId, TokenUsage, WorkUnit};
-use merlin_deps::ratatui::backend::Backend;
 use merlin_routing::{RoutingError, Task, TaskId, UiChannel, UiEvent};
 use merlin_tooling::ToolError;
+use ratatui::backend::Backend;
 use tokio::sync::{mpsc, oneshot};
 use tokio::task::spawn_local;
 
@@ -40,6 +40,8 @@ struct TaskResultContext<'ctx> {
 pub struct TaskExecutionParams {
     /// Orchestrator for task routing
     pub orchestrator: Arc<RoutingOrchestrator>,
+    /// Task ID (pre-created for immediate UI feedback)
+    pub task_id: TaskId,
     /// User input text
     pub user_input: String,
     /// Parent task ID if this is a subtask
@@ -53,6 +55,7 @@ pub struct TaskExecutionParams {
 /// Internal parameters for task execution including runtime state
 struct InternalExecutionParams {
     orchestrator: Arc<RoutingOrchestrator>,
+    task_id: TaskId,
     user_input: String,
     parent_task_id: Option<TaskId>,
     conversation_history: Vec<(String, String)>,
@@ -66,6 +69,7 @@ struct InternalExecutionParams {
 async fn execute_and_handle_task(params: InternalExecutionParams) {
     let InternalExecutionParams {
         orchestrator,
+        task_id,
         user_input,
         parent_task_id,
         conversation_history,
@@ -78,8 +82,8 @@ async fn execute_and_handle_task(params: InternalExecutionParams) {
         let _ignored = writeln!(log, "User: {user_input}");
     }
 
-    let task = Task::new(user_input.clone());
-    let task_id = task.id;
+    // Use the pre-created task_id
+    let task = Task::from_id(task_id, user_input.clone());
 
     let (actual_thread_id, message_id) =
         create_or_continue_thread(&orchestrator, &user_input, thread_id);
@@ -131,9 +135,7 @@ async fn execute_and_handle_task(params: InternalExecutionParams) {
 
     // Wait for forwarder to finish processing all events
     if forwarder_done_rx.await.is_err() {
-        merlin_deps::tracing::warn!(
-            "Forwarder completion signal sender was dropped before signaling"
-        );
+        tracing::warn!("Forwarder completion signal sender was dropped before signaling");
     }
 }
 
@@ -204,7 +206,7 @@ fn create_or_continue_thread(
         let thread = store.create_thread(thread_name);
         let tid = thread.id;
         if let Err(save_err) = store.save_thread(&thread) {
-            merlin_deps::tracing::warn!("Failed to create thread: {save_err}");
+            tracing::warn!("Failed to create thread: {save_err}");
         }
         tid
     });
@@ -220,7 +222,7 @@ fn create_or_continue_thread(
     if let Some(thread) = thread_to_save
         && let Err(save_err) = store.save_thread(&thread)
     {
-        merlin_deps::tracing::warn!("Failed to save thread message: {save_err}");
+        tracing::warn!("Failed to save thread message: {save_err}");
     }
 
     (Some(tid), Some(msg_id))
@@ -268,7 +270,7 @@ fn update_thread_work_completed(
     if let Some(thread) = thread_to_save
         && let Err(save_err) = store.save_thread(&thread)
     {
-        merlin_deps::tracing::warn!("Failed to save thread work completion: {save_err}");
+        tracing::warn!("Failed to save thread work completion: {save_err}");
     }
 }
 
@@ -308,7 +310,7 @@ fn update_thread_work_failed(
     if let Some(thread) = thread_to_save
         && let Err(save_err) = store.save_thread(&thread)
     {
-        merlin_deps::tracing::warn!("Failed to save thread work failure: {save_err}");
+        tracing::warn!("Failed to save thread work failure: {save_err}");
     }
 }
 
@@ -325,7 +327,7 @@ impl<B: Backend> TuiApp<B> {
                 // Send to task-specific channel (test waits on this) - now bounded
                 if task_event_tx.send(event.clone()).await.is_err() {
                     // Task channel closed, continue draining to global channel
-                    merlin_deps::tracing::debug!("Task event channel closed, draining to global");
+                    tracing::debug!("Task event channel closed, draining to global");
                 }
                 // Send to global UI channel (UI updates from this) - still unbounded
                 if global_ui_sender.send(event).is_err() {
@@ -334,7 +336,7 @@ impl<B: Backend> TuiApp<B> {
             }
             // Signal that forwarding is complete AFTER all events processed
             if forwarder_done_tx.send(()).is_err() {
-                merlin_deps::tracing::warn!("Forwarder completion signal receiver was dropped");
+                tracing::warn!("Forwarder completion signal receiver was dropped");
             }
         });
     }
@@ -345,6 +347,7 @@ impl<B: Backend> TuiApp<B> {
     pub(crate) fn spawn_task_execution(&mut self, params: TaskExecutionParams) {
         let TaskExecutionParams {
             orchestrator,
+            task_id,
             user_input,
             parent_task_id,
             conversation_history,
@@ -380,6 +383,7 @@ impl<B: Backend> TuiApp<B> {
 
         spawn_local(execute_and_handle_task(InternalExecutionParams {
             orchestrator,
+            task_id,
             user_input,
             parent_task_id,
             conversation_history,

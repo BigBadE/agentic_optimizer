@@ -2,9 +2,9 @@ use std::env;
 use std::time::Instant;
 
 use async_trait::async_trait;
-use merlin_deps::serde_json::{Value, json};
 use reqwest::Client;
 use serde::Deserialize;
+use serde_json::{Value, json};
 
 use merlin_core::{Context, CoreResult, Error, ModelProvider, Query, Response, Result, TokenUsage};
 

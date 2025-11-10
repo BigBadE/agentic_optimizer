@@ -1,9 +1,9 @@
 //! Agent executor benchmarks for end-to-end streaming execution.
 
+use anyhow::Error;
 use criterion::{BenchmarkId, Criterion, Throughput};
 use merlin_agent::RoutingOrchestrator;
 use merlin_core::{RoutingConfig, Task};
-use merlin_deps::anyhow::Error;
 use merlin_routing::{UiChannel, UiEvent};
 use std::hint::black_box;
 use tokio::runtime::Runtime;

@@ -1,0 +1,135 @@
+{
+  "name": "Multi-Turn Conversation History",
+  "description": "Tests that conversation history is maintained across multiple turns and affects agent responses",
+  "tags": [
+    "threads",
+    "conversation",
+    "context"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create a variable named counter",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "files": [
+          {
+            "path": "state.json",
+            "exists": true,
+            "contains": [
+              "counter"
+            ]
+          }
+        ]
+      },
+      "strategy": {
+        "type": "once",
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('state.json', JSON.stringify({ counter: 0 }));",
+            "  return 'Created counter variable';",
+            "}"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Increment it by 5",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "files": [
+          {
+            "path": "state.json",
+            "exists": true,
+            "contains": [
+              "counter"
+            ]
+          }
+        ]
+      },
+      "strategy": {
+        "type": "once",
+        "routing_match": {
+          "context_type": "step_execution"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const data = JSON.parse(await readFile('state.json'));",
+            "  data.counter += 5;",
+            "  await writeFile('state.json', JSON.stringify(data));",
+            "  return 'Incremented counter to 5';",
+            "}"
+          ]
+        }
+      }
+    },
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Double it",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "files": [
+          {
+            "path": "state.json",
+            "exists": true,
+            "contains": [
+              "counter"
+            ]
+          }
+        ]
+      },
+      "strategy": {
+        "type": "once",
+        "routing_match": {
+          "context_type": "step_execution"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  const data = JSON.parse(await readFile('state.json'));",
+            "  data.counter *= 2;",
+            "  await writeFile('state.json', JSON.stringify(data));",
+            "  return 'Doubled counter to 10';",
+            "}"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "state.json",
+        "exists": true,
+        "contains": [
+          "counter"
+        ]
+      }
+    ]
+  }
+}

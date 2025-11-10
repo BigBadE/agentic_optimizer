@@ -1,7 +1,7 @@
 //! Interactive mode functionality - TUI mode
 
+use anyhow::Result;
 use merlin_agent::RoutingOrchestrator;
-use merlin_deps::anyhow::Result;
 
 use crate::ui::TuiApp;
 use std::io::Write as _;
@@ -72,9 +72,12 @@ pub async fn run_tui_interactive(
 
     TuiApp::enable_raw_mode()?;
 
+    // Render the UI immediately before loading tasks
+    tui_app.render()?;
+
     tui_app.load_tasks_async().await;
     if let Err(err) = tui_app.load_threads() {
-        merlin_deps::tracing::warn!("Failed to load threads: {err}");
+        tracing::warn!("Failed to load threads: {err}");
     }
 
     // Count .gz files asynchronously
@@ -103,6 +106,9 @@ pub async fn run_tui_interactive(
         parsed_tasks,
         tasks_dir.display(),
     )?;
+
+    // Render again after loading tasks
+    tui_app.render()?;
 
     // Run the event loop until quit
     tui_app.run_event_loop().await?;

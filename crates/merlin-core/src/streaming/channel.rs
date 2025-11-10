@@ -1,6 +1,6 @@
 use super::StreamingEvent;
-use merlin_deps::tracing::warn;
 use tokio::sync::mpsc;
+use tracing::warn;
 
 /// Channel for streaming execution events
 #[derive(Clone)]

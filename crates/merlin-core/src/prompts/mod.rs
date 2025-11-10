@@ -47,7 +47,7 @@ fn extract_prompt_section(content: &str) -> Result<String, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::anyhow::Result;
+    use anyhow::Result;
 
     /// Tests extraction of prompt section from markdown.
     ///
@@ -71,8 +71,7 @@ This is the actual prompt content.
 It can have multiple lines.
 ";
 
-        let result = extract_prompt_section(markdown)
-            .map_err(|err| merlin_deps::anyhow::anyhow!("{err}"))?;
+        let result = extract_prompt_section(markdown).map_err(|err| anyhow::anyhow!("{err}"))?;
         assert_eq!(
             result,
             "This is the actual prompt content.\n\nIt can have multiple lines."
@@ -89,8 +88,7 @@ It can have multiple lines.
     /// Panics if assertions fail during test execution.
     #[test]
     fn test_load_context_planning_prompt() -> Result<()> {
-        let prompt =
-            load_prompt("context_planning").map_err(|err| merlin_deps::anyhow::anyhow!("{err}"))?;
+        let prompt = load_prompt("context_planning").map_err(|err| anyhow::anyhow!("{err}"))?;
         // Ensure Usage section is not included in the extracted prompt
         assert!(!prompt.contains("## Usage"));
         assert!(!prompt.contains("When used:"));
@@ -106,8 +104,7 @@ It can have multiple lines.
     /// Panics if assertions fail during test execution.
     #[test]
     fn test_load_typescript_agent_prompt() -> Result<()> {
-        let prompt =
-            load_prompt("typescript_agent").map_err(|err| merlin_deps::anyhow::anyhow!("{err}"))?;
+        let prompt = load_prompt("typescript_agent").map_err(|err| anyhow::anyhow!("{err}"))?;
         // Ensure Usage section is not included in the extracted prompt
         assert!(!prompt.contains("## Usage"));
         assert!(!prompt.contains("When used:"));

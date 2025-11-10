@@ -1,7 +1,7 @@
 //! Promise extraction and handling utilities.
 
-use merlin_deps::boa_engine::property::Attribute;
-use merlin_deps::boa_engine::{Context, JsValue, Source};
+use boa_engine::property::Attribute;
+use boa_engine::{Context, JsValue, Source};
 
 use crate::{ToolError, ToolResult};
 
@@ -34,7 +34,7 @@ pub fn extract_promise_if_needed(result: JsValue, context: &mut Context) -> Tool
         return Ok(result);
     }
 
-    merlin_deps::tracing::debug!("Result is a Promise, extracting resolved value");
+    tracing::debug!("Result is a Promise, extracting resolved value");
 
     // Store the promise in a global variable and use JavaScript to extract its value
     context

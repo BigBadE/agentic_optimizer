@@ -7,7 +7,7 @@ use merlin_core::{
 };
 use std::fmt::Write as _;
 use std::sync::Arc;
-use tokio::sync::Mutex;
+use tokio::sync::RwLock;
 
 /// Type alias for conversation history
 pub type ConversationHistory = Vec<(String, String)>;
@@ -16,8 +16,8 @@ pub type ConversationHistory = Vec<(String, String)>;
 #[derive(Clone)]
 pub struct ContextBuilder {
     context_fetcher: Arc<ContextFetcher>,
-    /// Conversation history for context building
-    pub conversation_history: Arc<Mutex<ConversationHistory>>,
+    /// Conversation history for context building (`RwLock` for read-heavy access)
+    pub conversation_history: Arc<RwLock<ConversationHistory>>,
 }
 
 impl ContextBuilder {
@@ -25,7 +25,7 @@ impl ContextBuilder {
     #[must_use]
     pub fn new(
         context_fetcher: Arc<ContextFetcher>,
-        conversation_history: Arc<Mutex<ConversationHistory>>,
+        conversation_history: Arc<RwLock<ConversationHistory>>,
     ) -> Self {
         Self {
             context_fetcher,
@@ -74,9 +74,9 @@ impl ContextBuilder {
             content: "Searching for relevant files".to_owned(),
         });
 
-        // Check if we have conversation history
+        // Check if we have conversation history (read lock)
         let context = {
-            let conv_history = self.conversation_history.lock().await;
+            let conv_history = self.conversation_history.read().await;
             if conv_history.is_empty() {
                 drop(conv_history);
                 self.context_fetcher
@@ -102,34 +102,22 @@ impl ContextBuilder {
     /// Build context for TypeScript-based agent execution
     ///
     /// # Errors
-    /// Returns an error if context building or prompt loading fails
+    /// Returns an error if context building fails
     pub async fn build_context_for_typescript(
         &self,
         task: &Task,
         ui_channel: &UiChannel,
-        tool_signatures: &str,
+        compiled_prompt: &str,
     ) -> Result<Context> {
-        use merlin_core::prompts::load_prompt;
-
-        const TOOL_SIGNATURES_PLACEHOLDER: &str = "{tool_signatures}";
-
-        // Load TypeScript agent prompt template
-        let prompt_template = load_prompt("typescript_agent").map_err(|err| {
-            RoutingError::Other(format!("Failed to load typescript_agent prompt: {err}"))
-        })?;
-
-        // Replace placeholder with actual signatures
-        let system_prompt = prompt_template.replace(TOOL_SIGNATURES_PLACEHOLDER, tool_signatures);
-
         // Always get file context (self-assessor handles simple tasks before we get here)
         let base_context = self.build_context(task, ui_channel).await?;
 
-        // Combine TypeScript prompt with file context
-        let mut context = Context::new(system_prompt);
+        // Combine pre-compiled TypeScript prompt with file context
+        let mut context = Context::new(compiled_prompt.to_owned());
         context.files = base_context.files;
 
-        // Add conversation history if present
-        let conv_history = self.conversation_history.lock().await;
+        // Add conversation history if present (read lock)
+        let conv_history = self.conversation_history.read().await;
         if !conv_history.is_empty() {
             let _write_result1 = write!(context.system_prompt, "\n\n## Conversation History\n\n");
 
@@ -145,7 +133,7 @@ impl ContextBuilder {
     #[must_use]
     pub async fn calculate_conversation_tokens(&self) -> usize {
         let char_count: usize = {
-            let conv_history = self.conversation_history.lock().await;
+            let conv_history = self.conversation_history.read().await;
             conv_history
                 .iter()
                 .map(|(role, content)| role.len() + content.len() + 10)
@@ -156,10 +144,10 @@ impl ContextBuilder {
 
     /// Log conversation preview
     pub async fn log_conversation_preview(&self) {
-        use merlin_deps::tracing::info;
+        use tracing::info;
 
         let (message_count, messages, has_more) = {
-            let conv_history = self.conversation_history.lock().await;
+            let conv_history = self.conversation_history.read().await;
             if conv_history.is_empty() {
                 return;
             }
@@ -202,9 +190,9 @@ impl ContextBuilder {
 
     /// Log conversation history section
     pub async fn log_conversation_history(&self) {
-        use merlin_deps::tracing::info;
+        use tracing::info;
 
-        let conv_history = self.conversation_history.lock().await;
+        let conv_history = self.conversation_history.read().await;
         if !conv_history.is_empty() {
             info!(
                 "=== CONVERSATION HISTORY ({} messages) ===",

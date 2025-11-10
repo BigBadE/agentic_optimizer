@@ -1,7 +1,7 @@
 //! Thread management operations for TUI
 
 use super::tui_app::TuiApp;
-use merlin_deps::ratatui::backend::Backend;
+use ratatui::backend::Backend;
 
 impl<B: Backend> TuiApp<B> {
     /// Navigates up in the thread list
@@ -72,20 +72,20 @@ impl<B: Backend> TuiApp<B> {
 
         // Save the thread
         if let Err(err) = store.save_thread(&thread) {
-            merlin_deps::tracing::error!("Failed to save new thread: {err}");
+            tracing::error!("Failed to save new thread: {err}");
             return;
         }
 
         // Select the new thread
         self.ui_components.state.active_thread_id = Some(thread_id);
-        merlin_deps::tracing::info!("Created new thread {thread_id}");
+        tracing::info!("Created new thread {thread_id}");
     }
 
     /// Branches from the current message
     pub(super) fn branch_from_current(&mut self) {
         // Get the current thread and message
         let Some(thread_id) = self.ui_components.state.active_thread_id else {
-            merlin_deps::tracing::warn!("No thread selected for branching");
+            tracing::warn!("No thread selected for branching");
             return;
         };
 
@@ -94,13 +94,13 @@ impl<B: Backend> TuiApp<B> {
         };
 
         let Some(thread) = store.get_thread(thread_id) else {
-            merlin_deps::tracing::warn!("Selected thread {thread_id} not found");
+            tracing::warn!("Selected thread {thread_id} not found");
             return;
         };
 
         // Get the last message from the thread
         let Some(last_message) = thread.messages.last() else {
-            merlin_deps::tracing::warn!("Thread {thread_id} has no messages to branch from");
+            tracing::warn!("Thread {thread_id} has no messages to branch from");
             return;
         };
 
@@ -114,16 +114,16 @@ impl<B: Backend> TuiApp<B> {
 
                 // Save the branch
                 if let Err(err) = store.save_thread(&branch) {
-                    merlin_deps::tracing::error!("Failed to save branch: {err}");
+                    tracing::error!("Failed to save branch: {err}");
                     return;
                 }
 
                 // Select the new branch
                 self.ui_components.state.active_thread_id = Some(branch_id);
-                merlin_deps::tracing::info!("Created branch {branch_id} from thread {thread_id}");
+                tracing::info!("Created branch {branch_id} from thread {thread_id}");
             }
             Err(err) => {
-                merlin_deps::tracing::error!("Failed to create branch: {err}");
+                tracing::error!("Failed to create branch: {err}");
             }
         }
     }
@@ -139,7 +139,7 @@ impl<B: Backend> TuiApp<B> {
         };
 
         if let Err(err) = store.archive_thread(thread_id) {
-            merlin_deps::tracing::error!("Failed to archive thread {thread_id}: {err}");
+            tracing::error!("Failed to archive thread {thread_id}: {err}");
             return;
         }
 
@@ -148,6 +148,6 @@ impl<B: Backend> TuiApp<B> {
         drop(store); // Release lock before navigating
         self.navigate_threads_down();
 
-        merlin_deps::tracing::info!("Archived thread {thread_id}");
+        tracing::info!("Archived thread {thread_id}");
     }
 }

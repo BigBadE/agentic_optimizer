@@ -1,0 +1,56 @@
+{
+  "name": "Task Shows Immediately on Submit",
+  "description": "Tests that a task appears in the task list immediately after pressing Enter, before the LLM response comes back. This ensures users see feedback that their input was received.",
+  "tags": [
+    "threads",
+    "tui",
+    "ui",
+    "task-list"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "What model are you?",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "tasks_displayed": 1,
+          "running_tasks_count": 1,
+          "selected_task_contains": "What model are you?"
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'I am Claude Sonnet 4.5';",
+            "}"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "ui": {
+      "tasks_displayed": 1,
+      "completed_tasks_count": 1
+    },
+    "execution": {}
+  }
+}

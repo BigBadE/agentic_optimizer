@@ -1,0 +1,56 @@
+{
+  "name": "Recursion Depth Limit Enforced",
+  "description": "Tests that MAX_RECURSION_DEPTH=10 is enforced and prevents infinite recursion",
+  "tags": [
+    "executor",
+    "recursion",
+    "limits",
+    "error-handling"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create infinitely nested structure",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {
+          "expected_failure": "recursion"
+        }
+      },
+      "strategy": {
+        "type": "repeating",
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<any> {",
+            "  return {",
+            "    title: 'Infinite Recursion Level',",
+            "    steps: [{",
+            "      title: 'Recurse deeper',",
+            "      description: 'Go deeper',",
+            "      step_type: 'implementation'",
+            "    }]",
+            "  };",
+            "}"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "execution": {
+      "expected_failure": "recursion"
+    }
+  }
+}

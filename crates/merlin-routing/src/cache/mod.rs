@@ -6,4 +6,4 @@
 /// Cache storage implementation
 pub mod storage;
 
-pub use storage::{CachedResponse, ResponseCache};
+pub use storage::{CacheStats, CachedResponse, ResponseCache};

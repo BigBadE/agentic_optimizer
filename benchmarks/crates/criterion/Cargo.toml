@@ -4,10 +4,10 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+anyhow.workspace = true
 merlin-agent.workspace = true
 merlin-context.workspace = true
 merlin-core.workspace = true
-merlin-deps.workspace = true
 merlin-local.workspace = true
 merlin-providers.workspace = true
 merlin-routing.workspace = true

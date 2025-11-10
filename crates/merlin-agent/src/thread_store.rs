@@ -3,8 +3,8 @@
 //! Handles saving/loading threads to/from disk and managing thread operations.
 
 use merlin_core::{MessageId, Result, RoutingError, Thread, ThreadColor, ThreadId};
-use merlin_deps::serde_json::{from_str, to_string_pretty};
 use serde::{Deserialize, Serialize};
+use serde_json::{from_str, to_string_pretty};
 use std::collections::HashMap;
 use std::fs;
 use std::path::PathBuf;
@@ -188,13 +188,19 @@ impl ThreadStore {
         Ok(())
     }
 
-    /// Returns all non-archived threads
+    /// Returns all non-archived threads sorted by most recently updated first
     #[must_use]
     pub fn active_threads(&self) -> Vec<&Thread> {
-        self.threads
+        let mut threads: Vec<&Thread> = self
+            .threads
             .values()
             .filter(|thread| !thread.archived)
-            .collect()
+            .collect();
+
+        // Sort by updated_at in descending order (most recent first)
+        threads.sort_by(|first, second| second.updated_at.cmp(&first.updated_at));
+
+        threads
     }
 
     /// Returns all archived threads
@@ -221,7 +227,7 @@ impl ThreadStore {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::tempfile::TempDir;
+    use tempfile::TempDir;
 
     /// Creates a test thread store with temporary directory.
     ///

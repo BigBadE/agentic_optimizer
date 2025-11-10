@@ -5,7 +5,7 @@ use crate::verify::UiVerify;
 use merlin_cli::TuiApp;
 use merlin_cli::ui::state::UiState;
 use merlin_core::Thread;
-use merlin_deps::ratatui::backend::TestBackend;
+use ratatui::backend::TestBackend;
 
 /// Helper to get thread count from either orchestrator or app thread store
 fn get_thread_count(app: &TuiApp<TestBackend>) -> usize {

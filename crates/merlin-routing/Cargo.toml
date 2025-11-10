@@ -6,14 +6,15 @@ edition.workspace = true
 [dependencies]
 merlin-context.workspace = true
 merlin-core.workspace = true
-merlin-deps.workspace = true
 merlin-languages.workspace = true
 merlin-local.workspace = true
 merlin-providers.workspace = true
 merlin-tooling.workspace = true
 async-trait.workspace = true
+petgraph.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
 
 [dev-dependencies]
 merlin-tooling.workspace = true

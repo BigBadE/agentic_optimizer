@@ -1,7 +1,7 @@
 use std::process::Command;
 
 use async_trait::async_trait;
-use merlin_deps::serde_json::from_value;
+use serde_json::from_value;
 use tokio::task::spawn_blocking;
 
 use crate::tool::{Tool, ToolError, ToolInput, ToolOutput, ToolResult};
@@ -29,15 +29,15 @@ impl BashTool {
     /// Returns a `ToolError` when the command fails to spawn or when reading the output fails.
     async fn execute_command(&self, command: &str) -> ToolResult<ToolOutput> {
         let command_str = command;
-        merlin_deps::tracing::debug!("Executing shell command: {}", command_str);
+        tracing::debug!("Executing shell command: {}", command_str);
 
         let command = command.to_owned();
 
         // Use spawn_blocking to run blocking I/O on Tokio's global thread pool
         // This works even when called from a current_thread runtime
-        merlin_deps::tracing::debug!("About to call spawn_blocking for command: {}", command);
+        tracing::debug!("About to call spawn_blocking for command: {}", command);
         let output = spawn_blocking(move || {
-            merlin_deps::tracing::debug!("Inside spawn_blocking, about to run command");
+            tracing::debug!("Inside spawn_blocking, about to run command");
             // Use sh for better performance on all platforms
             // On Windows (MINGW64/Git Bash), bash has ~6s startup overhead when spawned
             // from Rust's std::process::Command, while sh has only ~55ms overhead
@@ -50,7 +50,7 @@ impl BashTool {
                 .env("LANG", "C.UTF-8") // Ensure consistent locale
                 .output();
 
-            merlin_deps::tracing::debug!(
+            tracing::debug!(
                 "Command finished in spawn_blocking with result: {:?}",
                 result.as_ref().map(|output| output.status)
             );
@@ -72,7 +72,7 @@ impl BashTool {
         let message = if success {
             format!("Command executed successfully (exit code: {exit_code})")
         } else {
-            merlin_deps::tracing::warn!(
+            tracing::warn!(
                 "Command failed: {} | Exit code: {} | Stdout: {} | Stderr: {}",
                 command_str,
                 exit_code,
@@ -82,13 +82,13 @@ impl BashTool {
             format!("Command failed with exit code: {exit_code}")
         };
 
-        let data = merlin_deps::serde_json::json!({
+        let data = serde_json::json!({
             "stdout": stdout,
             "stderr": stderr,
             "exit_code": exit_code,
         });
 
-        merlin_deps::tracing::debug!(
+        tracing::debug!(
             "Bash command completed with exit code {}: {}",
             exit_code,
             command_str
@@ -159,7 +159,7 @@ impl Tool for BashTool {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::anyhow::Result;
+    use anyhow::Result;
 
     /// Tests basic bash command execution with successful output.
     ///
@@ -172,7 +172,7 @@ mod tests {
     async fn test_bash_tool_simple_command() -> Result<()> {
         let tool = BashTool;
         let input = ToolInput {
-            params: merlin_deps::serde_json::json!("echo 'hello'"),
+            params: serde_json::json!("echo 'hello'"),
         };
 
         let output = tool.execute(input).await?;
@@ -182,10 +182,10 @@ mod tests {
 
         let data = output
             .data
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected data"))?;
+            .ok_or_else(|| anyhow::anyhow!("Expected data"))?;
         let stdout = data["stdout"]
             .as_str()
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected stdout as string"))?;
+            .ok_or_else(|| anyhow::anyhow!("Expected stdout as string"))?;
         assert!(stdout.contains("hello"));
         Ok(())
     }
@@ -201,7 +201,7 @@ mod tests {
     async fn test_bash_tool_command_failure() -> Result<()> {
         let tool = BashTool;
         let input = ToolInput {
-            params: merlin_deps::serde_json::json!("exit 1"),
+            params: serde_json::json!("exit 1"),
         };
 
         let output = tool.execute(input).await?;
@@ -209,7 +209,7 @@ mod tests {
         assert!(output.message.contains("failed"));
         let data = output
             .data
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected data"))?;
+            .ok_or_else(|| anyhow::anyhow!("Expected data"))?;
         assert_eq!(data["exit_code"], 1);
         Ok(())
     }
@@ -225,17 +225,17 @@ mod tests {
     async fn test_bash_tool_with_object_params() -> Result<()> {
         let tool = BashTool;
         let input = ToolInput {
-            params: merlin_deps::serde_json::json!({"command": "echo test"}),
+            params: serde_json::json!({"command": "echo test"}),
         };
 
         let output = tool.execute(input).await?;
         assert!(output.success);
         let data = output
             .data
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected data"))?;
+            .ok_or_else(|| anyhow::anyhow!("Expected data"))?;
         let stdout = data["stdout"]
             .as_str()
-            .ok_or_else(|| merlin_deps::anyhow::anyhow!("Expected stdout as string"))?;
+            .ok_or_else(|| anyhow::anyhow!("Expected stdout as string"))?;
         assert!(stdout.contains("test"));
         Ok(())
     }
@@ -248,7 +248,7 @@ mod tests {
     async fn test_bash_tool_missing_command_param() {
         let tool = BashTool;
         let input = ToolInput {
-            params: merlin_deps::serde_json::json!({"wrong": "param"}),
+            params: serde_json::json!({"wrong": "param"}),
         };
 
         let result = tool.execute(input).await;

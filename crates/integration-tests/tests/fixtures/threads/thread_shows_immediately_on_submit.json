@@ -1,0 +1,57 @@
+{
+  "name": "Thread Shows Immediately on Submit",
+  "description": "Tests that a thread appears in the thread list immediately after pressing Enter, before the LLM response comes back. This ensures users see feedback that their input was received and a thread was created.",
+  "tags": [
+    "threads",
+    "tui",
+    "ui",
+    "thread-list"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "What model are you?",
+        "submit": true
+      },
+      "verify": {
+        "ui": {
+          "thread_count": 1,
+          "tasks_displayed": 1,
+          "running_tasks_count": 1
+        }
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {}
+      },
+      "strategy": {
+        "type": "once",
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  return 'I am Claude Sonnet 4.5';",
+            "}"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "ui": {
+      "thread_count": 1,
+      "tasks_displayed": 1,
+      "completed_tasks_count": 1
+    },
+    "execution": {}
+  }
+}

@@ -3,8 +3,8 @@
 use crate::verification_result::VerificationResult;
 use crate::verify::{RenderedRegionVerify, UiVerify};
 use merlin_cli::TuiApp;
-use merlin_deps::ratatui::backend::TestBackend;
-use merlin_deps::ratatui::buffer::Buffer;
+use ratatui::backend::TestBackend;
+use ratatui::buffer::Buffer;
 
 /// Verify rendered buffer patterns (contains and not contains)
 pub fn verify_rendered_buffer(

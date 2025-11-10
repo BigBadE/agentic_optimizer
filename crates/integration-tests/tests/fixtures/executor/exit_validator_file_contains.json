@@ -1,0 +1,84 @@
+{
+  "name": "Exit Validator - file_contains",
+  "description": "Tests the file_contains exit requirement validator to ensure file has specific content",
+  "tags": [
+    "executor",
+    "exit_validators",
+    "file_operations"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create README with project description",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "README.md",
+            "exists": true,
+            "contains": [
+              "# Test Project",
+              "description"
+            ]
+          }
+        ]
+      },
+      "strategy": {
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code() {",
+              "  return {",
+              "    title: 'Create README',",
+              "    steps: [",
+              "      {",
+              "        title: 'Write README file',",
+              "        description: 'Create README.md with project info',",
+              "        step_type: 'implementation'",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  const content = '# Test Project\\n\\nThis is a test project description.';",
+              "  await writeFile('README.md', content);",
+              "  return 'Created README.md with project description';",
+              "}"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "README.md",
+        "exists": true,
+        "contains": [
+          "# Test Project",
+          "description"
+        ]
+      }
+    ],
+    "execution": {}
+  }
+}

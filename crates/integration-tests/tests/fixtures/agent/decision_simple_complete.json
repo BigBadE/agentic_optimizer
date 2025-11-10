@@ -1,0 +1,66 @@
+{
+  "name": "Agent Decision - Simple Task Complete",
+  "description": "Tests that agent decides to complete simple tasks directly without decomposition",
+  "tags": [
+    "agent",
+    "decision-logic",
+    "simple-tasks"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Write hello to output.txt",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "output.txt",
+            "exists": true,
+            "contains": [
+              "hello"
+            ]
+          }
+        ]
+      },
+      "strategy": {
+        "type": "once",
+        "routing_match": {
+          "context_type": "step_execution"
+        },
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('output.txt', 'hello');",
+            "  return 'Wrote hello to output.txt';",
+            "}"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "output.txt",
+        "exists": true,
+        "contains": [
+          "hello"
+        ]
+      }
+    ],
+    "execution": {}
+  }
+}

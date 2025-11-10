@@ -1,0 +1,63 @@
+{
+  "name": "Thread Isolation",
+  "description": "Tests that different threads maintain isolated conversation contexts",
+  "tags": [
+    "threads",
+    "isolation",
+    "context"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create file thread1.txt",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "files": [
+          {
+            "path": "thread1.txt",
+            "exists": true
+          }
+        ]
+      },
+      "strategy": {
+        "type": "once",
+        "response": {
+          "typescript": [
+            "async function agent_code(): Promise<string> {",
+            "  await writeFile('thread1.txt', 'Thread 1 data');",
+            "  return 'Created thread1.txt';",
+            "}"
+          ]
+        }
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "thread1.txt",
+        "exists": true,
+        "contains": [
+          "Thread 1"
+        ]
+      },
+      {
+        "path": "thread2.txt",
+        "exists": false
+      }
+    ],
+    "execution": {}
+  }
+}

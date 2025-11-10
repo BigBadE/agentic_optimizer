@@ -1,0 +1,97 @@
+{
+  "name": "Agent Decision - Complex Task Decompose",
+  "description": "Tests that agent decides to decompose complex tasks into steps",
+  "tags": [
+    "agent",
+    "decision-logic",
+    "decomposition",
+    "complex-tasks"
+  ],
+  "setup": {
+    "files": {},
+    "terminal_size": [
+      120,
+      40
+    ]
+  },
+  "events": [
+    {
+      "type": "user_input",
+      "data": {
+        "text": "Create a project with config file and readme",
+        "submit": true
+      }
+    },
+    {
+      "type": "llm_response",
+      "verify": {
+        "execution": {},
+        "files": [
+          {
+            "path": "config.json",
+            "exists": true
+          },
+          {
+            "path": "README.md",
+            "exists": true
+          }
+        ]
+      },
+      "strategy": {
+        "type": "sequence",
+        "responses": [
+          {
+            "typescript": [
+              "async function agent_code() {",
+              "  return {",
+              "    title: 'Create Project Structure',",
+              "    steps: [",
+              "      {",
+              "        title: 'Create config file',",
+              "        description: 'Create config.json',",
+              "        step_type: 'implementation'",
+              "      },",
+              "      {",
+              "        title: 'Create README',",
+              "        description: 'Create README.md',",
+              "        step_type: 'implementation'",
+              "      }",
+              "    ]",
+              "  };",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('config.json', '{}');",
+              "  return 'Created config.json';",
+              "}"
+            ]
+          },
+          {
+            "typescript": [
+              "async function agent_code(): Promise<string> {",
+              "  await writeFile('README.md', '# Project');",
+              "  return 'Created README.md';",
+              "}"
+            ]
+          }
+        ]
+      }
+    }
+  ],
+  "final_verify": {
+    "files": [
+      {
+        "path": "config.json",
+        "exists": true
+      },
+      {
+        "path": "README.md",
+        "exists": true
+      }
+    ],
+    "execution": {}
+  }
+}

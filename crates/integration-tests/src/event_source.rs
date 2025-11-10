@@ -3,13 +3,9 @@
 //! This module provides an `InputEventSource` implementation that feeds events
 //! from test fixtures instead of reading from the terminal.
 
-use merlin_cli::InputEventSource;
-use merlin_deps::async_trait::async_trait;
-use merlin_deps::crossterm::event::{
-    Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers,
-};
+use crossterm::event::{Event, KeyCode, KeyEvent, KeyEventKind, KeyEventState, KeyModifiers};
+use merlin_cli::{EventFuture, InputEventSource};
 use std::collections::VecDeque;
-use std::io;
 use std::sync::{Arc, Mutex};
 
 use super::fixture::{TestEvent, TestFixture};
@@ -161,16 +157,17 @@ impl FixtureEventController {
     }
 }
 
-#[async_trait]
 impl InputEventSource for FixtureEventSource {
-    async fn next_event(&mut self) -> io::Result<Option<Event>> {
-        // Get next event from current queue (non-blocking)
-        let event_opt = self
-            .state
-            .lock()
-            .ok()
-            .and_then(|mut state| state.current_events.pop_front());
+    fn next_event(&mut self) -> EventFuture<'_> {
+        Box::pin(async move {
+            // Get next event from current queue (non-blocking)
+            let event_opt = self
+                .state
+                .lock()
+                .ok()
+                .and_then(|mut state| state.current_events.pop_front());
 
-        event_opt.map_or(Ok(None), |evt| Ok(Some(evt)))
+            event_opt.map_or(Ok(None), |evt| Ok(Some(evt)))
+        })
     }
 }

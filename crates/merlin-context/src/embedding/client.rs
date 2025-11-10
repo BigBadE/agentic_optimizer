@@ -153,11 +153,9 @@ impl EmbeddingProvider for OllamaEmbeddingClient {
         let model_available = models.iter().any(|model| model.name.contains(&self.model));
 
         if !model_available {
-            merlin_deps::tracing::info!("⚙️  Embedding model '{}' not found", self.model);
-            merlin_deps::tracing::info!(
-                "⬇️  Pulling model from Ollama (this may take a few minutes)..."
-            );
-            merlin_deps::tracing::info!("    Running: ollama pull {}", self.model);
+            tracing::info!("⚙️  Embedding model '{}' not found", self.model);
+            tracing::info!("⬇️  Pulling model from Ollama (this may take a few minutes)...");
+            tracing::info!("    Running: ollama pull {}", self.model);
 
             // Pull the model using Ollama CLI with inherited stdio for progress
             let status = Command::new("ollama")
@@ -177,7 +175,7 @@ impl EmbeddingProvider for OllamaEmbeddingClient {
                 )));
             }
 
-            merlin_deps::tracing::info!("✓ Successfully pulled embedding model '{}'", self.model);
+            tracing::info!("✓ Successfully pulled embedding model '{}'", self.model);
         }
 
         Ok(())

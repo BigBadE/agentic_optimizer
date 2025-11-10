@@ -15,8 +15,8 @@ use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
 
-use merlin_deps::boa_engine::{Context, Source};
-use merlin_deps::serde_json::Value;
+use boa_engine::{Context, Source};
+use serde_json::Value;
 use tokio::task::spawn_blocking;
 use tokio::time;
 
@@ -80,7 +80,7 @@ impl TypeScriptRuntime {
     pub async fn execute(&self, code: &str) -> ToolResult<Value> {
         use std::time::Instant;
         let exec_start = Instant::now();
-        merlin_deps::tracing::debug!("TypeScriptRuntime::execute called");
+        tracing::debug!("TypeScriptRuntime::execute called");
 
         let wrap_start = Instant::now();
         let wrapped_code = wrap_code(code);
@@ -106,7 +106,7 @@ impl TypeScriptRuntime {
         })?;
 
         let total_time = exec_start.elapsed();
-        merlin_deps::tracing::debug!(
+        tracing::debug!(
             total_time_secs = total_time.as_secs_f64(),
             wrap_time_secs = wrap_time.as_secs_f64(),
             spawn_exec_time_secs = spawn_start.elapsed().as_secs_f64(),
@@ -123,7 +123,7 @@ impl TypeScriptRuntime {
     fn execute_sync(code: &str, tools: &HashMap<String, Arc<dyn Tool>>) -> ToolResult<Value> {
         use std::time::Instant;
         let sync_start = Instant::now();
-        merlin_deps::tracing::debug!("Creating Boa context");
+        tracing::debug!("Creating Boa context");
 
         // Create context - Boa 0.21 handles job queue internally
         let ctx_start = Instant::now();
@@ -135,7 +135,7 @@ impl TypeScriptRuntime {
         register_tool_functions(&mut context, tools)?;
         let reg_time = reg_start.elapsed();
 
-        merlin_deps::tracing::debug!("Executing JavaScript code");
+        tracing::debug!("Executing JavaScript code");
 
         // Execute the code
         let eval_start = Instant::now();
@@ -145,7 +145,7 @@ impl TypeScriptRuntime {
         let eval_time = eval_start.elapsed();
 
         // Run all pending jobs (resolve Promises)
-        merlin_deps::tracing::debug!("Running job queue to resolve Promises");
+        tracing::debug!("Running job queue to resolve Promises");
         let job_start = Instant::now();
         let _result = context.run_jobs();
         let job_time = job_start.elapsed();
@@ -160,7 +160,7 @@ impl TypeScriptRuntime {
         let json_result = js_value_to_json(&final_result, &mut context)?;
         let conv_time = conv_start.elapsed();
 
-        merlin_deps::tracing::debug!(
+        tracing::debug!(
             total_time_secs = sync_start.elapsed().as_secs_f64(),
             ctx_time_secs = ctx_time.as_secs_f64(),
             reg_time_secs = reg_time.as_secs_f64(),
@@ -184,7 +184,7 @@ impl Default for TypeScriptRuntime {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use merlin_deps::anyhow::Result;
+    use anyhow::Result;
 
     /// Tests TypeScript runtime initialization.
     ///
@@ -220,7 +220,7 @@ mod tests {
         let runtime = TypeScriptRuntime::new();
         let code = "const x = 42; x * 2";
         let result = runtime.execute(code).await?;
-        assert_eq!(result, merlin_deps::serde_json::json!(84));
+        assert_eq!(result, serde_json::json!(84));
         Ok(())
     }
 }

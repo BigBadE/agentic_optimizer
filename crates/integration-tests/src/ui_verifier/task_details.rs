@@ -5,7 +5,7 @@ use crate::verify::UiVerify;
 use merlin_cli::TuiApp;
 use merlin_cli::ui::renderer::FocusedPane;
 use merlin_cli::ui::task_manager::{TaskManager, TaskStatus};
-use merlin_deps::ratatui::backend::TestBackend;
+use ratatui::backend::TestBackend;
 
 /// Verify task details (descriptions, all completed, task created, focus changed)
 pub fn verify_task_details(

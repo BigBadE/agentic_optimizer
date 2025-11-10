@@ -1,8 +1,8 @@
 //! Application lifecycle operations (constructors, initialization, raw mode)
 
-use merlin_deps::crossterm::terminal;
-use merlin_deps::ratatui::Terminal;
-use merlin_deps::ratatui::backend::{Backend, CrosstermBackend};
+use crossterm::terminal;
+use ratatui::Terminal;
+use ratatui::backend::{Backend, CrosstermBackend};
 use std::fs;
 use std::io;
 use std::path::PathBuf;
@@ -63,14 +63,22 @@ impl TuiApp<CrosstermBackend<io::Stdout>> {
             .as_ref()
             .map(|dir| TaskPersistence::new(dir.clone()));
 
-        let thread_storage_path = tasks_dir.as_ref().map_or_else(
-            || PathBuf::from(".merlin/threads"),
-            |dir| dir.join("threads"),
-        );
+        // Get thread store from orchestrator if available, otherwise create a new one
+        let thread_store = if let Some(ref orch) = orchestrator {
+            orch.thread_store().ok_or_else(|| {
+                RoutingError::Other("Orchestrator does not have a thread store".to_string())
+            })?
+        } else {
+            let thread_storage_path = tasks_dir.as_ref().map_or_else(
+                || PathBuf::from(".merlin/threads"),
+                |dir| dir.join("threads"),
+            );
 
-        let store = ThreadStore::new(thread_storage_path)
-            .map_err(|err| RoutingError::Other(format!("Failed to create thread store: {err}")))?;
-        let thread_store = Arc::new(Mutex::new(store));
+            let store = ThreadStore::new(thread_storage_path).map_err(|err| {
+                RoutingError::Other(format!("Failed to create thread store: {err}"))
+            })?;
+            Arc::new(Mutex::new(store))
+        };
 
         let app = Self {
             terminal,
@@ -145,7 +153,7 @@ impl<B: Backend> TuiApp<B> {
                 self.adjust_task_list_scroll();
             }
 
-            merlin_deps::tracing::info!("Loaded {} tasks from persistence", loaded_count);
+            tracing::info!("Loaded {} tasks from persistence", loaded_count);
             self.ui_components.state.loading_tasks = false;
         }
     }
@@ -164,7 +172,7 @@ impl<B: Backend> TuiApp<B> {
         store.load_all()?;
         let new_count = store.active_threads().len();
         drop(store);
-        merlin_deps::tracing::info!(
+        tracing::info!(
             "Loaded {} threads from disk ({} new)",
             new_count,
             new_count.saturating_sub(loaded_count)

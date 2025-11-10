@@ -3,7 +3,6 @@
 use super::strategy::ResponseStrategy;
 use async_trait::async_trait;
 use merlin_core::{Context, ModelProvider, Query, Response, Result, RoutingError, TokenUsage};
-use merlin_deps::tracing;
 use std::collections::HashMap;
 use std::fmt::Display;
 use std::sync::Mutex;

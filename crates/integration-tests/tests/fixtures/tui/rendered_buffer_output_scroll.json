@@ -34,7 +34,7 @@
             "Line 20"
           ],
           "rendered_buffer_contains": [
-            "\u2500\u2500\u2500 Tasks",
+            "\u2500\u2500\u2500 Threads",
             "\u2500\u2500\u2500 Input"
           ]
         },
@@ -61,7 +61,7 @@
       "all_tasks_completed": true,
       "tasks_displayed": 1,
       "rendered_buffer_contains": [
-        "\u2500\u2500\u2500 Tasks",
+        "\u2500\u2500\u2500 Threads",
         "\u2500\u2500\u2500 Input"
       ]
     }

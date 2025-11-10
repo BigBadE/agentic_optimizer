@@ -8,12 +8,12 @@ use crate::workspace_setup::{create_files, get_test_workspace_path};
 use merlin_agent::{RoutingOrchestrator, ThreadStore};
 use merlin_cli::TuiApp;
 use merlin_core::{ModelProvider, Result, RoutingError};
-use merlin_deps::ratatui::backend::TestBackend;
-use merlin_deps::tempfile::TempDir;
 use merlin_routing::{Model, ModelRegistry, ProviderRegistry, RoutingConfig, StrategyRouter};
+use ratatui::backend::TestBackend;
 use std::collections::HashMap;
 use std::path::PathBuf;
 use std::sync::{Arc, Mutex};
+use tempfile::TempDir;
 
 /// Components needed to construct a test runner
 pub struct RunnerComponents {

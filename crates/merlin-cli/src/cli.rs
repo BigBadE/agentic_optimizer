@@ -66,7 +66,7 @@ impl Cli {
         // Check for any remaining arguments
         let remaining = pargs.finish();
         if !remaining.is_empty() {
-            merlin_deps::tracing::warn!("Unexpected arguments: {remaining:?}");
+            tracing::warn!("Unexpected arguments: {remaining:?}");
         }
 
         Ok(cli)

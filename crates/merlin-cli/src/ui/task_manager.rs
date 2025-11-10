@@ -92,12 +92,6 @@ pub enum TaskStepStatus {
 pub struct TaskStepInfo {
     /// Unique identifier for this step
     pub step_id: String,
-    /// Type of step (e.g., `thinking`, `tool_call`, `validation`)
-    ///
-    /// Used for differentiated UI rendering of step types.
-    pub step_type: String,
-    /// Content of the step
-    pub content: String,
     /// Status of the step
     pub status: TaskStepStatus,
 }
@@ -107,8 +101,6 @@ impl Default for TaskStepInfo {
     fn default() -> Self {
         Self {
             step_id: String::new(),
-            step_type: String::new(),
-            content: String::new(),
             status: TaskStepStatus::Running,
         }
     }

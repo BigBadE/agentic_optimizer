@@ -1,12 +1,12 @@
 //! Persistent TypeScript runtime with long-lived Boa context using `LocalSet`
 
-use std::collections::HashMap;
+use std::collections::{HashMap, VecDeque};
 use std::sync::Arc;
 
-use merlin_deps::boa_engine::{Context, JsValue, JsValue as BoaJsValue, Source};
-use merlin_deps::serde_json::Value;
-use merlin_deps::uuid::Uuid;
+use boa_engine::{Context, JsValue, JsValue as BoaJsValue, Source};
+use serde_json::Value;
 use tokio::task::LocalSet;
+use uuid::Uuid;
 
 use super::bulk_extraction::{self, ExtractedTaskList};
 use super::conversion::js_value_to_json_static;
@@ -25,6 +25,10 @@ pub struct PersistentTypeScriptRuntime {
     value_storage: HashMap<String, JsValue>,
     /// `LocalSet` for running `!Send` futures
     local_set: LocalSet,
+    /// Cache for wrapped code (input code -> wrapped JavaScript)
+    code_cache: HashMap<String, String>,
+    /// Pre-generated UUID pool for handle generation
+    uuid_pool: VecDeque<String>,
 }
 
 impl PersistentTypeScriptRuntime {
@@ -42,11 +46,35 @@ impl PersistentTypeScriptRuntime {
         // Register tools
         register_tool_functions(&mut context, tools)?;
 
+        // Pre-generate UUID pool (batch of 100)
+        let uuid_pool: VecDeque<String> = (0..100).map(|_| Uuid::new_v4().to_string()).collect();
+
         Ok(Self {
             context,
             value_storage: HashMap::new(),
             local_set: LocalSet::new(),
+            code_cache: HashMap::new(),
+            uuid_pool,
         })
+    }
+
+    /// Get a UUID from the pool, refilling if needed
+    ///
+    /// # Panics
+    /// Never panics - pool is refilled immediately before pop if empty
+    fn get_uuid(&mut self) -> String {
+        if let Some(uuid) = self.uuid_pool.pop_front() {
+            uuid
+        } else {
+            // Refill pool if empty
+            self.uuid_pool
+                .extend((0..100).map(|_| Uuid::new_v4().to_string()));
+            // Pool was just filled with 100 UUIDs, so pop cannot fail
+            self.uuid_pool.pop_front().unwrap_or_else(|| {
+                // Fallback: generate on demand if pool somehow empty
+                Uuid::new_v4().to_string()
+            })
+        }
     }
 
     /// Execute JavaScript code and return a handle to the result
@@ -56,14 +84,22 @@ impl PersistentTypeScriptRuntime {
     /// # Errors
     /// Returns error if code execution fails
     pub async fn execute(&mut self, code: &str) -> ToolResult<JsValueHandle> {
-        let code = code.to_owned();
+        // Check cache for wrapped code
+        let wrapped_code = if let Some(cached) = self.code_cache.get(code) {
+            cached.clone()
+        } else {
+            // Wrap code and cache it
+            let wrapped = super::typescript::wrap_code(code);
+            self.code_cache.insert(code.to_owned(), wrapped.clone());
+            wrapped
+        };
+
+        // Get UUID from pool before async block
+        let handle_id = self.get_uuid();
 
         // Run in LocalSet to allow !Send Context
         self.local_set
             .run_until(async {
-                // Wrap code for execution
-                let wrapped_code = super::typescript::wrap_code(&code);
-
                 // Execute code
                 let result = self
                     .context
@@ -80,7 +116,6 @@ impl PersistentTypeScriptRuntime {
                     super::promise::extract_promise_if_needed(result, &mut self.context)?;
 
                 // Store result with handle
-                let handle_id = Uuid::new_v4().to_string();
                 self.value_storage.insert(handle_id.clone(), final_result);
 
                 Ok(JsValueHandle::new(handle_id))
@@ -134,6 +169,9 @@ impl PersistentTypeScriptRuntime {
     /// # Errors
     /// Returns error if handle is invalid, value is not callable, or call fails
     pub async fn call_function(&mut self, handle: JsValueHandle) -> ToolResult<JsValueHandle> {
+        // Get UUID from pool before async block
+        let new_handle_id = self.get_uuid();
+
         self.local_set
             .run_until(async {
                 let value = self.value_storage.get(handle.id()).ok_or_else(|| {
@@ -159,10 +197,10 @@ impl PersistentTypeScriptRuntime {
                     super::promise::extract_promise_if_needed(result, &mut self.context)?;
 
                 // Store result
-                let handle_id = Uuid::new_v4().to_string();
-                self.value_storage.insert(handle_id.clone(), final_result);
+                self.value_storage
+                    .insert(new_handle_id.clone(), final_result);
 
-                Ok(JsValueHandle::new(handle_id))
+                Ok(JsValueHandle::new(new_handle_id))
             })
             .await
     }

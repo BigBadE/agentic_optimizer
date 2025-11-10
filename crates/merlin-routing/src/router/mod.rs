@@ -32,6 +32,9 @@ pub struct RoutingDecision {
     pub estimated_latency_ms: u64,
     /// Explanation of why this model was chosen
     pub reasoning: String,
+    /// Actual provider name (may differ from model when using overrides)
+    #[serde(default)]
+    pub provider_name: String,
 }
 
 impl Default for RoutingDecision {
@@ -52,6 +55,7 @@ impl RoutingDecision {
             estimated_cost,
             estimated_latency_ms,
             reasoning,
+            provider_name: String::new(),
         }
     }
 

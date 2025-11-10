@@ -1,7 +1,7 @@
 //! Merlin CLI - Interactive AI coding assistant command-line interface
 
+use anyhow::{Context as _, Result};
 use cli::Cli;
-use merlin_deps::anyhow::{Context as _, Result};
 use tokio::task::LocalSet;
 
 mod cli;
@@ -36,12 +36,12 @@ async fn main() -> Result<()> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use anyhow::Error;
+    use filetime::{FileTime, set_file_mtime};
     use merlin_core::TokenUsage;
-    use merlin_deps::anyhow::Error;
-    use merlin_deps::filetime::{FileTime, set_file_mtime};
-    use merlin_deps::tempfile::TempDir;
     use std::fs;
     use std::result::Result as StdResult;
+    use tempfile::TempDir;
 
     /// Calculate estimated cost based on token usage.
     fn calculate_cost(usage: &TokenUsage) -> f64 {

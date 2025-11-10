@@ -8,5 +8,5 @@ pub mod collector;
 /// Report generation
 pub mod reporter;
 
-pub use collector::{MetricsCollector, RequestMetrics};
+pub use collector::{MetricsCollector, RequestMetrics, RequestMetricsParams};
 pub use reporter::{DailyReport, MetricsReport, TierBreakdown};

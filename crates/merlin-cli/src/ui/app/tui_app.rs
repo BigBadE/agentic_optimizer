@@ -1,7 +1,7 @@
 //! Main TUI application struct and core state management
 
-use merlin_deps::ratatui::Terminal;
-use merlin_deps::ratatui::backend::Backend;
+use ratatui::Terminal;
+use ratatui::backend::Backend;
 use std::fs;
 use std::sync::{Arc, Mutex};
 use std::time::Instant;

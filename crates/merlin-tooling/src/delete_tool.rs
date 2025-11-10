@@ -3,7 +3,7 @@
 //! Provides safe file deletion for agents executing in the TypeScript runtime.
 
 use async_trait::async_trait;
-use merlin_deps::serde_json::Value;
+use serde_json::Value;
 use std::fs;
 use std::path::PathBuf;
 

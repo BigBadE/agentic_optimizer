@@ -7,7 +7,6 @@ edition.workspace = true
 merlin-agent.workspace = true
 merlin-context.workspace = true
 merlin-core.workspace = true
-merlin-deps.workspace = true
 merlin-languages.workspace = true
 merlin-local.workspace = true
 merlin-providers.workspace = true

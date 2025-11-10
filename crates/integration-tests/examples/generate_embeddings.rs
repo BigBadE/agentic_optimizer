@@ -11,13 +11,13 @@ use std::path::PathBuf;
 async fn main() -> Result<(), Box<dyn std::error::Error>> {
     let workspace = PathBuf::from("test-workspaces/context-workspace");
 
-    merlin_deps::tracing::info!("Generating embeddings for {}", workspace.display());
+    tracing::info!("Generating embeddings for {}", workspace.display());
 
     VectorSearchManager::with_provider(&workspace, FakeEmbeddingClient)
         .initialize()
         .await?;
 
-    merlin_deps::tracing::info!("✓ Embeddings generated successfully");
+    tracing::info!("✓ Embeddings generated successfully");
 
     Ok(())
 }

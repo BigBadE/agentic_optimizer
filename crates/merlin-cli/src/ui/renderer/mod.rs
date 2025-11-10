@@ -1,12 +1,8 @@
 //! UI rendering module
 //!
-//! Organized into focused sub-modules for better maintainability.
+//! Handles rendering of the thread-based UI layout.
 
-mod helpers;
-mod task_rendering;
-mod task_tree_builder;
-
-use merlin_deps::ratatui::{
+use ratatui::{
     Frame,
     layout::{Constraint, Direction, Layout, Rect},
     style::{Modifier, Style},
@@ -17,20 +13,17 @@ use std::sync::{Arc, Mutex};
 
 use merlin_agent::ThreadStore;
 use merlin_core::{Thread, ThreadId};
-use merlin_deps::ratatui::text::Line;
+use ratatui::text::Line;
 
 use super::input::InputManager;
 use super::layout;
 use super::scroll;
-use super::state::{PanelFocus, UiState};
+use super::state::UiState;
 use super::task_manager::{TaskDisplay, TaskManager};
 use super::theme::Theme;
 
 // Layout constants
-const TASKS_PANE_MAX_HEIGHT_PERCENT: u16 = 60;
 const MIN_REMAINING_HEIGHT: u16 = 10;
-const UNFOCUSED_TASK_LIST_HEIGHT: u16 = 5;
-const MIN_FOCUSED_DETAIL_HEIGHT: u16 = 10;
 
 /// Handles rendering of the TUI
 pub struct Renderer {
@@ -53,8 +46,6 @@ pub struct RenderCtx<'ctx> {
     pub input: &'ctx InputManager,
     /// Currently focused pane
     pub focused: FocusedPane,
-    /// Layout cache to populate with actual rendered dimensions
-    pub layout_cache: &'ctx mut layout::LayoutCache,
     /// Thread store reference (shared with orchestrator)
     pub thread_store: &'ctx Arc<Mutex<ThreadStore>>,
 }
@@ -76,80 +67,11 @@ impl Renderer {
     }
 
     /// Renders the entire UI
-    pub fn render(&self, frame: &mut Frame, ctx: &mut RenderCtx<'_>) {
+    pub fn render(&self, frame: &mut Frame, ctx: &RenderCtx<'_>) {
         let main_area = frame.area();
 
-        // Check if thread mode should be active
-        let thread_mode = ctx.focused == FocusedPane::Threads
-            || ctx.ui_ctx.state.active_thread_id.is_some()
-            || ctx.ui_ctx.state.focused_panel == PanelFocus::ThreadList;
-
-        if thread_mode {
-            // Thread mode: side-by-side layout (threads | work + input)
-            self.render_thread_mode(frame, main_area, ctx);
-        } else {
-            // Classic mode: tasks + output + input (vertical layout)
-            self.render_classic_mode(frame, main_area, ctx);
-        }
-    }
-
-    /// Renders the classic task-based layout
-    fn render_classic_mode(&self, frame: &mut Frame, main_area: Rect, ctx: &mut RenderCtx<'_>) {
-        // Calculate task content lines
-        let max_task_area_height = if ctx.focused == FocusedPane::Tasks {
-            let max_height = (main_area.height * TASKS_PANE_MAX_HEIGHT_PERCENT) / 100;
-            max_height.min(main_area.height.saturating_sub(MIN_REMAINING_HEIGHT))
-        } else if ctx.focused == FocusedPane::Output && ctx.ui_ctx.state.active_task_id.is_some() {
-            UNFOCUSED_TASK_LIST_HEIGHT
-        } else {
-            main_area.height
-        };
-
-        let constrained_task_area = Rect {
-            height: max_task_area_height,
-            ..main_area
-        };
-        let task_content_lines =
-            self.calculate_task_tree_height(&ctx.ui_ctx, constrained_task_area, ctx.focused);
-        let input_content_lines = ctx.input.input_area().lines().len() as u16;
-
-        // Use centralized layout calculations
-        let task_height =
-            layout::calculate_task_area_height(main_area.height, task_content_lines, ctx.focused);
-        let input_height = layout::calculate_input_area_height(input_content_lines);
-
-        // If no task is selected, use minimal space for tasks panel and let input fill the rest
-        if ctx.ui_ctx.state.active_task_id.is_none() {
-            let primary_split = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(task_height),
-                    Constraint::Min(input_height), // Input fills remaining space
-                ])
-                .split(main_area);
-
-            self.render_task_tree_full(frame, primary_split[0], &ctx.ui_ctx, ctx.focused);
-            self.render_input_area(frame, primary_split[1], ctx.input, ctx);
-        } else {
-            // With selection, split between tasks, focused details, and input
-            let primary_split = Layout::default()
-                .direction(Direction::Vertical)
-                .constraints([
-                    Constraint::Length(task_height),
-                    Constraint::Min(MIN_FOCUSED_DETAIL_HEIGHT), // Focused details gets remaining space
-                    Constraint::Length(input_height),
-                ])
-                .split(main_area);
-
-            self.render_task_tree_full(frame, primary_split[0], &ctx.ui_ctx, ctx.focused);
-
-            // Cache the actual output area dimensions from ratatui's layout
-            ctx.layout_cache
-                .set_output_area(primary_split[1].width, primary_split[1].height);
-
-            self.render_focused_detail_section(frame, primary_split[1], &ctx.ui_ctx, ctx.focused);
-            self.render_input_area(frame, primary_split[2], ctx.input, ctx);
-        }
+        // Always use thread mode (side-by-side layout with threads | work + input)
+        self.render_thread_mode(frame, main_area, ctx);
     }
 
     /// Renders the thread-based side-by-side layout
@@ -184,45 +106,6 @@ impl Renderer {
 
     // Rendering methods
 
-    /// Calculates the height needed for the task tree content
-    fn calculate_task_tree_height(
-        &self,
-        ui_ctx: &UiCtx<'_>,
-        area: Rect,
-        focused: FocusedPane,
-    ) -> u16 {
-        let lines = task_tree_builder::build_task_tree_lines(ui_ctx, area, focused, self.theme);
-        lines.len() as u16
-    }
-
-    /// Renders full-width task tree at the top
-    fn render_task_tree_full(
-        &self,
-        frame: &mut Frame,
-        area: Rect,
-        ui_ctx: &UiCtx<'_>,
-        focused: FocusedPane,
-    ) {
-        let border_color = if focused == FocusedPane::Tasks {
-            self.theme.focused_border()
-        } else {
-            self.theme.unfocused_border()
-        };
-
-        let lines = task_tree_builder::build_task_tree_lines(ui_ctx, area, focused, self.theme);
-
-        let paragraph = Paragraph::new(lines)
-            .block(
-                Block::default()
-                    .borders(Borders::ALL)
-                    .title("─── Tasks ")
-                    .border_style(Style::default().fg(border_color)),
-            )
-            .wrap(Wrap { trim: false });
-
-        frame.render_widget(paragraph, area);
-    }
-
     /// Renders the focused task output section
     fn render_focused_detail_section(
         &self,
@@ -237,17 +120,22 @@ impl Renderer {
             self.theme.unfocused_border()
         };
 
-        let Some(active_task_id) = ui_ctx.state.active_task_id else {
-            // When no task selected, the focused box is omitted by caller; nothing to render
-            return;
-        };
+        // Get task output if a task is selected
+        let (text, title) = if let Some(active_task_id) = ui_ctx.state.active_task_id
+            && let Some(task) = ui_ctx.task_manager.get_task(active_task_id)
+        {
+            // Get plain text output from task
+            let text = task.output.clone();
 
-        let Some(task) = ui_ctx.task_manager.get_task(active_task_id) else {
-            return;
-        };
+            // Build title without embedding progress (moved to input box)
+            let base_title = format!("─── Focused - {} ", task.description);
+            let title = truncate_text(&base_title, area.width.saturating_sub(2) as usize);
 
-        // Get plain text output from task
-        let text = task.output.clone();
+            (text, title)
+        } else {
+            // No task selected - show empty output pane with generic title
+            (String::new(), "─── Focused ".to_owned())
+        };
 
         // Calculate content height and clamp scroll offset
         // Account for borders only (2) - horizontal padding doesn't affect height
@@ -255,11 +143,6 @@ impl Renderer {
         let text_lines = scroll::count_text_lines(&text);
         let max_scroll = text_lines.saturating_sub(viewport_height);
         let clamped_scroll = ui_ctx.state.output_scroll_offset.min(max_scroll);
-
-        // Build title without embedding progress (moved to input box)
-        let base_title = format!("─── Focused - {} ", task.description);
-        let title =
-            task_rendering::truncate_text(&base_title, area.width.saturating_sub(2) as usize);
 
         let paragraph = Paragraph::new(text)
             .style(Style::default().fg(self.theme.text()))
@@ -355,7 +238,7 @@ impl Renderer {
         selected_thread_id: Option<ThreadId>,
         focused: FocusedPane,
     ) -> Vec<Line<'static>> {
-        use merlin_deps::ratatui::text::Span;
+        use ratatui::text::Span;
 
         let mut lines = Vec::new();
 
@@ -370,8 +253,8 @@ impl Renderer {
                 Style::default().fg(self.theme.text()),
             )));
         } else {
-            for thread in threads {
-                lines.push(self.build_thread_line(thread, selected_thread_id));
+            for (index, thread) in threads.iter().enumerate() {
+                lines.push(self.build_thread_line(thread, selected_thread_id, index + 1));
             }
         }
 
@@ -389,13 +272,14 @@ impl Renderer {
         lines
     }
 
-    /// Builds a single thread line with selection, color, name, and status
+    /// Builds a single thread line with selection, number, name, and status
     fn build_thread_line(
         &self,
         thread: &Thread,
         selected_thread_id: Option<ThreadId>,
+        thread_number: usize,
     ) -> Line<'static> {
-        use merlin_deps::ratatui::text::Span;
+        use ratatui::text::Span;
 
         let is_selected = selected_thread_id == Some(thread.id);
         let mut spans = Vec::new();
@@ -412,8 +296,13 @@ impl Renderer {
             spans.push(Span::raw("  "));
         }
 
-        // Color emoji
-        spans.push(Span::raw(format!("{} ", thread.color.emoji())));
+        // Thread number in brackets
+        spans.push(Span::styled(
+            format!("[{thread_number}] "),
+            Style::default()
+                .fg(self.theme.text())
+                .add_modifier(Modifier::DIM),
+        ));
 
         // Thread name
         let name_style = if is_selected {
@@ -425,23 +314,50 @@ impl Renderer {
         };
         spans.push(Span::styled(thread.name.clone(), name_style));
 
-        // Show message count
-        let msg_count = thread.messages.len();
-        if msg_count > 0 {
+        // Check if thread has in-progress work and show running indicator
+        let is_running = thread
+            .last_message()
+            .and_then(|msg| msg.work.as_ref())
+            .is_some_and(|work| {
+                use merlin_core::WorkStatus;
+                matches!(work.status, WorkStatus::InProgress | WorkStatus::Retrying)
+            });
+
+        if is_running {
             spans.push(Span::styled(
-                format!(" ({msg_count})"),
+                " [...]",
                 Style::default()
-                    .fg(self.theme.text())
+                    .fg(self.theme.warning())
                     .add_modifier(Modifier::DIM),
             ));
         }
 
-        // Show latest work status if any
-        if let Some(last_msg) = thread.last_message()
-            && let Some(ref work) = last_msg.work
-        {
-            spans.push(Span::raw(" "));
-            spans.push(Span::raw(work.status.emoji()));
+        // Show message count with status color if work exists
+        let msg_count = thread.messages.len();
+        if msg_count > 0 {
+            let count_text = format!(" ({msg_count})");
+
+            // Apply status color if there's work
+            let count_style = if let Some(last_msg) = thread.last_message()
+                && let Some(ref work) = last_msg.work
+            {
+                use merlin_core::WorkStatus;
+                let status_color = match work.status {
+                    WorkStatus::Completed => self.theme.success(),
+                    WorkStatus::Failed => self.theme.error(),
+                    WorkStatus::InProgress | WorkStatus::Retrying => self.theme.warning(),
+                    WorkStatus::Cancelled => self.theme.text(),
+                };
+                Style::default()
+                    .fg(status_color)
+                    .add_modifier(Modifier::DIM)
+            } else {
+                Style::default()
+                    .fg(self.theme.text())
+                    .add_modifier(Modifier::DIM)
+            };
+
+            spans.push(Span::styled(count_text, count_style));
         }
 
         Line::from(spans)
@@ -453,6 +369,33 @@ impl Renderer {
     pub fn calculate_output_line_count(task: &TaskDisplay, _width: u16) -> u16 {
         task.output.lines().count() as u16
     }
+}
+
+/// Truncates text to fit within `max_width`, adding "..." if truncated
+fn truncate_text(text: &str, max_width: usize) -> String {
+    use unicode_width::{UnicodeWidthChar as _, UnicodeWidthStr as _};
+
+    let text_width = text.width();
+    if text_width <= max_width {
+        return text.to_string();
+    }
+
+    // Need to truncate - reserve space for "..."
+    let target_width = max_width.saturating_sub(3);
+    let mut result = String::new();
+    let mut current_width = 0;
+
+    for character in text.chars() {
+        let char_width = character.width().unwrap_or(0);
+        if current_width + char_width > target_width {
+            break;
+        }
+        result.push(character);
+        current_width += char_width;
+    }
+
+    result.push_str("...");
+    result
 }
 
 /// Focused pane identifier

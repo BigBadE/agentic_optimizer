@@ -1,9 +1,9 @@
 use super::task_manager::{TaskDisplay, TaskStatus};
+use flate2::{Compression, read::GzDecoder, write::GzEncoder};
 use merlin_core::ThreadId;
-use merlin_deps::flate2::{Compression, read::GzDecoder, write::GzEncoder};
-use merlin_deps::serde_json::{from_str, to_string};
 use merlin_routing::TaskId;
 use serde::{Deserialize, Serialize};
+use serde_json::{from_str, to_string};
 use std::collections::HashMap;
 use std::ffi::OsStr;
 use std::fs::{self as filesystem, File};
@@ -64,7 +64,7 @@ impl TaskPersistence {
                 }
                 Ok(None) => {}
                 Err(error) => {
-                    merlin_deps::tracing::warn!("Failed to load task file {:?}: {}", path, error);
+                    tracing::warn!("Failed to load task file {:?}: {}", path, error);
                 }
             }
         }

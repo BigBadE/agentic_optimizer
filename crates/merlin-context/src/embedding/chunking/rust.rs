@@ -106,7 +106,7 @@ fn process_rust_item(
         }
 
         // Force split by line count if no good split points found
-        merlin_deps::tracing::warn!(
+        tracing::warn!(
             "Force-splitting large chunk {chunk_id} ({tokens} tokens) by line count - no optimal split points"
         );
         let forced_chunks =

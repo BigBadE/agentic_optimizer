@@ -1,13 +1,18 @@
+use crossterm::event::{Event, EventStream};
 use futures::StreamExt as _;
-use merlin_deps::async_trait::async_trait;
-use merlin_deps::crossterm::event::{Event, EventStream};
+use std::future::Future;
 use std::io;
+use std::pin::Pin;
+
+/// Future type returned by `InputEventSource::next_event`
+pub type EventFuture<'fut> = Pin<Box<dyn Future<Output = io::Result<Option<Event>>> + Send + 'fut>>;
 
 /// Abstraction over the input event source used by the TUI.
 ///
-/// Async trait for receiving input events. Implementations provide
+/// Trait for receiving input events. Implementations provide
 /// asynchronous event streams that can be awaited without polling.
-#[async_trait]
+///
+/// Note: Uses explicit Future return types instead of `async fn` for dyn compatibility.
 pub trait InputEventSource: Send {
     /// Wait for the next input event to arrive.
     ///
@@ -15,7 +20,7 @@ pub trait InputEventSource: Send {
     ///
     /// # Errors
     /// Returns an error if reading the event fails.
-    async fn next_event(&mut self) -> io::Result<Option<Event>>;
+    fn next_event(&mut self) -> EventFuture<'_>;
 }
 
 /// Default event source backed by crossterm.
@@ -40,13 +45,14 @@ impl Default for CrosstermEventSource {
     }
 }
 
-#[async_trait]
 impl InputEventSource for CrosstermEventSource {
-    async fn next_event(&mut self) -> io::Result<Option<Event>> {
-        match self.stream.next().await {
-            Some(Ok(event)) => Ok(Some(event)),
-            Some(Err(error)) => Err(error),
-            None => Ok(None), // Stream ended (shouldn't happen in practice)
-        }
+    fn next_event(&mut self) -> EventFuture<'_> {
+        Box::pin(async move {
+            match self.stream.next().await {
+                Some(Ok(event)) => Ok(Some(event)),
+                Some(Err(error)) => Err(error),
+                None => Ok(None), // Stream ended (shouldn't happen in practice)
+            }
+        })
     }
 }

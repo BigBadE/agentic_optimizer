@@ -1,13 +1,13 @@
 //! Embedding operations for files and chunks.
 
 use futures::stream::{FuturesUnordered, StreamExt as _};
-use merlin_deps::tracing::{info, warn};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
 use std::sync::Arc;
 use std::time::SystemTime;
 use tokio::task::spawn_blocking;
+use tracing::{info, warn};
 
 use crate::embedding::chunking::{FileChunk, chunk_file};
 use crate::embedding::vector_search::cache::{CacheOperations, CachedEmbedding};
@@ -64,7 +64,7 @@ impl<E: EmbeddingProvider + Clone> EmbeddingOperations<E> {
         );
 
         // Phase 1: Parallel file reading and chunking (CPU-bound)
-        merlin_deps::tracing::info!("Reading and chunking files...");
+        tracing::info!("Reading and chunking files...");
         self.report_progress("Reading files", 0, Some(total_files as u64));
         let file_chunks_data = Self::parallel_read_and_chunk(files, &self.project_root).await;
 

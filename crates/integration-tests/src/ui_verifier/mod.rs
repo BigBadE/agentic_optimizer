@@ -6,7 +6,7 @@ use merlin_cli::TuiApp;
 use merlin_cli::ui::input::InputManager;
 use merlin_cli::ui::renderer::FocusedPane;
 use merlin_cli::ui::task_manager::TaskManager;
-use merlin_deps::ratatui::backend::TestBackend;
+use ratatui::backend::TestBackend;
 
 mod input;
 mod output;
